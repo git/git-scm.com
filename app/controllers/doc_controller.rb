@@ -6,6 +6,19 @@ class DocController < ApplicationController
     @docs = DocFile.all
   end
 
-  def show
+  def ref
   end
+
+  def man
+  end
+
+  def book
+  end
+
+  def videos
+  end
+
+  def ext
+  end
+
 end
