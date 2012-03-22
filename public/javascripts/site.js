@@ -1,6 +1,7 @@
 $(document).ready(function() {		
 	BrowserFallbacks.init();
   Search.init();
+  Dropdowns.init();
 });
 
 var BrowserFallbacks = {
@@ -32,5 +33,22 @@ var Search = {
       $(this).parent('form#search').switchClass("focus", "", 300);
 		});
   }
+}
+
+var Dropdowns = {
+  init: function() {
+    $('.dropdown-trigger').click(function(e) {
+      e.preventDefault();
+      var panelId = $(this).attr('data-panel-id');
+      if ($(this).hasClass('active')) {
+        $(this).removeClass('active');
+        $('#'+panelId).hide(); 
+      }
+      else {
+        $(this).addClass('active');
+        $('#'+panelId).show(); 
+      }
+    });
+  },
 }
 ;
