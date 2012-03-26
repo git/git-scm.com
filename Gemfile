@@ -7,7 +7,9 @@ gem 'rails', '3.2.2'
 
 gem 'json'
 gem 'thin'
-gem 'indextank'
+gem 'faraday'
+gem 'yajl-ruby', '~> 1.1.0'
+gem 'excon', '~> 0.9.4'
 
 # Gems used only for assets and not required
 # in production environments by default.
