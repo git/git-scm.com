@@ -1,8 +1,7 @@
 class DocController < ApplicationController
-  layout "sidebar"
+  layout "layout"
 
   def index
-    p Gitscm::CATEGORIES
     @docs = DocFile.all
   end
 

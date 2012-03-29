@@ -11,6 +11,7 @@ gem 'faraday'
 gem 'yajl-ruby', '~> 1.1.0'
 gem 'excon', '~> 0.9.4'
 gem 'heroku'
+gem 'haml'
 
 # Gems used only for assets and not required
 # in production environments by default.
