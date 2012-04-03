@@ -1,3 +1,5 @@
+# t.string :name
+# t.timestamps
 class DocFile < ActiveRecord::Base
   has_many :doc_versions
 

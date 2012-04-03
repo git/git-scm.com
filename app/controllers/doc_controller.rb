@@ -9,6 +9,10 @@ class DocController < ApplicationController
   end
 
   def man
+    p params
+    @docfile = DocFile.where(:name => params[:file]).first
+    @doc = @docfile.doc_versions.first.doc.plain
+    p @doc
   end
 
   def book
