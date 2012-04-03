@@ -1,5 +1,5 @@
 $(document).ready(function() {		
-	BrowserFallbacks.init();
+  BrowserFallbacks.init();
   Search.init();
   Dropdowns.init();
   Forms.init();
@@ -31,12 +31,12 @@ var Search = {
   },
   
   observeFocus: function() {
-  	$('form#search input').focus(function() {
+    $('form#search input').focus(function() {
       $(this).parent('form#search').switchClass("", "focus", 200);
-		});
-  	$('form#search input').blur(function() {
+    });
+    $('form#search input').blur(function() {
       Search.resetForm();
-		});
+    });
   },
 
   observeTextEntry: function() {
@@ -63,9 +63,17 @@ var Search = {
           Search.resultsNav("down");
           break;
         default:
-          // TODO: execute search with current text
+          // execute search with current text
+          Search.runSearch(e.which);
           break;
       };
+    });
+  },
+
+  runSearch: function(lastLetter) {
+    var term = $('#search-text').val() + String.fromCharCode(lastLetter);
+    $.get("/search", {search: term}, function(results) {
+      $("#search-results").html(results);
     });
   },
 
