@@ -13,6 +13,9 @@ gem 'excon', '~> 0.9.4'
 gem 'heroku'
 gem 'haml'
 gem 'tilt'
+gem 'rest-client'
+gem 'netrc'
+gem 'launchy'
 
 # Gems used only for assets and not required
 # in production environments by default.
@@ -35,8 +38,6 @@ group :development do
   gem "sqlite3-ruby"
   gem "shotgun"
   gem 'taps'
-  gem 'netrc'
-  gem 'launchy'
 end
 
 group :test do
