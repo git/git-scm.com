@@ -13,6 +13,7 @@ gem 'excon', '~> 0.9.4'
 gem 'heroku'
 gem 'haml'
 gem 'tilt'
+gem 'rest_client'
 
 # Gems used only for assets and not required
 # in production environments by default.
