@@ -9,10 +9,17 @@ class DocController < ApplicationController
   end
 
   def man
-    p params
-    @docfile = DocFile.where(:name => params[:file]).first
-    @doc = @docfile.doc_versions.first.doc.plain
-    p @doc
+    if params[:version]
+      doc_version = DocVersion.for_version(params[:file], params[:version])
+    else
+      doc_version = DocVersion.latest_for(params[:file])
+    end
+
+    if doc_version.nil?
+      redirect_to :index
+    else
+      @doc = doc_version.doc
+    end
   end
 
   def book
