@@ -11,7 +11,7 @@ task :preindex => :environment do
 
     # for each tag, get a date and a list of file/shas
     tags.each do |tag|
-      stag = Version.where(:name => tag).first_or_create
+      stag = Version.where(:name => tag.gsub('v','')).first_or_create
 
       # extract metadata
       commit_sha = `git rev-parse #{tag}`.chomp
@@ -38,21 +38,42 @@ task :preindex => :environment do
 
       puts "Found #{tree.size} entries"
 
+      # generate this tag's command list for includes
+      cmd_list = `git cat-file blob #{tag}:command-list.txt`.split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
+        name, kind, attr = cmd.split(/\s+/)
+        list[kind] ||= []
+        list[kind] << [name, attr]
+        list
+      end
+      categories = cmd_list.keys.inject({}) do |list, category|
+        links = cmd_list[category].map do |cmd, attr|
+          if match = `git cat-file blob #{tag}:Documentation/#{cmd}.txt`.match(/NAME\n----\n\S+ - (.*)$/)
+            "linkgit:#{cmd}[1]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
+          end
+        end
+
+        list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
+      end
+
       tree.each do |entry|
         path, sha, type = entry
-        path = path.gsub('.txt', '').gsub('v', '')
+        path = path.gsub('.txt', '')
         file = DocFile.where(:name => path).first_or_create
         doc = Doc.where(:blob_sha => sha).first_or_create
         if !doc.plain || !doc.html
           content = `git cat-file blob #{sha}`.chomp
           asciidoc = Asciidoc::Document.new(path, content) do |inc|
-            if match = inc.match(/^\.\.\/(.*)$/)
-              git_path = match[1]
+            if categories.has_key?(inc)
+              categories[inc]
             else
-              git_path = "Documentation/#{inc}"
-            end
+              if match = inc.match(/^\.\.\/(.*)$/)
+                git_path = match[1]
+              else
+                git_path = "Documentation/#{inc}"
+              end
 
-            `git cat-file blob #{tag}:#{git_path}`
+              `git cat-file blob #{tag}:#{git_path}`
+            end
           end
           doc.plain = asciidoc.source
           doc.html  = asciidoc.render(template_dir)
