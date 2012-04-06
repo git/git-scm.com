@@ -50,16 +50,16 @@ module Asciidoc
     :line     => /^([=\-~])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
     :dlist    => /^(.*)(::|;;)\s*$/,
-    :olist    => /^\d+\.(.*)$/,
+    :olist    => /^(\d+\.|\. )(.*)$/,
     :ulist    => /^\s*\*(.*)$/,
-    :title    => /^\.(.*)\s*$/,
+    :title    => /^\.(\S.*)\s*$/,
     :colist   => /^\<\d+\>\s*(.*)/,
     :oblock   => /^\-\-\s*$/,
     :anchor   => /^\[\[([^\]]+)\]\]/,
     :comment  => /^\/\/\s/,
     :listing  => /^\-+\s*$/,
     :example  => /^=+\s*$/,
-    :literal  => /^    (.*)$/,
+    :literal  => /^([ \t]+.*)$/,
     :caption  => /^\[caption=\"([^\"]+)\"\]/,
     :continue => /^\+\s*$/
   }
@@ -75,7 +75,7 @@ module Asciidoc
       files = Dir.glob(File.join(template_dir, '*')).select{|f| File.stat(f).file?}
       @views = files.inject({}) do |view_hash, view|
         name = File.basename(view).split('.').first
-        view_hash.merge!(name => Tilt.new(view))
+        view_hash.merge!(name => Tilt.new(view, nil, :trim => '<>'))
       end
     end
 
@@ -142,12 +142,7 @@ module Asciidoc
       @context = context
       @context ||= buffer.detect{|l| l !~ /^    /} ? :paragraph : :literal
 
-      @buffer = case @context
-                when :paragraph, :literal
-                  buffer.map{|l| l.lstrip}
-                else
-                  buffer.dup
-                end
+      @buffer = buffer.dup
 
       @blocks = []
     end
@@ -189,7 +184,12 @@ module Asciidoc
       when :dlist
         @buffer.map do |dt, dd|
           html_dt = htmlify(dt.content)
-          html_dd = htmlify(dd.content) || ''
+          if dd.content.empty?
+            html_dd = ''
+          else
+            html_dd = "<p>#{htmlify(dd.content)}</p>"
+          end
+          # html_dd = htmlify(dd.content) || ''
           html_dd += dd.blocks.map{|block| block.render}.join
 
           [html_dt, html_dd]
@@ -201,11 +201,14 @@ module Asciidoc
           htmlify(li.content) + li.blocks.map{|block| block.render}.join
         end
       when :listing
-        @buffer.map{|l| l.gsub(/(<\d+>)/,'<b>\1</b>')}.join('&x000A;')
+        @buffer.map{|l| l.gsub(/(<\d+>)/,'<b>\1</b>')}.join
       when :literal
-        @buffer.map{|l| htmlify(l)}.join('&x000A;')
+        leading_ws = @buffer.first.match(/^(\s+)/)[1]
+        @buffer.map{|l| htmlify(l.sub(/#{leading_ws}/,''))}.join
+      when :verse
+        @buffer.map{|l| htmlify(l.strip)}.join("\n")
       else
-        @buffer.map{|l| htmlify(l)}.join # ("\n")
+        @buffer.map{|l| htmlify(l.lstrip)}.join # ("\n")
       end
     end
 
@@ -224,11 +227,11 @@ module Asciidoc
         def htmlify(string)
           unless string.nil?
             CGI.escapeHTML(string).
-              gsub(/(^|\W)'([^']+)'/, '<em>\2</em>').
+              gsub(/(^|\W)'([^']+)'/, '\1<em>\2</em>').
               gsub(/`([^`]+)`/, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/, '<strong>\1</strong>').
-              gsub(/linkgit:(.*)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
-              gsub(/&lt;&lt;(.*)&gt;&gt;/, '<a href="#\1">\1</a>')
+              gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
+              gsub(/&lt;&lt;(.*)&gt;&gt;/, '<a href="#\1">[\1]</a>')
           end
         end
   end
@@ -577,7 +580,7 @@ module Asciidoc
             while !this_line.nil? && match = this_line.match(REGEXP[:olist])
               item = ListItem.new
               item_blocks = []
-              item_buffer = [match[1]]
+              item_buffer = [match[2]]
               while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:olist])
                 this_line = lines.shift
                 if this_line.match(REGEXP[:continue])
@@ -684,13 +687,14 @@ module Asciidoc
             block = Block.new(self, :colist, items)
           elsif this_line.match(REGEXP[:dlist])
             pairs = []
-            in_continuation = false
 
             while !this_line.nil? && match = this_line.match(REGEXP[:dlist])
               dt = ListItem.new(match[1])
               dd = ListItem.new
               dd_blocks = []
               dd_buffer = []
+              in_continuation = false
+              lines.shift if lines.any? && lines.first.strip.empty? # workaround eg. git-config OPTIONS --get-colorbool
               while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:dlist])
                 this_line = lines.shift
                 if this_line.match(REGEXP[:continue])
@@ -698,7 +702,7 @@ module Asciidoc
                     if in_continuation
                       dd_blocks << dd_buffer.dup
                     else
-                      dd.content = dd_buffer.join
+                      dd.content = dd_buffer.map{|l| l.strip}.join("\n")
                     end
                   end
                   dd_buffer.clear
@@ -712,7 +716,7 @@ module Asciidoc
                 if in_continuation
                   dd_blocks << dd_buffer.dup
                 else
-                  dd.content = dd_buffer.join
+                  dd.content = dd_buffer.map{|l| l.strip}.join("\n")
                 end
               end
 
@@ -724,12 +728,13 @@ module Asciidoc
 
               pairs << [dt, dd]
 
-              while @lines.any? && @lines.first.strip.empty?
-                @lines.shift
+              while lines.any? && lines.first.strip.empty?
+                lines.shift
               end
 
-              this_line = @lines.shift
+              this_line = lines.shift
             end
+            lines.unshift this_line
 
             block = Block.new(self, :dlist, pairs)
           elsif this_line.match(REGEXP[:verse])
