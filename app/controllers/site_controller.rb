@@ -6,28 +6,26 @@ class SiteController < ApplicationController
   end
 
   def search
-    query = { 'query' => params[:search] }
-
     query_options = {
-      'bool' => {
-        'must' => [
-          # Search for the query across all fields
-          { 'field' => { '_all' => query } },
-        ]
+      'prefix' => {
+        'name' => params['search'].downcase
       }
     }
+
+    p query_options
 
     resp  = BONSAI.search( 'doc', 
                            'query' => query_options,
                            'size' => 10)
 
+    p resp
     ref_hits = []
 
     resp['hits']['hits'].each do |hit|
       name = hit["_source"]["name"]
       ref_hits << { 
         :name => name,
-        :url  => "/doc/ref/#{name}"
+        :url  => "/ref/#{name}"
       }
     end
 

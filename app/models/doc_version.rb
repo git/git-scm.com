@@ -11,6 +11,17 @@ class DocVersion < ActiveRecord::Base
     for_doc(doc_name).joins(:version).where(['versions.name=?', version_name]).first
   end
 
+  def index
+    file = self.doc_file
+    doc = self.doc
+    data = {
+      'name' => file.name,
+      'blob_sha' => doc.blob_sha,
+      'text' => doc.plain,
+    }
+    BONSAI.add 'doc', file.name, data
+  end
+
   private
 
     def self.for_doc(doc_name)
