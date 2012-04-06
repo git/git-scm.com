@@ -12,11 +12,19 @@ class DocControllerTest < ActionController::TestCase
   end
 
   test "gets the latest version of a man page" do
+    file = FactoryGirl.create(:doc_file, :name => 'test-command')
+    doc  = FactoryGirl.create(:doc, :plain => "Doc 1")
+    vers = FactoryGirl.create(:version, :name => "v1.0")
+    dver = FactoryGirl.create(:doc_version, :doc_file => file, :version => vers, :doc => doc)
     get :man, :file => 'test-command'
     assert_response :success
   end
 
   test "gets a specific version of a man page" do
+    file = FactoryGirl.create(:doc_file, :name => 'test-command')
+    doc  = FactoryGirl.create(:doc, :plain => "Doc 1")
+    vers = FactoryGirl.create(:version, :name => "v1.0")
+    dver = FactoryGirl.create(:doc_version, :doc_file => file, :version => vers, :doc => doc)
     get :man, :file => 'test-command', :version => 'v1.0'
     assert_response :success
   end
