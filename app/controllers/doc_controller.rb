@@ -2,7 +2,6 @@ class DocController < ApplicationController
   layout "layout"
 
   def index
-    @docs = DocFile.all
   end
 
   def ref

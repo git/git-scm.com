@@ -38,6 +38,7 @@ module ElasticSearch
   class Index
     def initialize(name, server)
       @name = name
+      @server = server
       @conn = ElasticSearch.get_connection(server)
     end
 
@@ -84,8 +85,8 @@ module ElasticSearch
     #   create_options - a hash of index creation options
     #
     # Returns a hash, the parsed response body from elasticsearch.
-    def create(server, create_options={})
-      self.class.create @name, server, create_options
+    def create(create_options={})
+      self.class.create @name, @server, create_options
     end
 
     # Force a refresh of this index
