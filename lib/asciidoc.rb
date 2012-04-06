@@ -51,8 +51,9 @@ module Asciidoc
     :verse    => /^\[verse\]\s*$/,
     :dlist    => /^(.*)(::|;;)\s*$/,
     :olist    => /^\d+\.(.*)$/,
-    :ulist    => /^\*(.*)$/,
+    :ulist    => /^\s*\*(.*)$/,
     :title    => /^\.(.*)\s*$/,
+    :colist   => /^\<\d+\>\s*(.*)/,
     :oblock   => /^\-\-\s*$/,
     :anchor   => /^\[\[([^\]]+)\]\]/,
     :comment  => /^\/\/\s/,
@@ -195,12 +196,12 @@ module Asciidoc
         end
       when :oblock
         blocks.map{|block| block.render}.join
-      when :olist, :ulist
+      when :olist, :ulist, :colist
         @buffer.map do |li|
           htmlify(li.content) + li.blocks.map{|block| block.render}.join
         end
       when :listing
-        @buffer.join('&x000A;')
+        @buffer.map{|l| l.gsub(/(<\d+>)/,'<b>\1</b>')}.join('&x000A;')
       when :literal
         @buffer.map{|l| htmlify(l)}.join('&x000A;')
       else
@@ -422,15 +423,6 @@ module Asciidoc
     # Public: Get the String document source.
     attr_reader :source
 
-    # Public: Get the String title from the doc header.
-    attr_reader :title
-
-    # Public: Get the Array header section.
-    attr_reader :header
-
-    # Public: Get the Array of document sections.
-    attr_reader :sections
-
     # Public: Get the Asciidoc::Renderer instance currently being used
     # to render this Document.
     attr_reader :renderer
@@ -489,14 +481,15 @@ module Asciidoc
 
       @source = @lines.join
 
-      @title    = get_title
-      @header   = next_section(@lines)
-
-      @sections = []
-      while @lines.any?
-        @sections << next_section(@lines)
+      @root = next_section(@lines)
+      if @root.blocks.first.is_a?(Section)
+        @header = @root.blocks.shift
+      else
+        @preamble = Section.new(self)
+        while @root.blocks.first.is_a?(Block)
+          @preamble << @root.blocks.shift
+        end
       end
-      @sections.compact!
     end
 
     # Public: Render the Asciidoc document using Tilt-compatible templates in
@@ -513,41 +506,13 @@ module Asciidoc
     #   => "<h1>Doc Title</h1>\n<div class=\"section\">\n  <div class=\"paragraph\"><p>Foo</p></div>\n</div>\n"
     def render(template_dir)
       @renderer = Renderer.new(template_dir)
-
-      rendered_header = @renderer.render('header', header, :doc_title => title)
-
-      rendered_sections = sections.map{|section| section.render}.join
-
-      html = @renderer.render('document', self, :header => rendered_header, :sections => rendered_sections)
-
+      html = @renderer.render('document', @root, :header => @header, :preamble => @preamble)
       @renderer = nil
 
       @ic.iconv(html)
     end
 
     private
-
-      # Private: Return the String title from the document header.
-      #
-      # Examples
-      #
-      #   source
-      #   => "My Doc\n======\n\nGREETINGS\n---------\nThis is my doc."
-      #
-      #   Asciidoc.new(source).get_title
-      #   => "My Doc"
-      def get_title
-        header_loc = @lines.index{|s| s =~ /^=+\s*$/}
-
-        if !header_loc.nil?
-          title = @lines[header_loc - 1]
-          @lines.shift(header_loc + 1)
-
-          title.strip
-        else
-          nil
-        end
-      end
 
       # Private: Return the next block from the section.
       #
@@ -680,8 +645,46 @@ module Asciidoc
             lines.unshift(this_line) unless this_line.nil?
 
             block = Block.new(self, :ulist, items)
+          elsif this_line.match(REGEXP[:colist])
+            # colist is a series of blank-line-separated list items terminated by something that isn't an colist item
+            items = []
+            while !this_line.nil? && match = this_line.match(REGEXP[:colist])
+              item = ListItem.new
+              item_blocks = []
+              item_buffer = [match[1]]
+              while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:colist])
+                this_line = lines.shift
+                if this_line.match(REGEXP[:continue])
+                  item_blocks << item_buffer.dup if item_buffer.any?
+                  item_buffer.clear
+                else
+                  item_buffer << this_line
+                end
+              end
+              item_blocks << item_buffer.dup if item_buffer.any?
+
+              item.content = item_blocks.shift.join
+
+              while item_block = item_blocks.shift
+                while item_block.any?
+                  item.blocks << next_block(item_block)
+                end
+              end
+
+              items << item
+
+              while lines.any? && lines.first.strip.empty?
+                lines.shift
+              end
+
+              this_line = lines.shift
+            end
+            lines.unshift(this_line) unless this_line.nil?
+
+            block = Block.new(self, :colist, items)
           elsif this_line.match(REGEXP[:dlist])
             pairs = []
+            in_continuation = false
 
             while !this_line.nil? && match = this_line.match(REGEXP[:dlist])
               dt = ListItem.new(match[1])
@@ -691,15 +694,27 @@ module Asciidoc
               while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:dlist])
                 this_line = lines.shift
                 if this_line.match(REGEXP[:continue])
-                  dd_blocks << dd_buffer.dup if dd_buffer.any?
+                  if dd_buffer.any?
+                    if in_continuation
+                      dd_blocks << dd_buffer.dup
+                    else
+                      dd.content = dd_buffer.join
+                    end
+                  end
                   dd_buffer.clear
+                  in_continuation = true
                 else
                   dd_buffer << this_line
                 end
               end
-              dd_blocks << dd_buffer.dup if dd_buffer.detect{|line| !line.strip.empty?}
 
-              dd.content = dd_blocks.shift.join if dd_blocks.any?
+              if dd_buffer.detect{|line| !line.strip.empty?}
+                if in_continuation
+                  dd_blocks << dd_buffer.dup
+                else
+                  dd.content = dd_buffer.join
+                end
+              end
 
               while dd_block = dd_blocks.shift
                 while dd_block.any?
@@ -763,9 +778,9 @@ module Asciidoc
           end
         end
 
-        block.anchor  = anchor
-        block.title   = title
-        block.caption = caption
+        block.anchor  ||= anchor
+        block.title   ||= title
+        block.caption ||= caption
 
         block
       end
@@ -783,6 +798,10 @@ module Asciidoc
         when ['^']; 3
         when ['+']; 4
         end
+      end
+
+      def is_section_heading?(line1, line2)
+        !line1.nil? && !line2.nil? && line1.match(REGEXP[:name]) && line2.match(REGEXP[:line]) && (line1.size - line2.size).abs <= 1
       end
 
       # Private: Return the next section from the document.
@@ -808,8 +827,14 @@ module Asciidoc
           next_line = lines.first || ''
           if match = this_line.match(REGEXP[:anchor])
             section.anchor = match[1]
-          elsif (name = this_line.match(REGEXP[:name])) && (level = next_line.match(REGEXP[:line])) && (this_line.size - next_line.size).abs <= 1
-            section.name = name[1]
+          elsif is_section_heading?(this_line, next_line)
+            header = this_line.match(REGEXP[:name])
+            if anchor = header[1].match(/^(.*)\[\[([^\]]+)\]\]\s*$/)
+              section.name   = anchor[1]
+              section.anchor = anchor[2]
+            else
+              section.name = header[1]
+            end
             section.level = section_level(next_line)
             lines.shift
           end
@@ -823,7 +848,7 @@ module Asciidoc
           this_line = lines.shift
           next_line = lines.first
 
-          if this_line.match(REGEXP[:name]) && !next_line.nil? && next_line.match(REGEXP[:line]) && !section.level.nil? && section_level(next_line) <= section.level
+          if is_section_heading?(this_line, next_line) && section_level(next_line) <= section.level
             lines.unshift this_line
             lines.unshift section_lines.pop if section_lines.any? && section_lines.last.match(REGEXP[:anchor])
             break
