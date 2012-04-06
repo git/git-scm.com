@@ -16,7 +16,7 @@ class DocController < ApplicationController
     end
 
     if doc_version.nil?
-      redirect_to :index
+      redirect_to :ref
     else
       @doc = doc_version.doc
     end
