@@ -47,7 +47,7 @@ require 'iconv'
 module Asciidoc
   REGEXP = {
     :name     => /^([A-Za-z].*)\s*$/,
-    :line     => /^([=\-~])+\s*$/,
+    :line     => /^([=\-~^\+])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
     :dlist    => /^(.*)(::|;;)\s*$/,
     :olist    => /^(\d+\.|\. )(.*)$/,
@@ -71,12 +71,16 @@ module Asciidoc
     #
     # template_dir - the String pathname of the directory containing template
     #                files that should be used for subsequent render requests.
-    def initialize(template_dir)
+    def initialize(template_dir, options={})
+      @debug = !!options[:debug]
+
       files = Dir.glob(File.join(template_dir, '*')).select{|f| File.stat(f).file?}
       @views = files.inject({}) do |view_hash, view|
         name = File.basename(view).split('.').first
         view_hash.merge!(name => Tilt.new(view, nil, :trim => '<>'))
       end
+
+      @render_stack = []
     end
 
     # Public: Render an Asciidoc object with a specified view template.
@@ -85,7 +89,36 @@ module Asciidoc
     # object - the Object to be passed to Tilt as an evaluation scope.
     # locals - the optional Hash of locals to be passed to Tile (default {})
     def render(view, object, locals={})
-      @views[view].render(object, locals)
+      @render_stack.push([view, object])
+      ret = @views[view].render(object, locals)
+
+      if @debug
+        prefix = ''
+        STDERR.puts '=' * 80
+        STDERR.puts "Rendering:"
+        @render_stack.each do |stack_view, stack_obj|
+          obj_info = case stack_obj
+                     when Section; "SECTION #{stack_obj.name}"
+                     when Block;
+                       if stack_obj.context == :dlist
+                         dt_list = stack_obj.buffer.map{|dt,dd| dt.content.strip}.join(', ')
+                         "BLOCK :dlist (#{dt_list})"
+                       else
+                         "BLOCK #{stack_obj.context.inspect}"
+                       end
+                     else stack_obj.class
+                     end
+          STDERR.puts "#{prefix}#{stack_view}: #{obj_info}"
+          prefix << '  '
+        end
+        STDERR.puts '-' * 80
+        STDERR.puts ret.inspect
+        STDERR.puts '=' * 80
+        STDERR.puts
+      end
+
+      @render_stack.pop
+      ret
     end
   end
 
@@ -117,11 +150,11 @@ module Asciidoc
     # Public: Get the Symbol context for this section block.
     attr_reader :context
 
-    # Public: Get the original Array content for this section block.
-    attr_reader :buffer
-
     # Public: Get the Array of sub-blocks for this section block.
     attr_reader :blocks
+
+    # Public: Get/Set the original Array content for this section block.
+    attr_accessor :buffer
 
     # Public: Get/Set the String section anchor name.
     attr_accessor :anchor
@@ -137,12 +170,11 @@ module Asciidoc
     # parent  - The parent Asciidoc Object.
     # context - The Symbol context name for the type of content.
     # buffer  - The Array buffer of source data.
-    def initialize(parent, context, buffer)
+    def initialize(parent, context, buffer=nil)
       @parent = parent
       @context = context
-      @context ||= buffer.detect{|l| l !~ /^    /} ? :paragraph : :literal
 
-      @buffer = buffer.dup
+      @buffer = buffer.dup unless buffer.nil?
 
       @blocks = []
     end
@@ -189,13 +221,12 @@ module Asciidoc
           else
             html_dd = "<p>#{htmlify(dd.content)}</p>"
           end
-          # html_dd = htmlify(dd.content) || ''
           html_dd += dd.blocks.map{|block| block.render}.join
 
           [html_dt, html_dd]
         end
       when :oblock
-        blocks.map{|block| block.render}.join
+        ''
       when :olist, :ulist, :colist
         @buffer.map do |li|
           htmlify(li.content) + li.blocks.map{|block| block.render}.join
@@ -517,6 +548,74 @@ module Asciidoc
 
     private
 
+      # Private: Strip off leading blank lines in the Array of lines.
+      #
+      # lines - the Array of String lines.
+      #
+      # Returns nil.
+      #
+      # Examples
+      #
+      #   content
+      #   => ["\n", "\t\n", "Foo\n", "Bar\n", "\n"]
+      #
+      #   skip_blank(content)
+      #   => nil
+      #
+      #   lines
+      #   => ["Foo\n", "Bar\n"]
+      def skip_blank(lines)
+        while lines.any? && lines.first.strip.empty?
+          lines.shift
+        end
+
+        nil
+      end
+
+      # Private: Strip off and return the next segment (one or more contiguous blocks) from the Array of lines.
+      #
+      # lines   - the Array of String lines.
+      # options - an optional Hash of processing options:
+      #           * :alt_ending may be used to specify a regular expression match other than
+      #             a blank line to signify the end of the segment.
+      # Returns the Array of lines from the next segment.
+      #
+      # Examples
+      #
+      #   content
+      #   => ["First paragraph\n", "+\n", "Second paragraph\n", "--\n", "Open block\n", "\n", "Can have blank lines\n", "--\n", "\n", "In a different segment\n"]
+      #
+      #   next_segment(content)
+      #   => ["First paragraph\n", "+\n", "Second paragraph\n", "--\n", "Open block\n", "\n", "Can have blank lines\n", "--\n"]
+      #
+      #   content
+      #   => ["In a different segment\n"]
+      def next_segment(lines, options={})
+        alternate_ending = options[:alt_ending]
+        segment = []
+
+        skip_blank(lines)
+
+        # Grab lines until the first blank line not inside an open block
+        in_oblock = false
+        while lines.any?
+          this_line = lines.shift
+          in_oblock = !in_oblock if this_line.match(REGEXP[:oblock])
+          if !in_oblock
+            if this_line.strip.empty?
+              break
+            elsif !alternate_ending.nil? && this_line.match(alternate_ending)
+              lines.unshift this_line
+              break
+            end
+          end
+
+          segment << this_line
+        end
+
+        segment
+      end
+
       # Private: Return the next block from the section.
       #
       # * Skip over blank lines to find the start of the next content block.
@@ -524,7 +623,7 @@ module Asciidoc
       # * Based on the type of content block, grab lines to the end of the block.
       # * Return a new Asciidoc::Block or Asciidoc::Section instance with the
       #   content set to the grabbed lines.
-      def next_block(lines)
+      def next_block(lines, parent=self)
         # Skip ahead to the block content
         while lines.any? && lines.first.strip.empty?
           lines.shift
@@ -570,13 +669,14 @@ module Asciidoc
               buffer.pop
             end
 
-            block = Block.new(self, :oblock, [])
+            block = Block.new(parent, :oblock, [])
             while buffer.any?
-              block.blocks << next_block(buffer)
+              block.blocks << next_block(buffer, block)
             end
           elsif this_line.match(REGEXP[:olist])
             # olist is a series of blank-line-separated list items terminated by something that isn't an olist item
             items = []
+            block = Block.new(parent, :olist)
             while !this_line.nil? && match = this_line.match(REGEXP[:olist])
               item = ListItem.new
               item_blocks = []
@@ -610,10 +710,11 @@ module Asciidoc
             end
             lines.unshift(this_line) unless this_line.nil?
 
-            block = Block.new(self, :olist, items)
+            block.buffer = items
           elsif this_line.match(REGEXP[:ulist])
             # ulist is a series of blank-line-separated list items terminated by something that isn't an ulist item
             items = []
+            block = Block.new(parent, :ulist)
             while !this_line.nil? && match = this_line.match(REGEXP[:ulist])
               item = ListItem.new
               item_blocks = []
@@ -646,11 +747,11 @@ module Asciidoc
               this_line = lines.shift
             end
             lines.unshift(this_line) unless this_line.nil?
-
-            block = Block.new(self, :ulist, items)
+            block.buffer = items
           elsif this_line.match(REGEXP[:colist])
             # colist is a series of blank-line-separated list items terminated by something that isn't an colist item
             items = []
+            block = Block.new(parent, :colist)
             while !this_line.nil? && match = this_line.match(REGEXP[:colist])
               item = ListItem.new
               item_blocks = []
@@ -683,60 +784,33 @@ module Asciidoc
               this_line = lines.shift
             end
             lines.unshift(this_line) unless this_line.nil?
-
-            block = Block.new(self, :colist, items)
+            block.buffer = items
           elsif this_line.match(REGEXP[:dlist])
             pairs = []
+            block = Block.new(parent, :dlist)
 
             while !this_line.nil? && match = this_line.match(REGEXP[:dlist])
               dt = ListItem.new(match[1])
               dd = ListItem.new
-              dd_blocks = []
-              dd_buffer = []
-              in_continuation = false
               lines.shift if lines.any? && lines.first.strip.empty? # workaround eg. git-config OPTIONS --get-colorbool
-              while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:dlist])
-                this_line = lines.shift
-                if this_line.match(REGEXP[:continue])
-                  if dd_buffer.any?
-                    if in_continuation
-                      dd_blocks << dd_buffer.dup
-                    else
-                      dd.content = dd_buffer.map{|l| l.strip}.join("\n")
-                    end
-                  end
-                  dd_buffer.clear
-                  in_continuation = true
-                else
-                  dd_buffer << this_line
-                end
+
+              dd_segment = next_segment(lines, :alt_ending => REGEXP[:dlist])
+              while dd_segment.any?
+                dd.blocks << next_block(dd_segment, block)
               end
 
-              if dd_buffer.detect{|line| !line.strip.empty?}
-                if in_continuation
-                  dd_blocks << dd_buffer.dup
-                else
-                  dd.content = dd_buffer.map{|l| l.strip}.join("\n")
-                end
-              end
-
-              while dd_block = dd_blocks.shift
-                while dd_block.any?
-                  dd.blocks << next_block(dd_block)
-                end
+              if dd.blocks.any? && dd.blocks.first.is_a?(Block) && (dd.blocks.first.context == :paragraph || dd.blocks.first.context == :literal)
+                dd.content = dd.blocks.shift.buffer.map{|l| l.strip}.join("\n")
               end
 
               pairs << [dt, dd]
 
-              while lines.any? && lines.first.strip.empty?
-                lines.shift
-              end
+              skip_blank(lines)
 
               this_line = lines.shift
             end
-            lines.unshift this_line
-
-            block = Block.new(self, :dlist, pairs)
+            lines.unshift(this_line) unless this_line.nil?
+            block.buffer = pairs
           elsif this_line.match(REGEXP[:verse])
             # verse is preceded by [verse] and lasts until a blank line
             this_line = lines.shift
@@ -745,7 +819,7 @@ module Asciidoc
               this_line = lines.shift
             end
 
-            block = Block.new(self, :verse, buffer)
+            block = Block.new(parent, :verse, buffer)
           elsif this_line.match(REGEXP[:listing])
             # listing is surrounded by '----' (3 or more dashes) lines
             this_line = lines.shift
@@ -754,7 +828,7 @@ module Asciidoc
               this_line = lines.shift
             end
 
-            block = Block.new(self, :listing, buffer)
+            block = Block.new(parent, :listing, buffer)
           elsif this_line.match(REGEXP[:example])
             # example is surrounded by '====' (3 or more '=' chars) lines
             this_line = lines.shift
@@ -763,7 +837,7 @@ module Asciidoc
               this_line = lines.shift
             end
 
-            block = Block.new(self, :example, buffer)
+            block = Block.new(parent, :example, buffer)
           elsif this_line.match(REGEXP[:literal])
             # literal is contiguous lines starting with 4 spaces
             while !this_line.nil? && this_line.match(REGEXP[:literal])
@@ -771,15 +845,16 @@ module Asciidoc
               this_line = lines.shift
             end
 
-            block = Block.new(self, :literal, buffer)
+            block = Block.new(parent, :literal, buffer)
           else
-            # paragraph is contiguous nonblank lines
+            # paragraph is contiguous nonblank/noncontinuation lines
             while !this_line.nil? && !this_line.strip.empty?
+              break if this_line.match(REGEXP[:continue])
               buffer << this_line
               this_line = lines.shift
             end
 
-            block = Block.new(self, :paragraph, buffer)
+            block = Block.new(parent, :paragraph, buffer)
           end
         end
 
@@ -845,8 +920,6 @@ module Asciidoc
           end
         end
 
-        context = nil
-
         # Grab all the lines that belong to this section
         section_lines = []
         while lines.any?
@@ -867,7 +940,7 @@ module Asciidoc
             section_lines.shift
           end
 
-          section << next_block(section_lines) if section_lines.any?
+          section << next_block(section_lines, section) if section_lines.any?
         end
 
         section
