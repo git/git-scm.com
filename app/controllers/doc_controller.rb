@@ -27,6 +27,7 @@ class DocController < ApplicationController
     if doc_version.nil?
       redirect_to :ref
     else
+      @last = DocVersion.last_changed(params[:file])
       @version = doc_version.version
       @file = doc_version.doc_file
       @doc = doc_version.doc
