@@ -1,3 +1,8 @@
+# t.string :name
+# t.string :commit_sha
+# t.string :tree_sha
+# t.datetime :committed
+# t.timestamps
 class Version < ActiveRecord::Base
   validates :name, :uniqueness => true
 
