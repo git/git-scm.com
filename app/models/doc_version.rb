@@ -1,3 +1,7 @@
+# t.belongs_to :version
+# t.belongs_to :doc
+# t.belongs_to :doc_file
+# t.timestamps
 class DocVersion < ActiveRecord::Base
   belongs_to :doc
   belongs_to :version
@@ -5,6 +9,10 @@ class DocVersion < ActiveRecord::Base
 
   def self.latest_for(doc_name)
     for_doc(doc_name).joins(:version).order('versions.id DESC').first
+  end
+
+  def self.latest_versions(doc_name)
+    for_doc(doc_name).joins(:version).order('versions.name DESC').limit(20)
   end
 
   def self.for_version(doc_name, version_name)
