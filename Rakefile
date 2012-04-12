@@ -4,5 +4,7 @@
 
 require File.expand_path('../config/application', __FILE__)
 
+Rake.application.options.trace = true
+
 Gitscm::Application.load_tasks
 
