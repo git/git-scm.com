@@ -12,14 +12,16 @@ class DocVersion < ActiveRecord::Base
   end
 
   def index
-    file = self.doc_file
-    doc = self.doc
-    data = {
-      'name' => file.name,
-      'blob_sha' => doc.blob_sha,
-      'text' => doc.plain,
-    }
-    BONSAI.add 'doc', file.name, data
+    if BONSAI
+      file = self.doc_file
+      doc = self.doc
+      data = {
+        'name' => file.name,
+        'blob_sha' => doc.blob_sha,
+        'text' => doc.plain,
+      }
+      BONSAI.add 'doc', file.name, data
+    end
   end
 
   private
