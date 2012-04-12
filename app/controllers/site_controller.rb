@@ -6,32 +6,38 @@ class SiteController < ApplicationController
   end
 
   def search
+    sname = params['search'].downcase
+
     query_options = {
-      'prefix' => {
-        'name' => params['search'].downcase
+      "bool" => {
+        "should" => [
+            { "prefix" => { "name" => { "value" => sname, "boost" => 12.0 } } },
+            { "term" => { "text" => sname } }
+        ],
+        "minimum_number_should_match" => 1
       }
     }
-
-    p query_options
 
     resp  = BONSAI.search( 'doc', 
                            'query' => query_options,
                            'size' => 10)
 
-    p resp
+    #pp resp
     ref_hits = []
 
     resp['hits']['hits'].each do |hit|
       name = hit["_source"]["name"]
       ref_hits << { 
         :name => name,
+        #:meta => hit["_score"],
         :url  => "/ref/#{name}"
       }
     end
 
-    @data = [
-      { :category => "Reference", :matches  => ref_hits }
-    ]
+    @data = {
+      :term => sname,
+      :results => [{ :category => "Reference", :term => sname, :matches  => ref_hits }]
+    }
     render :partial => 'shared/search'
   end
 end
