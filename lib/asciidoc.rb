@@ -262,6 +262,7 @@ module Asciidoc
               gsub(/`([^`]+)`/, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/, '<strong>\1</strong>').
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
+              gsub(/link:([^\]]+)\[([^\]]+)\]/, '<a href="\1">\2</a>').
               gsub(/&lt;&lt;(.*)&gt;&gt;/, '<a href="#\1">[\1]</a>')
           end
         end
@@ -683,7 +684,15 @@ module Asciidoc
               item_buffer = [match[2]]
               while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:olist])
                 this_line = lines.shift
-                if this_line.match(REGEXP[:continue])
+                if this_line.match(REGEXP[:listing])
+                  item_buffer << this_line
+                  this_line = lines.shift
+                  while !this_line.nil? && !this_line.match(REGEXP[:listing])
+                    item_buffer << this_line
+                    this_line = lines.shift
+                  end
+                  item_buffer << this_line unless this_line.nil?
+                elsif this_line.match(REGEXP[:continue])
                   item_blocks << item_buffer.dup if item_buffer.any?
                   item_buffer.clear
                 else
@@ -721,7 +730,15 @@ module Asciidoc
               item_buffer = [match[1]]
               while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:ulist])
                 this_line = lines.shift
-                if this_line.match(REGEXP[:continue])
+                if this_line.match(REGEXP[:listing])
+                  item_buffer << this_line
+                  this_line = lines.shift
+                  while !this_line.nil? && !this_line.match(REGEXP[:listing])
+                    item_buffer << this_line
+                    this_line = lines.shift
+                  end
+                  item_buffer << this_line unless this_line.nil?
+                elsif this_line.match(REGEXP[:continue])
                   item_blocks << item_buffer.dup if item_buffer.any?
                   item_buffer.clear
                 else
@@ -758,7 +775,15 @@ module Asciidoc
               item_buffer = [match[1]]
               while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:colist])
                 this_line = lines.shift
-                if this_line.match(REGEXP[:continue])
+                if this_line.match(REGEXP[:listing])
+                  item_buffer << this_line
+                  this_line = lines.shift
+                  while !this_line.nil? && !this_line.match(REGEXP[:listing])
+                    item_buffer << this_line
+                    this_line = lines.shift
+                  end
+                  item_buffer << this_line unless this_line.nil?
+                elsif this_line.match(REGEXP[:continue])
                   item_blocks << item_buffer.dup if item_buffer.any?
                   item_buffer.clear
                 else
@@ -926,10 +951,23 @@ module Asciidoc
           this_line = lines.shift
           next_line = lines.first
 
-          if is_section_heading?(this_line, next_line) && section_level(next_line) <= section.level
-            lines.unshift this_line
-            lines.unshift section_lines.pop if section_lines.any? && section_lines.last.match(REGEXP[:anchor])
-            break
+          if is_section_heading?(this_line, next_line)
+            if section_level(next_line) <= section.level
+              lines.unshift this_line
+              lines.unshift section_lines.pop if section_lines.any? && section_lines.last.match(REGEXP[:anchor])
+              break
+            else
+              section_lines << this_line
+              section_lines << lines.shift
+            end
+          elsif this_line.match(REGEXP[:listing])
+            section_lines << this_line
+            this_line = lines.shift
+            while !this_line.nil? && !this_line.match(REGEXP[:listing])
+              section_lines << this_line
+              this_line = lines.shift
+            end
+            section_lines << this_line unless this_line.nil?
           else
             section_lines << this_line
           end
