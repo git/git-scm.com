@@ -15,4 +15,12 @@ module ApplicationHelper
     "<em>--</em>#{mtag}"
   end
 
+  def latest_version
+    Version.latest_version.name
+  end
+
+  def latest_release_date
+    '(' + Version.latest_version.committed.strftime("%Y-%m-%d") + ')'
+  end
+
 end

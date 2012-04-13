@@ -8,4 +8,8 @@ class Version < ActiveRecord::Base
 
   has_many :doc_versions
   has_many :docs, :through => :doc_versions
+
+  def self.latest_version
+    Version.order('versions.name DESC').first
+  end
 end
