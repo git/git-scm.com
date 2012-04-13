@@ -3,9 +3,34 @@ $(document).ready(function() {
   Search.init();
   Dropdowns.init();
   Forms.init();
+  Downloads.init();
 
-  console.log(window.session.browser.os); // Mac, Win, Linux
 });
+
+var Downloads = {
+  init: function() {
+    var os = window.session.browser.os; // Mac, Win, Linux
+    os = "Win"
+    if(os == "Mac") {
+      // we default to mac
+    } else if (os == "Win") {
+      $(".monitor").removeClass("mac");
+      $(".monitor").addClass("windows");
+      $("#download-link").text("Download for Windows").attr("href", "/download/win");
+      $("#gui-link").text("Windows GUI").attr("href", "/download/gui/win");
+      $("#alt-link").removeClass("windows").addClass("mac");
+      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
+    } else if (os == "Linux") {
+      $(".monitor").removeClass("mac");
+      $(".monitor").addClass("linux");
+      $("#download-link").text("Download for Linux").attr("href", "/download/linux");
+      $("#gui-link").text("Linux GUI Client").attr("href", "/download/gui/linux");
+      $("#alt-link").removeClass("windows").addClass("mac");
+      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
+    } else {
+    }
+  }
+}
 
 var BrowserFallbacks = {
   init: function() {
@@ -14,7 +39,6 @@ var BrowserFallbacks = {
 
   initPlaceholders: function() {
     if (!Modernizr.input.placeholder) {
-      alert('yo');
       $('input[placeholder], textarea[placeholder]').each(function(input) {
         $(this).defaultValue($(this).attr('placeholder'), 'active', 'inactive');
       });
