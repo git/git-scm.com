@@ -11,7 +11,6 @@ $(document).ready(function() {
 var DownloadBox = {
   init: function() {
     var os = window.session.browser.os; // Mac, Win, Linux
-    os = "Win"
     if(os == "Mac") {
       // we default to mac
     } else if (os == "Win") {
