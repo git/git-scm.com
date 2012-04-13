@@ -3,6 +3,8 @@ $(document).ready(function() {
   Search.init();
   Dropdowns.init();
   Forms.init();
+  Downloads.init();
+  AboutContent.init();
 });
 
 var BrowserFallbacks = {
@@ -121,6 +123,51 @@ var Forms = {
   observeCopyableInputs: function() {
     $('input.copyable').click(function() {
       $(this).select();
+    });
+  }
+}
+
+var Downloads = {
+  userOS: '',
+
+  init: function() {
+    Downloads.observeGUIOSFilter();
+  },
+
+  observeGUIOSFilter: function() {
+    $('a#gui-os-filter').click(function(e) {
+      e.preventDefault();
+      Downloads.userOS = $(this).attr('data-os');
+      if ($(this).hasClass('filtering')) {
+        var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
+        $('ul.gui-thumbnails li').switchClass("masked", "", 200);
+        $(this).html('Only show GUIs for my OS ('+ capitalizedOS +')');
+        $(this).removeClass('filtering');
+      }
+      else {
+        $('ul.gui-thumbnails li').not("."+Downloads.userOS).switchClass("", "masked", 200);
+        $(this).html('Show GUIs for all OSes');
+        $(this).addClass('filtering');
+      }
+    });
+  }
+}
+
+var AboutContent = {
+  init: function() {
+    AboutContent.observeReadMoreLinks();
+  },
+
+  observeReadMoreLinks: function() {
+    $('a.read-more').live('click', function(e) {
+      e.preventDefault();
+      $(this).closest('p').next('.more').slideDown('fast');
+      $(this).html('← Read Less').removeClass('read-more').addClass('read-less');
+    });
+    $('a.read-less').live('click', function(e) {
+      e.preventDefault();
+      $(this).closest('p').next('.more').slideUp('fast');
+      $(this).html('Read More →').removeClass('read-less').addClass('read-more');
     });
   }
 }
