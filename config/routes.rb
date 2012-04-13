@@ -9,6 +9,10 @@ Gitscm::Application.routes.draw do
   match "/videos" => "doc#videos"
   match "/doc/ext" => "doc#ext"
 
+  match "/about" => "about#index"
+  match "/community" => "community#index"
+  match "/downloads" => "downloads#index"
+
   match "/search" => "site#search"
 
   # mapping for jasons mocks
