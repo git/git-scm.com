@@ -46,7 +46,7 @@ Gitscm::Application.configure do
   # config.action_controller.asset_host = "http://assets.example.com"
 
   # Precompile additional assets (application.js, application.css, and all non-JS/CSS are already added)
-  config.assets.precompile += %w( git-scm.css modernizr.js selectivizr-min.js jquery-1.7.1.min.js jquery-ui-1.8.18.custom.min.js jquery.defaultvalue.js site.js )
+  config.assets.precompile += %w( git-scm.css modernizr.js selectivizr-min.js jquery-1.7.1.min.js jquery-ui-1.8.18.custom.min.js jquery.defaultvalue.js session.min.js site.js )
 
   # Disable delivery errors, bad email addresses will be ignored
   # config.action_mailer.raise_delivery_errors = false

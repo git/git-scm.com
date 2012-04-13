@@ -3,6 +3,8 @@ $(document).ready(function() {
   Search.init();
   Dropdowns.init();
   Forms.init();
+
+  console.log(window.session.browser.os); // Mac, Win, Linux
 });
 
 var BrowserFallbacks = {
