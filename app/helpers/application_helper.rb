@@ -16,11 +16,17 @@ module ApplicationHelper
   end
 
   def latest_version
-    Version.latest_version.name
+    @version ||= Version.latest_version
+    @version.name
   end
 
   def latest_release_date
-    '(' + Version.latest_version.committed.strftime("%Y-%m-%d") + ')'
+    @version ||= Version.latest_version
+    '(' + @version.committed.strftime("%Y-%m-%d") + ')'
+  end
+
+  def latest_relnote_url
+    "https://raw.github.com/git/git/master/Documentation/RelNotes/#{self.latest_version}.txt"
   end
 
 end
