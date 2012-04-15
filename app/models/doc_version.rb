@@ -8,17 +8,17 @@ class DocVersion < ActiveRecord::Base
   belongs_to :doc_file
 
   def self.latest_for(doc_name)
-    for_doc(doc_name).joins(:version).order('versions.name DESC').first
+    for_doc(doc_name).joins(:version).order('versions.vorder DESC').first
   end
 
   def self.last_changed(doc_name)
-    version = for_doc(doc_name).joins(:version).order('versions.name DESC').first
+    version = for_doc(doc_name).joins(:version).order('versions.vorder DESC').first
     sha = version.doc.blob_sha
-    for_doc(doc_name).joins(:version).where('docs.blob_sha = ?', sha).order('versions.name').first
+    for_doc(doc_name).joins(:version).where('docs.blob_sha = ?', sha).order('versions.vorder').first
   end
 
   def self.latest_versions(doc_name)
-    for_doc(doc_name).joins(:version).order('versions.name DESC').limit(20)
+    for_doc(doc_name).joins(:version).order('versions.vorder DESC').limit(15)
   end
 
   def self.for_version(doc_name, version_name)
