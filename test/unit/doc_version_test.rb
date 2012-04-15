@@ -5,7 +5,7 @@ class DocVersionTest < ActiveSupport::TestCase
     range = 0..3
     file = FactoryGirl.create(:doc_file, :name => 'test-command')
     docs = range.map{|i| FactoryGirl.create(:doc, :plain => "Doc #{i}")}
-    vers = range.map{|i| FactoryGirl.create(:version, :name => "v#{i}.0")}
+    vers = range.map{|i| FactoryGirl.create(:version, :name => "#{i}.0", :vorder => Version.version_to_num("#{i}.0"))}
     dver = range.map{|i| FactoryGirl.create(:doc_version, :doc_file => file, :version => vers[i], :doc => docs[i])}
 
     dv = DocVersion.latest_for('test-command')

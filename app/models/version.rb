@@ -9,7 +9,25 @@ class Version < ActiveRecord::Base
   has_many :doc_versions
   has_many :docs, :through => :doc_versions
 
-  def self.latest_version
-    Version.order('versions.name DESC').first
+  before_save :save_version_order
+
+  def save_version_order
+    self.vorder = Version.version_to_num(self.name)
   end
+
+  def self.latest_version
+    Version.order('versions.vorder DESC').first
+  end
+
+  def self.version_to_num(version)
+    version_int = 0.0
+    mult = 1000000
+    numbers = version.split('.')
+    numbers.each do |x|
+      version_int += x.to_f * mult 
+      mult = mult / 100.0
+    end
+    version_int
+  end
+
 end

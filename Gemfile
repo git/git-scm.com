@@ -38,7 +38,8 @@ group :development do
   gem "sqlite3"
   gem "sqlite3-ruby"
   gem "shotgun"
-  gem 'taps'
+  gem "taps"
+  gem "awesome_print"
 end
 
 group :test do

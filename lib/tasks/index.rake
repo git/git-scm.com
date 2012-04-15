@@ -1,16 +1,24 @@
 require 'asciidoc'
+require 'awesome_print'
 
 # fill in the db from a local git clone
 task :preindex => :environment do
   template_dir = File.join(Rails.root, 'templates')
   dir = ENV["GIT_REPO"]
+  rerun = false
   Dir.chdir(dir) do
     # find all tags
     tags = `git tag | grep v1`.strip.split("\n")
-    tags = tags.select { |tag| tag =~ /v\d(\.\d)+$/ }  # just get release tags
+    tags = tags.select { |tag| tag =~ /v\d([\.\d])+$/ }  # just get release tags
 
     # for each tag, get a date and a list of file/shas
     tags.each do |tag|
+
+      puts tag
+
+      stag = Version.where(:name => tag.gsub('v','')).first
+      next if stag && !rerun
+
       stag = Version.where(:name => tag.gsub('v','')).first_or_create
 
       # extract metadata
