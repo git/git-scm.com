@@ -1,5 +1,4 @@
 require 'asciidoc'
-require 'awesome_print'
 
 # fill in the db from a local git clone
 task :preindex => :environment do
