@@ -17,6 +17,7 @@ Gitscm::Application.routes.draw do
   match "/downloads/installers" => "downloads#installers"
   match "/downloads/logos" => "downloads#logos"
   match "/download/:platform" => "downloads#download"
+  match "/download/gui/:platform" => "downloads#gui"
 
   match "/search" => "site#search"
 
