@@ -51,11 +51,11 @@ module Asciidoc
     :verse    => /^\[verse\]\s*$/,
     :dlist    => /^(.*)(::|;;)\s*$/,
     :olist    => /^(\d+\.|\. )(.*)$/,
-    :ulist    => /^\s*\*(.*)$/,
+    :ulist    => /^\s*[\*\-]\s+(.*)$/,
     :title    => /^\.(\S.*)\s*$/,
     :colist   => /^\<\d+\>\s*(.*)/,
     :oblock   => /^\-\-\s*$/,
-    :anchor   => /^\[\[([^\]]+)\]\]/,
+    :anchor   => /^\[(\[.+\])\]\s*$/,
     :comment  => /^\/\/\s/,
     :listing  => /^\-+\s*$/,
     :example  => /^=+\s*$/,
@@ -179,6 +179,11 @@ module Asciidoc
       @blocks = []
     end
 
+    # Public: Get the Asciidoc::Document instance to which this Block belongs
+    def document
+      @parent.is_a?(Document) ? @parent : @parent.document
+    end
+
     # Public: Get the Asciidoc::Renderer instance being used for the ancestor
     # Asciidoc::Document instance.
     def renderer
@@ -232,7 +237,7 @@ module Asciidoc
           htmlify(li.content) + li.blocks.map{|block| block.render}.join
         end
       when :listing
-        @buffer.map{|l| l.gsub(/(<\d+>)/,'<b>\1</b>')}.join
+        @buffer.map{|l| CGI.escapeHTML(l).gsub(/(<\d+>)/,'<b>\1</b>')}.join
       when :literal
         leading_ws = @buffer.first.match(/^(\s+)/)[1]
         @buffer.map{|l| htmlify(l.sub(/#{leading_ws}/,''))}.join
@@ -256,14 +261,20 @@ module Asciidoc
         #   htmlify(asciidoc_string)
         #   => "Make <em>this</em> &lt;emphasized&gt;"
         def htmlify(string)
+          intrinsics = {
+            'startsb' => '[',
+            'endsb'   => ']'
+          }
+
           unless string.nil?
             CGI.escapeHTML(string).
               gsub(/(^|\W)'([^']+)'/, '\1<em>\2</em>').
               gsub(/`([^`]+)`/, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/, '<strong>\1</strong>').
+              gsub(/\{([^\}]+)\}/) { intrinsics[$1] }.
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
               gsub(/link:([^\]]+)\[([^\]]+)\]/, '<a href="\1">\2</a>').
-              gsub(/&lt;&lt;(.*)&gt;&gt;/, '<a href="#\1">[\1]</a>')
+              gsub(/&lt;&lt;([^,]+)(,(.*))?&gt;&gt;/){"<a href=\"##{$1}\">" + ($3.nil?? "#{document.references[$1]}</a>" : "#{$3}</a>")}
           end
         end
   end
@@ -324,6 +335,11 @@ module Asciidoc
     #   => "_foo"
     def section_id
       "_#{name && name.downcase.gsub(' ','_')}"
+    end
+
+    # Public: Get the Asciidoc::Document instance to which this Block belongs
+    def document
+      @parent.is_a?(Document) ? @parent : @parent.document
     end
 
     # Public: Get the Asciidoc::Renderer instance being used for the ancestor
@@ -462,6 +478,9 @@ module Asciidoc
     # to render this Document.
     attr_reader :renderer
 
+    # Public: Get the Hash of document references
+    attr_reader :references
+
     # Public: Initialize an Asciidoc object.
     #
     # data  - The String Asciidoc source document.
@@ -479,6 +498,7 @@ module Asciidoc
     def initialize(name, data, &block)
       raw_source = data.dup
       @defines = {}
+      @references = {}
       @ic = Iconv.new('UTF-8//IGNORE', 'UTF-8')
 
       include_regexp = /^include::([^\[]+)\[\]\s*\n/
@@ -633,7 +653,8 @@ module Asciidoc
         return nil if lines.empty?
 
         if match = lines.first.match(REGEXP[:anchor])
-          anchor = match[1]
+          anchor = match[1].match(/^\[(.*)\]/) ? $1 : match[1]
+          @references[anchor] = match[1]
           lines.shift
         else
           anchor = nil
@@ -943,6 +964,12 @@ module Asciidoc
             section.level = section_level(next_line)
             lines.shift
           end
+        end
+
+        if !section.anchor.nil?
+          anchor_id = section.anchor.match(/^\[(.*)\]/) ? $1 : section.anchor
+          @references[anchor_id] = section.anchor
+          section.anchor = anchor_id
         end
 
         # Grab all the lines that belong to this section
