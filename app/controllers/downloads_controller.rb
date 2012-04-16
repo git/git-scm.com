@@ -16,6 +16,12 @@ class DownloadsController < ApplicationController
     render "downloads/logos/index"
   end
 
+  def gui
+    @platform = params[:platform]
+    @platform = 'windows' if @platform == 'win'
+    render "downloads/guis/index"
+  end
+
   def download
     @platform = params[:platform]
     @platform = 'windows' if @platform == 'win'
