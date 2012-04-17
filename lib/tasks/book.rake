@@ -6,11 +6,9 @@ require 'awesome_print'
 def generate_pages(lang, chapter, content)
   toc = {:title => '', :sections => []}
 
-  doc = Maruku.new(content)
   markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML)
-  markdown.render(content)
+  raw = markdown.render(content)
 
-  raw = doc.to_html
   if m = raw.match(/<h1(.*?)>(.*?)<\/h1>/)
     chapter_title = m[2]
     toc[:title] = chapter_title
@@ -36,20 +34,10 @@ def generate_pages(lang, chapter, content)
       toc[:sections] << [section, nil]
     end
 
-    if lang == 'en'
-      pname = "../../../book/ch#{chapter}-#{section}.html"
-    else
-      FileUtils.mkdir("../../../book/#{lang}") rescue nil
-      pname = "../../../book/#{lang}/ch#{chapter}-#{section}.html"
-    end
-
     full_title = section_match ? "#{chapter_title} #{section_title}" : chapter_title
     layout = lang == 'en' ? 'master' : 'translation'
-    html = "---
-layout: #{layout}
-title: Pro Git #{chapter}.#{section} #{full_title}
----
-"
+
+    html = ''
     if section_match
       sec = '<h2' + sec
     else
@@ -63,7 +51,8 @@ title: Pro Git #{chapter}.#{section} #{full_title}
 </div>"
     html += nav
 
-    File.open(pname, 'w+') { |f| f.write(html) }
+    # TODO: post to git-scm site endpoint
+    puts "\t\t#{chapter}.#{section} : #{chapter_title} . #{section_title} - #{html.size}"
     section += 1
   end
   toc
@@ -80,22 +69,30 @@ task :genbook do
     exit 
   end
 
-  Dir.chdir(File.join(gitbook_dir, 'translations')) do
+  Dir.chdir(gitbook_dir) do
     Dir.glob("*").each do |lang|
       chapter_number = 0
       toc = []
       next if genlang && genlang != lang
+      next if !File.directory? lang
       Dir.chdir(lang) do
+        next if !File.exists?('01-introduction') # not a chapter
+        puts 'generating : ' + lang
         Dir.glob("*").each do |chapter|
-          puts 'generating : ' + lang + '/' + chapter
+          next if !File.directory? chapter
           content = ''
-          Dir.chdir(chapter) do
-            Dir.glob('*').each do |section|
-              content += File.read(section)
+          begin
+            Dir.chdir(chapter) do
+              puts "\t" + chapter
+              Dir.glob('*').each do |section|
+                content += File.read(section)
+              end
+              chapter_number += 1
+              toc << [chapter_number, generate_pages(lang, chapter_number, content)]
             end
-            chapter_number += 1
-            toc << [chapter_number, generate_pages(lang, chapter_number, content)]
-          end rescue nil
+          rescue Object => e
+            ap e
+          end 
         end
       end
     end
