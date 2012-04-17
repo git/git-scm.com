@@ -18,33 +18,10 @@ class DocController < ApplicationController
       doc_version = DocVersion.latest_for(params[:file])
     end
 
-    @versions = []
-    versions = DocVersion.latest_versions(params[:file])
-    unchanged = []
-    for i in 0..(versions.size-2)
-      v = versions[i]
-      prev = versions[i+1]
-      sha2 = v.doc.blob_sha
-      sha1 = prev.doc.blob_sha
-      if sha1 == sha2
-        unchanged << v.version.name
-      else
-        if unchanged.size > 0
-          if unchanged.size == 1
-            @versions << {:name => "#{unchanged.first} no changes", :changed => false}
-          else
-            @versions << {:name => "#{unchanged.last} &rarr; #{unchanged.first} no changes", :changed => false}
-          end
-          unchanged = []
-        end
-        @versions << {:name => v.version.name, :time => v.version.committed, :diff => Doc.get_diff(sha2, sha1), :changed => true}
-      end
-    end
-    @versions = @versions[0,20]
-
     if doc_version.nil?
       redirect_to :ref
     else
+      @versions = DocVersion.version_changes(params[:file], 20)
       @last = DocVersion.last_changed(params[:file])
       @version = doc_version.version
       @file = doc_version.doc_file
@@ -53,7 +30,20 @@ class DocController < ApplicationController
   end
 
   def book
+    lang = params[:lang] || 'en'
   end
+
+  def book_section
+  end
+
+  def book_update
+    # TODO: check credentials
+    lang    = params[:lang]
+    section = params[:section]
+    content = params[:content]
+  end
+
+  # API Methods to update book content #
 
   def videos
   end

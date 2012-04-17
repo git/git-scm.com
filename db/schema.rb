@@ -11,7 +11,24 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20120417001921) do
+ActiveRecord::Schema.define(:version => 20120417224143) do
+
+  create_table "books", :force => true do |t|
+    t.string   "code"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
+
+  add_index "books", ["code"], :name => "index_books_on_code"
+
+  create_table "chapters", :force => true do |t|
+    t.string   "title"
+    t.integer  "book_id"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+  end
+
+  add_index "chapters", ["book_id"], :name => "index_chapters_on_book_id"
 
   create_table "doc_files", :force => true do |t|
     t.string    "name"
@@ -47,6 +64,20 @@ ActiveRecord::Schema.define(:version => 20120417001921) do
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
   end
+
+  create_table "sections", :force => true do |t|
+    t.string   "title"
+    t.string   "slug"
+    t.text     "plain"
+    t.text     "html"
+    t.integer  "chapter_id"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
+    t.string   "source_url"
+  end
+
+  add_index "sections", ["chapter_id"], :name => "index_sections_on_chapter_id"
+  add_index "sections", ["slug"], :name => "index_sections_on_slug"
 
   create_table "versions", :force => true do |t|
     t.string   "name"

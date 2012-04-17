@@ -20,6 +20,7 @@ gem 'rubyzip'
 gem 'octokit'
 gem 'dalli'
 gem 'diff-lcs'
+gem 'redcarpet'
 
 # Gems used only for assets and not required
 # in production environments by default.

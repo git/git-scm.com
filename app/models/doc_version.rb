@@ -25,6 +25,32 @@ class DocVersion < ActiveRecord::Base
     for_doc(doc_name).joins(:version).where(['versions.name=?', version_name]).first
   end
 
+  def self.version_changes(file, size = 20)
+    versions = []
+    unchanged = []
+    vers = DocVersion.latest_versions(file)
+    for i in 0..(vers.size-2)
+      v = vers[i]
+      prev = vers[i+1]
+      sha2 = v.doc.blob_sha
+      sha1 = prev.doc.blob_sha
+      if sha1 == sha2
+        unchanged << v.version.name
+      else
+        if unchanged.size > 0
+          if unchanged.size == 1
+            versions << {:name => "#{unchanged.first} no changes", :changed => false}
+          else
+            versions << {:name => "#{unchanged.last} &rarr; #{unchanged.first} no changes", :changed => false}
+          end
+          unchanged = []
+        end
+        versions << {:name => v.version.name, :time => v.version.committed, :diff => Doc.get_diff(sha2, sha1), :changed => true}
+      end
+    end
+    versions[0,size]
+  end
+
   def index
     if BONSAI
       file = self.doc_file
