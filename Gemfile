@@ -17,6 +17,7 @@ gem 'rest-client'
 gem 'netrc'
 gem 'launchy'
 gem 'rubyzip'
+gem 'octokit'
 
 # Gems used only for assets and not required
 # in production environments by default.
