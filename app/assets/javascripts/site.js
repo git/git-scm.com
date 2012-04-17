@@ -13,6 +13,8 @@ var DownloadBox = {
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       // we default to mac
+      $("#gui-os-filter").attr('data-os', 'mac');
+      $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Win") {
       $(".monitor").removeClass("mac");
       $(".monitor").addClass("windows");
@@ -27,6 +29,8 @@ var DownloadBox = {
       $("#gui-link").text("Linux GUI Client").attr("href", "/download/gui/linux");
       $("#alt-link").removeClass("windows").addClass("mac");
       $("#alt-link").text("Mac Build").attr("href", "/download/mac");
+      $("#gui-os-filter").attr('data-os', 'linux');
+      $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
     } else {
     }
   }
