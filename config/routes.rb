@@ -13,6 +13,8 @@ Gitscm::Application.routes.draw do
   match "/about" => "about#index"
   match "/community" => "community#index"
 
+  match "/admin" => "site#admin"
+
   match "/downloads" => "downloads#index"
   match "/downloads/guis" => "downloads#guis"
   match "/downloads/installers" => "downloads#installers"

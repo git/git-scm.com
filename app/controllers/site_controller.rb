@@ -5,6 +5,10 @@ class SiteController < ApplicationController
   def index
   end
 
+  def admin
+    @downloads = Download.all
+  end
+
   def search
     sname = params['search'].downcase
 
