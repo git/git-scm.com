@@ -1,7 +1,6 @@
 require 'cgi'
 require 'erb'
 require 'tilt'
-require 'iconv'
 
 # REFERENCE
 # TODO:
@@ -499,7 +498,6 @@ module Asciidoc
       raw_source = data.dup
       @defines = {}
       @references = {}
-      @ic = Iconv.new('UTF-8//IGNORE', 'UTF-8')
 
       include_regexp = /^include::([^\[]+)\[\]\s*\n/
       while inc = raw_source.match(include_regexp)
@@ -564,7 +562,7 @@ module Asciidoc
       html = @renderer.render('document', @root, :header => @header, :preamble => @preamble)
       @renderer = nil
 
-      @ic.iconv(html)
+      html
     end
 
     private
