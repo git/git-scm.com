@@ -47,7 +47,7 @@ ActiveRecord::Schema.define(:version => 20120417224143) do
   end
 
   create_table "docs", :force => true do |t|
-    t.text      "blob_sha"
+    t.string    "blob_sha"
     t.text      "plain"
     t.text      "html"
     t.timestamp "created_at", :null => false

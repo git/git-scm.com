@@ -48,6 +48,7 @@ module Asciidoc
     :name     => /^([A-Za-z].*)\s*$/,
     :line     => /^([=\-~^\+])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
+    :note     => /^\[NOTE\]\s*$/,
     :dlist    => /^(.*)(::|;;)\s*$/,
     :olist    => /^(\d+\.|\. )(.*)$/,
     :ulist    => /^\s*[\*\-]\s+(.*)$/,
@@ -864,6 +865,15 @@ module Asciidoc
             end
 
             block = Block.new(parent, :verse, buffer)
+          elsif this_line.match(REGEXP[:note])
+            # note is an admonition preceded by [NOTE] and lasts until a blank line
+            this_line = lines.shift
+            while !this_line.nil? && !this_line.strip.empty?
+              buffer << this_line
+              this_line = lines.shift
+            end
+
+            block = Block.new(parent, :note, buffer)
           elsif this_line.match(REGEXP[:listing])
             # listing is surrounded by '----' (3 or more dashes) lines
             this_line = lines.shift
