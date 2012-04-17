@@ -16,7 +16,6 @@ task :downloads => :environment do
       d.save
     end
   end
-  exit
 
   # find latest mac version
   mac_downloads = Octokit.downloads("timcharper/git_osx_installer")
