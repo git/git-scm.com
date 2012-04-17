@@ -8,6 +8,7 @@ class Version < ActiveRecord::Base
 
   has_many :doc_versions
   has_many :docs, :through => :doc_versions
+  has_many :downloads
 
   before_save :save_version_order
 

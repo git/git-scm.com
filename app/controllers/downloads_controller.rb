@@ -27,13 +27,8 @@ class DownloadsController < ApplicationController
     @platform = 'windows' if @platform == 'win'
     if @platform == 'windows' || @platform == 'mac'
 
-      if @platform == 'mac'
-        @dl_link = "https://github.com/downloads/timcharper/git_osx_installer/git-1.7.9.4-intel-universal-snow-leopard.dmg"
-      end
-
-      if @platform == 'windows'
-        @dl_link = "http://msysgit.googlecode.com/files/Git-1.7.10-preview20120409.exe"
-      end
+      @download = Download.latest_for(@platform)
+      @latest = Version.latest_version
 
       render "downloads/download"
     elsif @platform == 'linux'
@@ -41,5 +36,7 @@ class DownloadsController < ApplicationController
     else
       redirect_to '/downloads/installers'
     end
+  rescue
+    redirect_to '/downloads/installers'
   end
 end
