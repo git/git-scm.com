@@ -10,10 +10,10 @@ $(document).ready(function() {
 
 var DownloadBox = {
   init: function() {
-    var os = window.session.browser.os; // Mac, Win, Linux
+    var os = window.session.browser.os; // Mac, Windows, Linux
     if(os == "Mac") {
       // we default to mac
-    } else if (os == "Win") {
+    } else if (os == "Windows") {
       $(".monitor").removeClass("mac");
       $(".monitor").addClass("windows");
       $("#download-link").text("Download for Windows").attr("href", "/download/win");
