@@ -18,6 +18,8 @@ gem 'netrc'
 gem 'launchy'
 gem 'rubyzip'
 gem 'octokit'
+gem 'dalli'
+gem 'diff-lcs'
 
 # Gems used only for assets and not required
 # in production environments by default.
