@@ -8,10 +8,6 @@ class DownloadsController < ApplicationController
     render "downloads/guis/index"
   end
 
-  def installers
-    render "downloads/installers/index"
-  end
-
   def logos
     render "downloads/logos/index"
   end
@@ -34,9 +30,9 @@ class DownloadsController < ApplicationController
     elsif @platform == 'linux'
       render "downloads/download_linux"
     else
-      redirect_to '/downloads/installers'
+      redirect_to '/downloads'
     end
   rescue
-    redirect_to '/downloads/installers'
+    redirect_to '/downloads'
   end
 end
