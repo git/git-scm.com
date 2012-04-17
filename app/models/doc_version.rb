@@ -18,7 +18,7 @@ class DocVersion < ActiveRecord::Base
   end
 
   def self.latest_versions(doc_name)
-    for_doc(doc_name).joins(:version).order('versions.vorder DESC').limit(15)
+    for_doc(doc_name).joins(:version).order('versions.vorder DESC')
   end
 
   def self.for_version(doc_name, version_name)

@@ -5,6 +5,7 @@ Gitscm::Application.routes.draw do
   match "/ref" => "doc#ref"
   match "/ref/:file" => "doc#man"
   match "/ref/:file/:version" => "doc#man", :version => /[^\/]+/
+  match "/test" => "doc#test"
   match "/book" => "doc#book"
   match "/videos" => "doc#videos"
   match "/doc/ext" => "doc#ext"
