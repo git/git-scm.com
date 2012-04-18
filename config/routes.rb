@@ -15,6 +15,8 @@ Gitscm::Application.routes.draw do
   match "/publish" => "doc#book_update"
 
   match "/about" => "about#index"
+  match "/about/:section" => "about#index"
+
   match "/community" => "community#index"
 
   match "/admin" => "site#admin"
