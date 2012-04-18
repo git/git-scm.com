@@ -37,7 +37,7 @@ class Section < ActiveRecord::Base
       BONSAI.add 'book', self.slug, data
     end
   rescue
-    nil
+    nil  # this is busted in production for some reason, which is really an issue
   end
 
   def self.search(term)
