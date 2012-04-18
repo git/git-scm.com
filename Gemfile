@@ -22,7 +22,7 @@ gem 'dalli'
 gem 'diff-lcs'
 gem 'redcarpet'
 gem 'nestful'
-gem 'slugize'
+gem "awesome_print"
 
 # Gems used only for assets and not required
 # in production environments by default.
@@ -45,7 +45,6 @@ group :development do
   gem "sqlite3-ruby"
   gem "shotgun"
   gem "taps"
-  gem "awesome_print"
 end
 
 group :test do

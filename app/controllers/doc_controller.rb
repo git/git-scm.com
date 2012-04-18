@@ -51,7 +51,7 @@ class DocController < ApplicationController
     section = params[:section].to_i
     chapter_title = params[:chapter_title]
     section_title = params[:section_title]
-    content = params[:content]
+    content = params[:content].force_encoding("UTF-8")
 
     # create book (if needed)
     book = Book.where(:code => lang).first_or_create

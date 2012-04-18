@@ -36,6 +36,8 @@ class Section < ActiveRecord::Base
       }
       BONSAI.add 'book', self.slug, data
     end
+  rescue
+    nil
   end
 
   def self.search(term)
