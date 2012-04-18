@@ -1,3 +1,4 @@
+
 class DocController < ApplicationController
   layout "layout"
 
@@ -31,16 +32,43 @@ class DocController < ApplicationController
 
   def book
     lang = params[:lang] || 'en'
+    @book = Book.where(:code => lang).first
   end
 
   def book_section
+    lang = params[:lang]
+    slug = params[:slug]
+    @content = Book.where(:code => lang).first.sections.where(:slug => slug).first
   end
 
   def book_update
-    # TODO: check credentials
+    if params[:token] != ENV['UPDATE_TOKEN']
+      return render :text => 'nope'
+    end
+
     lang    = params[:lang]
-    section = params[:section]
+    chapter = params[:chapter].to_i
+    section = params[:section].to_i
+    chapter_title = params[:chapter_title]
+    section_title = params[:section_title]
     content = params[:content]
+
+    # create book (if needed)
+    book = Book.where(:code => lang).first_or_create
+
+    # create chapter (if needed)
+    chapter = book.chapters.where(:number => chapter).first_or_create
+    chapter.title = chapter_title
+    chapter.save
+
+    # create/update section
+    section = chapter.sections.where(:number => section).first_or_create
+    section.title = section_title
+    section.html = content
+    section.save
+
+    # TODO: find and index commands
+    render :text => 'ok'
   end
 
   # API Methods to update book content #

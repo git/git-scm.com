@@ -1,7 +1,11 @@
 require 'redcarpet'
+require 'nestful'
 require 'awesome_print'
 
 # export GITBOOK_DIR=../../writing/progit/
+# export GITBOOK_DIR=../../writing/progit/
+
+CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
 
 def generate_pages(lang, chapter, content)
   toc = {:title => '', :sections => []}
@@ -35,7 +39,6 @@ def generate_pages(lang, chapter, content)
     end
 
     full_title = section_match ? "#{chapter_title} #{section_title}" : chapter_title
-    layout = lang == 'en' ? 'master' : 'translation'
 
     html = ''
     if section_match
@@ -46,13 +49,24 @@ def generate_pages(lang, chapter, content)
 
     html += sec
 
-    nav = "<div id='nav'>
-<a href='[[nav-prev]]'>prev</a> | <a href='[[nav-next]]'>next</a>
-</div>"
+    nav = "<div id='nav'><a href='[[nav-prev]]'>prev</a> | <a href='[[nav-next]]'>next</a></div>"
     html += nav
 
-    # TODO: post to git-scm site endpoint
-    puts "\t\t#{chapter}.#{section} : #{chapter_title} . #{section_title} - #{html.size}"
+    data = {
+      :lang => lang,
+      :chapter => chapter,
+      :section => section,
+      :chapter_title => chapter_title,
+      :section_title => section_title,
+      :content => html,
+      :token => ENV['UPDATE_TOKEN']
+    }
+
+    url = CONTENT_SERVER + "/publish"
+    result = Nestful.post url, :format => :form, :params => data
+    
+    puts "\t\t#{chapter}.#{section} : #{chapter_title} . #{section_title} - #{html.size} (#{result})"
+
     section += 1
   end
   toc
@@ -98,31 +112,4 @@ task :genbook do
     end
   end
 
-end
-
-# generate the site
-desc "Convert images"
-task :convert_images do
-  Dir.chdir('figures') do
-    Dir.glob("*").each do |chapter|
-      Dir.chdir(chapter) do
-        Dir.glob("*").each do |image|
-          puts image
-          (im, ending) = image.split('.')
-          if ending == 'png' and im[-3, 3] != '-tn'
-            convert_image = "#{im}-tn.png"
-            if !File.exists?(convert_image)
-              width_out = `exiftool #{image} | grep 'Image Width'`
-              width = width_out.scan(/: (\d+)/).first.first.to_i
-              if width > 500
-                `convert -thumbnail 500x #{image} #{convert_image}`
-              else
-                `cp #{image} #{convert_image}`
-              end
-            end
-          end
-        end
-      end
-    end
-  end
 end

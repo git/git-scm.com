@@ -12,7 +12,7 @@ Gitscm::Application.routes.draw do
   match "/book" => "doc#book"
   match "/book/:lang" => "doc#book"
   match "/book/:lang/:slug" => "doc#book_section"
-  match "/book/update" => "doc#book_update"
+  match "/publish" => "doc#book_update"
 
   match "/about" => "about#index"
   match "/community" => "community#index"

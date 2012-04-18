@@ -21,6 +21,8 @@ gem 'octokit'
 gem 'dalli'
 gem 'diff-lcs'
 gem 'redcarpet'
+gem 'nestful'
+gem 'slugize'
 
 # Gems used only for assets and not required
 # in production environments by default.
