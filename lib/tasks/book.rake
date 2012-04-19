@@ -28,6 +28,15 @@ def generate_pages(lang, chapter, content)
     end
   end
 
+  # add anchors to h3s
+  if subsec = raw.scan(/<h3>(.*?)<\/h3>/)
+    subsec.each do |sub|
+      sub = sub.first
+      id = sub.gsub(' ', '-')
+      raw.gsub!(/<h3>#{sub}<\/h3>/, "<h3 id=\"#{id}\"><a href=\"##{id}\">#{sub}</a></h3>")
+    end
+  end
+
   sections = raw.split('<h2')
   section = 0
   sections.each do |sec|
