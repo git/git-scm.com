@@ -267,14 +267,20 @@ module Asciidoc
           }
 
           unless string.nil?
-            CGI.escapeHTML(string).
+            html = string.dup
+
+            # Convert reference links to "link:" asciidoc for later HTMLification.
+            # This ensures that eg. "<<some reference>>" is turned into a link but
+            # "`<<<<<` and `>>>>>` are conflict markers" is not.
+            html.gsub!( /(^|[^<])<<([^<>,]+)(,([^>]*))?>>/ ) { "#{$1}link:##{$2}[" + ($4.nil?? document.references[$2] : $4) + "]" }
+
+            CGI.escapeHTML(html).
               gsub(/(^|\W)'([^']+)'/, '\1<em>\2</em>').
               gsub(/`([^`]+)`/, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/, '<strong>\1</strong>').
               gsub(/\{([^\}]+)\}/) { intrinsics[$1] }.
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
-              gsub(/link:([^\]]+)\[([^\]]+)\]/, '<a href="\1">\2</a>').
-              gsub(/&lt;&lt;([^,]+)(,(.*))?&gt;&gt;/){"<a href=\"##{$1}\">" + ($3.nil?? "#{document.references[$1]}</a>" : "#{$3}</a>")}
+              gsub(/link:([^\]]+)\[([^\]]+)\]/, '<a href="\1">\2</a>')
           end
         end
   end
