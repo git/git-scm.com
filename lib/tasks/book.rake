@@ -3,7 +3,8 @@ require 'nestful'
 require 'awesome_print'
 
 # export GITBOOK_DIR=../../writing/progit/
-# export GITBOOK_DIR=../../writing/progit/
+# export UPDATE_TOKEN=token
+# bundle exec rake genbook GENLANG=en
 
 CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
 

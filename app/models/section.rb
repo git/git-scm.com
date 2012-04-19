@@ -1,5 +1,3 @@
-require 'slugize'
-
 # t.string      :title
 # t.integer     :number
 # t.string      :slug
@@ -17,7 +15,7 @@ class Section < ActiveRecord::Base
 
   def set_slug
     if self.title
-      self.slug = (self.chapter.title + '-' + self.title).slugize
+      self.slug = (self.chapter.title + '-' + self.title).gsub(' ', '-')
     end
   end
 
