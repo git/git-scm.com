@@ -65,5 +65,7 @@ class Doc < ActiveRecord::Base
         [adds, mins, (8 - total)]
       end
     end
+  rescue
+    [0, 0, 8]
   end
 end
