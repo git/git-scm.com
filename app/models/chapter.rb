@@ -9,13 +9,13 @@ class Chapter < ActiveRecord::Base
 
   def prev
     num = self.number - 1
-    return Chapter.where(:number => num).first if num > 0
+    return self.book.chapters.where(:number => num).first if num > 0
     false
   end
 
   def next
     num = self.number + 1
-    return Chapter.where(:number => num).first if num > 0
+    return self.book.chapters.where(:number => num).first if num > 0
     false
   end
 
