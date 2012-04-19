@@ -53,9 +53,11 @@ module Asciidoc
     :olist    => /^(\d+\.|\. )(.*)$/,
     :ulist    => /^\s*[\*\-]\s+(.*)$/,
     :title    => /^\.(\S.*)\s*$/,
+    :quote    => /^_{4,}\s*$/,
     :colist   => /^\<\d+\>\s*(.*)/,
     :oblock   => /^\-\-\s*$/,
     :anchor   => /^\[(\[.+\])\]\s*$/,
+    :biblio   => /\[\[\[([^\]]+)\]\]\]/,
     :comment  => /^\/\/\s/,
     :listing  => /^\-+\s*$/,
     :example  => /^=+\s*$/,
@@ -271,18 +273,66 @@ module Asciidoc
 
             # Convert reference links to "link:" asciidoc for later HTMLification.
             # This ensures that eg. "<<some reference>>" is turned into a link but
-            # "`<<<<<` and `>>>>>` are conflict markers" is not.
+            # "`<<<<<` and `>>>>>` are conflict markers" is not.  This is much
+            # easier before the HTML is escaped and <> are turned into entities.
             html.gsub!( /(^|[^<])<<([^<>,]+)(,([^>]*))?>>/ ) { "#{$1}link:##{$2}[" + ($4.nil?? document.references[$2] : $4) + "]" }
 
+            # Do the same with URLs
+            html.gsub!(/(https?:\/\/[^\[ ]+)(\[.*)?/) do
+              if $2.nil?
+                "link:#{$1}[$1]$'"
+              else
+                link, rest = linkify($2[1..-1])
+                "link:#{$1}[#{link}]#{rest}"
+              end
+            end
+
             CGI.escapeHTML(html).
+              gsub(REGEXP[:biblio], '<a name="\1">[\1]</a>').
+              gsub(/``(.*?)''/, '&#147;\1&#148;').
               gsub(/(^|\W)'([^']+)'/, '\1<em>\2</em>').
               gsub(/`([^`]+)`/, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/, '<strong>\1</strong>').
               gsub(/\{([^\}]+)\}/) { intrinsics[$1] }.
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
-              gsub(/link:([^\]]+)\[([^\]]+)\]/, '<a href="\1">\2</a>')
+              gsub(/link:([^\[]+)\[(.*)$/) { link,rest = linkify($2); "<a href=\"#{$1}\">#{link}</a>#{rest}" }
           end
         end
+
+        # Private: Extract the link text from a string, allowing for the link text to have zero
+        # or more levels of '[]' characters.
+        #
+        # string - the String input following the leading '[' character after an Asciidoc link: tag
+        #
+        # Returns the Array of [String link, String rest_of_string]
+        #
+        # Examples
+        #
+        #   linkify( '1] lorem ipsum dolor' )
+        #   => ["1", " lorem ipsum dolor"]
+        #
+        #   linkify( '[1]] lorem ipsum dolor' )
+        #   => ["[1]", " lorem ipsum dolor"]
+        #
+        #   linkify( '[[1]]] lorem ipsum dolor' )
+        #   => ["[[1]]", " lorem ipsum dolor"]
+        #
+        def linkify(string)
+          chars = string.chars.to_a
+          i = 0
+          level = 1
+          while chars.any? && level > 0
+            case chars.shift
+            when '['; level += 1
+            when ']'; level -= 1
+            end
+            i += 1 unless level == 0
+          end
+          raise "Unable to find link in #{string.inspect}" unless level == 0
+
+          [string[0..i-1], string[i+1..-1]]
+        end
+
   end
 
   # Public: Methods for managing sections of Asciidoc content in a document.
@@ -537,6 +587,36 @@ module Asciidoc
         end
 
         lines
+      end
+
+      # Process bibliography references, so they're available when text
+      # before the reference is being rendered.
+      @lines.each do |line|
+        if biblio = line.match(REGEXP[:biblio])
+          references[biblio[1]] = "[#{biblio[1]}]"
+        end
+      end
+
+      # link: tags and xrefs (and maybe other things?) can span multiple lines.
+      # eg. the SEE ALSO section of git-branch or the shallow_repository
+      # definition in glossary-content.
+      i = 0
+      while i < @lines.size
+        while link = @lines[i].match(/link:[^\[]+(\[.*)$/) && $1.count('[') > $1.count(']')
+          @lines[i].sub!(/\n$/,' ')
+          next_line = @lines.delete_at(i+1)
+          break if next_line.nil?
+          @lines[i] << next_line
+        end
+
+        while xref = @lines[i].match(/<</) && $' !~ />>/
+          @lines[i].sub!(/\n$/,' ')
+          next_line = @lines.delete_at(i+1)
+          break if next_line.nil?
+          @lines[i] << next_line
+        end
+
+        i += 1
       end
 
       @source = @lines.join
@@ -898,6 +978,15 @@ module Asciidoc
             end
 
             block = Block.new(parent, :example, buffer)
+          elsif this_line.match(REGEXP[:quote])
+            # quote is surrounded by '____' (4 or more '_' chars) lines
+            this_line = lines.shift
+            while !this_line.nil? && !this_line.match(REGEXP[:quote])
+              buffer << this_line
+              this_line = lines.shift
+            end
+
+            block = Block.new(parent, :quote, buffer)
           elsif this_line.match(REGEXP[:literal])
             # literal is contiguous lines starting with 4 spaces
             while !this_line.nil? && this_line.match(REGEXP[:literal])
