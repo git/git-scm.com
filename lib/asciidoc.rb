@@ -174,7 +174,7 @@ module Asciidoc
       @parent = parent
       @context = context
 
-      @buffer = buffer.dup unless buffer.nil?
+      @buffer = buffer.join.gsub(/\n\s*\\/m,'').lines.to_a unless buffer.nil?
 
       @blocks = []
     end
@@ -904,11 +904,20 @@ module Asciidoc
             # paragraph is contiguous nonblank/noncontinuation lines
             while !this_line.nil? && !this_line.strip.empty?
               break if this_line.match(REGEXP[:continue])
+              if this_line.match(REGEXP[:listing])
+                lines.unshift this_line
+                break
+              end
               buffer << this_line
               this_line = lines.shift
             end
 
-            block = Block.new(parent, :paragraph, buffer)
+            if buffer.any? && admonition = buffer.first.match(/^NOTE:\s*/)
+              buffer[0] = admonition.post_match
+              block = Block.new(parent, :note, buffer)
+            else
+              block = Block.new(parent, :paragraph, buffer)
+            end
           end
         end
 
