@@ -22,8 +22,9 @@ def generate_pages(lang, chapter, content)
   # replace images
   if images = raw.scan(/Insert (.*?).png/)
     images.each do |img|
-      real = "<center><img src=\"/figures/ch#{chapter}/#{img}-tn.png\"></center><br/>"
-      raw.gsub!("Insert #{img}.png", real)
+      img = img.first
+      real = "<center><img src=\"/figures/#{img}-tn.png\"></center><br/>"
+      raw.gsub!(/Insert #{img}.png/, real)
     end
   end
 
