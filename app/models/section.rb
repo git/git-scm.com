@@ -10,6 +10,7 @@ class Section < ActiveRecord::Base
   default_scope :order => 'number'
 
   belongs_to :chapter
+  has_one :book, :through => :chapter
   before_save :set_slug
   after_save :index
 
@@ -17,6 +18,38 @@ class Section < ActiveRecord::Base
     if self.title
       self.slug = (self.chapter.title + '-' + self.title).gsub(' ', '-')
     end
+  end
+
+  def prev_slug
+    lang = self.book.code
+    prev_number = self.number - 1
+    if section = self.chapter.sections.where(:number => prev_number).first
+      return "/book/#{lang}/#{section.slug}"
+    else
+      # find previous chapter
+      if ch = self.chapter.prev
+        if section = ch.last_section
+          return "/book/#{lang}/#{section.slug}"
+        end
+      end
+    end
+    '/book'
+  end
+
+  def next_slug
+    lang = self.book.code
+    next_number = self.number + 1
+    if section = self.chapter.sections.where(:number => next_number).first
+      return "/book/#{lang}/#{section.slug}"
+    else
+      if ch = self.chapter.next
+        if section = ch.first_section
+          return "/book/#{lang}/#{section.slug}"
+        end
+      end
+      # find next chapter
+    end
+    "/book/#{lang}"
   end
 
   def cs_number
