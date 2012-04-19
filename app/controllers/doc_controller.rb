@@ -3,6 +3,7 @@ class DocController < ApplicationController
   layout "layout"
 
   def index
+    @book = Book.where(:code => 'en').first
   end
 
   def ref
