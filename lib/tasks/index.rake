@@ -45,7 +45,7 @@ task :preindex => :environment do
     # find all the doc entries
     tree_info = Octokit.tree( repo, tree_sha, :recursive => true )
     tag_files = tree_info.tree
-    doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index,user-manual)\.txt/ }
+    doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index|user-manual)\.txt/ }
 
     puts "Found #{doc_files.size} entries"
 
