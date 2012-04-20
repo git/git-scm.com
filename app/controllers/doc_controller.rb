@@ -42,6 +42,17 @@ class DocController < ApplicationController
     @content = Book.where(:code => lang).first.sections.where(:slug => slug).first
   end
 
+  # so we can display urls old progit.org style
+  def progit
+    chapter = params[:chapter].to_i
+    section = params[:section].to_i
+    lang = params[:lang] || 'en'
+    book = Book.where(:code => lang).first
+    chapter = book.chapters.where(:number => chapter).first
+    @content = chapter.sections.where(:number => section).first
+    render 'book_section'
+  end
+
   def book_update
     if params[:token] != ENV['UPDATE_TOKEN']
       return render :text => 'nope'
