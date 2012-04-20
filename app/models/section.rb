@@ -73,9 +73,12 @@ class Section < ActiveRecord::Base
     nil  # this is busted in production for some reason, which is really an issue
   end
 
-  def self.search(term)
+  def self.search(term, lang = 'en', highlight = false)
     query_options = {
       "bool" => {
+        "must" => [
+            { "term" => { "lang" => lang } }
+        ],
         "should" => [
             { "prefix" => { "section" => { "value" => term, "boost" => 12.0 } } },
             { "term" => { "html" => term } }
@@ -84,9 +87,17 @@ class Section < ActiveRecord::Base
       }
     }
 
-    resp  = BONSAI.search('book',
-                          'query' => query_options,
-                          'size' => 10)
+    highlight_options = {
+      'pre_tags'  => ['[highlight]'],
+      'post_tags' => ['[xhighlight]'],
+      'fields'    => { 'html' => {"fragment_size" => 200} }
+    }
+
+    options = { 'query' => query_options,
+                'size' => 10 }
+    options['highlight'] = highlight_options
+
+    resp  = BONSAI.search('book', options)
 
     ref_hits = []
     resp['hits']['hits'].each do |hit|
@@ -95,9 +106,12 @@ class Section < ActiveRecord::Base
       slug = hit["_id"]
       lang = hit["_source"]["lang"]
       meta = "Chapter " + hit["_source"]['number'] + ' : ' + hit["_source"]["chapter"]
+      highlight = hit.has_key?('highlight') ? hit['highlight']['html'].first : nil
       ref_hits << { 
         :name => name,
         :meta => meta,
+        :score => hit["_score"],
+        :highlight => highlight,
         :url  => "/book/#{lang}/#{slug}"
       }
     end

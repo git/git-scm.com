@@ -10,21 +10,44 @@ class SiteController < ApplicationController
   end
 
   def search
-    sname = params['search'].downcase
+    @term = sname = params['search'].to_s.downcase
+    @data = search_term(sname)
+    render :partial => 'shared/search'
+  end
 
-    @data = {
+  def search_results
+    @term = sname = params['search'].to_s.downcase
+    data = search_term(sname, true)
+    @top = []
+    @rest = []
+    data[:results].each do |type|
+      type[:matches].each do |hit|
+        if hit[:score] >= 1.0
+          @top << hit
+        else 
+          @rest << hit
+        end
+      end
+    end
+    @top.sort! { |a, b| b[:score] <=> a[:score] }
+    @rest.sort! { |a, b| b[:score] <=> a[:score] }
+    render "results"
+  end
+
+  def search_term(sname, highlight = false)
+    data = {
       :term => sname,
       :results => []
     }
 
-    if results = Doc.search(sname)
-      @data[:results] << results
+    if results = Doc.search(sname, highlight)
+      data[:results] << results
     end
 
-    if results = Section.search(sname)
-      @data[:results] << results
+    if results = Section.search(sname, 'en', highlight)
+      data[:results] << results
     end
 
-    render :partial => 'shared/search'
+    data
   end
 end

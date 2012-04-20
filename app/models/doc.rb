@@ -8,7 +8,7 @@ require 'pp'
 class Doc < ActiveRecord::Base
   has_many :doc_versions
 
-  def self.search(term)
+  def self.search(term, highlight = false)
     query_options = {
       "bool" => {
         "should" => [
@@ -19,16 +19,26 @@ class Doc < ActiveRecord::Base
       }
     }
 
-    resp  = BONSAI.search('doc',
-                          'query' => query_options,
-                          'size' => 10)
+    highlight_options = {
+      'pre_tags'  => ['[highlight]'],
+      'post_tags' => ['[xhighlight]'],
+      'fields'    => { 'text' => {"fragment_size" => 200} }
+    }
+
+    options = { 'query' => query_options,
+                'size' => 10 }
+    options['highlight'] = highlight_options
+
+    resp  = BONSAI.search('doc', options)
 
     ref_hits = []
     resp['hits']['hits'].each do |hit|
+      highlight = hit.has_key?('highlight') ? hit['highlight']['text'].first : nil
       name = hit["_source"]["name"]
       ref_hits << { 
         :name => name,
-        #:meta => hit["_score"],
+        :score => hit["_score"],
+        :highlight => highlight,
         :url  => "/ref/#{name}"
       }
     end

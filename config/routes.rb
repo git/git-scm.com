@@ -34,6 +34,7 @@ Gitscm::Application.routes.draw do
   match "/download/gui/:platform" => "downloads#gui"
 
   match "/search" => "site#search"
+  match "/search/results" => "site#search_results"
 
   # mapping for jasons mocks
   match "/documentation" => "doc#index"
