@@ -1,0 +1,513 @@
+---
+layout: post
+title: Reset Demystified
+---
+
+<p>One of the topics that I didn't cover in depth in the Pro Git book is the
+<code>reset</code> command.  Most of the reason for this, honestly, is that
+I never strongly understood the command beyond the handful of
+specific use cases that I needed it for.  I knew what the command did, but
+not really how it was designed to work.</p>
+
+<p>Since then I have become more comfortable with the command, largely thanks to
+<a href="http://blog.plover.com/prog/git-reset.html">Mark Dominus's article</a>
+re-phrasing the content of the man-page, which I always found very difficult to
+follow. After reading that explanation of the command, I now personally feel
+more comfortable using <code>reset</code> and enjoy trying to help others feel
+the same way.</p>
+
+<p>This post assumes some basic understanding of how Git branching works. If you
+don't really know what HEAD and the Index are on a basic level, you might want to
+read chapters 2 and 3 of this book before reading this post.</p>
+
+<h2>The Three Trees of Git</h2>
+
+<img src="/images/reset/trees.png"/><br/>
+
+<p>The way I now like to think about <code>reset</code> and <code>checkout</code>
+is through the mental frame of Git being a content manager of three different
+trees. By 'tree' here I really mean "collection of files", not specifically the
+data structure. (Some Git developers will get a bit mad at me here, because there
+are a few cases where the Index doesn't exactly act like a tree, but for our purposes
+it is easier - forgive me).</p>
+
+<p>Git as a system manages and manipulates three trees in it's
+normal operation. Each of these is covered in the book, but let's review them.</p>
+
+
+<table id="threetrees">
+  <tr>
+    <th class="title" colspan="2">Tree Roles</th>
+  </tr><tr>
+    <th>The HEAD</th><td>last commit snapshot, next parent</td>
+  </tr><tr>
+    <th>The Index</th><td>proposed next commit snapshot</td>
+  </tr><tr>
+    <th>The Working Directory</th><td>sandbox</td>
+  </tr>
+</table>
+
+<h3 class="subtitle">
+  The HEAD
+  <small>last commit snapshot, next parent</small>
+</h3>
+
+<p>
+The HEAD in Git is the pointer to the current branch reference, which is in
+turn a pointer to the last commit you made or the last commit that was checked
+out into your working directory.  That also means it will be the parent of the
+next commit you do. It's generally simplest to think of it as <b>HEAD is the
+snapshot of your last commit</b>.
+</p>
+
+<p>In fact, it's pretty easy to see what the snapshot of your HEAD looks like.
+Here is an example of getting the actual directory listing and SHA checksums
+for each file in the HEAD snapshot:</p>
+
+<pre>
+$ cat .git/HEAD 
+ref: refs/heads/master
+
+$ cat .git/refs/heads/master 
+e9a570524b63d2a2b3a7c3325acf5b89bbeb131e
+
+$ git cat-file -p e9a570524b63d2a2b3a7c3325acf5b89bbeb131e
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+author Scott Chacon <schacon@gmail.com> 1301511835 -0700
+committer Scott Chacon <schacon@gmail.com> 1301511835 -0700
+
+initial commit
+
+$ git ls-tree -r cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+100644 blob a906cb2a4a904a152...   README
+100644 blob 8f94139338f9404f2...   Rakefile
+040000 tree 99f1a6d12cb4b6f19...   lib
+</pre>
+
+<h3 class="subtitle">
+  The Index
+  <small>next proposed commit snapshot</small>
+</h3>
+
+<p>
+The Index is your proposed next commit.  Git populates it with a list of all the
+file contents that were last checked out into your working directory and what
+they looked like when they were originally checked out.  It's not technically a
+tree structure, it's a flattened manifest, but for our purposes it's close
+enough. When you run <code>git commit</code>, that command only looks at your
+Index by default, not at anything in your working directory.  So, it's simplest
+to think of it as <b>the Index is the snapshot of your next commit</b>.
+</p>
+
+<pre>
+$ git ls-files -s
+100644 a906cb2a4a904a152e80877d4088654daad0c859 0	README
+100644 8f94139338f9404f26296befa88755fc2598c289 0	Rakefile
+100644 47c6340d6459e05787f644c2447d2595f5d3a54b 0	lib/simplegit.rb
+</pre>
+
+<h3 class="subtitle">
+  The Working Directory
+  <small>sandbox, scratch area</small>
+</h3>
+
+<p>
+Finally, you have your working directory.  This is where the content of files
+are placed into actual files on your filesystem so they're easily edited by
+you. <b>The Working Directory is your scratch space, used to easily modify file
+content.</b>
+</p>
+
+<pre>
+$ tree
+.
+├── README
+├── Rakefile
+└── lib
+    └── simplegit.rb
+
+1 directory, 3 files
+</pre>
+
+<h2>The Workflow</h2>
+
+<p>So, Git is all about recording snapshots of your project in successively
+better states by manipulating these three trees, or collections of contents
+of files.</p>
+
+<center><img width="400px" src="/images/reset/workflow.png"/></center><br/>
+
+<p>Let's visualize this process.  Say you go into a new directory with a single
+file in it. We'll call this V1 of the file and we'll indicate it in blue.
+Now we run <code>git init</code>, which will create a Git repository with a
+HEAD reference that points to an unborn branch (aka, <i>nothing</i>)</p>
+
+<center><img width="500px" src="/images/reset/ex2.png"/></center><br/>
+
+<p>At this point, only the <b>Working Directory</b> tree has any content.</p>
+
+<p>Now we want to commit this file, so we use <code>git add</code> to take
+content in your Working Directory and populate our Index with the updated
+content</p>
+
+<center><img width="500px" src="/images/reset/ex3.png"/></center><br/>
+
+<p>Then we run <code>git commit</code> to take what the Index looks like now
+and save it as a permanent snapshot pointed to by a commit, which HEAD is then
+updated to point at.</p>
+
+<center><img width="500px" src="/images/reset/ex4.png"/></center><br/>
+
+<p>At this point, all three of the trees are the same.  If we run
+<code>git status</code> now, we'll see no changes because they're all the
+same.</p>
+
+<p>Now we want to make a change to that file and commit it.  We will go
+through the same process. First we change the file in our working directory.</p>
+
+<center><img width="500px" src="/images/reset/ex5.png"/></center><br/>
+
+<p>If we run <code>git status</code> right now we'll see the file in red as
+"changed but not updated" because that entry differs between our Index and our
+Working Directory. Next we run <code>git add</code> on it to stage it into our
+Index.<p>
+
+<center><img width="500px" src="/images/reset/ex6.png"/></center><br/>
+
+<p>At this point if we run <code>git status</code> we will see the file in green
+under 'Changes to be Committed' because the Index and HEAD differ - that is, our
+proposed next commit is now different from our last commit.  Those are the entries
+we will see as 'to be Committed'. Finally, we run <code>git commit</code> to
+finalize the commit.</p>
+
+<center><img width="500px" src="/images/reset/ex7.png"/></center><br/>
+
+<p>Now <code>git status</code> will give us no output because all three trees
+are the same.</p>
+
+<p>Switching branches or cloning goes through a similar process.
+When you checkout a branch, it changes <b>HEAD</b> to point to the new commit,
+populates your <b>Index</b> with the snapshot of that commit, then checks out the
+contents of the files in your <b>Index</b> into your <b>Working Directory</b>.</p>
+
+
+<h2>The Role of Reset</h2>
+
+<p>So the <code>reset</code> command makes more sense when viewed in this
+context.  It directly manipulates these three trees in a simple and predictable
+way.  It does up to three basic operations.</p>
+
+<h3 class="subtitle">
+  Step 1: Moving HEAD
+  <small>killing me --soft ly</small>
+</h3>
+
+<p>
+The first thing <code>reset</code> will do is move what HEAD points to.  Unlike
+<code>checkout</code> it does not move what branch HEAD points to, it directly
+changes the SHA of the reference itself.  This means if HEAD is pointing to the
+'master' branch, running <code>git reset 9e5e64a</code> will first of all make
+'master' point to <code>9e5e64a</code> before it does anything else.
+</p>
+
+<center><img width="500px" src="/images/reset/reset-soft.png"/></center><br/>
+
+<p>No matter what form of <code>reset</code> with a commit you invoke, this is
+the first thing it will always try to do. If you add the flag <code>--soft</code>,
+this is the <b>only</b> thing it will do. With <code>--soft</code>, <code>reset</code>
+will simply stop there.</p>
+
+<p>Now take a second to look at that diagram and realize what it did.  It
+essentially undid the last commit you made.  When you run <code>git commit</code>,
+Git will create a new commit and move the branch that <code>HEAD</code> points
+to up to it.  When you <code>reset</code> back to <code>HEAD~</code> (the parent
+of HEAD), you are moving the branch back to where it was without changing the Index
+(staging area) or Working Directory.  You could now do a bit more work and
+<code>commit</code> again to accomplish basically what <code>git commit --amend</code>
+would have done.</p>
+
+<h3 class="subtitle">
+  Step 2: Updating the Index
+  <small>having --mixed feelings</small>
+</h3>
+
+<p>Note that if you run <code>git status</code> now you'll see the in green the
+difference between the Index and what the new HEAD is.</p>
+
+<p>The next thing <code>reset</code> will do 
+is to update the Index with the contents of whatever tree HEAD now
+points to so they're the same.</p>
+
+<center><img width="500px" src="/images/reset/reset-mixed.png"/></center><br/>
+
+<p>If you specify the <code>--mixed</code> option, <code>reset</code> will stop
+at this point.  This is also the default, so if you specify no option at all,
+this is where the command will stop.</p>
+
+<p>Now take another second to look at THAT diagram and realize what it did. It
+still undid your last <code>commit</code>, but also <i>unstaged</i> everything.
+You rolled back to before you ran all your <code>git add</code>s <i>AND</i>
+<code>git commit</code>.
+</p>
+
+<h3 class="subtitle">
+  Step 3: Updating the Working Directory
+  <small>math is --hard, let's go shopping</small>
+</h3>
+
+<p>The third thing that <code>reset</code> will do is to then make the Working
+Directory look like the Index.  If you use the <code>--hard</code> option, it
+will continue to this stage.</p>
+
+<center><img width="500px" src="/images/reset/reset-hard.png"/></center><br/>
+
+<p>Finally, take yet a third second to look at <i>that</i> diagram and think
+about what happened.  You undid your last commit, all the <code>git add</code>s,
+<i>and</i> all the work you did in your working directory.</p>
+
+<p>It's important to note at this point that this is the only way to make the
+<code>reset</code> command dangerous (ie: not working directory safe).  Any
+other invocation of <code>reset</code> can be pretty easily undone, the
+<code>--hard</code> option cannot, since it overwrites (without checking) any
+files in the Working Directory. In this particular case, we still have <b>v3</b>
+version of our file in a commit in our Git DB that we could get back by looking
+at our <code>reflog</code>, but if we had not committed it, Git still would have
+overwritten the file.</p>
+
+<h3>Overview</h3>
+
+<p>
+That is basically it.  The <code>reset</code> command overwrites these three
+trees in a specific order, stopping when you tell it to.
+</p>
+
+<ul>
+  <li>#1) Move whatever branch HEAD points to <small>(stop if <code>--soft</code>)</small>
+  <li>#2) THEN, make the Index look like that <small>(stop here unless <code>--hard</code>)</small>
+  <li>#3) THEN, make the Working Directory look like that
+</ul>
+
+<p>There are also <code>--merge</code> and <code>--keep</code> options, but
+I would rather keep things simpler for now - that will be for another article.</p>
+
+<p>Boom. You are now a <code>reset</code> master.</p>
+
+<h2>Reset with a Path</h2>
+
+<p>
+Well, I lied.  That's not actually all.  If you specify a path,
+<code>reset</code> will skip the first step and just do the other ones but limited
+to a specific file or set of files.  This actually sort of makes sense - if the
+first step is to move a pointer to a different commit, you can't make it point
+to <i>part</i> of a commit, so it simply doesn't do that part.  However, you can
+use <code>reset</code> to update part of the Index or the Working Directory
+with previously committed content this way.
+</p>
+
+<p>So, assume we run <code>git reset file.txt</code>.  This assumes, since you
+did not specify a commit SHA or branch that points to a commit SHA, and that you
+provided no reset option, that you are typing the shorthand for 
+<code>git reset --mixed HEAD file.txt</code>, which will:
+
+<ul>
+  <li><strike>#1) Move whatever branch HEAD points to <small>(stop if <code>--soft</code>)</strike></small>
+  <li>#2) THEN, make the Index look like that <small><strike>(stop here unless <code>--hard</code>)</strike></small>
+</ul>
+
+<p>So it essentially just takes whatever <code>file.txt</code> looks like in
+HEAD and puts that in the Index.</p>
+
+<center><img width="500px" src="/images/reset/reset-path1.png"/></center><br/>
+
+<p>So what does that do in a practical sense?  Well, it <i>unstages</i> the
+file.  If we look at the diagram for that command vs what <code>git add</code>
+does, we can see that it is simply the opposite.  This is why the output of
+the <code>git status</code> command suggests that you run this to unstage a
+file.</p>
+
+<center><img width="500px" src="/images/reset/reset-path2.png"/></center><br/>
+
+<p>We could just as easily not let Git assume we meant "pull the data from HEAD"
+by specifying a specific commit to pull that file version from to populate our
+Index by running something like <code>git reset eb43bf file.txt</code>.
+
+<center><img width="500px" src="/images/reset/reset-path3.png"/></center><br/>
+
+<p>So what does that mean?  That functionally does the same thing as if we had
+reverted the content of the file to <b>v1</b>, ran <code>git add</code> on it,
+then reverted it back to to <b>v3</b> again.  If we run <code>git commit</code>,
+it will record a change that reverts that file back to <b>v1</b>, even though
+we never actually had it in our Working Directory again.</p>
+
+<p>It's also pretty interesting to note that like <code>git add --patch</code>,
+the <code>reset</code> command will accept a <code>--patch</code> option to
+unstage content on a hunk-by-hunk basis.  So you can selectively unstage or
+revert content.</p>
+
+<h2>A fun example</h2>
+
+<p>I may use the term "fun" here a bit loosely, but if this doesn't sound like
+fun to you, you may drink while doing it.  Let's look at how to do something
+interesting with this newfound power - squashing commits.</p>
+
+<p>If you have this history and you're about to push and you want to squash
+down the last N commits you've done into one awesome commit that makes you
+look really smart (vs a bunch of commits with messages like "oops.", "WIP"
+and "forgot this file") you can use <code>reset</code> to quickly and easily
+do that (as opposed to using <code>git rebase -i</code>).</p>
+
+<p>So, let's take a slightly more complex example.  Let's say you have a project
+where the first commit has one file, the second commit added a new file and changed
+the first, and the third commit changed the first file again. The second commit
+was a work in progress and you want to squash it down.</p>
+
+<center><img width="500px" src="/images/reset/squash-r1.png"/></center><br/>
+
+<p>You can run <code>git reset --soft HEAD~2</code> to move the HEAD
+branch back to an older commit (the first commit you want to keep):</p>
+
+<center><img width="500px" src="/images/reset/squash-r2.png"/></center><br/>
+
+<p>And then simply run <code>git commit</code> again:</p>
+
+<center><img width="500px" src="/images/reset/squash-r3.png"/></center><br/>
+
+<p>
+Now you can see that your reachable history, the history you would push,
+now looks like you had one commit with the one file, then a second that both
+added the new file and modified the first to it's final state.
+</p>
+
+<h2>Check it out</h2>
+
+<p>Finally, some of you may wonder what the difference between <code>checkout</code>
+and <code>reset</code> is. Well, like <code>reset</code>, <code>checkout</code>
+manipulates the three trees and it is a bit different depending on whether you
+give the command a file path or not.  So, let's look at both examples seperately.
+</p>
+
+<h3>git checkout [branch]</h3>
+
+<p>Running <code>git checkout [branch]</code> is pretty similar to running
+<code>git reset --hard [branch]</code> in that it updates all three trees for
+you to look like <code>[branch]</code>, but there are two important differences.
+</p>
+
+<p>First, unlike <code>reset --hard</code>, <code>checkout</code> is working
+directory safe in this invocation.  It will check to make sure it's not blowing
+away files that have changes to them.  Actually, this is a subtle difference,
+because it will update all of the working directory except the files you've
+modified if it can - it will do a trivial merge between what you're checking
+out and what's already there.  In this case, <code>reset --hard</code> will
+simply replace everything across the board without checking.
+</p>
+
+<p>The second important difference is how it updates HEAD.  Where <code>reset</code>
+will move the branch that HEAD points to, <code>checkout</code> will move HEAD
+itself to point to another branch.</p>
+
+<p>For instance, if we have two branches, 'master'
+and 'develop' pointing at different commits, and we're currently on 'develop'
+(so HEAD points to it) and we run <code>git reset master</code>, 'develop' itself
+will now point to the same commit that 'master' does.</p>
+
+<p>On the other hand, if we instead run <code>git checkout master</code>, 'develop'
+will not move, HEAD itself will.  HEAD will now point to 'master'.  So, in both
+cases we're moving HEAD to point to commit A, but <i>how</i> we do so is very
+different.  <code>reset</code> will move the branch HEAD points to,
+<code>checkout</code> moves HEAD itself to point to another branch.</p>
+
+<center><img width="500px" src="/images/reset/reset-checkout.png"/></center><br/>
+
+<h3>git checkout [branch] file</h3>
+
+<p>The other way to run <code>checkout</code> is with a file path, which like
+<code>reset</code>, does not move HEAD.  It is just like <code>git reset [branch] file</code>
+in that it updates the index with that file at that commit, but it also
+overwrites the file in the working directory.  Think of it like
+<code>git reset --hard [branch] file</code> - it would be exactly the same thing,
+it is also not working directory safe and it also does not move HEAD.  The only
+difference is that <code>reset</code> will a file name will not accept <code>--hard</code>,
+so you can't actually run that.</p>
+
+<p>Also, like <code>git reset</code> and <code>git add</code>, <code>checkout</code>
+will accept a <code>--patch</code> option to allow you to selectively revert file
+contents on a hunk-by-hunk basis.</p>
+
+<h2>Cheaters Gonna Cheat</h2>
+
+<p>Hopefully now you understand and feel more comfortable with the
+<code>reset</code> command, but are probably still a little confused about how
+exactly it differs from <code>checkout</code> and could not possibly remember
+all the rules of the different invocations.</p>
+
+<p>So to help you out, I've created something that I pretty much hate, which
+is a table. However, if you've followed the article at all, it may be a useful
+cheat sheet or reminder. The table shows each class of the <code>reset</code>
+and <code>checkout</code> commands and which of the three trees it updates.</p>
+
+<p>Pay especial attention to the 'WD Safe?' column - if
+it's red, really think about it before you run that command.</p>
+
+<table class="rdata">
+  <tr>
+    <th></th>
+    <th>head</th>
+    <th>index</th>
+    <th>work dir</th>
+    <th>wd safe</th>
+  </tr>
+  <tr class="level">
+    <th>Commit Level</th>
+    <td colspan="4">&nbsp;</th>
+  </tr>
+  <tr class="even">
+    <th class="cmd">reset --soft [commit]</th>
+    <td class="yes">REF</td>
+    <td class="no">NO</td>
+    <td class="no">NO</td>
+    <td class="yes-wd">YES</td>
+  </tr>
+  <tr class="odd">
+    <th class="cmd">reset [commit]</th>
+    <td class="yes">REF</td>
+    <td class="yes">YES</td>
+    <td class="no">NO</td>
+    <td class="yes-wd">YES</td>
+  </tr>
+  <tr class="even">
+    <th class="cmd">reset --hard [commit]</th>
+    <td class="yes">REF</td>
+    <td class="yes">YES</td>
+    <td class="yes">YES</td>
+    <td class="no-wd">NO</td>
+  </tr>
+  <tr class="odd">
+    <th class="cmd">checkout [commit]</th>
+    <td class="yes">HEAD</td>
+    <td class="yes">YES</td>
+    <td class="yes">YES</td>
+    <td class="yes-wd">YES</td>
+  </tr>
+  <tr class="level">
+    <th>File Level</th>
+    <td colspan="4">&nbsp;</th>
+  </tr>
+  <tr class="even">
+    <th class="cmd">reset (commit) [file]</th>
+    <td class="no">NO</td>
+    <td class="yes">YES</td>
+    <td class="no">NO</td>
+    <td class="yes-wd">YES</td>
+  </tr>
+  <tr class="odd">
+    <th class="cmd">checkout (commit) [file]</th>
+    <td class="no">NO</td>
+    <td class="yes">YES</td>
+    <td class="yes">YES</td>
+    <td class="no-wd">NO</td>
+  </tr>
+</table>
+
+<p>Good night, and good luck.</p>
+

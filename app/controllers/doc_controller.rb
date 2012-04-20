@@ -1,3 +1,4 @@
+require 'redcarpet'
 
 class DocController < ApplicationController
   layout "layout"
@@ -7,6 +8,35 @@ class DocController < ApplicationController
   end
 
   def ref
+  end
+
+  def blog
+    y = params[:year]
+    m = params[:month]
+    d = params[:day]
+    slug = params[:slug]
+    file = "#{y}-#{m}-#{d}-#{slug}"
+    @path = path = "#{Rails.root}/app/views/blog/progit/#{file}"
+    content = ''
+    if File.exists?("#{path}.markdown")
+      markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML)
+      content = File.read("#{path}.markdown")
+      content, @frontmatter = extract_frontmatter(content)
+      @content = markdown.render(content)
+    elsif File.exists?("#{path}.html")
+      content = File.read("#{path}.html")
+      @content, @frontmatter = extract_frontmatter(content)
+    end
+  end
+
+  def extract_frontmatter(content)
+    if content =~ /^(---\s*\n.*?\n?)^(---\s*$\n?)(.*)/m
+      cnt = $3
+      data = YAML.load($1)
+      [cnt, data]
+    else
+      [content, {}]
+    end
   end
 
   def test

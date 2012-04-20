@@ -15,6 +15,9 @@ Gitscm::Application.routes.draw do
   match "/book/:lang" => "doc#book"
   match "/book/:lang/:slug" => "doc#book_section"
   match "/publish" => "doc#book_update"
+  match "/:year/:month/:day/:slug" => "doc#blog", :year => /\d{4}/, 
+                                                  :month => /\d{2}/, 
+                                                  :day => /\d{2}/
 
   match "/about" => "about#index"
   match "/about/:section" => "about#index"
