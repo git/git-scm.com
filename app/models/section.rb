@@ -16,7 +16,7 @@ class Section < ActiveRecord::Base
 
   def set_slug
     if self.title
-      self.slug = (self.chapter.title + '-' + self.title).gsub(' ', '-')
+      self.slug = (self.chapter.title + '-' + self.title).gsub(' ', '-').gsub('&#39;', "'")
     end
   end
 
