@@ -11,6 +11,7 @@ $(document).ready(function() {
   Downloads.init();
   DownloadBox.init();
   AboutContent.init();
+  FlippyBook.init();
 
   var _gauges = _gauges || [];
   (function() {
@@ -209,8 +210,10 @@ var AboutContent = {
   defaultSection: "branching-and-merging",
 
   init: function() {
+    if ($('body#about').length === 0) return;
     AboutContent.observeNav();
     AboutContent.observePopState();
+    AboutContent.showSection(AboutContent.getSection());
   },
 
   observePopState: function() {
@@ -255,5 +258,24 @@ var AboutContent = {
       }
       AboutContent.showSection(section);
     });
+  }
+}
+
+var FlippyBook = {
+  init: function() {
+    FlippyBook.observeOpenCloseClicks();
+  },
+
+  observeOpenCloseClicks: function() {
+    $('#book-cover-outside, #open-book').click(function(e) {
+      e.preventDefault();
+      $('#book-intro').css('z-index', '');
+      $('#book-cover').addClass('open');
+    }); 
+    $('#about-book').click(function(e) {
+      e.preventDefault();
+      $('#book-cover').removeClass('open').addClass('close');                    
+      var t = setTimeout ("$('#book-intro').css('z-index', 100)", 1000);
+    }); 
   }
 }
