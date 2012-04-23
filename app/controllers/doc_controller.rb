@@ -55,6 +55,7 @@ class DocController < ApplicationController
     else
       @versions = DocVersion.version_changes(params[:file], 20)
       @last = DocVersion.last_changed(params[:file])
+      @related = DocVersion.get_related(params[:file], 8)
       @version = doc_version.version
       @file = doc_version.doc_file
       @doc = doc_version.doc
@@ -70,6 +71,7 @@ class DocController < ApplicationController
     lang = params[:lang]
     slug = params[:slug]
     @content = Book.where(:code => lang).first.sections.where(:slug => slug).first
+    @related = @content.get_related(8)
   end
 
   # so we can display urls old progit.org style

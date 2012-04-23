@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20120418152515) do
+ActiveRecord::Schema.define(:version => 20120423150252) do
 
   create_table "books", :force => true do |t|
     t.string   "code"
@@ -48,11 +48,11 @@ ActiveRecord::Schema.define(:version => 20120418152515) do
   end
 
   create_table "docs", :force => true do |t|
-    t.string    "blob_sha"
-    t.text      "plain"
-    t.text      "html"
-    t.timestamp "created_at", :null => false
-    t.timestamp "updated_at", :null => false
+    t.string   "blob_sha"
+    t.text     "plain"
+    t.text     "html"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   add_index "docs", ["blob_sha"], :name => "index_docs_on_blob_sha"
@@ -64,6 +64,17 @@ ActiveRecord::Schema.define(:version => 20120418152515) do
     t.integer  "version_id"
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
+  end
+
+  create_table "related_items", :force => true do |t|
+    t.string   "name"
+    t.string   "content_type"
+    t.string   "content_url"
+    t.string   "related_type"
+    t.string   "related_id"
+    t.integer  "score"
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
   end
 
   create_table "sections", :force => true do |t|

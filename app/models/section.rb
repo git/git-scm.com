@@ -14,6 +14,11 @@ class Section < ActiveRecord::Base
   before_save :set_slug
   after_save :index
 
+  def get_related(limit = 10)
+    ri = RelatedItem.where(:related_type => 'book', :related_id => slug).order('score DESC').limit(limit)
+    ri.sort { |a, b| a.content_type <=> b.content_type }
+  end
+
   def set_slug
     if self.title
       self.slug = (self.chapter.title + '-' + self.title).gsub(' ', '-').gsub('&#39;', "'")

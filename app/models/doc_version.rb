@@ -7,6 +7,11 @@ class DocVersion < ActiveRecord::Base
   belongs_to :version
   belongs_to :doc_file
 
+  def self.get_related(doc_name, limit = 10)
+    ri = RelatedItem.where(:related_type => 'reference', :related_id => doc_name).order('score DESC').limit(limit)
+    ri.sort { |a, b| a.content_type <=> b.content_type }
+  end
+
   def self.latest_for(doc_name)
     for_doc(doc_name).joins(:version).order('versions.vorder DESC').first
   end

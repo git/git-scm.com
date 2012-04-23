@@ -1,0 +1,96 @@
+require 'awesome_print'
+
+# bundle exec rake related
+CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+
+desc "Generate the related sidebar content"
+task :related => :environment do
+  find_reference_links
+  find_book_links
+
+  # TODO: git-ref?
+  # TODO: screencasts?
+  # TODO: blog posts?
+
+end
+
+CMD_IGNORE = ['aware', 'binaries', 'ci', 'co', 'com', 'directory', 'feature',
+         'gitolite', 'gitosis-init', 'installed', 'last', 'library', 'my',
+         'mygrit', 'project', 'prune', 'rack', 'repository', 'stash-unapply',
+         'tarball', 'that', 'user', 'visual', 'will', 'world', 'unstage']
+
+CMD_GROUPS = [
+     ['Setup and Config', [ 'config', 'help' ]],
+     ['Getting and Creating Projects', [ 'init', 'clone']],
+     ['Basic Snapshotting', [ 'add', 'status', 'diff', 'commit', 'reset', 'rm', 'mv']],
+     ['Branching and Merging', [ 'branch', 'checkout', 'merge', 'mergetool', 'log', 'stash', 'tag' ]],
+     ['Sharing and Updating Projects', [ 'fetch', 'pull', 'push', 'remote', 'submodule' ]],
+     ['Inspection and Comparison', [ 'show', 'log', 'diff', 'shortlog', 'describe' ]],
+     ['Patching', ['am', 'apply', 'cherry-pick', 'rebase']],
+     ['Debugging', [ 'bisect', 'blame' ]],
+     ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
+     ['External Sytems', ['svn', 'fast-import']],
+     ['Administration', [ 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
+     ['Server Admin', [ 'daemon', 'update-server-info' ]],
+]
+
+# book content
+#  - reference calls
+def find_book_links
+  aindex = {}
+  book = Book.where(:code => 'en').first
+  book.sections.each do |section|
+    content = section.html
+    content.scan(/git (\-+[a-z\-=]+ )*([a-z][a-z\-]+)/) do |match|
+      next if CMD_IGNORE.include? match[1]
+      aindex[match[1]] ||= []
+      aindex[match[1]] << section.id
+    end
+  end
+  aindex.each do |command, ids|
+    command = "git-#{command}"
+    sec_ids = {}
+    ids.each do |id|
+      sec_ids[id] ||= 0
+      sec_ids[id] += 1
+    end
+    sec_ids.each do |id, score|
+      if section = Section.find(id)
+        puts "linking #{section.title} with #{command}"
+        from = ['book', section.title, section.slug, "/book/en/#{section.slug}", score]
+        to   = ['reference', command, command, "/ref/#{command}", score]
+        RelatedItem.create_both(from, to)
+      end
+    end
+  end
+end
+
+# index all reference pages
+#  - linked to/from other pages
+def find_reference_links
+  v = Version.latest_version
+  v.doc_versions.each do |dv|
+    f = dv.doc_file
+    doc = dv.doc
+    name = f.name
+
+    matches = doc.plain.scan(/linkgit:(.*?)\[(\d)\]/)
+
+    m = {}
+    matches.each do |command, number|
+      m[command] ||= 0
+      m[command] += 1
+    end
+    related = m.sort { |a, b| b[1] <=> a[1] }[0, 5]
+
+    related.each do |command, score|
+      next if command == name
+      if rdv = DocVersion.latest_for(command)
+        puts "linking #{name} with #{command}"
+        from = ['reference', name, name, "/ref/#{name}", score]
+        to   = ['reference', command, command, "/ref/#{command}", score]
+        RelatedItem.create_both(from, to)
+      end
+    end
+  end
+end
