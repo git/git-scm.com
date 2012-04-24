@@ -19,21 +19,6 @@ CMD_IGNORE = ['aware', 'binaries', 'ci', 'co', 'com', 'directory', 'feature',
          'mygrit', 'project', 'prune', 'rack', 'repository', 'stash-unapply',
          'tarball', 'that', 'user', 'visual', 'will', 'world', 'unstage']
 
-CMD_GROUPS = [
-     ['Setup and Config', [ 'config', 'help' ]],
-     ['Getting and Creating Projects', [ 'init', 'clone']],
-     ['Basic Snapshotting', [ 'add', 'status', 'diff', 'commit', 'reset', 'rm', 'mv']],
-     ['Branching and Merging', [ 'branch', 'checkout', 'merge', 'mergetool', 'log', 'stash', 'tag' ]],
-     ['Sharing and Updating Projects', [ 'fetch', 'pull', 'push', 'remote', 'submodule' ]],
-     ['Inspection and Comparison', [ 'show', 'log', 'diff', 'shortlog', 'describe' ]],
-     ['Patching', ['am', 'apply', 'cherry-pick', 'rebase']],
-     ['Debugging', [ 'bisect', 'blame' ]],
-     ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
-     ['External Sytems', ['svn', 'fast-import']],
-     ['Administration', [ 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
-     ['Server Admin', [ 'daemon', 'update-server-info' ]],
-]
-
 # book content
 #  - reference calls
 def find_book_links

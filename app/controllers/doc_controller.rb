@@ -74,6 +74,35 @@ class DocController < ApplicationController
     @related = @content.get_related(8)
   end
 
+  CMD_GROUPS = [
+       ['Setup and Config', [ 'config', 'help' ]],
+       ['Getting and Creating Projects', [ 'init', 'clone']],
+       ['Basic Snapshotting', [ 'add', 'status', 'diff', 'commit', 'reset', 'rm', 'mv']],
+       ['Branching and Merging', [ 'branch', 'checkout', 'merge', 'mergetool', 'log', 'stash', 'tag' ]],
+       ['Sharing and Updating Projects', [ 'fetch', 'pull', 'push', 'remote', 'submodule' ]],
+       ['Inspection and Comparison', [ 'show', 'log', 'diff', 'shortlog', 'describe' ]],
+       ['Patching', ['am', 'apply', 'cherry-pick', 'rebase']],
+       ['Debugging', [ 'bisect', 'blame' ]],
+       ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
+       ['External Sytems', ['svn', 'fast-import']],
+       ['Administration', [ 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
+       ['Server Admin', [ 'daemon', 'update-server-info' ]],
+  ]
+
+  # commands index
+  def commands
+    @related = {}
+    ri = RelatedItem.where(:content_type => 'reference', :related_type => 'book')
+    ri.each do |item|
+      cmd = item.name.gsub('git-', '')
+      if s = Section.where(:slug => item.related_id).first
+        @related[cmd] ||= []
+        @related[cmd] << [s.cs_number, s.slug, item.score]
+      end
+    end
+    @groups = CMD_GROUPS
+  end
+
   # so we can display urls old progit.org style
   def progit
     chapter = params[:chapter].to_i

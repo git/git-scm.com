@@ -10,6 +10,7 @@ Gitscm::Application.routes.draw do
   match "/doc/ext" => "doc#ext"
 
   match "/book" => "doc#book"
+  match "/book/commands" => "doc#commands"
   match "/book/ch:chapter-:section.html" => "doc#progit"
   match "/book/:lang/ch:chapter-:section.html" => "doc#progit"
   match "/book/:lang" => "doc#book"
