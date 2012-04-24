@@ -37,14 +37,14 @@ var DownloadBox = {
       $(".monitor").removeClass("mac");
       $(".monitor").addClass("windows");
       $("#download-link").text("Download for Windows").attr("href", "/download/win");
-      $("#gui-link").text("Windows GUI").attr("href", "/download/gui/win");
+      $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
       $("#alt-link").removeClass("windows").addClass("mac");
       $("#alt-link").text("Mac Build").attr("href", "/download/mac");
     } else if (os == "Linux") {
       $(".monitor").removeClass("mac");
       $(".monitor").addClass("linux");
       $("#download-link").text("Download for Linux").attr("href", "/download/linux");
-      $("#gui-link").text("Linux GUI Client").attr("href", "/download/gui/linux");
+      $("#gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
       $("#alt-link").removeClass("windows").addClass("mac");
       $("#alt-link").text("Mac Build").attr("href", "/download/mac");
       $("#gui-os-filter").attr('data-os', 'linux');
