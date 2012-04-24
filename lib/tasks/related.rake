@@ -6,7 +6,7 @@ CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
 
 def create_related_item(from, to)
   url = CONTENT_SERVER + "/related"
-  result = Nestful.post url, :format => :form, :params => {:from_content => from, :to_content => to}
+  result = Nestful.post url, :format => :form, :params => {:from_content => from, :to_content => to, :token => ENV["UPDATE_TOKEN"]}
 end
 
 desc "Generate the related sidebar content"

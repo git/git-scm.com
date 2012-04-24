@@ -109,8 +109,8 @@ class DocController < ApplicationController
       return render :text => 'nope'
     end
 
-    from = params[:from_content]
-    to = params[:to_content]
+    fromc = params[:from_content]
+    toc = params[:to_content]
     RelatedItem.create_both(from, to)
     render :text => 'ok'
   end
