@@ -13,7 +13,7 @@ class RelatedItem < ActiveRecord::Base
                             :content_url  => to_arr[3],
                             :related_type => from_arr[0],
                             :related_id   => from_arr[2]).first_or_create
-    ri.score = to_arr[4] if to_arr[4] > ri.score.to_i
+    ri.score = to_arr[4].to_i if to_arr[4].to_i > ri.score.to_i
     ri.save
 
     ri = RelatedItem.where( :name         => from_arr[1],
@@ -21,7 +21,7 @@ class RelatedItem < ActiveRecord::Base
                             :content_url  => from_arr[3],
                             :related_type => to_arr[0],
                             :related_id   => to_arr[2]).first_or_create
-    ri.score = from_arr[4] if from_arr[4] > ri.score.to_i
+    ri.score = from_arr[4].to_i if from_arr[4].to_i > ri.score.to_i
     ri.save
   end
 end

@@ -104,6 +104,17 @@ class DocController < ApplicationController
     @groups = CMD_GROUPS
   end
 
+  def related_update
+    if params[:token] != ENV['UPDATE_TOKEN']
+      return render :text => 'nope'
+    end
+
+    from = params[:from_content]
+    to = params[:to_content]
+    RelatedItem.create_both(from, to)
+    render :text => 'ok'
+  end
+
   # so we can display urls old progit.org style
   def progit
     chapter = params[:chapter].to_i
@@ -114,6 +125,8 @@ class DocController < ApplicationController
     @content = chapter.sections.where(:number => section).first
     render 'book_section'
   end
+
+  # API Methods to update book content #
 
   def book_update
     if params[:token] != ENV['UPDATE_TOKEN']
@@ -141,11 +154,8 @@ class DocController < ApplicationController
     section.html = content
     section.save
 
-    # TODO: find and index commands
     render :text => 'ok'
   end
-
-  # API Methods to update book content #
 
   def videos
   end

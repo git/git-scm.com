@@ -1,7 +1,13 @@
 require 'awesome_print'
+require 'nestful'
 
 # bundle exec rake related
 CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+
+def create_related_item(from, to)
+  url = CONTENT_SERVER + "/related"
+  result = Nestful.post url, :format => :form, :params => {:from_content => from, :to_content => to}
+end
 
 desc "Generate the related sidebar content"
 task :related => :environment do
@@ -44,7 +50,7 @@ def find_book_links
         puts "linking #{section.title} with #{command}"
         from = ['book', section.title, section.slug, "/book/en/#{section.slug}", score]
         to   = ['reference', command, command, "/ref/#{command}", score]
-        RelatedItem.create_both(from, to)
+        create_related_item(from, to)
       end
     end
   end
@@ -74,7 +80,7 @@ def find_reference_links
         puts "linking #{name} with #{command}"
         from = ['reference', name, name, "/ref/#{name}", score]
         to   = ['reference', command, command, "/ref/#{command}", score]
-        RelatedItem.create_both(from, to)
+        create_related_item(from, to)
       end
     end
   end
