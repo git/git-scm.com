@@ -98,6 +98,7 @@ class DocController < ApplicationController
       if s = Section.where(:slug => item.related_id).first
         @related[cmd] ||= []
         @related[cmd] << [s.cs_number, s.slug, item.score]
+        @related[cmd].sort!
       end
     end
     @groups = CMD_GROUPS
