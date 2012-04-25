@@ -26,7 +26,7 @@ class DownloadsController < ApplicationController
       @download = Download.latest_for(@platform)
       @latest = Version.latest_version
 
-      render "downloads/download"
+      render "downloads/downloading"
     elsif @platform == 'linux'
       render "downloads/download_linux"
     else
