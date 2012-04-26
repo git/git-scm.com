@@ -2,12 +2,15 @@ Gitscm::Application.routes.draw do
   get "site/index"
 
   match "/doc" => "doc#index"
-  match "/ref" => "doc#ref"
-  match "/ref/:file" => "doc#man"
-  match "/ref/:file/:version" => "doc#man", :version => /[^\/]+/
+  match "/docs" => "doc#ref"
+  match "/docs/:file" => "doc#man"
+  match "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
   match "/test" => "doc#test"
   match "/videos" => "doc#videos"
   match "/doc/ext" => "doc#ext"
+
+  match "/ref/:file" => "doc#man"
+  match "/ref/:file/:version" => "doc#man", :version => /[^\/]+/
 
   match "/book" => "doc#book"
   match "/book/commands" => "doc#commands"

@@ -39,7 +39,7 @@ class Doc < ActiveRecord::Base
         :name => name,
         :score => hit["_score"],
         :highlight => highlight,
-        :url  => "/ref/#{name}"
+        :url  => "/docs/#{name}"
       }
     end
 

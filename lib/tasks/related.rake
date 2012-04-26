@@ -49,7 +49,7 @@ def find_book_links
       if section = Section.find(id)
         puts "linking #{section.title} with #{command}"
         from = ['book', section.title, section.slug, "/book/en/#{section.slug}", score]
-        to   = ['reference', command, command, "/ref/#{command}", score]
+        to   = ['reference', command, command, "/docs/#{command}", score]
         create_related_item(from, to)
       end
     end
@@ -78,8 +78,8 @@ def find_reference_links
       next if command == name
       if rdv = DocVersion.latest_for(command)
         puts "linking #{name} with #{command}"
-        from = ['reference', name, name, "/ref/#{name}", score]
-        to   = ['reference', command, command, "/ref/#{command}", score]
+        from = ['reference', name, name, "/docs/#{name}", score]
+        to   = ['reference', command, command, "/docs/#{command}", score]
         create_related_item(from, to)
       end
     end
