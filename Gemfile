@@ -23,6 +23,8 @@ gem 'diff-lcs'
 gem 'redcarpet'
 gem 'nestful'
 gem "awesome_print"
+gem 'newrelic_rpm'
+gem 'exceptional'
 
 # Gems used only for assets and not required
 # in production environments by default.
