@@ -50,6 +50,8 @@ Gitscm::Application.routes.draw do
   match "/documentation/external-links" => "doc#ext"
 
   # TODO: old routes to new pages
+  match "/course/svn" => "site#svn"
+  match "/sfc" => "site#sfc"
 
   root :to => 'site#index'
 end

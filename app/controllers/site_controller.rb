@@ -50,4 +50,7 @@ class SiteController < ApplicationController
 
     data
   end
+
+  def svn
+  end
 end
