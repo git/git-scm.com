@@ -22,6 +22,11 @@ class DownloadsController < ApplicationController
     @platform = params[:platform]
     @platform = 'windows' if @platform == 'win'
     if @platform == 'windows' || @platform == 'mac'
+      if @platform == 'windows'
+        @project_url = "http://msysgit.github.com/"
+      else
+        @project_url = "https://github.com/timcharper/git_osx_installer"
+      end
 
       @download = Download.latest_for(@platform)
       @latest = Version.latest_version
