@@ -272,7 +272,6 @@ var FlippyBook = {
   initBrowsers: function() {
     // only allow webkit since moz 3d transforms are still
     // janky when using z-index
-    // if ($.browser.webkit) {
     if (Modernizr.webkit) {
       FlippyBook.threeDee = true;
       $('#book-container').addClass('three-dee');
