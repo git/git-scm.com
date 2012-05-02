@@ -5,6 +5,36 @@ module SiteHelper
       .gsub('[xhighlight]', '</span>')
   end
 
+  def rchart(title, data, extra = nil)
+    git = data[0][1]
+    svn = data[1][1]
+    out  = "<tr>"
+    out += "<td nowrap>#{title}</td>"
+    out += "<td class='desc'>#{extra}</td>"
+    out += "<td class='number'>#{sprintf("%5.2f", git)}</td>"
+    out += "<td class='number'>#{sprintf("%5.2f", svn)}</td>"
+    out += "<td class='number'>#{(svn / git).floor}x</td>"
+    out += "</tr>"
+  end
+
+  def trchart(title, data, extra = nil)
+    git = data[1][1]
+    git2 = data[0][1]
+    svn = data[2][1]
+    out  = "<tr>"
+    out += "<td nowrap>#{title}</td>"
+    out += "<td class='desc'>#{extra}</td>"
+    if git2
+      out += "<td class='number'>#{sprintf("%5.1f", git2)}</td>"
+    else
+      out += "<td></td>"
+    end
+    out += "<td class='number'>#{sprintf("%5.1f", git)}</td>"
+    out += "<td class='number'>#{sprintf("%5.1f", svn)}</td>"
+    out += "</tr>"
+  end
+
+
   def gchart(title, data)
     labels = data.map {|v| v[0] }
     vals = data.map {|v| v[1] }
@@ -21,9 +51,9 @@ module SiteHelper
     c += "chds=0,#{scale}" + "&amp;"
     c += "chs=100x125" + "&amp;"
     if vals.size == 3
-      c += "chco=009099|009099|E05F49" + "&amp;"
+      c += "chco=E09FA0|E09FA0|E05F49" + "&amp;"
     else
-      c += "chco=009099|E05F49" + "&amp;"
+      c += "chco=E09FA0|E05F49" + "&amp;"
     end
     c += "chf=bg,s,fcfcfa&"
     c += "chtt=#{title}"
