@@ -33,7 +33,7 @@ var DownloadBox = {
       // we default to mac
       $("#gui-os-filter").attr('data-os', 'mac');
       $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
-    } else if (os == "Win") {
+    } else if (os == "Windows") {
       $(".monitor").removeClass("mac");
       $(".monitor").addClass("windows");
       $("#download-link").text("Download for Windows").attr("href", "/download/win");
