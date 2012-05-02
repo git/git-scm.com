@@ -1,4 +1,13 @@
 Gitscm::Application.routes.draw do
+  constraints(:host => 'whygitisbetterthanx.com') do
+    root :to => 'site#redirect_wgibtx'
+  end
+
+  constraints(:host => 'progit.org') do
+    root :to => 'site#redirect_book'
+    match '*path' => 'site#redirect_book'
+  end
+  
   get "site/index"
 
   match "/doc" => "doc#index"
@@ -49,7 +58,6 @@ Gitscm::Application.routes.draw do
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
 
-  # TODO: old routes to new pages
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
 

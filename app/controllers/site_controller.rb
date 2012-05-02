@@ -53,4 +53,19 @@ class SiteController < ApplicationController
 
   def svn
   end
+
+  def redirect_wgibtx
+    redirect_to "http://git-scm.com/about"
+  end
+
+  def redirect_book
+    current_uri = request.env['PATH_INFO']
+    puts "CURRENT URI"
+    puts current_uri
+    if current_uri == '/'
+      redirect_to "http://git-scm.com/book"
+    else
+      redirect_to "http://git-scm.com#{current_uri}"
+    end
+  end
 end
