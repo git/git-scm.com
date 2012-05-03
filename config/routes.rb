@@ -7,6 +7,11 @@ Gitscm::Application.routes.draw do
     root :to => 'site#redirect_book'
     match '*path' => 'site#redirect_book'
   end
+
+  constraints(:subdomain => 'book') do
+    root :to => 'site#redirect_book'
+    match '*path' => 'site#redirect_combook'
+  end
   
   get "site/index"
 
