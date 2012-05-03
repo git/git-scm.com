@@ -1,8 +1,16 @@
+// Used to detect initial (useless) popstate.
+// If history.state exists, assume browser isn't going to fire initial popstate.
+popped = 'state' in window.history;
+initialURL = location.href;
+
 $(document).ready(function() {		
 	BrowserFallbacks.init();
   Search.init();
   Dropdowns.init();
   Forms.init();
+  Downloads.init();
+  AboutContent.init();
+  FlippyBook.init();
 });
 
 var BrowserFallbacks = {
@@ -12,7 +20,6 @@ var BrowserFallbacks = {
 
   initPlaceholders: function() {
     if (!Modernizr.input.placeholder) {
-      alert('yo');
       $('input[placeholder], textarea[placeholder]').each(function(input) {
         $(this).defaultValue($(this).attr('placeholder'), 'active', 'inactive');
       });
@@ -124,3 +131,127 @@ var Forms = {
     });
   }
 }
+
+var Downloads = {
+  userOS: '',
+
+  init: function() {
+    Downloads.observeGUIOSFilter();
+  },
+
+  observeGUIOSFilter: function() {
+    $('a#gui-os-filter').click(function(e) {
+      e.preventDefault();
+      Downloads.userOS = $(this).attr('data-os');
+      if ($(this).hasClass('filtering')) {
+        var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
+        $('ul.gui-thumbnails li').switchClass("masked", "", 200);
+        $(this).html('Only show GUIs for my OS ('+ capitalizedOS +')');
+        $(this).removeClass('filtering');
+      }
+      else {
+        $('ul.gui-thumbnails li').not("."+Downloads.userOS).switchClass("", "masked", 200);
+        $(this).html('Show GUIs for all OSes');
+        $(this).addClass('filtering');
+      }
+    });
+  }
+}
+
+var AboutContent = {
+  defaultSection: "branching-and-merging",
+
+  init: function() {
+    if ($('body#about').length === 0) return;
+    AboutContent.observeNav();
+    AboutContent.observePopState();
+    AboutContent.showSection(AboutContent.getSection());
+  },
+
+  observePopState: function() {
+    if (window.history && window.history.pushState) {
+      return $(window).bind('popstate', function(event) {
+        var section;
+        initialPop = !popped && location.href === initialURL;
+        popped = true;
+        if (initialPop) {
+          return;
+        }
+        section = AboutContent.getSection();
+        return AboutContent.showSection(section);
+      });
+    }
+  },
+
+  getSection: function(href) {
+    var section;
+    section = location.href.substring(location.href.lastIndexOf("/") + 1);
+    if (section.length === 0 || section == 'about') {
+      section = AboutContent.defaultSection;
+    }
+    return section;
+  },
+
+  showSection: function(section) {
+    if (section == 'about') section = AboutContent.defaultSection;
+    $('ol#about-nav a').removeClass('current');
+    $('ol#about-nav a#nav-' + section).addClass('current');
+    $('section').hide();
+    $('section#' + section).show();
+  },
+
+  observeNav: function() {
+    $('ol#about-nav a, .bottom-nav a').click(function(e) {
+      e.preventDefault();
+      var section = $(this).attr('data-section-id');
+
+      if (window.history && window.history.pushState) {
+        history.pushState(null, $(this).html(), '/about/'+section);
+      }
+      AboutContent.showSection(section);
+    });
+  }
+}
+
+var FlippyBook = {
+  threeDee: false,
+
+  init: function() {
+    FlippyBook.initBrowsers();
+    FlippyBook.observeOpenCloseClicks();
+  },
+
+  initBrowsers: function() {
+    // only allow webkit since moz 3d transforms are still
+    // janky when using z-index
+    if (Modernizr.webkit) {
+      FlippyBook.threeDee = true;
+      $('#book-container').addClass('three-dee');
+    }
+  },
+
+  observeOpenCloseClicks: function() {
+    $('#book-cover-outside, #open-book').click(function(e) {
+      e.preventDefault();
+      $('#book-cover').removeClass('close').addClass('open');
+      $('#book-intro').css('z-index', '');
+      if (!FlippyBook.threeDee) {
+        $('#book-cover-inside').show();
+        $('#book-inside-page').show();
+      }
+    }); 
+    $('#about-book').click(function(e) {
+      e.preventDefault();
+      $('#book-cover').removeClass('open').addClass('close');                    
+      if (FlippyBook.threeDee) {
+        var t = setTimeout ("$('#book-intro').css('z-index', 100)", 1000);
+      }
+      else {
+        $('#book-cover-inside').hide();
+        $('#book-inside-page').hide();
+        $('#book-intro').css('z-index', 100);
+      }
+    }); 
+  }
+}
+
