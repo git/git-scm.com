@@ -53,7 +53,10 @@ class DocController < ApplicationController
     if doc_version.nil?
       redirect_to :ref
     else
-      @versions = DocVersion.version_changes(params[:file], 20)
+      key = "version-changes-#{doc_version.id}"
+      @versions = Rails.cache.fetch(key) do
+        DocVersion.version_changes(params[:file], 20)
+      end
       @last = DocVersion.last_changed(params[:file])
       @related = DocVersion.get_related(params[:file], 8)
       @version = doc_version.version
