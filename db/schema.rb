@@ -32,19 +32,19 @@ ActiveRecord::Schema.define(:version => 20120423150252) do
   add_index "chapters", ["book_id"], :name => "index_chapters_on_book_id"
 
   create_table "doc_files", :force => true do |t|
-    t.string    "name"
-    t.timestamp "created_at", :null => false
-    t.timestamp "updated_at", :null => false
+    t.string   "name"
+    t.datetime "created_at", :null => false
+    t.datetime "updated_at", :null => false
   end
 
   add_index "doc_files", ["name"], :name => "index_doc_files_on_name"
 
   create_table "doc_versions", :force => true do |t|
-    t.integer   "version_id"
-    t.integer   "doc_id"
-    t.integer   "doc_file_id"
-    t.timestamp "created_at",  :null => false
-    t.timestamp "updated_at",  :null => false
+    t.integer  "version_id"
+    t.integer  "doc_id"
+    t.integer  "doc_file_id"
+    t.datetime "created_at",  :null => false
+    t.datetime "updated_at",  :null => false
   end
 
   create_table "docs", :force => true do |t|

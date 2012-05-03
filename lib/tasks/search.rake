@@ -6,3 +6,11 @@ task :search_index => :environment do
     p docv.index
   end
 end
+
+require 'pp'
+task :search_index_book => :environment do
+  book = Book.where(:code => 'en').first
+  book.sections.each do |sec|
+    sec.index
+  end
+end
