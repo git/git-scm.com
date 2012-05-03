@@ -20,7 +20,6 @@ Gitscm::Application.routes.draw do
   match "/docs/:file" => "doc#man"
   match "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
   match "/test" => "doc#test"
-  match "/videos" => "doc#videos"
   match "/doc/ext" => "doc#ext"
 
   match "/ref/:file" => "doc#man"
@@ -40,6 +39,9 @@ Gitscm::Application.routes.draw do
 
   match "/about" => "about#index"
   match "/about/:section" => "about#index"
+
+  match "/videos" => "doc#videos"
+  match "/video/:id" => "doc#watch"
 
   match "/community" => "community#index"
 
