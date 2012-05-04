@@ -9,6 +9,7 @@ task :preindex => :environment do
 
   template_dir = File.join(Rails.root, 'templates')
   repo = ENV['GIT_REPO'] || 'git/git'
+  rebuild = ENV['REBUILD_DOC']
   rerun = false
 
   blob_content = Hash.new do |blobs, sha|
@@ -18,6 +19,11 @@ task :preindex => :environment do
 
   # find all tags
   tags = Octokit.tags( repo ).select { |tag| tag.name =~ /^v1[\d\.]+$/ }  # just get release tags
+
+  if rebuild
+    tags = tags.select { |t| t.name == rebuild }
+    rerun = true
+  end
 
   # for each tag, get a date and a list of file/shas
   tags.sort_by( &:name ).each do |tag|
@@ -50,6 +56,7 @@ task :preindex => :environment do
     puts "Found #{doc_files.size} entries"
 
     # Generate this tag's command list for includes
+    puts "building command list"
     if cmd_file = tag_files.detect { |ent| ent.path == 'command-list.txt' }
       commands = blob_content[cmd_file.sha]
       cmd_list = commands.split( "\n" ).reject { |l| l =~ /^#/ }.inject( {} ) do |list, cmd|
@@ -63,6 +70,7 @@ task :preindex => :environment do
     end
 
     # Build virtual category include files for inclusion by actual checked-in files
+    puts "building include files"
     categories = cmd_list.keys.inject({}) do |list, category|
       if category_file = tag_files.detect { |ent| ent.path == "Documentation/#{category}.txt" }
         links = cmd_list[category].map do |cmd, attr|
@@ -77,9 +85,14 @@ task :preindex => :environment do
       end
     end
 
+    doc_limit = ENV['ONLY_BUILD_DOC']
+    doc_files = doc_files.select { |df| df.path =~ /#{doc_limit}/ } if doc_limit
+
     doc_files.each do |entry|
       path = File.basename( entry.path, '.txt' )
       file = DocFile.where(:name => path).first_or_create
+
+      puts "   build: #{path}"
 
       content = blob_content[entry.sha]
       asciidoc = Asciidoc::Document.new(path, content) do |inc|

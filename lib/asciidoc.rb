@@ -275,7 +275,7 @@ module Asciidoc
             # This ensures that eg. "<<some reference>>" is turned into a link but
             # "`<<<<<` and `>>>>>` are conflict markers" is not.  This is much
             # easier before the HTML is escaped and <> are turned into entities.
-            html.gsub!( /(^|[^<])<<([^<>,]+)(,([^>]*))?>>/ ) { "#{$1}link:##{$2}[" + ($4.nil?? document.references[$2] : $4) + "]" }
+            html.gsub!( /(^|[^<])<<([^<>,]+)(,([^>]*))?>>/ ) { "#{$1}link:##{$2}[" + ($4.nil?? document.references[$2] : $4).to_s + "]" }
 
             # Do the same with URLs
             html.gsub!(/(https?:\/\/[^\[ ]+)(\[.*)?/) do
