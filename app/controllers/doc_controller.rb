@@ -52,7 +52,7 @@ class DocController < ApplicationController
     end
 
     if doc_version.nil?
-      redirect_to :ref
+      redirect_to '/docs'
     else
       key = "version-changes-#{doc_version.id}"
       @versions = Rails.cache.fetch(key) do
