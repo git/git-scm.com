@@ -73,8 +73,8 @@ class Section < ActiveRecord::Base
         'lang' => code,
         'html' => self.html,
       }
-      id = "#{code}/#{self.slug}"
-      BONSAI.add 'book', self.slug, data
+      id = "#{code}---#{self.slug}"
+      BONSAI.add 'book', id, data
     end
   rescue Object => e
     require 'pp'
@@ -115,7 +115,7 @@ class Section < ActiveRecord::Base
     resp['hits']['hits'].each do |hit|
       name = hit["_source"]["section"]
       name = hit["_source"]["chapter"] if name.empty?
-      slug = hit["_id"]
+      slug = hit["_id"].gsub('---', '/')
       lang = hit["_source"]["lang"]
       meta = "Chapter " + hit["_source"]['number'] + ' : ' + hit["_source"]["chapter"]
       highlight = hit.has_key?('highlight') ? hit['highlight']['html'].first : nil
