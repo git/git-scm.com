@@ -65,13 +65,15 @@ class Section < ActiveRecord::Base
 
   def index
     if BONSAI
+      code = self.chapter.book.code
       data = {
         'chapter' => self.chapter.title,
         'section' => self.title,
         'number' => self.cs_number,
-        'lang' => self.chapter.book.code,
+        'lang' => code,
         'html' => self.html,
       }
+      id = "#{code}-#{self.slug}"
       BONSAI.add 'book', self.slug, data
     end
   rescue Object => e
@@ -86,13 +88,16 @@ class Section < ActiveRecord::Base
         "must" => [
             { "term" => { "lang" => lang } }
         ],
-        "should" => [
-            { "prefix" => { "section" => { "value" => term, "boost" => 12.0 } } },
-            { "term" => { "html" => term } }
-        ],
+        "should" => [],
         "minimum_number_should_match" => 1
       }
     }
+
+    terms = term.split(' ')
+    terms.each do |terma|
+      query_options['bool']['should'] << { "prefix" => { "section" => { "value" => terma, "boost" => 12.0 } } }
+      query_options['bool']['should'] << { "term" => { "html" => terma } }
+    end
 
     highlight_options = {
       'pre_tags'  => ['[highlight]'],

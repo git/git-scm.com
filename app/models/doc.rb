@@ -11,13 +11,16 @@ class Doc < ActiveRecord::Base
   def self.search(term, highlight = false)
     query_options = {
       "bool" => {
-        "should" => [
-            { "prefix" => { "name" => { "value" => term, "boost" => 12.0 } } },
-            { "term" => { "text" => term } }
-        ],
+        "should" => [],
         "minimum_number_should_match" => 1
       }
     }
+
+    terms = term.split(' ')
+    terms.each do |terma|
+      query_options['bool']['should'] << { "prefix" => { "name" => { "value" => terma, "boost" => 12.0 } } }
+      query_options['bool']['should'] << { "term" => { "text" => terma } }
+    end
 
     highlight_options = {
       'pre_tags'  => ['[highlight]'],

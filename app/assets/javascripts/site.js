@@ -121,7 +121,7 @@ var Search = {
   runSearch: function(lastLetter) {
     Search.searching = true;
     var term = $('#search-text').val();
-    if(term.length < 3) { return false };
+    if(term.length < 2) { return false };
 
     if(term != Search.currentSearch) {
       Search.currentSearch = term;
