@@ -71,6 +71,7 @@ var BrowserFallbacks = {
 
 var Search = {
   searching: false,
+  currentSearch: '',
   selectedIndex: 0,
 
   init: function() {
@@ -88,8 +89,11 @@ var Search = {
   },
 
   observeTextEntry: function() {
+    $('form#search input').keyup(function(e) {
+      Search.runSearch(e.which);
+    });
+
     $('form#search input').keydown(function(e) {
-      Search.searching = true;
       if ($('#search-results').not(':visible') && e.which != 27) {
         $('#search-results').fadeIn(0.2);
         Search.highlight(Search.selectedIndex);
@@ -110,24 +114,31 @@ var Search = {
           e.preventDefault();
           Search.resultsNav("down");
           break;
-        default:
-          // execute search with current text
-          Search.runSearch(e.which);
-          break;
       };
     });
   },
 
   runSearch: function(lastLetter) {
-    var term = $('#search-text').val() + String.fromCharCode(lastLetter);
-    $.get("/search", {search: term}, function(results) {
-      $("#search-results").html(results);
-    });
+    Search.searching = true;
+    var term = $('#search-text').val();
+    if(term.length < 3) { return false };
+
+    if(term != Search.currentSearch) {
+      Search.currentSearch = term;
+      $.get("/search", {search: term}, function(results) {
+        $("#search-results").html(results);
+      });
+    };
   },
 
   selectResultOption: function() {
     var link = $('#search-results a')[Search.selectedIndex];
-    window.location.href = $(link).attr('href');
+    var url = $(link).attr('href');
+    if(!link) {
+      var term = $('#search-text').val();
+      url = "/search/results?search=" + term;
+    }
+    window.location.href = url;
     selectedIndex = 0; 
   },
 
