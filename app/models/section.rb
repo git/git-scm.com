@@ -73,7 +73,7 @@ class Section < ActiveRecord::Base
         'lang' => code,
         'html' => self.html,
       }
-      id = "#{code}-#{self.slug}"
+      id = "#{code}/#{self.slug}"
       BONSAI.add 'book', self.slug, data
     end
   rescue Object => e
@@ -124,7 +124,7 @@ class Section < ActiveRecord::Base
         :meta => meta,
         :score => hit["_score"],
         :highlight => highlight,
-        :url  => "/book/#{lang}/#{slug}"
+        :url  => "/book/#{slug}"
       }
     end
 
