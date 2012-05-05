@@ -1,6 +1,6 @@
 # Git Homepage
 
-This is the web application for the git-scm.com site.  It is meant to be the
+This is the web application for the [git-scm.com](http://git-scm.com) site.  It is meant to be the
 first place that a person new to Git will land and download or learn about the
 Git SCM system.
 
