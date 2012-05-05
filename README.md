@@ -10,11 +10,11 @@ This app is written in Ruby on Rails and deployed on Heroku.
 
 To run the tests for this project, run:
 
-  $ rake test
+    $ rake test
 
 To run the website for testing purposes, run:
 
-  $ bundle exec rackup config.ru
+    $ bundle exec rackup config.ru
 
 ## Contributing
 
