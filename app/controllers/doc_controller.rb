@@ -62,6 +62,7 @@ class DocController < ApplicationController
       @related = DocVersion.get_related(params[:file], 8)
       @version = doc_version.version
       @file = doc_version.doc_file
+      @page_title = "#{@file.name} #{@version.name}"
       @doc = doc_version.doc
     end
   end
