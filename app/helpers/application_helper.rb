@@ -5,12 +5,13 @@ module ApplicationHelper
   end
 
   def random_tagline
-    tags = ['fast-version-control',
-     'everything-is-local',
-     'distributed-even-if-your-workflow-isnt',
-     'local-branching-on-the-cheap',
-     'distributed-is-the-new-centralized' ]
-    mtag = tags[rand(tags.length)]
+    mtag = %w{
+      fast-version-control
+      everything-is-local
+      distributed-even-if-your-workflow-isnt
+      local-branching-on-the-cheap
+      distributed-is-the-new-centralized
+    }.sample
     "<em>--</em>#{mtag}"
   end
 
