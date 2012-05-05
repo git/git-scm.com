@@ -3,7 +3,7 @@
 popped = 'state' in window.history;
 initialURL = location.href;
 
-$(document).ready(function() {		
+$(document).ready(function() {
   BrowserFallbacks.init();
   Search.init();
   Dropdowns.init();
@@ -78,7 +78,7 @@ var Search = {
     Search.observeFocus();
     Search.observeTextEntry();
   },
-  
+
   observeFocus: function() {
     $('form#search input').focus(function() {
       $(this).parent('form#search').switchClass("", "focus", 200);
@@ -139,7 +139,7 @@ var Search = {
       url = "/search/results?search=" + term;
     }
     window.location.href = url;
-    selectedIndex = 0; 
+    selectedIndex = 0;
   },
 
   resultsNav: function(direction) {
@@ -170,11 +170,11 @@ var Dropdowns = {
       var panelId = $(this).attr('data-panel-id');
       if ($(this).hasClass('active')) {
         $(this).removeClass('active');
-        $('#'+panelId).hide(); 
+        $('#'+panelId).hide();
       }
       else {
         $(this).addClass('active');
-        $('#'+panelId).show(); 
+        $('#'+panelId).show();
       }
     });
   }
@@ -255,8 +255,9 @@ var AboutContent = {
     if (section == 'about') section = AboutContent.defaultSection;
     $('ol#about-nav a').removeClass('current');
     $('ol#about-nav a#nav-' + section).addClass('current');
-    $('section').hide();
-    $('section#' + section).show();
+    $('section').hide(0, function(){
+      $('section#' + section).show();
+    });
   },
 
   observeNav: function() {
@@ -298,10 +299,10 @@ var FlippyBook = {
         $('#book-cover-inside').show();
         $('#book-inside-page').show();
       }
-    }); 
+    });
     $('#about-book').click(function(e) {
       e.preventDefault();
-      $('#book-cover').removeClass('open').addClass('close');                    
+      $('#book-cover').removeClass('open').addClass('close');
       if (FlippyBook.threeDee) {
         var t = setTimeout ("$('#book-intro').css('z-index', 100)", 1000);
       }
@@ -310,7 +311,7 @@ var FlippyBook = {
         $('#book-inside-page').hide();
         $('#book-intro').css('z-index', 100);
       }
-    }); 
+    });
   }
 }
 
