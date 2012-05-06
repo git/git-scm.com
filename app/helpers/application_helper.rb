@@ -1,18 +1,19 @@
 module ApplicationHelper
 
+  TAGLINES = %w{
+    fast-version-control
+    everything-is-local
+    distributed-even-if-your-workflow-isnt
+    local-branching-on-the-cheap
+    distributed-is-the-new-centralized
+  }
+
   def partial(part)
     render part
   end
 
   def random_tagline
-    mtag = %w{
-      fast-version-control
-      everything-is-local
-      distributed-even-if-your-workflow-isnt
-      local-branching-on-the-cheap
-      distributed-is-the-new-centralized
-    }.sample
-    "<em>--</em>#{mtag}"
+    "<em>--</em>#{TAGLINES.sample}"
   end
 
   def latest_version
