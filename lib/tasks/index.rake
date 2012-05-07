@@ -124,5 +124,6 @@ task :preindex => :environment do
     end
 
   end
+  Rails.cache.write("latest-version", Version.latest_version.name)
 end
 

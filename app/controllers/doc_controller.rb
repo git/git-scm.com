@@ -45,25 +45,32 @@ class DocController < ApplicationController
   end
 
   def man
-    if params[:version]
-      doc_version = DocVersion.for_version(params[:file], params[:version])
-    else
-      doc_version = DocVersion.latest_for(params[:file])
-    end
+    latest = Rails.cache.read("latest-version")
+    filename = params[:file]
+    version = params[:version] || latest
+    @cache_key = "man-#{filename}-#{latest}-#{version}"
 
-    if doc_version.nil?
-      redirect_to '/docs'
-    else
-      key = "version-changes-#{doc_version.id}"
-      @versions = Rails.cache.fetch(key) do
-        DocVersion.version_changes(params[:file], 20)
+    if !Rails.cache.exist?("views/" + @cache_key)
+      if params[:version]
+        doc_version = DocVersion.for_version(filename, params[:version])
+      else
+        doc_version = DocVersion.latest_for(filename)
       end
-      @last = DocVersion.last_changed(params[:file])
-      @related = DocVersion.get_related(params[:file], 8)
-      @version = doc_version.version
-      @file = doc_version.doc_file
-      @page_title = "#{@file.name} #{@version.name}"
-      @doc = doc_version.doc
+
+      if doc_version.nil?
+        redirect_to '/docs'
+      else
+        key = "version-changes-#{doc_version.id}"
+        @versions = Rails.cache.fetch(key) do
+          DocVersion.version_changes(filename, 20)
+        end
+        @last = DocVersion.last_changed(filename)
+        @related = DocVersion.get_related(filename, 8)
+        @version = doc_version.version
+        @file = doc_version.doc_file
+        @page_title = "#{@file.name} #{@version.name}"
+        @doc = doc_version.doc
+      end
     end
   end
 
