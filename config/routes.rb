@@ -26,6 +26,7 @@ Gitscm::Application.routes.draw do
   match "/ref/:file/:version" => "doc#man", :version => /[^\/]+/
 
   match "/book" => "doc#book"
+  match "/book/index" => "doc#book"
   match "/book/commands" => "doc#commands"
   match "/book/ch:chapter-:section.html" => "doc#progit"
   match "/book/:lang/ch:chapter-:section.html" => "doc#progit"
@@ -47,6 +48,7 @@ Gitscm::Application.routes.draw do
 
   match "/admin" => "site#admin"
 
+  match "/download" => "downloads#index"  # from old site
   match "/downloads" => "downloads#index"
   match "/downloads/guis" => "downloads#guis"
   match "/downloads/installers" => "downloads#installers"
