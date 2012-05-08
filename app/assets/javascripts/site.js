@@ -33,7 +33,6 @@ var DownloadBox = {
       $(".monitor").removeClass("linux");
       $(".monitor").addClass("mac");
       $("#download-link").text("Download for Mac").attr("href", "/download/mac");
-      $("#alt-link").removeClass("windows").addClass("mac");
       $("#alt-link").text("Windows Build").attr("href", "/download/win");
       $("#gui-os-filter").attr('data-os', 'mac');
       $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
