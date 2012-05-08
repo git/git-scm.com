@@ -286,6 +286,7 @@ var FlippyBook = {
       FlippyBook.threeDee = true;
       $('#book-container').addClass('three-dee');
     }
+    $('#about-book').addClass('visible');
   },
 
   observeOpenCloseClicks: function() {
