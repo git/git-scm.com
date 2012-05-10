@@ -22,6 +22,9 @@ Gitscm::Application.routes.draw do
   match "/test" => "doc#test"
   match "/doc/ext" => "doc#ext"
 
+  match "/man/:file" => "doc#man"
+  match "/man/:file/:version" => "doc#man", :version => /[^\/]+/
+
   match "/ref/:file" => "doc#man"
   match "/ref/:file/:version" => "doc#man", :version => /[^\/]+/
 
