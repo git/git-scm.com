@@ -22,8 +22,11 @@ Gitscm::Application.routes.draw do
   match "/test" => "doc#test"
   match "/doc/ext" => "doc#ext"
 
-  match "/ref/:file" => "doc#man"
-  match "/ref/:file/:version" => "doc#man", :version => /[^\/]+/
+  %w{man ref}.each do |path|
+    match "/#{path}/:file" => redirect("/docs/%{file}")
+    match "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"),
+                                       :version => /[^\/]+/
+  end
 
   match "/book" => "doc#book"
   match "/book/index" => "doc#book"
