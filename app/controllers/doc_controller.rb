@@ -51,10 +51,11 @@ class DocController < ApplicationController
     @cache_key = "man-#{filename}-#{latest}-#{version}"
 
     if !Rails.cache.exist?("views/" + @cache_key)
-      if params[:version]
-        doc_version = DocVersion.for_version(filename, params[:version])
-      else
-        doc_version = DocVersion.latest_for(filename)
+      doc_version = doc_for filename, version
+      if doc_version.nil?
+        filename = "git-#{filename}"
+        doc_version = doc_for filename, version
+        redirect_to doc_file_url(filename) unless doc_version.nil?
       end
 
       if doc_version.nil?
@@ -189,6 +190,16 @@ class DocController < ApplicationController
   end
 
   def ext
+  end
+
+  private
+
+  def doc_for(filename, version = nil)
+    if version
+      doc_version = DocVersion.for_version filename, version
+    else
+      doc_version = DocVersion.latest_for filename
+    end
   end
 
 end

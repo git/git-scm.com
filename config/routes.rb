@@ -12,12 +12,12 @@ Gitscm::Application.routes.draw do
     root :to => 'site#redirect_book'
     match '*path' => 'site#redirect_combook'
   end
-  
+
   get "site/index"
 
   match "/doc" => "doc#index"
   match "/docs" => "doc#ref"
-  match "/docs/:file" => "doc#man"
+  match "/docs/:file" => "doc#man", :as => :doc_file
   match "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
   match "/test" => "doc#test"
   match "/doc/ext" => "doc#ext"
@@ -34,8 +34,8 @@ Gitscm::Application.routes.draw do
   match "/book/:lang/:slug" => "doc#book_section"
   match "/publish" => "doc#book_update"
   match "/related" => "doc#related_update"
-  match "/:year/:month/:day/:slug" => "doc#blog", :year => /\d{4}/, 
-                                                  :month => /\d{2}/, 
+  match "/:year/:month/:day/:slug" => "doc#blog", :year => /\d{4}/,
+                                                  :month => /\d{2}/,
                                                   :day => /\d{2}/
 
   match "/about" => "about#index"
