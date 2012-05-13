@@ -23,7 +23,7 @@ class DocVersion < ActiveRecord::Base
   end
 
   def self.latest_versions(doc_name)
-    for_doc(doc_name).joins(:version).order('versions.vorder DESC')
+    for_doc(doc_name).includes(:version).order('versions.vorder DESC')
   end
 
   def self.for_version(doc_name, version_name)
@@ -34,7 +34,7 @@ class DocVersion < ActiveRecord::Base
     versions = []
     unchanged = []
     vers = DocVersion.latest_versions(file)
-    for i in 0..(vers.size-2)
+    (vers.size-2).times do |i|
       v = vers[i]
       prev = vers[i+1]
       sha2 = v.doc.blob_sha
