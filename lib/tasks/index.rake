@@ -115,7 +115,7 @@ task :preindex => :environment do
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
-      if rebuild || !doc.plain || !doc.html
+      if rerun || !doc.plain || !doc.html
         doc.plain = asciidoc.source
         doc.html  = asciidoc.render( template_dir )
         doc.save
