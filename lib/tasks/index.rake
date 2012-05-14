@@ -10,7 +10,7 @@ task :preindex => :environment do
   template_dir = File.join(Rails.root, 'templates')
   repo = ENV['GIT_REPO'] || 'git/git'
   rebuild = ENV['REBUILD_DOC']
-  rerun = false
+  rerun = ENV['RERUN'] || false
 
   blob_content = Hash.new do |blobs, sha|
     content = Base64.decode64( Octokit.blob( repo, sha, :encoding => 'base64' ).content )
@@ -120,7 +120,9 @@ task :preindex => :environment do
         doc.html  = asciidoc.render( template_dir )
         doc.save
       end
-      DocVersion.where(:version_id => stag.id, :doc_id => doc.id, :doc_file_id => file.id).first_or_create
+      dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create
+      dv.doc_id = doc.id
+      dv.save
     end
 
   end
