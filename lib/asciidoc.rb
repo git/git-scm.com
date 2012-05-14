@@ -49,19 +49,20 @@ module Asciidoc
     :line     => /^([=\-~^\+])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
     :note     => /^\[NOTE\]\s*$/,
-    :dlist    => /^(.*)(::|;;)\s*$/,
-    :olist    => /^(\d+\.|\. )(.*)$/,
+    :dlist    => /^(\s*)(\S.*)(::|;;)\s*$/,
+    :olist    => /^\s*(\d+\.|\. )(.*)$/,
     :ulist    => /^\s*[\*\-]\s+(.*)$/,
-    :title    => /^\.(\S.*)\s*$/,
+    :title    => /^\.([^\s\.].*)\s*$/,
     :quote    => /^_{4,}\s*$/,
     :colist   => /^\<\d+\>\s*(.*)/,
     :oblock   => /^\-\-\s*$/,
     :anchor   => /^\[(\[.+\])\]\s*$/,
     :biblio   => /\[\[\[([^\]]+)\]\]\]/,
     :comment  => /^\/\/\s/,
-    :listing  => /^\-+\s*$/,
-    :example  => /^=+\s*$/,
-    :literal  => /^([ \t]+.*)$/,
+    :listing  => /^\-{4,}\s*$/,
+    :example  => /^={4,}\s*$/,
+    :lit_blk  => /^\.{4,}\s*$/,
+    :lit_par  => /^([ \t]+.*)$/,
     :caption  => /^\[caption=\"([^\"]+)\"\]/,
     :continue => /^\+\s*$/
   }
@@ -132,6 +133,9 @@ module Asciidoc
     # Public: Get/Set the String content.
     attr_accessor :content
 
+    # Public: Get/Set the String list item anchor name.
+    attr_accessor :anchor
+
     # Public: Initialize an Asciidoc::ListItem object.
     #
     # content - the String content (default '')
@@ -175,10 +179,14 @@ module Asciidoc
     def initialize(parent, context, buffer=nil)
       @parent = parent
       @context = context
-
-      @buffer = buffer.join.gsub(/\n\s*\\/m,'').lines.to_a unless buffer.nil?
+      @buffer = buffer
 
       @blocks = []
+    end
+
+    # Public: Get the truthiness of whether this block has a list context
+    def list?
+      [ :ulist, :olist, :dlist, :colist ].include?( context )
     end
 
     # Public: Get the Asciidoc::Document instance to which this Block belongs
@@ -222,7 +230,11 @@ module Asciidoc
       case @context
       when :dlist
         @buffer.map do |dt, dd|
-          html_dt = htmlify(dt.content)
+          if !dt.anchor.nil? && !dt.anchor.empty?
+            html_dt = "<a id=#{dt.anchor}></a>" + htmlify(dt.content)
+          else
+            html_dt = htmlify(dt.content)
+          end
           if dd.content.empty?
             html_dd = ''
           else
@@ -241,12 +253,12 @@ module Asciidoc
       when :listing
         @buffer.map{|l| CGI.escapeHTML(l).gsub(/(<\d+>)/,'<b>\1</b>')}.join
       when :literal
-        leading_ws = @buffer.first.match(/^(\s+)/)[1]
-        @buffer.map{|l| htmlify(l.sub(/#{leading_ws}/,''))}.join
+        leading_ws = @buffer.first.match(/^(\s*)/)[1]
+        htmlify( @buffer.map{ |l| l.sub( /#{leading_ws}/, '' ) }.join )
       when :verse
-        @buffer.map{|l| htmlify(l.strip)}.join("\n")
+        htmlify( @buffer.map{ |l| l.strip }.join( "\n" ) )
       else
-        @buffer.map{|l| htmlify(l.lstrip)}.join # ("\n")
+        htmlify( @buffer.map{ |l| l.lstrip }.join )
       end
     end
 
@@ -263,10 +275,18 @@ module Asciidoc
         #   htmlify(asciidoc_string)
         #   => "Make <em>this</em> &lt;emphasized&gt;"
         def htmlify(string)
-          intrinsics = {
-            'startsb' => '[',
-            'endsb'   => ']'
-          }
+          intrinsics = Hash.new{|h,k| STDERR.puts "Missing intrinsic: #{k.inspect}"; "{#{k}}"}.merge(
+            'startsb'    => '[',
+            'endsb'      => ']',
+            'caret'      => '^',
+            'asterisk'   => '*',
+            'tilde'      => '~',
+            'litdd'      => '--',
+            'plus'       => '+',
+            'apostrophe' => "'",
+            'backslash'  => "\\",
+            'backtick'   => '`'
+          )
 
           unless string.nil?
             html = string.dup
@@ -278,61 +298,27 @@ module Asciidoc
             html.gsub!( /(^|[^<])<<([^<>,]+)(,([^>]*))?>>/ ) { "#{$1}link:##{$2}[" + ($4.nil?? document.references[$2] : $4).to_s + "]" }
 
             # Do the same with URLs
-            html.gsub!(/(https?:\/\/[^\[ ]+)(\[.*)?/) do
-              if $2.nil?
-                "link:#{$1}[$1]$'"
-              else
-                link, rest = linkify($2[1..-1])
-                "link:#{$1}[#{link}]#{rest}"
-              end
+            html.gsub!( /(^|[^`])(https?:\/\/[^\[ ]+)(\[+[^\]]*\]+)?/ ) do
+              pre=$1
+              url=$2
+              link=( $3 || $2 ).gsub( /(^\[|\]$)/,'' )
+              link = url if link.empty?
+
+              "#{pre}link:#{url}[#{link}]"
             end
 
             CGI.escapeHTML(html).
               gsub(REGEXP[:biblio], '<a name="\1">[\1]</a>').
-              gsub(/``(.*?)''/, '&#147;\1&#148;').
-              gsub(/(^|\W)'([^']+)'/, '\1<em>\2</em>').
-              gsub(/`([^`]+)`/, '<tt>\1</tt>').
-              gsub(/\*([^\*]+)\*/, '<strong>\1</strong>').
-              gsub(/\{([^\}]+)\}/) { intrinsics[$1] }.
+              gsub(/``(.*?)''/m, '&#147;\1&#148;').
+              gsub(/(^|\W)'([^']+)'/m, '\1<em>\2</em>').
+              gsub(/`([^`]+)`/m, '<tt>\1</tt>').
+              gsub(/\*([^\*]+)\*/m, '<strong>\1</strong>').
+              gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + intrinsics[$2] }.
+              gsub(/\\([\{\}\-])/, '\1').
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
-              gsub(/link:([^\[]+)\[(.*)$/) { link,rest = linkify($2); "<a href=\"#{$1}\">#{link}</a>#{rest}" }
+              gsub(/link:([^\[]+)(\[+[^\]]*\]+)/ ) { "<a href=\"#{$1}\">#{$2.gsub( /(^\[|\]$)/,'' )}</a>" }
           end
         end
-
-        # Private: Extract the link text from a string, allowing for the link text to have zero
-        # or more levels of '[]' characters.
-        #
-        # string - the String input following the leading '[' character after an Asciidoc link: tag
-        #
-        # Returns the Array of [String link, String rest_of_string]
-        #
-        # Examples
-        #
-        #   linkify( '1] lorem ipsum dolor' )
-        #   => ["1", " lorem ipsum dolor"]
-        #
-        #   linkify( '[1]] lorem ipsum dolor' )
-        #   => ["[1]", " lorem ipsum dolor"]
-        #
-        #   linkify( '[[1]]] lorem ipsum dolor' )
-        #   => ["[[1]]", " lorem ipsum dolor"]
-        #
-        def linkify(string)
-          chars = string.chars.to_a
-          i = 0
-          level = 1
-          while chars.any? && level > 0
-            case chars.shift
-            when '['; level += 1
-            when ']'; level -= 1
-            end
-            i += 1 unless level == 0
-          end
-          raise "Unable to find link in #{string.inspect}" unless level == 0
-
-          [string[0..i-1], string[i+1..-1]]
-        end
-
   end
 
   # Public: Methods for managing sections of Asciidoc content in a document.
@@ -379,6 +365,13 @@ module Asciidoc
     def initialize(parent)
       @parent = parent
       @blocks = []
+    end
+
+    # Public: Get the truthiness of whether this section is a list
+    #
+    # Returns Boolean false (only Blocks can be lists)
+    def list?
+      false
     end
 
     # Public: Get the String section id
@@ -597,28 +590,6 @@ module Asciidoc
         end
       end
 
-      # link: tags and xrefs (and maybe other things?) can span multiple lines.
-      # eg. the SEE ALSO section of git-branch or the shallow_repository
-      # definition in glossary-content.
-      i = 0
-      while i < @lines.size
-        while link = @lines[i].match(/link:[^\[]+(\[.*)$/) && $1.count('[') > $1.count(']')
-          @lines[i].sub!(/\n$/,' ')
-          next_line = @lines.delete_at(i+1)
-          break if next_line.nil?
-          @lines[i] << next_line
-        end
-
-        while xref = @lines[i].match(/<</) && $' !~ />>/
-          @lines[i].sub!(/\n$/,' ')
-          next_line = @lines.delete_at(i+1)
-          break if next_line.nil?
-          @lines[i] << next_line
-        end
-
-        i += 1
-      end
-
       @source = @lines.join
 
       @root = next_section(@lines)
@@ -678,7 +649,7 @@ module Asciidoc
         nil
       end
 
-      # Private: Strip off and return the next segment (one or more contiguous blocks) from the Array of lines.
+      # Private: Strip off and return the list item segment (one or more contiguous blocks) from the Array of lines.
       #
       # lines   - the Array of String lines.
       # options - an optional Hash of processing options:
@@ -691,12 +662,12 @@ module Asciidoc
       #   content
       #   => ["First paragraph\n", "+\n", "Second paragraph\n", "--\n", "Open block\n", "\n", "Can have blank lines\n", "--\n", "\n", "In a different segment\n"]
       #
-      #   next_segment(content)
+      #   list_item_segment(content)
       #   => ["First paragraph\n", "+\n", "Second paragraph\n", "--\n", "Open block\n", "\n", "Can have blank lines\n", "--\n"]
       #
       #   content
       #   => ["In a different segment\n"]
-      def next_segment(lines, options={})
+      def list_item_segment(lines, options={})
         alternate_ending = options[:alt_ending]
         segment = []
 
@@ -709,7 +680,29 @@ module Asciidoc
           in_oblock = !in_oblock if this_line.match(REGEXP[:oblock])
           if !in_oblock
             if this_line.strip.empty?
-              break
+              # From the Asciidoc user's guide:
+              #   Another list or a literal paragraph immediately following a list item will be implicitly included in the list item
+              next_nonblank = lines.detect{|l| !l.strip.empty?}
+              if !next_nonblank.nil? &&
+                 ( alternate_ending.nil? ||
+                   !next_nonblank.match(alternate_ending)
+                 ) &&
+                 ( next_nonblank.match(REGEXP[:ulist])  ||
+                   next_nonblank.match(REGEXP[:olist])  ||
+                   next_nonblank.match(REGEXP[:colist]) ||
+                   next_nonblank.match(REGEXP[:dlist])  ||
+                   next_nonblank.match(REGEXP[:lit_par])
+                 )
+
+                 # Pull blank lines into the segment, so the next thing up for processing
+                 # will be the next nonblank line.
+                 while lines.first.strip.empty?
+                   segment << this_line
+                   this_line = lines.shift
+                 end
+              else
+                break
+              end
             elsif !alternate_ending.nil? && this_line.match(alternate_ending)
               lines.unshift this_line
               break
@@ -916,16 +909,23 @@ module Asciidoc
             end
             lines.unshift(this_line) unless this_line.nil?
             block.buffer = items
-          elsif this_line.match(REGEXP[:dlist])
+          elsif match = this_line.match(REGEXP[:dlist])
             pairs = []
             block = Block.new(parent, :dlist)
 
-            while !this_line.nil? && match = this_line.match(REGEXP[:dlist])
-              dt = ListItem.new(match[1])
+            this_dlist = Regexp.new(/^#{match[1]}(.*)#{match[3]}\s*$/)
+
+            while !this_line.nil? && match = this_line.match(this_dlist)
+              if anchor = match[1].match( /\[\[([^\]]+)\]\]/ )
+                dt = ListItem.new( $` + $' )
+                dt.anchor = anchor[1]
+              else
+                dt = ListItem.new( match[1] )
+              end
               dd = ListItem.new
               lines.shift if lines.any? && lines.first.strip.empty? # workaround eg. git-config OPTIONS --get-colorbool
 
-              dd_segment = next_segment(lines, :alt_ending => REGEXP[:dlist])
+              dd_segment = list_item_segment(lines, :alt_ending => this_dlist)
               while dd_segment.any?
                 dd.blocks << next_block(dd_segment, block)
               end
@@ -961,7 +961,7 @@ module Asciidoc
 
             block = Block.new(parent, :note, buffer)
           elsif this_line.match(REGEXP[:listing])
-            # listing is surrounded by '----' (3 or more dashes) lines
+            # listing is surrounded by '----' (4 or more dashes) lines
             this_line = lines.shift
             while !this_line.nil? && !this_line.match(REGEXP[:listing])
               buffer << this_line
@@ -970,7 +970,7 @@ module Asciidoc
 
             block = Block.new(parent, :listing, buffer)
           elsif this_line.match(REGEXP[:example])
-            # example is surrounded by '====' (3 or more '=' chars) lines
+            # example is surrounded by '====' (4 or more '=' chars) lines
             this_line = lines.shift
             while !this_line.nil? && !this_line.match(REGEXP[:example])
               buffer << this_line
@@ -987,9 +987,19 @@ module Asciidoc
             end
 
             block = Block.new(parent, :quote, buffer)
-          elsif this_line.match(REGEXP[:literal])
-            # literal is contiguous lines starting with 4 spaces
-            while !this_line.nil? && this_line.match(REGEXP[:literal])
+          elsif this_line.match(REGEXP[:lit_blk])
+            # example is surrounded by '....' (4 or more '.' chars) lines
+            this_line = lines.shift
+            while !this_line.nil? && !this_line.match(REGEXP[:lit_blk])
+              buffer << this_line
+              this_line = lines.shift
+            end
+
+            block = Block.new(parent, :literal, buffer)
+          elsif this_line.match(REGEXP[:lit_par]) && !parent.list?
+            # literal paragraph is contiguous lines starting with
+            # one or more space or tab characters
+            while !this_line.nil? && this_line.match(REGEXP[:lit_par])
               buffer << this_line
               this_line = lines.shift
             end
