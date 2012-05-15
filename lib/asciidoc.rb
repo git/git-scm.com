@@ -67,6 +67,19 @@ module Asciidoc
     :continue => /^\+\s*$/
   }
 
+  INTRINSICS = Hash.new{|h,k| STDERR.puts "Missing intrinsic: #{k.inspect}"; "{#{k}}"}.merge(
+    'startsb'    => '[',
+    'endsb'      => ']',
+    'caret'      => '^',
+    'asterisk'   => '*',
+    'tilde'      => '~',
+    'litdd'      => '--',
+    'plus'       => '+',
+    'apostrophe' => "'",
+    'backslash'  => "\\",
+    'backtick'   => '`'
+  )
+
   # Public: Methods for rendering Asciidoc Documents, Sections, and Blocks
   # using Tile-compatible templates.
   class Renderer
@@ -275,19 +288,6 @@ module Asciidoc
         #   htmlify(asciidoc_string)
         #   => "Make <em>this</em> &lt;emphasized&gt;"
         def htmlify(string)
-          intrinsics = Hash.new{|h,k| STDERR.puts "Missing intrinsic: #{k.inspect}"; "{#{k}}"}.merge(
-            'startsb'    => '[',
-            'endsb'      => ']',
-            'caret'      => '^',
-            'asterisk'   => '*',
-            'tilde'      => '~',
-            'litdd'      => '--',
-            'plus'       => '+',
-            'apostrophe' => "'",
-            'backslash'  => "\\",
-            'backtick'   => '`'
-          )
-
           unless string.nil?
             html = string.dup
 
@@ -313,7 +313,7 @@ module Asciidoc
               gsub(/(^|\W)'([^']+)'/m, '\1<em>\2</em>').
               gsub(/`([^`]+)`/m, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/m, '<strong>\1</strong>').
-              gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + intrinsics[$2] }.
+              gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + INTRINSICS[$2] }.
               gsub(/\\([\{\}\-])/, '\1').
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
               gsub(/link:([^\[]+)(\[+[^\]]*\]+)/ ) { "<a href=\"#{$1}\">#{$2.gsub( /(^\[|\]$)/,'' )}</a>" }
@@ -344,8 +344,8 @@ module Asciidoc
     # Public: Get/Set the Integer section level.
     attr_accessor :level
 
-    # Public: Get/Set the String section name.
-    attr_accessor :name
+    # Public: Set the String section name.
+    attr_writer :name
 
     # Public: Get/Set the String section title.
     attr_accessor :title
@@ -365,6 +365,19 @@ module Asciidoc
     def initialize(parent)
       @parent = parent
       @blocks = []
+    end
+
+    # Public: Get the String section name with intrinsics converted
+    #
+    # Examples
+    #
+    #   section.name = "git-web{litdd}browse(1) Manual Page"
+    #   section.name
+    #   => "git-web--browse(1) Manual Page"
+    #
+    # Returns the String section name
+    def name
+      @name && @name.gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + INTRINSICS[$2] }
     end
 
     # Public: Get the truthiness of whether this section is a list
