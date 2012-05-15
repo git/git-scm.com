@@ -967,7 +967,7 @@ module Asciidoc
           elsif this_line.match(REGEXP[:note])
             # note is an admonition preceded by [NOTE] and lasts until a blank line
             this_line = lines.shift
-            while !this_line.nil? && !this_line.strip.empty?
+            while !this_line.nil? && !this_line.strip.empty? && !this_line.match( REGEXP[:continue] )
               buffer << this_line
               this_line = lines.shift
             end
