@@ -22,7 +22,7 @@ Gitscm::Application.routes.draw do
   match "/test" => "doc#test"
   match "/doc/ext" => "doc#ext"
 
-  %w{man ref}.each do |path|
+  %w{man ref git}.each do |path|
     match "/#{path}/:file" => redirect("/docs/%{file}")
     match "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"),
                                        :version => /[^\/]+/
