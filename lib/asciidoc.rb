@@ -312,6 +312,7 @@ module Asciidoc
               gsub(/`([^`]+)`/m) { "<tt>#{$1.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' )}</tt>" }.
               gsub(/``(.*?)''/m, '&#147;\1&#148;').
               gsub(/(^|\W)'([^']+)'/m, '\1<em>\2</em>').
+              gsub(/(^|\W)_([^_]+)_/m, '\1<em>\2</em>').
               gsub(/\*([^\*]+)\*/m, '<strong>\1</strong>').
               gsub(/(?<!\\)\{(\w[\w\-]+\w)\}/) { INTRINSICS[$1] }.
               gsub(/\\([\{\}\-])/, '\1').
@@ -704,7 +705,8 @@ module Asciidoc
                    next_nonblank.match(REGEXP[:olist])  ||
                    next_nonblank.match(REGEXP[:colist]) ||
                    next_nonblank.match(REGEXP[:dlist])  ||
-                   next_nonblank.match(REGEXP[:lit_par])
+                   next_nonblank.match(REGEXP[:lit_par]) ||
+                   next_nonblank.match(REGEXP[:continue])
                  )
 
                  # Pull blank lines into the segment, so the next thing up for processing
