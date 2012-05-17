@@ -48,7 +48,7 @@ task :local_index => :environment do
         mode, type, sha, path = e.split(' ')
         [path, sha, type]
       end
-      tree = tree.select { |t| t.first =~ /^(git.*|everyday|howto-index,user-manual)\.txt/ }
+      tree = tree.select { |t| t.first =~ /^(git.*|everyday|howto-index|user-manual)\.txt/ }
 
       puts "Found #{tree.size} entries"
 
