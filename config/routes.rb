@@ -17,7 +17,8 @@ Gitscm::Application.routes.draw do
 
   match "/doc" => "doc#index"
   match "/docs" => "doc#ref"
-  match "/docs/:file" => "doc#man", :as => :doc_file
+  match "/docs/:file.html" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
+  match "/docs/:file" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
   match "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
   match "/test" => "doc#test"
   match "/doc/ext" => "doc#ext"
