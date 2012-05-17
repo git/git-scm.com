@@ -4,14 +4,21 @@ require 'asciidoc'
 task :local_index => :environment do
   template_dir = File.join(Rails.root, 'templates')
   dir = ENV["GIT_REPO"]
-  rerun = false
+  rebuild = ENV['REBUILD_DOC']
+  rerun = ENV['RERUN'] || false
+
   Dir.chdir(dir) do
     # find all tags
     tags = `git tag | grep v1`.strip.split("\n")
     tags = tags.select { |tag| tag =~ /v\d([\.\d])+$/ }  # just get release tags
 
+    if rebuild
+      tags = tags.select { |t| t == rebuild }
+      rerun = true
+    end
+
     # for each tag, get a date and a list of file/shas
-    tags.each do |tag|
+    tags.sort.each do |tag|
 
       puts tag
 
@@ -62,31 +69,41 @@ task :local_index => :environment do
         list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
       end
 
+      doc_limit = ENV['ONLY_BUILD_DOC']
+
       tree.each do |entry|
         path, sha, type = entry
         path = path.gsub('.txt', '')
+        next if doc_limit && path !~ /#{doc_limit}/
         file = DocFile.where(:name => path).first_or_create
-        doc = Doc.where(:blob_sha => sha).first_or_create
-        if !doc.plain || !doc.html
-          content = `git cat-file blob #{sha}`.chomp
-          asciidoc = Asciidoc::Document.new(path, content) do |inc|
-            if categories.has_key?(inc)
-              categories[inc]
-            else
-              if match = inc.match(/^\.\.\/(.*)$/)
-                git_path = match[1]
-              else
-                git_path = "Documentation/#{inc}"
-              end
 
-              `git cat-file blob #{tag}:#{git_path}`
+        puts "   build: #{path}"
+
+        content = `git cat-file blob #{sha}`.chomp
+        asciidoc = Asciidoc::Document.new(path, content) do |inc|
+          if categories.has_key?(inc)
+            categories[inc]
+          else
+            if match = inc.match(/^\.\.\/(.*)$/)
+              git_path = match[1]
+            else
+              git_path = "Documentation/#{inc}"
             end
+
+            `git cat-file blob #{tag}:#{git_path}`
           end
+        end
+        asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
+
+        doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
+        if rerun || !doc.plain || !doc.html
           doc.plain = asciidoc.source
           doc.html  = asciidoc.render(template_dir)
           doc.save
         end
-        DocVersion.where(:version_id => stag.id, :doc_id => doc.id, :doc_file_id => file.id).first_or_create
+        dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create
+        dv.doc_id = doc.id
+        dv.save
       end
 
     end

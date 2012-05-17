@@ -309,11 +309,11 @@ module Asciidoc
 
             CGI.escapeHTML(html).
               gsub(REGEXP[:biblio], '<a name="\1">[\1]</a>').
+              gsub(/`([^`]+)`/m) { "<tt>#{$1.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' )}</tt>" }.
               gsub(/``(.*?)''/m, '&#147;\1&#148;').
               gsub(/(^|\W)'([^']+)'/m, '\1<em>\2</em>').
-              gsub(/`([^`]+)`/m, '<tt>\1</tt>').
               gsub(/\*([^\*]+)\*/m, '<strong>\1</strong>').
-              gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + INTRINSICS[$2] }.
+              gsub(/(?<!\\)\{(\w[\w\-]+\w)\}/) { INTRINSICS[$1] }.
               gsub(/\\([\{\}\-])/, '\1').
               gsub(/linkgit:([^\]]+)\[(\d+)\]/, '<a href="\1.html">\1(\2)</a>').
               gsub(/link:([^\[]+)(\[+[^\]]*\]+)/ ) { "<a href=\"#{$1}\">#{$2.gsub( /(^\[|\]$)/,'' )}</a>" }
