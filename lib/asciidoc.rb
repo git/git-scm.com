@@ -45,16 +45,16 @@ require 'tilt'
 #   html = doc.render(template_path)
 module Asciidoc
   REGEXP = {
-    :name     => /^([A-Za-z].*)\s*$/,
+    :name     => /^(["A-Za-z].*)\s*$/,
     :line     => /^([=\-~^\+])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
     :note     => /^\[NOTE\]\s*$/,
     :dlist    => /^(\s*)(\S.*)(::|;;)\s*$/,
     :olist    => /^\s*(\d+\.|\. )(.*)$/,
-    :ulist    => /^\s*[\*\-]\s+(.*)$/,
+    :ulist    => /^\s*([\*\-])\s+(.*)$/,
     :title    => /^\.([^\s\.].*)\s*$/,
     :quote    => /^_{4,}\s*$/,
-    :colist   => /^\<\d+\>\s*(.*)/,
+    :colist   => /^(\<\d+\>)\s*(.*)/,
     :oblock   => /^\-\-\s*$/,
     :anchor   => /^\[(\[.+\])\]\s*$/,
     :biblio   => /\[\[\[([^\]]+)\]\]\]/,
@@ -197,11 +197,6 @@ module Asciidoc
       @blocks = []
     end
 
-    # Public: Get the truthiness of whether this block has a list context
-    def list?
-      [ :ulist, :olist, :dlist, :colist ].include?( context )
-    end
-
     # Public: Get the Asciidoc::Document instance to which this Block belongs
     def document
       @parent.is_a?(Document) ? @parent : @parent.document
@@ -213,16 +208,12 @@ module Asciidoc
       @parent.renderer
     end
 
-    # Public: Get the rendered String content for this Block and all its child
-    # Blocks.
+    # Public: Get the rendered String content for this Block.  If the block
+    # has child blocks, the content method should cause them to be
+    # rendered and returned as content that can be included in the
+    # parent block's template.
     def render
-      rendered_blocks = [renderer.render("section_#{context}", self)]
-      rendered_blocks += blocks.map do |block|
-        view = "section_#{block.context}"
-        renderer.render(view, block)
-      end
-
-      rendered_blocks.join
+      renderer.render("section_#{context}", self)
     end
 
     # Public: Get an HTML-ified version of the source buffer, with special
@@ -257,8 +248,8 @@ module Asciidoc
 
           [html_dt, html_dd]
         end
-      when :oblock
-        ''
+      when :oblock, :quote
+        blocks.map{|block| block.render}.join
       when :olist, :ulist, :colist
         @buffer.map do |li|
           htmlify(li.content) + li.blocks.map{|block| block.render}.join
@@ -267,7 +258,7 @@ module Asciidoc
         @buffer.map{|l| CGI.escapeHTML(l).gsub(/(<\d+>)/,'<b>\1</b>')}.join
       when :literal
         leading_ws = @buffer.first.match(/^(\s*)/)[1]
-        htmlify( @buffer.map{ |l| l.sub( /#{leading_ws}/, '' ) }.join )
+        htmlify( @buffer.map{ |l| l.sub( /#{leading_ws}/, '' ) }.join.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' ))
       when :verse
         htmlify( @buffer.map{ |l| l.strip }.join( "\n" ) )
       else
@@ -378,14 +369,7 @@ module Asciidoc
     #
     # Returns the String section name
     def name
-      @name && @name.gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + INTRINSICS[$2] }
-    end
-
-    # Public: Get the truthiness of whether this section is a list
-    #
-    # Returns Boolean false (only Blocks can be lists)
-    def list?
-      false
+      @name && @name.gsub(/(^|[^\\])\{(\w[\w\-]+\w)\}/) { $1 + INTRINSICS[$2] }.gsub( /`([^`]+)`/, '<tt>\1</tt>' )
     end
 
     # Public: Get the String section id
@@ -689,10 +673,12 @@ module Asciidoc
 
         # Grab lines until the first blank line not inside an open block
         in_oblock = false
+        in_listing = false
         while lines.any?
           this_line = lines.shift
           in_oblock = !in_oblock if this_line.match(REGEXP[:oblock])
-          if !in_oblock
+          in_listing = !in_listing if this_line.match(REGEXP[:listing])
+          if !in_oblock && !in_listing
             if this_line.strip.empty?
               # From the Asciidoc user's guide:
               #   Another list or a literal paragraph immediately following a list item will be implicitly included in the list item
@@ -788,141 +774,30 @@ module Asciidoc
             while buffer.any?
               block.blocks << next_block(buffer, block)
             end
-          elsif this_line.match(REGEXP[:olist])
-            # olist is a series of blank-line-separated list items terminated by something that isn't an olist item
+          elsif list = [:olist, :ulist, :colist].detect{|l| this_line.match( REGEXP[l] )}
             items = []
-            block = Block.new(parent, :olist)
-            while !this_line.nil? && match = this_line.match(REGEXP[:olist])
+            block = Block.new(parent, list)
+            while !this_line.nil? && match = this_line.match(REGEXP[list])
               item = ListItem.new
-              item_blocks = []
-              item_buffer = [match[2]]
-              while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:olist])
-                this_line = lines.shift
-                if this_line.match(REGEXP[:listing])
-                  item_buffer << this_line
-                  this_line = lines.shift
-                  while !this_line.nil? && !this_line.match(REGEXP[:listing])
-                    item_buffer << this_line
-                    this_line = lines.shift
-                  end
-                  item_buffer << this_line unless this_line.nil?
-                elsif this_line.match(REGEXP[:continue])
-                  item_blocks << item_buffer.dup if item_buffer.any?
-                  item_buffer.clear
-                else
-                  item_buffer << this_line
-                end
+
+              lines.unshift match[2].lstrip.sub(/^\./, '\.')
+              item_segment = list_item_segment(lines, :alt_ending => REGEXP[list])
+              while item_segment.any?
+                item.blocks << next_block(item_segment, block)
               end
-              item_blocks << item_buffer.dup if item_buffer.any?
 
-              item.content = item_blocks.shift.join
-
-              while item_block = item_blocks.shift
-                while item_block.any?
-                  item.blocks << next_block(item_block)
-                end
+              if item.blocks.any? && item.blocks.first.is_a?(Block) && (item.blocks.first.context == :paragraph || item.blocks.first.context == :literal)
+                item.content = item.blocks.shift.buffer.map{|l| l.strip}.join("\n")
               end
 
               items << item
 
-              while lines.any? && lines.first.strip.empty?
-                lines.shift
-              end
+              skip_blank(lines)
 
               this_line = lines.shift
             end
             lines.unshift(this_line) unless this_line.nil?
 
-            block.buffer = items
-          elsif this_line.match(REGEXP[:ulist])
-            # ulist is a series of blank-line-separated list items terminated by something that isn't an ulist item
-            items = []
-            block = Block.new(parent, :ulist)
-            while !this_line.nil? && match = this_line.match(REGEXP[:ulist])
-              item = ListItem.new
-              item_blocks = []
-              item_buffer = [match[1]]
-              while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:ulist])
-                this_line = lines.shift
-                if this_line.match(REGEXP[:listing])
-                  item_buffer << this_line
-                  this_line = lines.shift
-                  while !this_line.nil? && !this_line.match(REGEXP[:listing])
-                    item_buffer << this_line
-                    this_line = lines.shift
-                  end
-                  item_buffer << this_line unless this_line.nil?
-                elsif this_line.match(REGEXP[:continue])
-                  item_blocks << item_buffer.dup if item_buffer.any?
-                  item_buffer.clear
-                else
-                  item_buffer << this_line
-                end
-              end
-              item_blocks << item_buffer.dup if item_buffer.any?
-
-              item.content = item_blocks.shift.join
-
-              while item_block = item_blocks.shift
-                while item_block.any?
-                  item.blocks << next_block(item_block)
-                end
-              end
-
-              items << item
-
-              while lines.any? && lines.first.strip.empty?
-                lines.shift
-              end
-
-              this_line = lines.shift
-            end
-            lines.unshift(this_line) unless this_line.nil?
-            block.buffer = items
-          elsif this_line.match(REGEXP[:colist])
-            # colist is a series of blank-line-separated list items terminated by something that isn't an colist item
-            items = []
-            block = Block.new(parent, :colist)
-            while !this_line.nil? && match = this_line.match(REGEXP[:colist])
-              item = ListItem.new
-              item_blocks = []
-              item_buffer = [match[1]]
-              while lines.any? && !lines.first.strip.empty? && !lines.first.match(REGEXP[:colist])
-                this_line = lines.shift
-                if this_line.match(REGEXP[:listing])
-                  item_buffer << this_line
-                  this_line = lines.shift
-                  while !this_line.nil? && !this_line.match(REGEXP[:listing])
-                    item_buffer << this_line
-                    this_line = lines.shift
-                  end
-                  item_buffer << this_line unless this_line.nil?
-                elsif this_line.match(REGEXP[:continue])
-                  item_blocks << item_buffer.dup if item_buffer.any?
-                  item_buffer.clear
-                else
-                  item_buffer << this_line
-                end
-              end
-              item_blocks << item_buffer.dup if item_buffer.any?
-
-              item.content = item_blocks.shift.join
-
-              while item_block = item_blocks.shift
-                while item_block.any?
-                  item.blocks << next_block(item_block)
-                end
-              end
-
-              items << item
-
-              while lines.any? && lines.first.strip.empty?
-                lines.shift
-              end
-
-              this_line = lines.shift
-            end
-            lines.unshift(this_line) unless this_line.nil?
             block.buffer = items
           elsif match = this_line.match(REGEXP[:dlist])
             pairs = []
@@ -975,33 +850,26 @@ module Asciidoc
             end
 
             block = Block.new(parent, :note, buffer)
-          elsif this_line.match(REGEXP[:listing])
-            # listing is surrounded by '----' (4 or more dashes) lines
+          elsif text = [:listing, :example].detect{|t| this_line.match( REGEXP[t] )}
             this_line = lines.shift
-            while !this_line.nil? && !this_line.match(REGEXP[:listing])
+            while !this_line.nil? && !this_line.match( REGEXP[text] )
               buffer << this_line
               this_line = lines.shift
             end
 
-            block = Block.new(parent, :listing, buffer)
-          elsif this_line.match(REGEXP[:example])
-            # example is surrounded by '====' (4 or more '=' chars) lines
+            block = Block.new(parent, text, buffer)
+          elsif this_line.match( REGEXP[:quote] )
+            block = Block.new(parent, :quote)
+
             this_line = lines.shift
-            while !this_line.nil? && !this_line.match(REGEXP[:example])
+            while !this_line.nil? && !this_line.match( REGEXP[:quote] )
               buffer << this_line
               this_line = lines.shift
             end
 
-            block = Block.new(parent, :example, buffer)
-          elsif this_line.match(REGEXP[:quote])
-            # quote is surrounded by '____' (4 or more '_' chars) lines
-            this_line = lines.shift
-            while !this_line.nil? && !this_line.match(REGEXP[:quote])
-              buffer << this_line
-              this_line = lines.shift
+            while buffer.any?
+              block.blocks << next_block(buffer, block)
             end
-
-            block = Block.new(parent, :quote, buffer)
           elsif this_line.match(REGEXP[:lit_blk])
             # example is surrounded by '....' (4 or more '.' chars) lines
             this_line = lines.shift
@@ -1011,20 +879,21 @@ module Asciidoc
             end
 
             block = Block.new(parent, :literal, buffer)
-          elsif this_line.match(REGEXP[:lit_par]) && !parent.list?
+          elsif this_line.match(REGEXP[:lit_par])
             # literal paragraph is contiguous lines starting with
             # one or more space or tab characters
             while !this_line.nil? && this_line.match(REGEXP[:lit_par])
               buffer << this_line
               this_line = lines.shift
             end
+            lines.unshift( this_line ) unless this_line.nil?
 
             block = Block.new(parent, :literal, buffer)
           else
             # paragraph is contiguous nonblank/noncontinuation lines
             while !this_line.nil? && !this_line.strip.empty?
               break if this_line.match(REGEXP[:continue])
-              if this_line.match(REGEXP[:listing])
+              if this_line.match( REGEXP[:listing] ) || this_line.match( REGEXP[:oblock] )
                 lines.unshift this_line
                 break
               end
