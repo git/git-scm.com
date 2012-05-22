@@ -13,6 +13,10 @@ Gitscm::Application.routes.draw do
     match '*path' => 'site#redirect_combook'
   end
 
+  constraints(:host => 'msysgit.github.com') do
+    root :to => 'windows#index'
+  end
+
   get "site/index"
 
   match "/doc" => "doc#index"
@@ -70,6 +74,8 @@ Gitscm::Application.routes.draw do
   match "/documentation/book" => "doc#book"
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
+
+  match "/windows" => "windows#index"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
