@@ -16,7 +16,7 @@ class Doc < ActiveRecord::Base
       }
     }
 
-    terms = term.split(' ')
+    terms = term.split(/\s|-/)
     terms.each do |terma|
       query_options['bool']['should'] << { "prefix" => { "name" => { "value" => terma, "boost" => 12.0 } } }
       query_options['bool']['should'] << { "term" => { "text" => terma } }
