@@ -93,7 +93,7 @@ class Section < ActiveRecord::Base
       }
     }
 
-    terms = term.split(' ')
+    terms = term.split(/\s|-/)
     terms.each do |terma|
       query_options['bool']['should'] << { "prefix" => { "section" => { "value" => terma, "boost" => 12.0 } } }
       query_options['bool']['should'] << { "term" => { "html" => terma } }
