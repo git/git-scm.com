@@ -257,8 +257,7 @@ module Asciidoc
       when :listing
         @buffer.map{|l| CGI.escapeHTML(l).gsub(/(<\d+>)/,'<b>\1</b>')}.join
       when :literal
-        leading_ws = @buffer.first.match(/^(\s*)/)[1]
-        htmlify( @buffer.map{ |l| l.sub( /#{leading_ws}/, '' ) }.join.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' ))
+        htmlify( @buffer.join.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' ))
       when :verse
         htmlify( @buffer.map{ |l| l.strip }.join( "\n" ) )
       else
