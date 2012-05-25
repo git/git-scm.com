@@ -8,7 +8,7 @@ task :preindex => :environment do
   ActiveRecord::Base.logger.level = Logger::WARN
 
   template_dir = File.join(Rails.root, 'templates')
-  repo = ENV['GIT_REPO'] || 'git/git'
+  repo = ENV['GIT_REPO'] || 'git/gitster'
   rebuild = ENV['REBUILD_DOC']
   rerun = ENV['RERUN'] || false
 
