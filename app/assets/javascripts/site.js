@@ -228,6 +228,7 @@ var AboutContent = {
 
   init: function() {
     if ($('body#about').length === 0) return;
+    $('section.about').css('display:none');
     AboutContent.observeNav();
     AboutContent.observePopState();
     AboutContent.showSection(AboutContent.getSection());
