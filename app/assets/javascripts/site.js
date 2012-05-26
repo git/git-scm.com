@@ -133,7 +133,7 @@ var Search = {
       Search.currentSearch = term;
       $.get("/search", {search: term}, function(results) {
         $("#search-results").html(results);
-      });
+      }, 'html');
     };
   },
 
