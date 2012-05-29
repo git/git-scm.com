@@ -2,20 +2,6 @@ require 'cgi'
 require 'erb'
 require 'tilt'
 
-# REFERENCE
-# TODO:
-# * Nexted section blocks (eg. olist with listing blocks in git-cvsserver)
-# * paragraph/block titles
-# * captions
-# * example blocks
-# * list items with +\n<moar things>
-# * escaped attributes
-# * single-line titles, eg. === TITLE
-# * optional paragraph titles
-# * passthrough block
-# * unordered lists, nested [uod]lists
-# * tables
-
 # Public: Methods for parsing Asciidoc input files and rendering documents
 # using Tilt-compatible templates.
 #
