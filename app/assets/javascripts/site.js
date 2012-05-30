@@ -83,6 +83,7 @@ var Search = {
   init: function() {
     Search.observeFocus();
     Search.observeTextEntry();
+    Search.observeResultsClicks();
   },
 
   observeFocus: function() {
@@ -121,6 +122,12 @@ var Search = {
           Search.resultsNav("down");
           break;
       };
+    });
+  },
+
+  observeResultsClicks: function() {
+    $('#search-results').mousedown(function(e) {
+      e.preventDefault();
     });
   },
 
