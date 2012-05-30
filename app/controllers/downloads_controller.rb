@@ -4,6 +4,11 @@ class DownloadsController < ApplicationController
   def index
   end
 
+  def latest
+    latest = Rails.cache.read("latest-version")
+    render :text => latest
+  end
+
   def guis
     render "downloads/guis/index"
   end
