@@ -1,0 +1,1329 @@
+.man-page
+  #header
+    %h1
+      git-rebase(1) Manual Page
+    %h2 NAME
+    .sectionbody
+      %p
+        git-rebase -
+        Forward-port local commits to the updated upstream head
+  %h2#_synopsis SYNOPSIS
+  .sectionbody
+    .verseblock
+      .verseblock-content
+        %em git rebase
+        [-i | --interactive] [options] [--onto &lt;newbase&gt;]
+        [&lt;upstream&gt;] [&lt;branch&gt;]
+        %em git rebase
+        [-i | --interactive] [options] --onto &lt;newbase&gt;
+        \--root [&lt;branch&gt;]
+        %em git rebase
+        \--continue | --skip | --abort
+      .verseblock-attribution
+  %h2#_description DESCRIPTION
+  .sectionbody
+    .paragraph
+      %p
+        If &lt;branch&gt; is specified,
+        %em git rebase
+        will perform an automatic
+        %tt git checkout &lt;branch&gt;
+        before doing anything else.  Otherwise
+        it remains on the current branch.
+    .paragraph
+      %p
+        If &lt;upstream&gt; is not specified, the upstream configured in
+        branch.&lt;name&gt;.remote and branch.&lt;name&gt;.merge options will be used; see
+        %a{:href => "git-config.html"} git-config(1)
+        for details.  If you are currently not on any
+        branch or if the current branch does not have a configured upstream,
+        the rebase will abort.
+    .paragraph
+      %p
+        All changes made by commits in the current branch but that are not
+        in &lt;upstream&gt; are saved to a temporary area.  This is the same set
+        of commits that would be shown by
+        %tt git log &lt;upstream&gt;..HEAD
+        (or
+        = succeed "," do
+          %tt git log HEAD
+        if --root is specified).
+    .paragraph
+      %p
+        The current branch is reset to &lt;upstream&gt;, or &lt;newbase&gt; if the
+        \--onto option was supplied.  This has the exact same effect as
+        %tt git reset --hard &lt;upstream&gt;
+        (or &lt;newbase&gt;).  ORIG_HEAD is set
+        to point at the tip of the branch before the reset.
+    .paragraph
+      %p
+        The commits that were previously saved into the temporary area are
+        then reapplied to the current branch, one by one, in order. Note that
+        any commits in HEAD which introduce the same textual changes as a commit
+        in HEAD..&lt;upstream&gt; are omitted (i.e., a patch already accepted upstream
+        with a different commit message or timestamp will be skipped).
+    .paragraph
+      %p
+        It is possible that a merge failure will prevent this process from being
+        completely automatic.  You will have to resolve any such merge failure
+        and run
+        = succeed "." do
+          %tt git rebase --continue
+        Another option is to bypass the commit
+        that caused the merge failure with
+        = succeed "." do
+          %tt git rebase --skip
+        To check out the
+        original &lt;branch&gt; and remove the .git/rebase-apply working files, use the
+        command
+        %tt git rebase --abort
+        instead.
+    .paragraph
+      %p Assume the following history exists and the current branch is "topic":
+    .listingblock
+      .content
+        %pre
+          %tt
+            A---B---C topic
+            \/
+            D---E---F---G master
+    .paragraph
+      %p From this point, the result of either of the following commands:
+    .literalblock
+      .content
+        %pre
+          %tt
+            git rebase master
+            git rebase master topic
+    .paragraph
+      %p would be:
+    .listingblock
+      .content
+        %pre
+          %tt
+            A'--B'--C' topic
+            \/
+            D---E---F---G master
+    .paragraph
+      %p
+        %strong NOTE:
+        The latter form is just a short-hand of
+        %tt git checkout topic
+        followed by
+        = succeed "." do
+          %tt git rebase master
+        When rebase exits
+        %tt topic
+        will
+        remain the checked-out branch.
+    .paragraph
+      %p
+        If the upstream branch already contains a change you have made (e.g.,
+        because you mailed a patch which was applied upstream), then that commit
+        will be skipped. For example, running ‘git rebase master` on the
+        following history (in which A’ and A introduce the same set of changes,
+        but have different committer information):
+    .listingblock
+      .content
+        %pre
+          %tt
+            A---B---C topic
+            \/
+            D---E---A'---F master
+    .paragraph
+      %p will result in:
+    .listingblock
+      .content
+        %pre
+          %tt
+            B'---C' topic
+            \/
+            D---E---A'---F master
+    .paragraph
+      %p
+        Here is how you would transplant a topic branch based on one
+        branch to another, to pretend that you forked the topic branch
+        from the latter branch, using
+        = succeed "." do
+          %tt rebase --onto
+    .paragraph
+      %p
+        First let’s assume your
+        %em topic
+        is based on branch
+        = succeed "." do
+          %em next
+        For example, a feature developed in
+        %em topic
+        depends on some
+        functionality which is found in
+        = succeed "." do
+          %em next
+    .listingblock
+      .content
+        %pre
+          %tt
+            o---o---o---o---o  master
+            \\
+            o---o---o---o---o  next
+            \\
+            o---o---o  topic
+    .paragraph
+      %p
+        We want to make
+        %em topic
+        forked from branch
+        = succeed ";" do
+          %em master
+        for example,
+        because the functionality on which
+        %em topic
+        depends was merged into the
+        more stable
+        %em master
+        branch. We want our tree to look like this:
+    .listingblock
+      .content
+        %pre
+          %tt
+            o---o---o---o---o  master
+            |            \
+            |             o'--o'--o'  topic
+            \\
+            o---o---o---o---o  next
+    .paragraph
+      %p We can get this using the following command:
+    .literalblock
+      .content
+        %pre
+          %tt git rebase --onto master next topic
+    .paragraph
+      %p
+        Another example of --onto option is to rebase part of a
+        branch.  If we have the following situation:
+    .listingblock
+      .content
+        %pre
+          %tt
+            H---I---J topicB
+            \/
+            E---F---G  topicA
+            \/
+            A---B---C---D  master
+    .paragraph
+      %p then the command
+    .literalblock
+      .content
+        %pre
+          %tt git rebase --onto master topicA topicB
+    .paragraph
+      %p would result in:
+    .listingblock
+      .content
+        %pre
+          %tt
+            H'--I'--J'  topicB
+            \/
+            | E---F---G  topicA
+            |/
+            A---B---C---D  master
+    .paragraph
+      %p This is useful when topicB does not depend on topicA.
+    .paragraph
+      %p
+        A range of commits could also be removed with rebase.  If we have
+        the following situation:
+    .listingblock
+      .content
+        %pre
+          %tt E---F---G---H---I---J  topicA
+    .paragraph
+      %p then the command
+    .literalblock
+      .content
+        %pre
+          %tt git rebase --onto topicA~5 topicA~3 topicA
+    .paragraph
+      %p would result in the removal of commits F and G:
+    .listingblock
+      .content
+        %pre
+          %tt E---H'---I'---J'  topicA
+    .paragraph
+      %p
+        This is useful if F and G were flawed in some way, or should not be
+        part of topicA.  Note that the argument to --onto and the &lt;upstream&gt;
+        parameter can be any valid commit-ish.
+    .paragraph
+      %p
+        In case of conflict,
+        %em git rebase
+        will stop at the first problematic commit
+        and leave conflict markers in the tree.  You can use
+        %em git diff
+        to locate
+        the markers (&lt;&lt;&lt;&lt;&lt;&lt;) and make edits to resolve the conflict.  For each
+        file you edit, you need to tell git that the conflict has been resolved,
+        typically this would be done with
+    .literalblock
+      .content
+        %pre
+          %tt git add &lt;filename&gt;
+    .paragraph
+      %p
+        After resolving the conflict manually and updating the index with the
+        desired resolution, you can continue the rebasing process with
+    .literalblock
+      .content
+        %pre
+          %tt git rebase --continue
+    .paragraph
+      %p
+        Alternatively, you can undo the
+        %em git rebase
+        with
+    .literalblock
+      .content
+        %pre
+          %tt git rebase --abort
+  %h2#_configuration CONFIGURATION
+  .sectionbody
+    .dlist
+      %dl
+        %dt.hdlist1
+          rebase.stat
+        %dd
+          %p
+            Whether to show a diffstat of what changed upstream since the last
+            rebase. False by default.
+        %dt.hdlist1
+          rebase.autosquash
+        %dd
+          %p
+            If set to true enable
+            %em --autosquash
+            option by default.
+  %h2#_options OPTIONS
+  .sectionbody
+    .dlist
+      %dl
+        %dt.hdlist1
+          \&lt;newbase&gt;
+        %dd
+          %p
+            Starting point at which to create the new commits. If the
+            \--onto option is not specified, the starting point is
+            \&lt;upstream&gt;.  May be any valid commit, and not just an
+            existing branch name.
+          .paragraph
+            %p
+              As a special case, you may use "A...B" as a shortcut for the
+              merge base of A and B if there is exactly one merge base. You can
+              leave out at most one of A and B, in which case it defaults to HEAD.
+        %dt.hdlist1
+          \&lt;upstream&gt;
+        %dd
+          %p
+            Upstream branch to compare against.  May be any valid commit,
+            not just an existing branch name. Defaults to the configured
+            upstream for the current branch.
+        %dt.hdlist1
+          \&lt;branch&gt;
+        %dd
+          %p
+            Working branch; defaults to HEAD.
+        %dt.hdlist1
+          \--continue
+        %dd
+          %p
+            Restart the rebasing process after having resolved a merge conflict.
+        %dt.hdlist1
+          \--abort
+        %dd
+          %p
+            Abort the rebase operation and reset HEAD to the original
+            branch. If &lt;branch&gt; was provided when the rebase operation was
+            started, then HEAD will be reset to &lt;branch&gt;. Otherwise HEAD
+            will be reset to where it was when the rebase operation was
+            started.
+        %dt.hdlist1
+          \--skip
+        %dd
+          %p
+            Restart the rebasing process by skipping the current patch.
+        %dt.hdlist1
+          \-m
+        %dt.hdlist1
+          \--merge
+        %dd
+          %p
+            Use merging strategies to rebase.  When the recursive (default) merge
+            strategy is used, this allows rebase to be aware of renames on the
+            upstream side.
+          .paragraph
+            %p
+              Note that a rebase merge works by replaying each commit from the working
+              branch on top of the &lt;upstream&gt; branch.  Because of this, when a merge
+              conflict happens, the side reported as
+              %em ours
+              is the so-far rebased
+              series, starting with &lt;upstream&gt;, and
+              %em theirs
+              is the working branch.  In
+              other words, the sides are swapped.
+        %dt.hdlist1
+          \-s &lt;strategy&gt;
+        %dt.hdlist1
+          \--strategy=&lt;strategy&gt;
+        %dd
+          %p
+            Use the given merge strategy.
+            If there is no
+            %tt -s
+            option
+            %em git merge-recursive
+            is used
+            instead.  This implies --merge.
+          .paragraph
+            %p
+              Because
+              %em git rebase
+              replays each commit from the working branch
+              on top of the &lt;upstream&gt; branch using the given strategy, using
+              the
+              %em ours
+              strategy simply discards all patches from the &lt;branch&gt;,
+              which makes little sense.
+        %dt.hdlist1
+          \-X &lt;strategy-option&gt;
+        %dt.hdlist1
+          \--strategy-option=&lt;strategy-option&gt;
+        %dd
+          %p
+            Pass the &lt;strategy-option&gt; through to the merge strategy.
+            This implies
+            %tt --merge
+            and, if no strategy has been
+            specified,
+            = succeed "." do
+              %tt -s recursive
+            Note the reversal of
+            %em ours
+            and
+            %em theirs
+            as noted in above for the
+            %tt -m
+            option.
+        %dt.hdlist1
+          \-q
+        %dt.hdlist1
+          \--quiet
+        %dd
+          %p
+            Be quiet. Implies --no-stat.
+        %dt.hdlist1
+          \-v
+        %dt.hdlist1
+          \--verbose
+        %dd
+          %p
+            Be verbose. Implies --stat.
+        %dt.hdlist1
+          \--stat
+        %dd
+          %p
+            Show a diffstat of what changed upstream since the last rebase. The
+            diffstat is also controlled by the configuration option rebase.stat.
+        %dt.hdlist1
+          \-n
+        %dt.hdlist1
+          \--no-stat
+        %dd
+          %p
+            Do not show a diffstat as part of the rebase process.
+        %dt.hdlist1
+          \--no-verify
+        %dd
+          %p
+            This option bypasses the pre-rebase hook.  See also
+            = succeed "." do
+              %a{:href => "githooks.html"} githooks(5)
+        %dt.hdlist1
+          \--verify
+        %dd
+          %p
+            Allows the pre-rebase hook to run, which is the default.  This option can
+            be used to override --no-verify.  See also
+            = succeed "." do
+              %a{:href => "githooks.html"} githooks(5)
+        %dt.hdlist1
+          \-C&lt;n&gt;
+        %dd
+          %p
+            Ensure at least &lt;n&gt; lines of surrounding context match before
+            and after each change.  When fewer lines of surrounding
+            context exist they all must match.  By default no context is
+            ever ignored.
+        %dt.hdlist1
+          \-f
+        %dt.hdlist1
+          \--force-rebase
+        %dd
+          %p
+            Force the rebase even if the current branch is a descendant
+            of the commit you are rebasing onto.  Normally non-interactive rebase will
+            exit with the message "Current branch is up to date" in such a
+            situation.
+            Incompatible with the --interactive option.
+          .paragraph
+            %p
+              You may find this (or --no-ff with an interactive rebase) helpful after
+              reverting a topic branch merge, as this option recreates the topic branch with
+              fresh commits so it can be remerged successfully without needing to "revert
+              the reversion" (see the
+              %a{:href => "howto/revert-a-faulty-merge.txt"} revert-a-faulty-merge How-To
+              for details).
+        %dt.hdlist1
+          \--ignore-whitespace
+        %dt.hdlist1
+          \--whitespace=&lt;option&gt;
+        %dd
+          %p
+            These flag are passed to the
+            %em git apply
+            program
+            (see
+            = succeed ")" do
+              %a{:href => "git-apply.html"} git-apply(1)
+            that applies the patch.
+            Incompatible with the --interactive option.
+        %dt.hdlist1
+          \--committer-date-is-author-date
+        %dt.hdlist1
+          \--ignore-date
+        %dd
+          %p
+            These flags are passed to
+            %em git am
+            to easily change the dates
+            of the rebased commits (see
+            = succeed ")." do
+              %a{:href => "git-am.html"} git-am(1)
+            Incompatible with the --interactive option.
+        %dt.hdlist1
+          \-i
+        %dt.hdlist1
+          \--interactive
+        %dd
+          %p
+            Make a list of the commits which are about to be rebased.  Let the
+            user edit that list before rebasing.  This mode can also be used to
+            split commits (see SPLITTING COMMITS below).
+        %dt.hdlist1
+          \-p
+        %dt.hdlist1
+          \--preserve-merges
+        %dd
+          %p
+            Instead of ignoring merges, try to recreate them.
+          .paragraph
+            %p
+              This uses the
+              %tt --interactive
+              machinery internally, but combining it
+              with the
+              %tt --interactive
+              option explicitly is generally not a good
+              idea unless you know what you are doing (see BUGS below).
+        %dt.hdlist1
+          \--root
+        %dd
+          %p
+            Rebase all commits reachable from &lt;branch&gt;, instead of
+            limiting them with an &lt;upstream&gt;.  This allows you to rebase
+            the root commit(s) on a branch.  Must be used with --onto, and
+            will skip changes already contained in &lt;newbase&gt; (instead of
+            \&lt;upstream&gt;).  When used together with --preserve-merges,
+            %em all
+            root commits will be rewritten to have &lt;newbase&gt; as parent
+            instead.
+        %dt.hdlist1
+          \--autosquash
+        %dt.hdlist1
+          \--no-autosquash
+        %dd
+          %p
+            When the commit log message begins with "squash! …" (or
+            "fixup! …"), and there is a commit whose title begins with
+            the same …, automatically modify the todo list of rebase -i
+            so that the commit marked for squashing comes right after the
+            commit to be modified, and change the action of the moved
+            commit from
+            %tt pick
+            to
+            %tt squash
+            (or
+            = succeed ")." do
+              %tt fixup
+          .paragraph
+            %p
+              This option is only valid when the
+              %em --interactive
+              option is used.
+          .paragraph
+            %p
+              If the
+              %em --autosquash
+              option is enabled by default using the
+              configuration variable
+              = succeed "," do
+                %tt rebase.autosquash
+              this option can be
+              used to override and disable this setting.
+        %dt.hdlist1
+          \--no-ff
+        %dd
+          %p
+            With --interactive, cherry-pick all rebased commits instead of
+            fast-forwarding over the unchanged ones.  This ensures that the
+            entire history of the rebased branch is composed of new commits.
+          .paragraph
+            %p Without --interactive, this is a synonym for --force-rebase.
+          .paragraph
+            %p
+              You may find this helpful after reverting a topic branch merge, as this option
+              recreates the topic branch with fresh commits so it can be remerged
+              successfully without needing to "revert the reversion" (see the
+              %a{:href => "howto/revert-a-faulty-merge.txt"} revert-a-faulty-merge How-To
+              for details).
+  %h2#_merge_strategies MERGE STRATEGIES
+  .sectionbody
+    .paragraph
+      %p
+        The merge mechanism (
+        %em git-merge
+        and
+        %em git-pull
+        commands) allows the
+        backend
+        %em merge strategies
+        to be chosen with
+        %tt -s
+        option.  Some strategies
+        can also take their own options, which can be passed by giving
+        %tt -X&lt;option&gt;
+        arguments to
+        %em git-merge
+        and/or
+        = succeed "." do
+          %em git-pull
+    .dlist
+      %dl
+        %dt.hdlist1
+          resolve
+        %dd
+          %p
+            This can only resolve two heads (i.e. the current branch
+            and another branch you pulled from) using a 3-way merge
+            algorithm.  It tries to carefully detect criss-cross
+            merge ambiguities and is considered generally safe and
+            fast.
+        %dt.hdlist1
+          recursive
+        %dd
+          %p
+            This can only resolve two heads using a 3-way merge
+            algorithm.  When there is more than one common
+            ancestor that can be used for 3-way merge, it creates a
+            merged tree of the common ancestors and uses that as
+            the reference tree for the 3-way merge.  This has been
+            reported to result in fewer merge conflicts without
+            causing mis-merges by tests done on actual merge commits
+            taken from Linux 2.6 kernel development history.
+            Additionally this can detect and handle merges involving
+            renames.  This is the default merge strategy when
+            pulling or merging one branch.
+          .paragraph
+            %p
+              The
+              %em recursive
+              strategy can take the following options:
+          .dlist
+            %dl
+              %dt.hdlist1
+                ours
+              %dd
+                %p
+                  This option forces conflicting hunks to be auto-resolved cleanly by
+                  favoring
+                  %em our
+                  version.  Changes from the other tree that do not
+                  conflict with our side are reflected to the merge result.
+                .paragraph
+                  %p
+                    This should not be confused with the
+                    %em ours
+                    merge strategy, which does not
+                    even look at what the other tree contains at all.  It discards everything
+                    the other tree did, declaring
+                    %em our
+                    history contains all that happened in it.
+              %dt.hdlist1
+                theirs
+              %dd
+                %p
+                  This is opposite of
+                  = succeed "." do
+                    %em ours
+              %dt.hdlist1
+                patience
+              %dd
+                %p
+                  With this option,
+                  %em merge-recursive
+                  spends a little extra time
+                  to avoid mismerges that sometimes occur due to unimportant
+                  matching lines (e.g., braces from distinct functions).  Use
+                  this when the branches to be merged have diverged wildly.
+                  See also
+                  %a{:href => "git-diff.html"} git-diff(1)
+                  = succeed "." do
+                    %tt --patience
+              %dt.hdlist1
+                ignore-space-change
+              %dt.hdlist1
+                ignore-all-space
+              %dt.hdlist1
+                ignore-space-at-eol
+              %dd
+                %p
+                  Treats lines with the indicated type of whitespace change as
+                  unchanged for the sake of a three-way merge.  Whitespace
+                  changes mixed with other changes to a line are not ignored.
+                  See also
+                  %a{:href => "git-diff.html"} git-diff(1)
+                  = succeed "," do
+                    %tt -b
+                  = succeed "," do
+                    %tt -w
+                  and
+                  = succeed "." do
+                    %tt --ignore-space-at-eol
+                .ulist
+                  %ul
+                    %li
+                      %p
+                        If
+                        %em their
+                        version only introduces whitespace changes to a line,
+                        %em our
+                        version is used;
+                    %li
+                      %p
+                        If
+                        %em our
+                        version introduces whitespace changes but
+                        %em their
+                        version includes a substantial change,
+                        %em their
+                        version is used;
+                    %li
+                      %p
+                        Otherwise, the merge proceeds in the usual way.
+              %dt.hdlist1
+                renormalize
+              %dd
+                %p
+                  This runs a virtual check-out and check-in of all three stages
+                  of a file when resolving a three-way merge.  This option is
+                  meant to be used when merging branches with different clean
+                  filters or end-of-line normalization rules.  See "Merging
+                  branches with differing checkin/checkout attributes" in
+                  %a{:href => "gitattributes.html"} gitattributes(5)
+                  for details.
+              %dt.hdlist1
+                no-renormalize
+              %dd
+                %p
+                  Disables the
+                  %tt renormalize
+                  option.  This overrides the
+                  %tt merge.renormalize
+                  configuration variable.
+              %dt.hdlist1
+                rename-threshold=&lt;n&gt;
+              %dd
+                %p
+                  Controls the similarity threshold used for rename detection.
+                  See also
+                  %a{:href => "git-diff.html"} git-diff(1)
+                  = succeed "." do
+                    %tt -M
+              %dt.hdlist1
+                subtree[=&lt;path&gt;]
+              %dd
+                %p
+                  This option is a more advanced form of
+                  %em subtree
+                  strategy, where
+                  the strategy makes a guess on how two trees must be shifted to
+                  match with each other when merging.  Instead, the specified path
+                  is prefixed (or stripped from the beginning) to make the shape of
+                  two trees to match.
+        %dt.hdlist1
+          octopus
+        %dd
+          %p
+            This resolves cases with more than two heads, but refuses to do
+            a complex merge that needs manual resolution.  It is
+            primarily meant to be used for bundling topic branch
+            heads together.  This is the default merge strategy when
+            pulling or merging more than one branch.
+        %dt.hdlist1
+          ours
+        %dd
+          %p
+            This resolves any number of heads, but the resulting tree of the
+            merge is always that of the current branch head, effectively
+            ignoring all changes from all other branches.  It is meant to
+            be used to supersede old development history of side
+            branches.  Note that this is different from the -Xours option to
+            the
+            %em recursive
+            merge strategy.
+        %dt.hdlist1
+          subtree
+        %dd
+          %p
+            This is a modified recursive strategy. When merging trees A and
+            B, if B corresponds to a subtree of A, B is first adjusted to
+            match the tree structure of A, instead of reading the trees at
+            the same level. This adjustment is also done to the common
+            ancestor tree.
+  %h2#_notes NOTES
+  .sectionbody
+    .paragraph
+      %p
+        You should understand the implications of using
+        %em git rebase
+        on a
+        repository that you share.  See also RECOVERING FROM UPSTREAM REBASE
+        below.
+    .paragraph
+      %p
+        When the git-rebase command is run, it will first execute a "pre-rebase"
+        hook if one exists.  You can use this hook to do sanity checks and
+        reject the rebase if it isn’t appropriate.  Please see the template
+        pre-rebase hook script for an example.
+    .paragraph
+      %p Upon completion, &lt;branch&gt; will be the current branch.
+  %h2#_interactive_mode INTERACTIVE MODE
+  .sectionbody
+    .paragraph
+      %p
+        Rebasing interactively means that you have a chance to edit the commits
+        which are rebased.  You can reorder the commits, and you can
+        remove them (weeding out bad or otherwise unwanted patches).
+    .paragraph
+      %p The interactive mode is meant for this type of workflow:
+    .olist.arabic
+      %ol.arabic
+        %li
+          %p
+            have a wonderful idea
+        %li
+          %p
+            hack on the code
+        %li
+          %p
+            prepare a series for submission
+        %li
+          %p
+            submit
+    .paragraph
+      %p where point 2. consists of several instances of
+    .olist.loweralpha
+      %ol.loweralpha
+        %li
+          %p
+            regular use
+          .olist.arabic
+            %ol.arabic
+              %li
+                %p
+                  finish something worthy of a commit
+              %li
+                %p
+                  commit
+        %li
+          %p
+            independent fixup
+          .olist.arabic
+            %ol.arabic
+              %li
+                %p
+                  realize that something does not work
+              %li
+                %p
+                  fix that
+              %li
+                %p
+                  commit it
+    .paragraph
+      %p
+        Sometimes the thing fixed in b.2. cannot be amended to the not-quite
+        perfect commit it fixes, because that commit is buried deeply in a
+        patch series.  That is exactly what interactive rebase is for: use it
+        after plenty of "a"s and "b"s, by rearranging and editing
+        commits, and squashing multiple commits into one.
+    .paragraph
+      %p Start it with the last commit you want to retain as-is:
+    .literalblock
+      .content
+        %pre
+          %tt git rebase -i &lt;after-this-commit&gt;
+    .paragraph
+      %p
+        An editor will be fired up with all the commits in your current branch
+        (ignoring merge commits), which come after the given commit.  You can
+        reorder the commits in this list to your heart’s content, and you can
+        remove them.  The list looks more or less like this:
+    .listingblock
+      .content
+        %pre
+          %tt
+            pick deadbee The oneline of this commit
+            pick fa1afe1 The oneline of the next commit
+            \...
+    .paragraph
+      %p
+        The oneline descriptions are purely for your pleasure;
+        %em git rebase
+        will
+        not look at them but at the commit names ("deadbee" and "fa1afe1" in this
+        example), so do not delete or edit the names.
+    .paragraph
+      %p
+        By replacing the command "pick" with the command "edit", you can tell
+        %em git rebase
+        to stop after applying that commit, so that you can edit
+        the files and/or the commit message, amend the commit, and continue
+        rebasing.
+    .paragraph
+      %p
+        If you just want to edit the commit message for a commit, replace the
+        command "pick" with the command "reword".
+    .paragraph
+      %p
+        If you want to fold two or more commits into one, replace the command
+        "pick" for the second and subsequent commits with "squash" or "fixup".
+        If the commits had different authors, the folded commit will be
+        attributed to the author of the first commit.  The suggested commit
+        message for the folded commit is the concatenation of the commit
+        messages of the first commit and of those with the "squash" command,
+        but omits the commit messages of commits with the "fixup" command.
+    .paragraph
+      %p
+        %em git rebase
+        will stop when "pick" has been replaced with "edit" or
+        when a command fails due to merge errors. When you are done editing
+        and/or resolving conflicts you can continue with
+        = succeed "." do
+          %tt git rebase --continue
+    .paragraph
+      %p
+        For example, if you want to reorder the last 5 commits, such that what
+        was HEAD~4 becomes the new HEAD. To achieve that, you would call
+        %em git rebase
+        like this:
+    .listingblock
+      .content
+        %pre
+          %tt $ git rebase -i HEAD~5
+    .paragraph
+      %p And move the first patch to the end of the list.
+    .paragraph
+      %p You might want to preserve merges, if you have a history like this:
+    .listingblock
+      .content
+        %pre
+          %tt
+            X
+            \\
+            A---M---B
+            \/
+            \---o---O---P---Q
+    .paragraph
+      %p
+        Suppose you want to rebase the side branch starting at "A" to "Q". Make
+        sure that the current HEAD is "B", and call
+    .listingblock
+      .content
+        %pre
+          %tt $ git rebase -i -p --onto Q O
+    .paragraph
+      %p
+        Reordering and editing commits usually creates untested intermediate
+        steps.  You may want to check that your history editing did not break
+        anything by running a test, or at least recompiling at intermediate
+        points in history by using the "exec" command (shortcut "x").  You may
+        do so by creating a todo list like this one:
+    .listingblock
+      .content
+        %pre
+          %tt
+            pick deadbee Implement feature XXX
+            fixup f1a5c00 Fix to feature XXX
+            exec make
+            pick c0ffeee The oneline of the next commit
+            edit deadbab The oneline of the commit after
+            exec cd subdir; make test
+            \...
+    .paragraph
+      %p
+        The interactive rebase will stop when a command fails (i.e. exits with
+        non-0 status) to give you an opportunity to fix the problem. You can
+        continue with
+        = succeed "." do
+          %tt git rebase --continue
+    .paragraph
+      %p
+        The "exec" command launches the command in a shell (the one specified
+        in
+        = succeed "," do
+          %tt $SHELL
+        or the default shell if
+        %tt $SHELL
+        is not set), so you can
+        use shell features (like "cd", "&gt;", ";" …). The command is run from
+        the root of the working tree.
+  %h2#_splitting_commits SPLITTING COMMITS
+  .sectionbody
+    .paragraph
+      %p
+        In interactive mode, you can mark commits with the action "edit".  However,
+        this does not necessarily mean that
+        %em git rebase
+        expects the result of this
+        edit to be exactly one commit.  Indeed, you can undo the commit, or you can
+        add other commits.  This can be used to split a commit into two:
+    .ulist
+      %ul
+        %li
+          %p
+            Start an interactive rebase with
+            = succeed "," do
+              %tt git rebase -i &lt;commit&gt;^
+            where
+            \&lt;commit&gt; is the commit you want to split.  In fact, any commit range
+            will do, as long as it contains that commit.
+        %li
+          %p
+            Mark the commit you want to split with the action "edit".
+        %li
+          %p
+            When it comes to editing that commit, execute
+            = succeed "." do
+              %tt git reset HEAD^
+            The
+            effect is that the HEAD is rewound by one, and the index follows suit.
+            However, the working tree stays the same.
+        %li
+          %p
+            Now add the changes to the index that you want to have in the first
+            commit.  You can use
+            %tt git add
+            (possibly interactively) or
+            %em git gui
+            (or both) to do that.
+        %li
+          %p
+            Commit the now-current index with whatever commit message is appropriate
+            now.
+        %li
+          %p
+            Repeat the last two steps until your working tree is clean.
+        %li
+          %p
+            Continue the rebase with
+            = succeed "." do
+              %tt git rebase --continue
+    .paragraph
+      %p
+        If you are not absolutely sure that the intermediate revisions are
+        consistent (they compile, pass the testsuite, etc.) you should use
+        %em git stash
+        to stash away the not-yet-committed changes
+        after each commit, test, and amend the commit if fixes are necessary.
+  %h2#_recovering_from_upstream_rebase RECOVERING FROM UPSTREAM REBASE
+  .sectionbody
+    .paragraph
+      %p
+        Rebasing (or any other form of rewriting) a branch that others have
+        based work on is a bad idea: anyone downstream of it is forced to
+        manually fix their history.  This section explains how to do the fix
+        from the downstream’s point of view.  The real fix, however, would be
+        to avoid rebasing the upstream in the first place.
+    .paragraph
+      %p
+        To illustrate, suppose you are in a situation where someone develops a
+        %em subsystem
+        branch, and you are working on a
+        %em topic
+        that is dependent
+        on this
+        = succeed "." do
+          %em subsystem
+        You might end up with a history like the
+        following:
+    .listingblock
+      .content
+        %pre
+          %tt
+            o---o---o---o---o---o---o---o---o  master
+            \\
+            o---o---o---o---o  subsystem
+            \\
+            *---*---*  topic
+    .paragraph
+      %p
+        If
+        %em subsystem
+        is rebased against
+        = succeed "," do
+          %em master
+        the following happens:
+    .listingblock
+      .content
+        %pre
+          %tt
+            o---o---o---o---o---o---o---o  master
+            \\                       \
+            o---o---o---o---o       o'--o'--o'--o'--o'  subsystem
+            \\
+            *---*---*  topic
+    .paragraph
+      %p
+        If you now continue development as usual, and eventually merge
+        %em topic
+        to
+        = succeed "," do
+          %em subsystem
+        the commits from
+        %em subsystem
+        will remain duplicated forever:
+    .listingblock
+      .content
+        %pre
+          %tt
+            o---o---o---o---o---o---o---o  master
+            \\                       \
+            o---o---o---o---o       o'--o'--o'--o'--o'--M  subsystem
+            \\                         /
+            *---*---*-..........-*--*  topic
+    .paragraph
+      %p
+        Such duplicates are generally frowned upon because they clutter up
+        history, making it harder to follow.  To clean things up, you need to
+        transplant the commits on
+        %em topic
+        to the new
+        %em subsystem
+        tip, i.e.,
+        rebase
+        = succeed "." do
+          %em topic
+        This becomes a ripple effect: anyone downstream from
+        %em topic
+        is forced to rebase too, and so on!
+    .paragraph
+      %p There are two kinds of fixes, discussed in the following subsections:
+    .dlist
+      %dl
+        %dt.hdlist1
+          Easy case: The changes are literally the same.
+        %dd
+          %p
+            This happens if the
+            %em subsystem
+            rebase was a simple rebase and
+            had no conflicts.
+        %dt.hdlist1
+          Hard case: The changes are not the same.
+        %dd
+          %p
+            This happens if the
+            %em subsystem
+            rebase had conflicts, or used
+            %tt --interactive
+            to omit, edit, squash, or fixup commits; or
+            if the upstream used one of
+            = succeed "," do
+              %tt commit --amend
+            = succeed "," do
+              %tt reset
+            or
+            = succeed "." do
+              %tt filter-branch
+    %h3#_the_easy_case The easy case
+    %div{:style => "clear:left"}
+    .paragraph
+      %p
+        Only works if the changes (patch IDs based on the diff contents) on
+        %em subsystem
+        are literally the same before and after the rebase
+        %em subsystem
+        did.
+    .paragraph
+      %p
+        In that case, the fix is easy because
+        %em git rebase
+        knows to skip
+        changes that are already present in the new upstream.  So if you say
+        (assuming you’re on
+        = succeed ")" do
+          %em topic
+    .listingblock
+      .content
+        %pre
+          %tt $ git rebase subsystem
+    .paragraph
+      %p you will end up with the fixed history
+    .listingblock
+      .content
+        %pre
+          %tt
+            o---o---o---o---o---o---o---o  master
+            \\
+            o'--o'--o'--o'--o'  subsystem
+            \\
+            *---*---*  topic
+    %h3#_the_hard_case The hard case
+    %div{:style => "clear:left"}
+    .paragraph
+      %p
+        Things get more complicated if the
+        %em subsystem
+        changes do not exactly
+        correspond to the ones before the rebase.
+    .admonitionblock
+      %table
+        %tr
+          %td.icon
+            .title Note
+          %td.content
+            While an "easy case recovery" sometimes appears to be successful
+            even in the hard case, it may have unintended consequences.  For
+            example, a commit that was removed via
+            %tt
+              git rebase
+              \--interactive
+            will be
+            = succeed "!" do
+              %strong resurrected
+    .paragraph
+      %p
+        The idea is to manually tell
+        %em git rebase
+        "where the old
+        %em subsystem
+        ended and your
+        %em topic
+        began", that is, what the old merge-base
+        between them was.  You will have to find a way to name the last commit
+        of the old
+        = succeed "," do
+          %em subsystem
+        for example:
+    .ulist
+      %ul
+        %li
+          %p
+            With the
+            %em subsystem
+            reflog: after
+            = succeed "," do
+              %em git fetch
+            the old tip of
+            %em subsystem
+            is at
+            = succeed "." do
+              %tt subsystem@{1}
+            Subsequent fetches will
+            increase the number.  (See
+            = succeed ".)" do
+              %a{:href => "git-reflog.html"} git-reflog(1)
+        %li
+          %p
+            Relative to the tip of
+            = succeed ":" do
+              %em topic
+            knowing that your
+            %em topic
+            has three
+            commits, the old tip of
+            %em subsystem
+            must be
+            = succeed "." do
+              %tt topic~3
+    .paragraph
+      %p
+        You can then transplant the old
+        %tt subsystem..topic
+        to the new tip by
+        saying (for the reflog case, and assuming you are on
+        %em topic
+        already):
+    .listingblock
+      .content
+        %pre
+          %tt $ git rebase --onto subsystem subsystem@{1}
+    .paragraph
+      %p
+        The ripple effect of a "hard case" recovery is especially bad:
+        %em everyone
+        downstream from
+        %em topic
+        will now have to perform a "hard
+        case" recovery too!
+  %h2#_bugs BUGS
+  .sectionbody
+    .paragraph
+      %p
+        The todo list presented by
+        %tt --preserve-merges --interactive
+        does not
+        represent the topology of the revision graph.  Editing commits and
+        rewording their commit messages should work fine, but attempts to
+        reorder commits tend to produce counterintuitive results.
+    .paragraph
+      %p For example, an attempt to rearrange
+    .listingblock
+      .content
+        %pre
+          %tt 1 --- 2 --- 3 --- 4 --- 5
+    .paragraph
+      %p to
+    .listingblock
+      .content
+        %pre
+          %tt 1 --- 2 --- 4 --- 3 --- 5
+    .paragraph
+      %p by moving the "pick 4" line will result in the following history:
+    .listingblock
+      .content
+        %pre
+          %tt
+            3
+            \/
+            1 --- 2 --- 4 --- 5
+  %h2#_git GIT
+  .sectionbody
+    .paragraph
+      %p
+        Part of the
+        %a{:href => "git.html"} git(1)
+        suite
+  #footer
+    #footer-text
+      Last updated 2011-07-23 00:49:30 UTC
