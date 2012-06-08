@@ -215,16 +215,21 @@ var Downloads = {
     $('a#gui-os-filter').click(function(e) {
       e.preventDefault();
       Downloads.userOS = $(this).attr('data-os');
+      var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
       if ($(this).hasClass('filtering')) {
-        var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
         $('ul.gui-thumbnails li').switchClass("masked", "", 200);
         $(this).html('Only show GUIs for my OS ('+ capitalizedOS +')');
         $(this).removeClass('filtering');
+        $('#os-filter-count').hide();
       }
       else {
         $('ul.gui-thumbnails li').not("."+Downloads.userOS).switchClass("", "masked", 200);
         $(this).html('Show GUIs for all OSes');
         $(this).addClass('filtering');
+        var osCount = $('ul.gui-thumbnails li' + '.' + Downloads.userOS).length;
+        $('#os-filter-count strong').html(osCount);
+        $('#os-filter-count .os').html(capitalizedOS);
+        $('#os-filter-count').show();
       }
     });
   }
