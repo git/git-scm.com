@@ -240,7 +240,8 @@ var AboutContent = {
 
   init: function() {
     if ($('body#about').length === 0) return;
-    $('section.about').css('display:none');
+    $('section.about').hide();
+    $('section.about .bottom-nav').show();
     AboutContent.observeNav();
     AboutContent.observePopState();
     AboutContent.showSection(AboutContent.getSection());
