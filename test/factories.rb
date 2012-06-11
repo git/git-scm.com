@@ -23,4 +23,7 @@ FactoryGirl.define do
   factory :version do
     name :version_name
   end
+
+  factory :book do
+  end
 end
