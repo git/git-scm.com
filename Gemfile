@@ -7,22 +7,18 @@ gem 'rails', '3.2.2'
 
 gem 'json'
 gem 'thin'
-gem 'faraday'
 gem 'yajl-ruby', '~> 1.1.0'
 gem 'excon', '~> 0.9.4'
-gem 'heroku'
 gem 'haml'
 gem 'tilt'
 gem 'rest-client'
 gem 'netrc'
-gem 'launchy'
 gem 'rubyzip'
 gem 'octokit'
 gem 'dalli'
 gem 'diff-lcs'
 gem 'redcarpet'
 gem 'nestful'
-gem "awesome_print"
 gem 'newrelic_rpm'
 gem 'exceptional'
 
@@ -42,13 +38,20 @@ group :production do
   gem "pg"
 end
 
-group :development do
+group :development, :test do
+  gem 'faraday'
+  gem "awesome_print"
   gem "sqlite3"
   gem "sqlite3-ruby"
+  gem 'factory_girl_rails'
+end
+
+group :development do
+  gem 'heroku'
   gem "shotgun"
   gem "taps"
 end
 
 group :test do
-  gem 'factory_girl_rails'
+  gem 'launchy'
 end
