@@ -98,7 +98,7 @@ class DocController < ApplicationController
        ['Debugging', [ 'bisect', 'blame' ]],
        ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
        ['External Sytems', ['svn', 'fast-import']],
-       ['Administration', [ 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
+       ['Administration', [ 'clean', 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
        ['Server Admin', [ 'daemon', 'update-server-info' ]],
   ]
 
