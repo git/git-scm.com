@@ -13,7 +13,7 @@ module ApplicationHelper
   end
 
   def random_tagline
-    content_tag(:em, '-' * 2) + TAGLINES.sample
+    "<em>--</em>#{TAGLINES.sample}"
   end
 
   def latest_version
@@ -32,8 +32,8 @@ module ApplicationHelper
 
   # overriding this because we're not using asset pipeline for images,
   # but jason is using image_tag
-  #def image_tag(image)
-  #  raw "<img src=\"/images/" + image  + "\"/>"
-  #end
+  def image_tag(image)
+    raw "<img src=\"/images/" + image  + "\"/>"
+  end
 
 end
