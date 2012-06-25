@@ -64,7 +64,7 @@ class Section < ActiveRecord::Base
   end
 
   def index
-    if BONSAI
+    if defined?(BONSAI)
       code = self.chapter.book.code
       data = {
         'chapter' => self.chapter.title,

@@ -1,5 +1,3 @@
-require 'redcarpet'
-
 class DocController < ApplicationController
   layout "layout"
 

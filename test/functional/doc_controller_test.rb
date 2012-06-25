@@ -1,6 +1,7 @@
 require File.expand_path("../../test_helper", __FILE__)
 
 class DocControllerTest < ActionController::TestCase
+
   test "should get index" do
     book = FactoryGirl.create(:book, :code =>'en')
     get :index
@@ -34,4 +35,48 @@ class DocControllerTest < ActionController::TestCase
     assert_redirected_to '/docs/git-commit'
   end
 
+  test "gets the blog page" do
+    get :blog, :year => 2009, :month => '02', :day => 11, :slug => "moved-to-github-pages"
+    assert_response :success
+  end
+
+  test "gets the reference page" do
+    get :ref
+    assert_response :success
+  end
+
+  test "gets the book page" do
+    book = FactoryGirl.create(:book, :code =>'en')
+    get :book, :lang => 'en'
+    assert_response :success
+  end
+
+  test "gets the book section page" do
+  end
+
+  test "gets the progit page" do
+    section = FactoryGirl.create(:section)
+    get :progit, :chapter => section.chapter.number, :section => section.number
+    assert_response :success
+  end
+
+  test "gets the videos page" do
+    get :videos
+    assert_response :success
+  end
+
+  test "should redirect to videos page" do
+    get :watch, :id => 'bad-slug'
+    assert_redirected_to videos_path
+  end
+
+  test "watches the video" do
+    get :watch, :id => 'get-going'
+    assert_response :success
+  end
+
+  test "gets the external links page" do
+    get :ext
+    assert_response :success
+  end
 end
