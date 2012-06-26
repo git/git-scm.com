@@ -9,12 +9,12 @@ class SiteControllerTest < ActionController::TestCase
 
   test "whygitisbetterthanx.com should redirect to about page" do
     get :redirect_wgibtx
-    assert_redirected_to about_path
+    assert_redirected_to "http://git-scm.com/about"
   end
 
   test "if no slug then should redirect to the book page" do
     get :redirect_combook
-    assert_redirected_to book_path
+    assert_redirected_to "http://git-scm.com/book"
   end
 
   test "should redirect to particular book page" do
@@ -25,7 +25,7 @@ class SiteControllerTest < ActionController::TestCase
 
   test "should redirect to the book page" do
     get :redirect_book
-    assert_redirected_to book_path
+    assert_redirected_to "http://git-scm.com/book"
   end
 
   test "should redirect to any book page" do
