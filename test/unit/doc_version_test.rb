@@ -1,6 +1,11 @@
 require File.expand_path("../../test_helper", __FILE__)
 
 class DocVersionTest < ActiveSupport::TestCase
+
+  should belong_to :doc
+  should belong_to :version
+  should belong_to :doc_file
+
   test 'finds most recent version' do
     range = 0..3
     file = FactoryGirl.create(:doc_file, :name => 'test-command')
@@ -22,4 +27,5 @@ class DocVersionTest < ActiveSupport::TestCase
     dv = DocVersion.for_version('test-command', 'v2.0')
     assert_equal docs[2], dv.doc
   end
+
 end
