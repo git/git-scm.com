@@ -28,16 +28,7 @@ class DocController < ApplicationController
     end
   end
 
-  def extract_frontmatter(content)
-    if content =~ /^(---\s*\n.*?\n?)^(---\s*$\n?)(.*)/m
-      cnt = $3
-      data = YAML.load($1)
-      [cnt, data]
-    else
-      [content, {}]
-    end
-  end
-
+  
   def test
     render 'doc/rebase'
   end
@@ -84,21 +75,6 @@ class DocController < ApplicationController
     @content = Book.where(:code => lang).first.sections.where(:slug => slug).first
     @related = @content.get_related(8)
   end
-
-  CMD_GROUPS = [
-       ['Setup and Config', [ 'config', 'help' ]],
-       ['Getting and Creating Projects', [ 'init', 'clone']],
-       ['Basic Snapshotting', [ 'add', 'status', 'diff', 'commit', 'reset', 'rm', 'mv']],
-       ['Branching and Merging', [ 'branch', 'checkout', 'merge', 'mergetool', 'log', 'stash', 'tag' ]],
-       ['Sharing and Updating Projects', [ 'fetch', 'pull', 'push', 'remote', 'submodule' ]],
-       ['Inspection and Comparison', [ 'show', 'log', 'diff', 'shortlog', 'describe' ]],
-       ['Patching', ['am', 'apply', 'cherry-pick', 'rebase']],
-       ['Debugging', [ 'bisect', 'blame' ]],
-       ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
-       ['External Sytems', ['svn', 'fast-import']],
-       ['Administration', [ 'clean', 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
-       ['Server Admin', [ 'daemon', 'update-server-info' ]],
-  ]
 
   # commands index
   def commands
@@ -167,14 +143,7 @@ class DocController < ApplicationController
 
     render :text => 'ok'
   end
-
-  VIDEOS = [
-    [1, "41027679", "Git Basics", "What is Version Control?", "what-is-version-control", "05:59"],
-    [2, "41381741", "Git Basics", "What is Git?", "what-is-git", "08:15"],
-    [3, "41493906", "Git Basics", "Get Going with Git", "get-going", "04:26"],
-    [4, "41516942", "Git Basics", "Quick Wins with Git", "quick-wins", "05:06"],
-  ]
-
+ 
   def videos
     @videos = VIDEOS
   end
@@ -197,6 +166,16 @@ class DocController < ApplicationController
       doc_version = DocVersion.for_version filename, version
     else
       doc_version = DocVersion.latest_for filename
+    end
+  end
+
+  def extract_frontmatter(content)
+    if content =~ /^(---\s*\n.*?\n?)^(---\s*$\n?)(.*)/m
+      cnt = $3
+      data = YAML.load($1)
+      [cnt, data]
+    else
+      [content, {}]
     end
   end
 
