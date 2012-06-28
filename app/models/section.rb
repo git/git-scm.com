@@ -13,6 +13,7 @@ class Section < ActiveRecord::Base
   has_one :book, :through => :chapter
   before_save :set_slug
   after_save :index
+  has_many :sections, :through => :chapter
 
   def get_related(limit = 10)
     ri = RelatedItem.where(:related_type => 'book', :related_id => slug).order('score DESC').limit(limit)
@@ -30,7 +31,7 @@ class Section < ActiveRecord::Base
   def prev_slug
     lang = self.book.code
     prev_number = self.number - 1
-    if section = self.chapter.sections.where(:number => prev_number).first
+    if section = self.sections.where(:number => prev_number).first
       return "/book/#{lang}/#{section.slug}"
     else
       # find previous chapter
@@ -46,7 +47,7 @@ class Section < ActiveRecord::Base
   def next_slug
     lang = self.book.code
     next_number = self.number + 1
-    if section = self.chapter.sections.where(:number => next_number).first
+    if section = self.sections.where(:number => next_number).first
       return "/book/#{lang}/#{section.slug}"
     else
       if ch = self.chapter.next

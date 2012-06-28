@@ -1,7 +1,7 @@
 class DocController < ApplicationController
   layout "layout"
 
-  before_filter :book_resource, :only => [:index, :book, :book_section, :progit]
+  before_filter :book_resource, :only => [:index, :book_section, :progit]
 
   def index
     @videos = VIDEOS
@@ -66,6 +66,8 @@ class DocController < ApplicationController
   end
 
   def book
+    @book = Book.includes(:sections).where(:code => (params[:lang] || "en")).first
+    raise PageNotFound unless @book
   end
 
   def book_section
