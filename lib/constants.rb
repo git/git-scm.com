@@ -1,3 +1,12 @@
+# ApplicationHelper
+TAGLINES = %w{
+    fast-version-control
+    everything-is-local
+    distributed-even-if-your-workflow-isnt
+    local-branching-on-the-cheap
+    distributed-is-the-new-centralized
+}
+
 # DocsController#commands
 CMD_GROUPS = [
   ['Setup and Config', [ 'config', 'help' ]],

@@ -1,7 +1,9 @@
 module DocHelper
+
   def man(name)
-    "<a href=\"/docs/#{name}\">#{name.gsub('git-', '')}</a>".html_safe
+    link_to name.gsub('git-', ''), doc_file_path(:file => name) 
   end
+
   def linkify(content, section)
     next_page = section.next_slug
     prev_page = section.prev_slug
