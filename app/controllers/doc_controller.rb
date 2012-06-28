@@ -1,8 +1,9 @@
 class DocController < ApplicationController
   layout "layout"
 
+  before_filter :book_resource, :only => [:index, :book, :book_section, :progit]
+
   def index
-    @book = Book.where(:code => 'en').first
     @videos = VIDEOS
   end
 
@@ -65,14 +66,11 @@ class DocController < ApplicationController
   end
 
   def book
-    lang = params[:lang] || 'en'
-    @book = Book.where(:code => lang).first
   end
 
   def book_section
-    lang = params[:lang]
-    slug = params[:slug]
-    @content = Book.where(:code => lang).first.sections.where(:slug => slug).first
+    @content = @book.sections.where(:slug => params[:slug]).first
+    raise PageNotFound unless @content
     @related = @content.get_related(8)
   end
 
@@ -106,10 +104,9 @@ class DocController < ApplicationController
   def progit
     chapter = params[:chapter].to_i
     section = params[:section].to_i
-    lang = params[:lang] || 'en'
-    book = Book.where(:code => lang).first
-    chapter = book.chapters.where(:number => chapter).first
+    chapter = @book.chapters.where(:number => chapter).first
     @content = chapter.sections.where(:number => section).first
+    raise PageNotFound unless @content
     render 'book_section'
   end
 
@@ -160,6 +157,12 @@ class DocController < ApplicationController
   end
 
   private
+
+  def book_resource
+    @book ||= Book.where(:code => (params[:lang] || "en")).first
+    raise PageNotFound unless @book
+    @book
+  end
 
   def doc_for(filename, version = nil)
     if version
