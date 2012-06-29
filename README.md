@@ -1,4 +1,4 @@
-# Git Homepage
+# Git Homepage [![Build Status](https://secure.travis-ci.org/github/gitscm-next.png?branch=master)](http://travis-ci.org/github/gitscm-next)
 
 This is the web application for the [git-scm.com](http://git-scm.com) site.  It is meant to be the
 first place that a person new to Git will land and download or learn about the
