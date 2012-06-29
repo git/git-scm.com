@@ -14,11 +14,11 @@ class ApplicationController < ActionController::Base
   private
 
   def page_not_found
-    render :file => not_found_template, :layout => false 
+    render :file => not_found_template, :layout => false
   end
 
   def not_found_template
-    File.join(Rails.root, "public/404")
+    File.join(Rails.root, "public/404.html")
   end
 
 end
