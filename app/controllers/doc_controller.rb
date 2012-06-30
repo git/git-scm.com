@@ -72,7 +72,7 @@ class DocController < ApplicationController
 
   def book_section
     @content = @book.sections.where(:slug => params[:slug]).first
-    raise PageNotFound unless @content
+    return redirect_to "/book/#{@book.code}" unless @content 
     @related = @content.get_related(8)
   end
 
