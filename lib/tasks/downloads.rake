@@ -3,7 +3,7 @@ require 'octokit'
 # find newest mac and windows binary downloads
 task :downloads => :environment do
   # find latest windows version
-  win_downloads = Octokit.downloads("schacon/testy")
+  win_downloads = Octokit.downloads("msysgit/git")
   win_downloads.each do |down|
     if m = /^Git-(.*?)-(.*).exe/.match(down.name)
       version = m[1]
