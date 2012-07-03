@@ -35,15 +35,17 @@ class Doc < ActiveRecord::Base
     resp  = BONSAI.search('doc', options)
 
     ref_hits = []
-    resp['hits']['hits'].each do |hit|
-      highlight = hit.has_key?('highlight') ? hit['highlight']['text'].first : nil
-      name = hit["_source"]["name"]
-      ref_hits << { 
-        :name => name,
-        :score => hit["_score"],
-        :highlight => highlight,
-        :url  => "/docs/#{name}"
-      }
+    if resp
+      resp['hits']['hits'].each do |hit|
+        highlight = hit.has_key?('highlight') ? hit['highlight']['text'].first : nil
+        name = hit["_source"]["name"]
+        ref_hits << { 
+          :name => name,
+          :score => hit["_score"],
+          :highlight => highlight,
+          :url  => "/docs/#{name}"
+        }
+      end
     end
 
     if ref_hits.size > 0

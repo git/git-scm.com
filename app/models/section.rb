@@ -113,21 +113,23 @@ class Section < ActiveRecord::Base
     resp  = BONSAI.search('book', options)
 
     ref_hits = []
-    resp['hits']['hits'].each do |hit|
-      name = hit["_source"]["section"]
-      name = hit["_source"]["chapter"] if name.empty?
-      slug = hit["_id"].gsub('---', '/')
-      lang = hit["_source"]["lang"]
-      meta = "Chapter " + hit["_source"]['number'] + ' : ' + hit["_source"]["chapter"]
-      highlight = hit.has_key?('highlight') ? hit['highlight']['html'].first : nil
-      ref_hits << { 
-        :name => name,
-        :meta => meta,
-        :score => hit["_score"],
-        :highlight => highlight,
-        :url  => "/book/#{slug}"
-      }
-    end
+    if resp
+      resp['hits']['hits'].each do |hit|
+        name = hit["_source"]["section"]
+        name = hit["_source"]["chapter"] if name.empty?
+        slug = hit["_id"].gsub('---', '/')
+        lang = hit["_source"]["lang"]
+        meta = "Chapter " + hit["_source"]['number'] + ' : ' + hit["_source"]["chapter"]
+        highlight = hit.has_key?('highlight') ? hit['highlight']['html'].first : nil
+        ref_hits << { 
+          :name => name,
+          :meta => meta,
+          :score => hit["_score"],
+          :highlight => highlight,
+          :url  => "/book/#{slug}"
+        }
+      end
+      end
 
     if ref_hits.size > 0
       return { :category => "Book", :term => term, :matches  => ref_hits }
