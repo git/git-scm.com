@@ -13,6 +13,10 @@ Gitscm::Application.routes.draw do
     match '*path' => 'site#redirect_combook'
   end
 
+  constraints(:host => 'libgit2.github.com') do
+    root :to => 'libgit2#index'
+  end
+
   get "site/index"
 
   match "/doc" => "doc#index"
@@ -71,6 +75,8 @@ Gitscm::Application.routes.draw do
   match "/documentation/book" => "doc#book"
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
+
+  match "/libgit2" => "libgit2#index"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
