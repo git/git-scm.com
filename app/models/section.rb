@@ -1,3 +1,5 @@
+require 'searchable'
+
 # t.string      :title
 # t.integer     :number
 # t.string      :slug
@@ -7,6 +9,9 @@
 # t.belongs_to  :chapter
 # t.timestamps
 class Section < ActiveRecord::Base
+
+  include Searchable
+
   default_scope :order => 'number'
 
   belongs_to :chapter
@@ -81,62 +86,6 @@ class Section < ActiveRecord::Base
     require 'pp'
     pp e
     nil  # this is busted in production for some reason, which is really an issue
-  end
-
-  def self.search(term, lang = 'en', highlight = false)
-    query_options = {
-      "bool" => {
-        "must" => [
-            { "term" => { "lang" => lang } }
-        ],
-        "should" => [],
-        "minimum_number_should_match" => 1
-      }
-    }
-
-    terms = term.split(/\s|-/)
-    terms.each do |terma|
-      query_options['bool']['should'] << { "prefix" => { "section" => { "value" => terma, "boost" => 12.0 } } }
-      query_options['bool']['should'] << { "term" => { "html" => terma } }
-    end
-
-    highlight_options = {
-      'pre_tags'  => ['[highlight]'],
-      'post_tags' => ['[xhighlight]'],
-      'fields'    => { 'html' => {"fragment_size" => 200} }
-    }
-
-    options = { 'query' => query_options,
-                'size' => 10 }
-    options['highlight'] = highlight_options
-
-    resp  = BONSAI.search('book', options)
-
-    ref_hits = []
-    if resp
-      resp['hits']['hits'].each do |hit|
-        name = hit["_source"]["section"]
-        name = hit["_source"]["chapter"] if name.empty?
-        slug = hit["_id"].gsub('---', '/')
-        lang = hit["_source"]["lang"]
-        meta = "Chapter " + hit["_source"]['number'] + ' : ' + hit["_source"]["chapter"]
-        highlight = hit.has_key?('highlight') ? hit['highlight']['html'].first : nil
-        ref_hits << { 
-          :name => name,
-          :meta => meta,
-          :score => hit["_score"],
-          :highlight => highlight,
-          :url  => "/book/#{slug}"
-        }
-      end
-      end
-
-    if ref_hits.size > 0
-      return { :category => "Book", :term => term, :matches  => ref_hits }
-    else
-      nil
-    end
-
   end
 
 end

@@ -1,59 +1,16 @@
 require 'diff/lcs'
 require 'pp'
+require 'searchable'
 
 # t.text :blob_sha
 # t.text :plain
 # t.text :html
 # t.timestamps
 class Doc < ActiveRecord::Base
+  
+  include Searchable
+
   has_many :doc_versions
-
-  def self.search(term, highlight = false)
-    query_options = {
-      "bool" => {
-        "should" => [],
-        "minimum_number_should_match" => 1
-      }
-    }
-
-    terms = term.split(/\s|-/)
-    terms.each do |terma|
-      query_options['bool']['should'] << { "prefix" => { "name" => { "value" => terma, "boost" => 12.0 } } }
-      query_options['bool']['should'] << { "term" => { "text" => terma } }
-    end
-
-    highlight_options = {
-      'pre_tags'  => ['[highlight]'],
-      'post_tags' => ['[xhighlight]'],
-      'fields'    => { 'text' => {"fragment_size" => 200} }
-    }
-
-    options = { 'query' => query_options,
-                'size' => 10 }
-    options['highlight'] = highlight_options
-
-    resp  = BONSAI.search('doc', options)
-
-    ref_hits = []
-    if resp
-      resp['hits']['hits'].each do |hit|
-        highlight = hit.has_key?('highlight') ? hit['highlight']['text'].first : nil
-        name = hit["_source"]["name"]
-        ref_hits << { 
-          :name => name,
-          :score => hit["_score"],
-          :highlight => highlight,
-          :url  => "/docs/#{name}"
-        }
-      end
-    end
-
-    if ref_hits.size > 0
-      return { :category => "Reference", :term => term, :matches  => ref_hits }
-    else
-      nil
-    end
-  end
 
   # returns an array of the differences with 3 entries
   # 0: additions

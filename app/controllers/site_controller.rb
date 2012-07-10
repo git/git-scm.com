@@ -39,11 +39,11 @@ class SiteController < ApplicationController
       :results => []
     }
 
-    if results = Doc.search(sname, highlight)
+    if results = Doc.search(sname)
       data[:results] << results
     end
 
-    if results = Section.search(sname, 'en', highlight)
+    if results = Section.search(sname, :lang => 'en')
       data[:results] << results
     end
 
