@@ -32,10 +32,11 @@ module Searchable
         query_options['query']['bool']['should'] << { "term" => { "html" => keyword } }
       end
 
-      search = Tire::Search::Search.new('gitscm', :type => search_type, :payload => query_options) rescue nil
+      search = Tire::Search::Search.new(ELASTIC_SEARCH_INDEX, :type => search_type, :payload => query_options) rescue nil
       if search
         ref_hits = []
-        search.results.each do |result|
+        results = search.results rescue []
+        results.each do |result|
           name = result.section || result.chapter || result.name
           slug = result.id.gsub('---','/')
           ref_hits << {

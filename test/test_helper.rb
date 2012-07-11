@@ -13,20 +13,14 @@ class ActiveSupport::TestCase
   # Add more helper methods to be used by all tests here...
 end
 
-module ElasticSearch
-  def self.get_connection(server)
-    Faraday.new(:url => server) do |builder|
-      builder.request :json
-      builder.use JSONResponse
-      builder.adapter :test do |stub|
-        resp = {
-          'hits' => {'hits' => []}
-        }
-        stub.get('/gitscm/doc/_search') {[200, {}, JSON.dump(resp)]}
-        stub.get('/gitscm/book/_search') {[200, {}, JSON.dump(resp)]}
-        stub.put("/gitscm/book/en---Title-1-Title-2") {[200, {}, "{}"]}
-      end
-    end
+Faraday.new(:url => "http://0.0.0.0:9200") do |builder|
+  builder.request :json
+  builder.adapter :test do |stub|
+    resp = {
+      'hits' => {'hits' => []}
+    }
+    stub.get('/gitscm/doc/_search') {[200, {}, JSON.dump(resp)]}
+    stub.get('/gitscm/book/_search') {[200, {}, JSON.dump(resp)]}
+    stub.put("/gitscm/book/en---Title-1-Title-2") {[200, {}, "{}"]}
   end
 end
-BONSAI = ElasticSearch::Index.new("gitscm", "http://elasticsearch.test/")
