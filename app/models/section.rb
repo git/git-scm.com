@@ -70,22 +70,23 @@ class Section < ActiveRecord::Base
   end
 
   def index
-    if defined?(BONSAI)
-      code = self.chapter.book.code
-      data = {
-        'chapter' => self.chapter.title,
-        'section' => self.title,
-        'number' => self.cs_number,
-        'lang' => code,
-        'html' => self.html,
-      }
-      id = "#{code}---#{self.slug}"
-      BONSAI.add 'book', id, data
+    code = self.book.code
+    data = {
+      'id'        => "#{code}---#{self.slug}",
+      'type'      => "book",
+      'chapter'   => self.chapter.title,
+      'section'   => self.title,
+      'number'    => self.cs_number,
+      'lang'      => code,
+      'html'      => self.html,
+    }
+    begin
+      Tire.index ELASTIC_SEARCH_INDEX do
+        store data
+      end
+    rescue Exception => e
+      nil
     end
-  rescue Object => e
-    require 'pp'
-    pp e
-    nil  # this is busted in production for some reason, which is really an issue
   end
 
 end
