@@ -26,6 +26,8 @@ class DocController < ApplicationController
     elsif File.exists?("#{path}.html")
       content = File.read("#{path}.html")
       @content, @frontmatter = extract_frontmatter(content)
+    else
+      raise PageNotFound
     end
   end
 
