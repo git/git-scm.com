@@ -60,7 +60,7 @@ def generate_pages(lang, chapter, content)
 
     html += sec
 
-    nav = "<div id='nav'><a href='[[nav-prev]]'>prev</a> | <a href='[[nav-next]]'>next</a></div>"
+    nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
     html += nav
 
     data = {
