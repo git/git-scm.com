@@ -1,7 +1,7 @@
 class DocController < ApplicationController
   layout "layout"
 
-  before_filter :book_resource, :only => [:index, :book_section, :progit]
+  before_filter :book_resource, :only => [:index]
 
   def index
     @videos = VIDEOS
@@ -67,32 +67,6 @@ class DocController < ApplicationController
     end
   end
 
-  def book
-    @book = Book.includes(:sections).where(:code => (params[:lang] || "en")).first
-    raise PageNotFound unless @book
-  end
-
-  def book_section
-    @content = @book.sections.where(:slug => params[:slug]).first
-    return redirect_to "/book/#{@book.code}" unless @content 
-    @related = @content.get_related(8)
-  end
-
-  # commands index
-  def commands
-    @related = {}
-    ri = RelatedItem.where(:content_type => 'reference', :related_type => 'book')
-    ri.each do |item|
-      cmd = item.name.gsub('git-', '')
-      if s = Section.where(:slug => item.related_id).first
-        @related[cmd] ||= []
-        @related[cmd] << [s.cs_number, s.slug, item.score]
-        @related[cmd].sort!
-      end
-    end
-    @groups = CMD_GROUPS
-  end
-
   def related_update
     if params[:token] != ENV['UPDATE_TOKEN']
       return render :text => 'nope'
@@ -102,16 +76,6 @@ class DocController < ApplicationController
     toc = params[:to_content]
     RelatedItem.create_both(fromc, toc)
     render :text => 'ok'
-  end
-
-  # so we can display urls old progit.org style
-  def progit
-    chapter = params[:chapter].to_i
-    section = params[:section].to_i
-    chapter = @book.chapters.where(:number => chapter).first
-    @content = chapter.sections.where(:number => section).first
-    raise PageNotFound unless @content
-    render 'book_section'
   end
 
   # API Methods to update book content #

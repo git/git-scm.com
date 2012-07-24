@@ -29,13 +29,15 @@ Gitscm::Application.routes.draw do
                                        :version => /[^\/]+/
   end
 
-  match "/book" => "doc#book"
-  match "/book/index" => "doc#book"
-  match "/book/commands" => "doc#commands"
-  match "/book/ch:chapter-:section.html" => "doc#progit"
-  match "/book/:lang/ch:chapter-:section.html" => "doc#progit"
-  match "/book/:lang" => "doc#book"
-  match "/book/:lang/:slug" => "doc#book_section"
+  resource :book do
+    match "/index"                          => redirect("/book")
+    match "/commands"                       => "books#commands"
+    match "/:lang"                          => "books#show"
+    match "/:lang/:slug"                    => "books#section"
+    match "/ch:chapter-:section.html"       => "books#chapter"
+    match "/:lang/ch:chapter-:section.html" => "books#chapter"
+  end
+
   match "/publish" => "doc#book_update"
   match "/related" => "doc#related_update"
   match "/:year/:month/:day/:slug" => "doc#blog", :year => /\d{4}/,
