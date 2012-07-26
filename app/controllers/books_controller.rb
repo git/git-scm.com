@@ -1,7 +1,5 @@
 class BooksController < ApplicationController
 
-  layout 'layout'
-
   before_filter :book_resource, :only => [:section, :chapter]
   
   def show

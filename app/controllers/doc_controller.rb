@@ -1,5 +1,4 @@
 class DocController < ApplicationController
-  layout "layout"
 
   before_filter :book_resource, :only => [:index]
 

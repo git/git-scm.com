@@ -4,6 +4,8 @@ class ApplicationController < ActionController::Base
   protect_from_forgery
   before_filter :determine_os
 
+  layout 'layout'
+
   rescue_from PageNotFound, :with => :page_not_found
 
   # Mac, Windows, Linux are valid
