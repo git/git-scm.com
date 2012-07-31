@@ -9,28 +9,6 @@ class DocController < ApplicationController
   def ref
   end
 
-  def blog
-    y = params[:year]
-    m = params[:month]
-    d = params[:day]
-    slug = params[:slug]
-    file = "#{y}-#{m}-#{d}-#{slug}"
-    @path = path = "#{Rails.root}/app/views/blog/progit/#{file}"
-    content = ''
-    if File.exists?("#{path}.markdown")
-      markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML)
-      content = File.read("#{path}.markdown")
-      content, @frontmatter = extract_frontmatter(content)
-      @content = markdown.render(content)
-    elsif File.exists?("#{path}.html")
-      content = File.read("#{path}.html")
-      @content, @frontmatter = extract_frontmatter(content)
-    else
-      raise PageNotFound
-    end
-  end
-
-  
   def test
     render 'doc/rebase'
   end
@@ -136,16 +114,6 @@ class DocController < ApplicationController
       doc_version = DocVersion.for_version filename, version
     else
       doc_version = DocVersion.latest_for filename
-    end
-  end
-
-  def extract_frontmatter(content)
-    if content =~ /^(---\s*\n.*?\n?)^(---\s*$\n?)(.*)/m
-      cnt = $3
-      data = YAML.load($1)
-      [cnt, data]
-    else
-      [content, {}]
     end
   end
 

@@ -74,4 +74,5 @@ class SiteController < ApplicationController
       redirect_to "http://git-scm.com#{current_uri}"
     end
   end
+
 end

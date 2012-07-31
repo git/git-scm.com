@@ -1,4 +1,5 @@
 Gitscm::Application.routes.draw do
+
   constraints(:host => 'whygitisbetterthanx.com') do
     root :to => 'site#redirect_wgibtx'
   end
@@ -26,7 +27,7 @@ Gitscm::Application.routes.draw do
   %w{man ref git}.each do |path|
     match "/#{path}/:file" => redirect("/docs/%{file}")
     match "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"),
-                                       :version => /[^\/]+/
+    :version => /[^\/]+/
   end
 
   resource :book do
@@ -38,11 +39,27 @@ Gitscm::Application.routes.draw do
     match "/:lang/ch:chapter-:section.html" => "books#chapter"
   end
 
+  resource :download, :controller => :downloads, :only => [:index] do
+    match "/:platform"      => "downloads#download"
+    match "/gui/:platform"  => "downloads#gui"
+  end
+
+  resources :downloads, :only => [:index] do
+    collection do
+      match "/guis"       => "downloads#guis"
+      match "/installers" => "downloads#installers"
+      match "/logos"       => "downloads#logos"
+      match "/latest"     => "downloads#latest"
+    end
+  end
+
+  match "/:year/:month/:day/:slug" => "blog#progit",  :year   => /\d{4}/,
+                                                      :month  => /\d{2}/,
+                                                      :day    => /\d{2}/
+
   match "/publish" => "doc#book_update"
   match "/related" => "doc#related_update"
-  match "/:year/:month/:day/:slug" => "doc#blog", :year => /\d{4}/,
-                                                  :month => /\d{2}/,
-                                                  :day => /\d{2}/
+
 
   match "/about" => "about#index"
   match "/about/:section" => "about#index"
@@ -53,15 +70,6 @@ Gitscm::Application.routes.draw do
   match "/community" => "community#index"
 
   match "/admin" => "site#admin"
-
-  match "/download" => "downloads#index"  # from old site
-  match "/downloads" => "downloads#index"
-  match "/downloads/guis" => "downloads#guis"
-  match "/downloads/installers" => "downloads#installers"
-  match "/downloads/logos" => "downloads#logos"
-  match "/downloads/latest" => "downloads#latest"
-  match "/download/:platform" => "downloads#download"
-  match "/download/gui/:platform" => "downloads#gui"
 
   match "/search" => "site#search"
   match "/search/results" => "site#search_results"

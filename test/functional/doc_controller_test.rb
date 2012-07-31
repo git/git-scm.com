@@ -35,11 +35,6 @@ class DocControllerTest < ActionController::TestCase
     assert_redirected_to '/docs/git-commit'
   end
 
-  test "gets the blog page" do
-    get :blog, :year => 2009, :month => '02', :day => 11, :slug => "moved-to-github-pages"
-    assert_response :success
-  end
-
   test "gets the reference page" do
     get :ref
     assert_response :success

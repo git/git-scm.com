@@ -24,6 +24,7 @@ class DownloadsController < ApplicationController
 
   def download
     @platform = params[:platform]
+    logger.info @platform
     @platform = 'windows' if @platform == 'win'
     if @platform == 'windows' || @platform == 'mac'
       if @platform == 'windows'
