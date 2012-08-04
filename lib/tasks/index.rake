@@ -1,4 +1,4 @@
-require 'asciidoc'
+require 'asciidoctor'
 require 'octokit'
 require 'time'
 require 'digest/sha1'
@@ -95,7 +95,7 @@ task :preindex => :environment do
       puts "   build: #{path}"
 
       content = blob_content[entry.sha]
-      asciidoc = Asciidoc::Document.new(path, content) do |inc|
+      asciidoc = Asciidoctor::Document.new(content) do |inc|
         if categories.has_key?(inc)
           categories[inc]
         else
@@ -117,7 +117,7 @@ task :preindex => :environment do
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
         doc.plain = asciidoc.source
-        doc.html  = asciidoc.render( template_dir )
+        doc.html  = asciidoc.render( :template_dir => template_dir )
         doc.save
       end
       dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create

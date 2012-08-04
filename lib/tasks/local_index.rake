@@ -1,4 +1,4 @@
-require 'asciidoc'
+require 'asciidoctor'
 
 # fill in the db from a local git clone
 task :local_index => :environment do
@@ -80,7 +80,7 @@ task :local_index => :environment do
         puts "   build: #{path}"
 
         content = `git cat-file blob #{sha}`.chomp
-        asciidoc = Asciidoc::Document.new(path, content) do |inc|
+        asciidoc = Asciidoctor::Document.new(content) do |inc|
           if categories.has_key?(inc)
             categories[inc]
           else
@@ -98,7 +98,7 @@ task :local_index => :environment do
         doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
         if rerun || !doc.plain || !doc.html
           doc.plain = asciidoc.source
-          doc.html  = asciidoc.render(template_dir)
+          doc.html  = asciidoc.render(:template_dir => template_dir)
           doc.save
         end
         dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create
@@ -109,4 +109,3 @@ task :local_index => :environment do
     end
   end
 end
-

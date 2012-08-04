@@ -26,6 +26,7 @@ gem "awesome_print"
 gem 'newrelic_rpm'
 gem 'exceptional'
 gem 'tire'
+gem 'asciidoctor', '>= 0.0.3'
 
 # Gems used only for assets and not required
 # in production environments by default.
