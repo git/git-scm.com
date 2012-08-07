@@ -39,11 +39,10 @@ Gitscm::Application.routes.draw do
     match "/:lang/ch:chapter-:section.html" => "books#chapter"
   end
 
-  resource :download, :controller => :downloads, :only => [:index] do
-    match "/:platform"      => "downloads#download"
-    match "/gui/:platform"  => "downloads#gui"
-  end
-
+  match "/download"               => "downloads#index"
+  match "/download/:platform"     => "downloads#download"
+  match "/download/gui/:platform" => "downloads#gui"
+  
   resources :downloads, :only => [:index] do
     collection do
       match "/guis"       => "downloads#guis"
