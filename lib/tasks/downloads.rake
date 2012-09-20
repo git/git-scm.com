@@ -10,10 +10,12 @@ task :downloads => :environment do
       puts version = version
       puts url = down.html_url
       v = Version.where(:name => version).first
-      d = v.downloads.where(:url => url).first_or_create
-      d.filename = down.name
-      d.platform = 'windows'
-      d.save
+      if v
+        d = v.downloads.where(:url => url).first_or_create
+        d.filename = down.name
+        d.platform = 'windows'
+        d.save
+      end
     end
   end
 
@@ -25,10 +27,12 @@ task :downloads => :environment do
       puts version = version
       puts url = down.html_url
       v = Version.where(:name => version).first
-      d = v.downloads.where(:url => url).first_or_create
-      d.filename = down.name
-      d.platform = 'mac'
-      d.save
+      if v
+        d = v.downloads.where(:url => url).first_or_create
+        d.filename = down.name
+        d.platform = 'mac'
+        d.save
+      end
     end
   end
 end
