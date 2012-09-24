@@ -31,12 +31,12 @@ Gitscm::Application.routes.draw do
   end
 
   resource :book do
+    match "/ch:chapter-:section.html"    => "books#chapter"
+    match "/:lang/ch:chapter-:section.html" => "books#chapter"
     match "/index"                          => redirect("/book")
     match "/commands"                       => "books#commands"
     match "/:lang"                          => "books#show"
     match "/:lang/:slug"                    => "books#section"
-    match "/ch:chapter-:section.html"       => "books#chapter"
-    match "/:lang/ch:chapter-:section.html" => "books#chapter"
   end
 
   match "/download"               => "downloads#index"
