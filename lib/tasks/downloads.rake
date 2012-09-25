@@ -5,7 +5,7 @@ task :downloads => :environment do
   # find latest windows version
   win_downloads = Octokit.downloads("msysgit/git")
   win_downloads.each do |down|
-    if m = /^Git-(.*?)-(.*).exe/.match(down.name)
+    if m = /^Git-(.*?)-(.*?)(\d{4})(\d{2})(\d{2})\.exe/.match(down.name)
       version = m[1]
       puts version = version
       puts url = down.html_url
@@ -14,6 +14,7 @@ task :downloads => :environment do
         d = v.downloads.where(:url => url).first_or_create
         d.filename = down.name
         d.platform = 'windows'
+        d.release_date = Time.utc(m[3], m[4], m[5])
         d.save
       end
     end
@@ -31,6 +32,7 @@ task :downloads => :environment do
         d = v.downloads.where(:url => url).first_or_create
         d.filename = down.name
         d.platform = 'mac'
+        d.release_date = down.created_at
         d.save
       end
     end
