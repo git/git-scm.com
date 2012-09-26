@@ -24,13 +24,14 @@ class DownloadsController < ApplicationController
 
   def download
     @platform = params[:platform]
-    logger.info @platform
     @platform = 'windows' if @platform == 'win'
     if @platform == 'windows' || @platform == 'mac'
       if @platform == 'windows'
-        @project_url = "http://msysgit.github.com/"
+        @project_url  = "http://msysgit.github.com/"
+        @source_url   = "https://github.com/msysgit/git/"
       else
         @project_url = "https://github.com/timcharper/git_osx_installer"
+        @source_url   = "https://github.com/git/git/"
       end
 
       @download = Download.latest_for(@platform)
