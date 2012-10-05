@@ -15,7 +15,7 @@ Gitscm::Application.routes.draw do
   end
 
   constraints(:host => 'libgit2.github.com') do
-    root :to => 'libgit2#index'
+    root :to => 'library#index'
   end
 
   get "site/index"
@@ -46,7 +46,7 @@ Gitscm::Application.routes.draw do
   match "/download"               => "downloads#index"
   match "/download/:platform"     => "downloads#download"
   match "/download/gui/:platform" => "downloads#gui"
-  
+
   resources :downloads, :only => [:index] do
     collection do
       match "/guis"       => "downloads#guis"
@@ -85,7 +85,7 @@ Gitscm::Application.routes.draw do
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
 
-  match "/libgit2" => "libgit2#index"
+  match "/library" => "library#index"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
