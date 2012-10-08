@@ -86,7 +86,9 @@ Gitscm::Application.routes.draw do
   match "/documentation/external-links" => "doc#ext"
 
   match "/library" => "library#index"
+  # TODO: these are only for static templates until properly wired up
   match "/library/functions" => "library#functions"
+  match "/library/group" => "library#group"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
