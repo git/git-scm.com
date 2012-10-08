@@ -1,6 +1,9 @@
 class LibraryController < ApplicationController
-  layout "libgit2"
+  layout "library"
 
   def index
+  end
+
+  def functions
   end
 end

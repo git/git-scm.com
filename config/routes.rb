@@ -86,6 +86,7 @@ Gitscm::Application.routes.draw do
   match "/documentation/external-links" => "doc#ext"
 
   match "/library" => "library#index"
+  match "/library/functions" => "library#functions"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"

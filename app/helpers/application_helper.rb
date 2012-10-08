@@ -28,4 +28,10 @@ module ApplicationHelper
     raw "<img src=\"/images/" + image  + "\"/>"
   end
 
+  def function_nav_link(name, count)
+    link_to "#", {:class => (@subsection == name) ? 'active' : ''} do
+      content_tag(:span, name) + content_tag(:em, "(#{count})")
+    end
+  end
+
 end
