@@ -89,6 +89,7 @@ Gitscm::Application.routes.draw do
   # TODO: these are only for static templates until properly wired up
   match "/library/functions" => "library#functions"
   match "/library/group" => "library#group"
+  match "/library/function" => "library#function"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
