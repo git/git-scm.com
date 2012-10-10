@@ -1,0 +1,728 @@
+<div id="usage-guide">
+
+  <h2 id="contents">Contents</h2>
+  <div class="contents"><div class="bullet">
+    <div class="description">
+      <ul>
+        <li><a href="api.html#sha">SHA conversions and formatting</a></li>
+        <li><a href="api.html#rawread">object reading (loose and packed)</a></li>
+        <li><a href="api.html#rawwrite">object writing (loose)</a></li>
+        <li><a href="api.html#parsing">commit, tag, tree and blob parsing and write-back</a></li>
+        <li><a href="api.html#trees">tree traversal</a></li>
+        <li><a href="api.html#revwalk">revision walking</a></li>
+        <li><a href="api.html#index">index file (staging area) manipulation</a></li>
+        <li><a href="api.html#backends">custom ODB backends</a></li>
+      </ul>
+    </div>
+  </div></div>
+
+  <h2 id="started">Getting started</h2>
+
+  <div class="contents"><div class="bullet">
+    <div class="description">
+      <p>This is the usage guide for the libgit2 API.  The machine generated
+        documentation for the C API can be found <a href="http://libgit2.github.com/libgit2">here</a>;
+        this page is to show some examples and usage of libgit2 and the Ruby
+        bindings, <a href="https://github.com/libgit2/rugged">Rugged</a>.
+      </p>
+
+      <p>You can also see heavily documented, compilable example C files
+      using libgit2 <a href="http://libgit2.github.com/libgit2/ex/HEAD/libgit.html">here</a></p>
+
+      <p>To get started, you need to initialize the <code>Repository</code>
+      object.  This is the starting point for most of what you will do with
+      the libgit2 API.
+      </p>
+
+      <p>You will have to include <code>git2.h</code> to access the main
+      libgit2 functionality.</p>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+#include &lt;git2.h&gt;
+git_repository *repo;
+git_repository_open(&repo, "/path/to/repo.git");
+
+/* do stuff with the repository */
+
+git_repository_free(repo);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+require 'rugged'
+@repo = Rugged::Repository.new(@path)
+</pre>
+
+      </div>
+    </div></div>
+
+    <h2 id="sha">SHA1 Conversion and Formatting</h2>
+    <div class="contents"><div class="bullet">
+      <div class="description">
+
+      <p>The Git object database is basically a key-value store wher
+      the key for each object is the SHA1 checksum of the contents of
+      the object it is storing. This means that working with these SHA1
+      values is pretty important.  The SHA1 algorithm returns a 20-byte
+      raw value for any content given to it, but in order to be readable
+      by people or to even accurately represent it in ASCII, you have to
+      convert the value to 40 hex characters.  libgit2 provides helper
+      functions to easily do this conversion.</p>
+
+      <h3>Hex to Raw</h3>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+char hex[] = "599955586da1c3ad514f3e65f1081d2012ec862d";
+git_oid oid;
+git_oid_fromstr(&oid, hex);
+printf("Raw 20 bytes: [%s]\n", (&oid)->id);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+raw = Rugged::hex_to_raw("ce08fe4884650f067bd5703b6a59a8b3b3c99a09")
+puts "Raw 20 bytes: #{raw}"
+</pre>
+
+      <h3>Raw to Hex</h3>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_oid oid;
+char out[41];
+out[40] = '\0';
+
+git_oid_fmt(out, &oid);
+printf("SHA hex string: %s\n", out);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+hex = Rugged::raw_to_hex(Base64.decode64("FqASNFZ4mrze9Ld1ITwjqL109eA="))
+puts "SHA hex string: #{hex}"
+</pre>
+
+        </div>
+    </div></div>
+
+    <h2 id="rawread">Raw Data Reading and Writing</h2>
+    <div class="contents"><div class="bullet">
+      <div class="description">
+
+      <p>This is the lowest layer of Git access, raw read and write
+      access to the object database. With libgit2 you can read the raw
+      data of any object out of the database by providing the SHA1 hash
+      of that object.</p>
+
+      <p>The object database is split in several layers, called backends.
+      By default, it is instantiated with two backends, just like the original
+      git.git: object requests will first be looked up in the loose object storage,
+      and if not found, a lookup will be attempted on the packfile storage. On top
+      of that, libgit2 also supports <a href="api.html#backends">custom backends</a>.</p>
+
+      <h3>Reading Data</h3>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_odb *odb;
+git_odb_object *obj;
+git_otype otype;
+
+unsigned char *data;
+const char *str_type;
+int error;
+
+odb = git_repository_odb(&odb, repo);
+
+error = git_odb_read(&obj, odb, &oid);
+
+data = (const unsigned char*)git_odb_object_data(obj);
+otype = git_odb_object_type(obj);
+
+str_type = git_object_type2string(otype);
+printf("object length and type: %d, %s\n", (int)git_odb_object_size(obj), str_type);
+
+git_odb_object_free(obj); // close the object when you are done with it
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+sha = "599955586da1c3ad514f3e65f1081d2012ec862d"
+if @repo.exists(sha)
+  raw_objct = @repo.read(sha)
+
+  pp raw_object.data
+  pp raw_object.type
+  pp raw_object.len
+end
+</pre>
+
+      <p id="rawwrite">We also provide access to write arbitrary content back into
+      the object database.  For writing blob contents, this is fine,
+      but remember that other types such as commits and trees have very
+      specific formats. It would be easy to introduce corrupt objects
+      this way.</p>
+
+      <h3>Writing Data</h3>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_oid oid2;
+git_odb_write(&oid2, odb, "test data", sizeof("test data") - 1, GIT_OBJ_BLOB);
+git_oid_fmt(out, &oid2);
+printf("Written Object: %s\n", out);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+content = "any ol content will do"
+sha = @repo.hash(content, "blob")  # just gives you the SHA hash
+sha = @repo.write(content, "blob") # actually writes to the odb
+</pre>
+
+        </div>
+      </div></div>
+
+      <h2 id="parsing">Object Parsing and Writing</h2>
+      <div class="contents"><div class="bullet">
+        <div class="description">
+        <p>
+          The different Git object types other than blobs have very specific
+          formats they need to be in.  libgit2 is capable of properly parsing
+          commits, tags, and trees for you. It can also construct the proper
+          format given the raw data to for easy write-back capability.
+        </p>
+
+    <p>You can get objects from the database either via the
+      <code>git_[object]_lookup(&obj, repo, &id)</code> method or the more
+      general <code>git_repository_lookup(&obj, repo, &oid, OBJ_TYPE)</code>
+      call.  I will use them interchangably through these examples.</p>
+
+    <p>Note that any object references returned by these two methods are owned by
+    the Repository object, and shall not be <code>free</code>'d manually. The repository
+    has an internal object cache, and will take care of freeing all the loaded
+    objects after the repository itself is <code>free</code>'d. However, if you
+    are sure that an object won't be needed again, you can manually free it
+    using the <code>git_object_free(obj)</code> method.</p>
+
+      <a class="apilink" href="http://libgit2.github.com/libgit2/#HEAD/group/commit">Commit API</a>
+      <h3 id="commits">Commits</h3>
+
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_commit *commit;
+git_oid oid3;
+
+git_oid_fromstr(&oid3, "f0877d0b841d75172ec404fc9370173dfffc20d1");
+
+error = git_commit_lookup(&commit, repo, &oid3);
+
+const git_signature *author, *cmtter;
+const char *message, *message_short;
+time_t ctime;
+unsigned int parents, p;
+
+message  = git_commit_message(commit);
+author   = git_commit_author(commit);
+cmtter   = git_commit_committer(commit);
+ctime    = git_commit_time(commit);
+
+printf("Author: %s (%s)\n", author->name, author->email);
+
+parents  = git_commit_parentcount(commit);
+for (p = 0;p < parents;p++) {
+  git_commit *parent;
+  git_commit_parent(&parent, commit, p);
+  git_oid_fmt(out, git_commit_id(parent));
+  printf("Parent: %s\n", out);
+  git_commit_free(parent);
+}
+
+git_commit_free(commit);
+
+/* and writing a commit object */
+
+git_oid tree_id, parent_id, commit_id;
+git_tree *tree;
+git_commit *parent;
+
+/* create signatures */
+author = git_signature_new("Scott Chacon", "schacon@gmail.com", 123456789, 60);
+cmtter = git_signature_new("Scott A Chacon", "scott@github.com", 987654321, 90);
+
+git_oid_fromstr(&tree_id, "28873d96b4e8f4e33ea30f4c682fd325f7ba56ac");
+git_tree_lookup(&tree, repo, &tree_id);
+git_oid_fromstr(&parent_id, "f0877d0b841d75172ec404fc9370173dfffc20d1");
+git_commit_lookup(&parent, repo, &parent_id);
+
+git_commit_create_v(
+  &commit_id, /* out id */
+  repo,
+  NULL, /* do not update the HEAD */
+  author,
+  cmtter,
+  NULL, /* use default message encoding */
+  "example commit",
+  tree,
+  1, parent);
+
+git_oid_fmt(out, &commit_id);
+printf("New Commit: %s\n", out);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+sha = "599955586da1c3ad514f3e65f1081d2012ec862d"
+obj = @repo.lookup(sha)
+
+obj.sha
+obj.type
+obj.message
+obj.message_short
+obj.time
+
+c = obj.committer
+c.name       # "Scott Chacon"
+c.time.to_i  # 1273360386
+c.email      # "schacon@gmail.com"
+
+obj.tree.sha # "181037049a54a1eb5fab404658a3a250b44335d7"
+obj.parents.each do |parent|
+  pp parent
+end
+
+tree = @repo.lookup("07b3b552c4e879a21eb81d048fa729df65a49051")
+obj.tree = tree
+
+c.name = "Orange Peel Chacon"
+c.email = "op@gmail.com"
+
+obj.author = c
+obj.committer = c
+obj.message = "the new commit message"
+obj.write  # write back to the database
+</pre>
+
+      <a class="apilink" href="http://libgit2.github.com/libgit2/#HEAD/group/tag">Tag API</a>
+      <h3 id="tags">Tags</h3>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_tag *tag;
+const char *tmessage, *tname;
+git_otype ttype;
+
+git_oid_fromstr(&oid, "bc422d45275aca289c51d79830b45cecebff7c3a");
+
+error = git_tag_lookup(&tag, repo, &oid);
+
+git_tag_target((git_object **)&commit, tag);
+tname = git_tag_name(tag);    // "test"
+ttype = git_tag_type(tag);    // GIT_OBJ_COMMIT (otype enum)
+tmessage = git_tag_message(tag); // "tag message\n"
+printf("Tag Message: %s\n", tmessage);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+sha = "0c37a5391bbff43c37f0d0371823a5509eed5b1d"
+obj = @repo.lookup(sha)
+
+obj.sha
+obj.type        # "tag"
+obj.message     # "test tag message\n"
+obj.name        # "v1.0"
+obj.target.sha  # "5b5b025afb0b4c913b4c338a42934a3863bf3644"
+obj.target_type # "commit"
+
+c = obj.tagger
+c.name      # "Scott Chacon"
+c.time.to_i # 1288114383
+c.email     # "schacon@gmail.com"
+</pre>
+
+
+      <a class="apilink" href="http://libgit2.github.com/libgit2/#HEAD/group/tree">Tree API</a>
+      <h3 id="trees">Trees</h3>
+
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_tree *tree;
+git_tree_entry *entry;
+git_object *objt;
+
+git_oid_fromstr(&oid, "2a741c18ac5ff082a7caaec6e74db3075a1906b5");
+
+git_tree_lookup(&tree, repo, &oid);
+
+int cnt = git_tree_entrycount(tree); // 3
+printf("tree entries: %d\n", cnt);
+
+entry = git_tree_entry_byname(tree, "hello.c");
+git_tree_entry_name(entry); // "hello.c"
+
+entry = git_tree_entry_byindex(tree, 0);
+printf("Entry name: %s\n", git_tree_entry_name(entry)); // "README"
+
+git_tree_entry_2object(&objt, repo, entry); // blob
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+tree = @repo.lookup("1385f264afb75a56a5bec74243be9b367ba4ca08")
+tree.sha
+tree.type         # "tree"
+tree.entry_count  # 3
+tree.each do |entry|
+  puts entry.name
+  puts entry.to_object.sha
+  puts entry.attributes
+end
+
+enumdir = tree.sort { |a, b| a.sha <=> b.sha }.map { |e| e.name }.join(':')
+puts enumdir # "README:subdir:new.txt"
+</pre>
+
+      <a class="apilink" href="http://libgit2.github.com/libgit2/#HEAD/group/blob">Blob API</a>
+      <h3 id="blobs">Blobs</h3>
+
+<p>Since blobs are basically unstructured, there isn't a lot the blob routines
+provide over the raw access calls, but there are some interesting methods to help
+read in contents from disk.</p>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_blob *blob;
+
+git_oid_fromstr(&oid, "af7574ea73f7b166f869ef1a39be126d9a186ae0");
+
+git_blob_lookup(&blob, repo, &oid);
+printf("Blob Size: %d\n", git_blob_rawsize(blob)); // 8
+git_blob_rawcontent(blob); // "content"
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+sha = "fa49b077972391ad58037050f2a75f74e3671e92"
+blob = @repo.lookup(sha)
+blob.size    # 9
+blob.content # "new file\n"
+blob.type    # "blob"
+
+blob.content = "new blob content"
+blob.write
+</pre>
+
+        </div>
+      </div></div>
+
+      <h2 id="revwalk">Revision Walking</h2>
+      <div class="contents"><div class="bullet">
+        <div class="description">
+
+        <p>libgit2 also has a revision walking API that gives you access to the
+        mechanics of the 'log' command.  Instead of just running 'git log', you
+        start a graph walker, tell it where to start and just begin asking it
+        for the next commit in the list.</p>
+
+        <p>You can technically write your own walker by starting with any commit
+        and continuously putting it's parents in a queue and then taking the
+        next commit off that queue, but the built in walker is faster and has a
+        few different walking strategies built in.</p>
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_revwalk *walk;
+git_commit *wcommit;
+
+git_oid_fromstr(&oid, "f0877d0b841d75172ec404fc9370173dfffc20d1");
+
+git_revwalk_new(&walk, repo);
+git_revwalk_sorting(walk, GIT_SORT_TOPOLOGICAL | GIT_SORT_REVERSE);
+git_revwalk_push(walk, &oid);
+
+const git_signature *cauth;
+const char *cmsg;
+
+while ((git_revwalk_next(&oid, walk)) == 0) {
+  error = git_commit_lookup(&wcommit, repo, &oid);
+  cmsg  = git_commit_message_short(wcommit);
+  cauth = git_commit_author(wcommit);
+  printf("%s (%s)\n", cmsg, cauth->email);
+  git_commit_free(wcommit);
+}
+
+git_revwalk_free(walk);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+walker = Rugged::Walker.new(@repo)
+# find commits reachable from this
+walker.push("d6c2306fcbf0d346b9129b303c3babae58f619f7")
+# but not from this
+walker.hide("42b551c353a29d29f6f0dc4137a40706b128a8d3")
+walker.each do |commit|
+  msg   = commit.message
+  email = commit.author.email
+  puts "#{msg} (#{email})"
+end
+</pre>
+
+        </div>
+      </div></div>
+
+      <h2 id="index">Index Manipulation</h2>
+
+      <div class="contents"><div class="bullet">
+        <div class="description">
+        <p>libgit2 also has a set of index (cachefile) manipulation methods.
+        These cover being able to read and write the Git index file - stage and
+        unstage files, that sort of thing.</p>
+
+      <a class="apilink" href="http://libgit2.github.com/libgit2/#HEAD/group/index">Index API</a>
+      <h3 id="indexread">Reading Index Files</h3>
+
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+git_index *index;
+unsigned int i, ecount;
+
+git_repository_index(&index, repo);
+
+ecount = git_index_entrycount(index);
+for (i = 0; i < ecount; ++i) {
+  git_index_entry *e = git_index_get(index, i);
+
+  printf("path: %s\n", e->path);
+  printf("mtime: %d\n", (int)e->mtime.seconds);
+  printf("fs: %d\n", (int)e->file_size);
+}
+
+git_index_free(index);
+</pre>
+
+<br/>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+index = Rugged::Index.new(path)
+index.refresh
+puts index.entry_count # 2
+
+e = index.get_entry(0)
+puts e.path  # 'README'
+puts e.sha   # '1385f264afb75a56a5bec74243be9b367ba4ca08'
+puts e.mtime.to_i # 1273360380
+puts e.ctime.to_i # 1273360380
+puts e.file_size  # 4
+# also e.dev, e.ino, e.mode, e.uid, e.gid, e.flags, e.valid?, e.stage
+
+index.each do |entry|
+  puts entry.name # file name of each entry
+end
+</pre>
+
+        </div>
+    </div></div>
+
+      <h2 id="backends">Custom backends</h2>
+
+      <div class="contents"><div class="bullet">
+        <div class="description">
+    <p>libgit2 decouples the Object Database logic from the actual storage of
+    the objects. This means that you can actually extend the library with
+    custom backends that steer away from the default "loose object and packfiles"
+    storage model that Git uses.</p>
+
+    <p>Before extending the library with a custom backend in C, the special header
+    <code>git2/odb_backend.h</code> must be included<p>
+
+      <h3 id="indexread">Implementing a custom backend</h3>
+
+
+<span class="shtitle">C</span>
+<pre class="sh_c">
+typedef struct {
+  git_odb_backend parent;
+
+  /* custom data for your backend */
+  const char *sqlite_db;
+} sqlite_backend;
+
+int sqlb_read(git_rawobj *out, git_odb_backend *back, const git_oid *oid)
+{
+  sqlite_backend *b = (sqlite_backend *)back;
+
+  /* read the object identified by 'oid' and write its contents
+  to 'out'. Return 0 if the read was succesful,
+  or an error code otherwise. */
+
+  return 0;
+}
+
+int sqlb_read_header(git_rawobj *out, git_odb_backend *back, const git_oid *oid)
+{
+  sqlite_backend *b = (sqlite_backend *)backend;
+
+  /* read the header of the object identified by 'oid' and fill
+  the 'out-&gt;type' and 'out-&gt;len' fields without actually
+  loading the whole object in memory. Return 0 if
+  the read was succesful, or an error code otherwise. */
+
+  return 0;
+}
+
+int sqlb_exists(git_odb_backend *back, const git_oid *oid)
+{
+  sqlite_backend *b = (sqlite_backend *)back;
+
+  /* check whether the object identified by 'oid' exists in the backend.
+  Return 1 or 0. */
+
+  return 1;
+}
+
+int sqlb_write(git_oid *out, git_odb_backend *back, git_rawobj *obj)
+{
+  sqlite_backend *b = (sqlite_backend *)back;
+
+  /* write the object in 'obj' to the storage, and fill the 'out' oid
+  with the SHA1 identifier of the written object. Return 0
+  if the write was successful, error code otherwise */
+
+  return 0;
+}
+
+void sqlb_free(git_odb_backend *backend)
+{
+  sqlite_backend *b = (sqlite_backend *)back;
+
+  /* completely free the backend instance */
+
+  free(b-&gt;sqlite_db);
+  free(b);
+}
+
+sqlite_backend *create_backend(const char *path_do_db)
+{
+  sqlite_backend *backend;
+
+  /* create a new instance of the backend */
+  backend = calloc(1, sizeof(sqlite_backend));
+
+  /* fill the instance with pointers to the backend methods */
+  backend-&gt;parent.read = &sqlb_read;
+  backend-&gt;parent.read_header = &sqlb_read_header;
+  backend-&gt;parent.write = &sqlb_write;
+  backend-&gt;parent.exists = &sqlb_exists;
+  backend-&gt;parent.free = &sqlb_free;
+
+  /* set the priority of the backend */
+  backend-&gt;parent.priority = 3;
+
+  /* fill the custom data fields, if needed */
+  backend-&gt;sqlite_db = strdup(path_to_db);
+
+  return backend;
+}
+</pre>
+
+  <p>Once you have created a new backend instance, you can add
+  it to an existing object database using the <code>git_odb_add_backend(backend)</code> method.
+  A single backend instance can only be active in one ODB at the same time</p>
+
+  <p>The <code>priority</code> field is used to when sorting the backends for their usage:
+  for instance, a <code>read</code> call on the ODB will first check the backend with the
+  highest priority and attempt to read the object from it; if the backend returns an error
+  code, it will fallback silently to the following backend, until the object has been read
+  or there are no more backends left.</p>
+
+  <p>It it not necessary to specify all the backend methods on a custom backend: unspecified
+  methods will be skipped silently on their respective backend calls. If no <code>free</code>
+  method is specified for a given backend, the library will automatically try to free the backend using
+  a plain <code>free()</code> call.</p>
+
+<span class="shtitle">Ruby</span>
+<pre class="sh_ruby">
+class TestBackend &lt; Rugged::Backend
+  def read(oid)
+    # return a raw object with the read contents
+    Rugged::RawObject.new(type, contents)
+  end
+
+  def read_header(oid)
+    # return a raw object with the read header (type and length)
+    Rugged::RawObject.new(type, nil, len)
+  end
+
+  def exists(oid)
+    # return whether the object exists in the backend
+    true
+  end
+
+  def write(raw_object)
+    # write the object and return a SHA1 id
+    sha1
+  end
+end
+
+# add the backend to our repository
+backend = TestBackend.new(5) # high priority
+@repo.add_backend(backend)
+</pre>
+
+  <h3 id="indexread">A world of possibilities</h3>
+
+  <p>The options when implementing custom backends are endless. Here are just a few examples:</p>
+
+  <ul>
+    <li>in-memory object storage (useful for config storage)</li>
+    <li>in-memory cache for fast lookups (make sure you write the objects back to disk before flushing the cache!)</li>
+    <li>a transparent backend acting as a logger for all the ODB reads and writes</li>
+    <li>SQLite backend writing and reading objects from a compact database</li>
+    <li>Cassandra backend (or your favourite NoSQL flavour!)</li>
+    <li>Network backend (store the objects remotely, directly)</li>
+    <li>...Oh my god, so many cool ideas!</li>
+  </ul>
+
+  </div>
+  </div></div>
+
+  <h2 id="index">Overview</h2>
+
+  <div class="contents"><div class="bullet">
+    <div class="description">
+      <p>That is the basic usage of the libgit2 library.  For more detailed
+      information, please see the API documentation for the C library or the
+      Rugged Ruby library.
+      </p>
+    </div>
+  </div></div>
+
+</div>

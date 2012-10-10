@@ -90,6 +90,7 @@ Gitscm::Application.routes.draw do
   match "/library/functions" => "library#functions"
   match "/library/group" => "library#group"
   match "/library/function" => "library#function"
+  match "/library/guide" => "library#guide"
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
