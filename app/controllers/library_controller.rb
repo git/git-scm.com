@@ -1,4 +1,6 @@
 class LibraryController < ApplicationController
-  layout "library"
+  layout 'library'
 
+  def index
+  end
 end

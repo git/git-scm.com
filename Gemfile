@@ -26,6 +26,8 @@ gem "awesome_print"
 gem 'newrelic_rpm'
 gem 'exceptional'
 gem 'tire'
+gem 'mongo'
+gem "mongo_mapper"
 
 # Gems used only for assets and not required
 # in production environments by default.

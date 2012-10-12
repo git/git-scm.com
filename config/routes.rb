@@ -1,5 +1,7 @@
 Gitscm::Application.routes.draw do
 
+  get "library/index"
+
   constraints(:host => 'whygitisbetterthanx.com') do
     root :to => 'site#redirect_wgibtx'
   end
