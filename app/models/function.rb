@@ -1,5 +1,6 @@
 class Function
   include MongoMapper::Document
+  safe
   key :version, String
 
   key :argline, String

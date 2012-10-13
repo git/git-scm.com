@@ -1,10 +1,16 @@
 module LibraryHelper
+
+
+  def version
+    params[:version] || 'HEAD'
+  end
+
   def functions_for(group)
-    Function.where(:group => group)
+    Function.where(:version => version, :group => group)
   end
 
   def all_groups
-    @groups ||= Group.where(:version => @version).to_a
+    @groups ||= Group.where(:version => version).to_a
   end
 
   def each_column
@@ -23,7 +29,7 @@ module LibraryHelper
   end
 
   def function_nav_link(name, count)
-    link_to "#", {:class => (@subsection == name) ? 'active' : ''} do
+    link_to "#{api_route}/g/#{name}", {:class => (@subsection == name) ? 'active' : ''} do
       content_tag(:span, name) + content_tag(:em, "(#{count})")
     end
   end
@@ -33,11 +39,11 @@ module LibraryHelper
   end
 
   def api_route
-    @version == 'HEAD' ? '/library/api' : '/library/api/' + @version
+    version == 'HEAD' ? '/library/api' : '/library/api/' + version
   end
 
   def function_link(function)
-    link_to function, "#{api_route}/f/#{function}" 
+    link_to function.name, "#{api_route}/f/#{function.name}"
   end
 
   def markdown(text)

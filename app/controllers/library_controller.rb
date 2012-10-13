@@ -2,11 +2,15 @@ class LibraryController < ApplicationController
   layout 'library'
 
   def api
-    @version = params[:version] || 'HEAD'
+  end
+
+  def group
+    @group = Group.where(:version => params[:version], :name => params[:gname]).first
+    render_404 unless @group
   end
 
   def function
-    @function = Function.where(:name => params[:fname]).first
+    @function = Function.where(:version => params[:version], :name => params[:fname]).first
     render_404 unless @function
   end
 

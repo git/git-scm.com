@@ -88,8 +88,10 @@ Gitscm::Application.routes.draw do
   match "/documentation/external-links" => "doc#ext"
 
   namespace :library do
+    get "/" => "library#index"
     get "/api(/:version)" => "library#api", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
     get "/api/(:version)/f/:fname" => "library#function", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
+    get "/api/(:version)/g/:gname" => "library#group", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
   end
 
   match "/course/svn" => "site#svn"
