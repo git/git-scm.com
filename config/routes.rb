@@ -87,13 +87,10 @@ Gitscm::Application.routes.draw do
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
 
-  match "/library/api" => "library#api"
-  match "library/api/:version" => "library#api"
-  # TODO: these are only for static templates until properly wired up
-  match "/library/functions" => "library#functions"
-  match "/library/group" => "library#group"
-  match "/library/function" => "library#function"
-  match "/library/guide" => "library#guide"
+  namespace :library do
+    get "/api(/:version)" => "library#api", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
+    get "/api/(:version)/f/:fname" => "library#function", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
+  end
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"

@@ -3,7 +3,7 @@ class Function
   key :version, String
 
   key :argline, String
-  key :args, Hash
+  key :args, Array
   key :comments, String
   key :description, String
   key :file, String

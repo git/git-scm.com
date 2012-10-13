@@ -3,6 +3,14 @@ class LibraryController < ApplicationController
 
   def api
     @version = params[:version] || 'HEAD'
-    @groups = Group.where(:version => @version).to_a
+  end
+
+  def function
+    @function = Function.where(:name => params[:fname]).first
+    render_404 unless @function
+  end
+
+  def render_404
+    raise ActionController::RoutingError.new('Not Found')
   end
 end
