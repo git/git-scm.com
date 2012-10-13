@@ -14,7 +14,7 @@ task 'library:import' => [:environment] do |t|
     func[:name] = func_name
     func[:version] = version
     func[:examples] = func[:examples].to_a
-    func[:group] = Group.where(:group => func[:group]).first
+    func[:group] = Group.where(:name => func[:group]).first
     Function.create(func).save!
   end
 end
