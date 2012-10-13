@@ -87,7 +87,8 @@ Gitscm::Application.routes.draw do
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
 
-  match "/library" => "library#index"
+  match "/library/api" => "library#api"
+  match "library/api/:version" => "library#api"
   # TODO: these are only for static templates until properly wired up
   match "/library/functions" => "library#functions"
   match "/library/group" => "library#group"
