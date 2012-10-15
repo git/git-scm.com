@@ -5,15 +5,17 @@ def import_file(file, version)
   docs = JSON.parse(IO.read(file), :symbolize_names => true)
 
   docs[:groups].each do |(group_name, functions)|
-    Group.create(:_id => group_name, :functions => functions, :version => version)
+    Group.create(:name => group_name, :functions => functions, :version => version)
   end
 
   docs[:functions].each do |func_name, func|
-    func[:_id] = func_name
+    func[:name] = func_name
     func[:version] = version
     func[:examples] = func[:examples].to_a
     doc = Function.create(func)
   end
+
+  puts "** => #{version} (#{file}) [#{docs[:functions].size} functions]"
 end
 
 task 'library:import' => [:environment] do |t|

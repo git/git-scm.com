@@ -7,6 +7,6 @@ class Function
 
   def group
     @group ||= Group.new(
-      Function.collection.find('_id' => @doc['group'], 'version' => version))
+      Function.collection.find('name' => @doc['group'], 'version' => version))
   end
 end

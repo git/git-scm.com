@@ -5,6 +5,6 @@ class Library
   end
 
   def self.versions
-    @@versions ||= collection.find('_id' => 'versions').first['numbers']
+    collection.find('_id' => 'versions').first['numbers']
   end
 end

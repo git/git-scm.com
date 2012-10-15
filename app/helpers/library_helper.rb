@@ -3,6 +3,21 @@ module LibraryHelper
     params[:version] || 'HEAD'
   end
 
+  def all_versions
+    if @versions.nil?
+      @versions = Library.versions.sort
+      
+      # Natural sort, baby
+      @versions.sort! { |a, b|
+        if a == 'HEAD' then -1
+        elsif b == 'HEAD' then 1
+        else a[1..-1].split('.').map(&:to_i) <=> b[1..-1].split('.').map(&:to_i)
+        end
+      }
+    end
+    @versions
+  end
+
   def all_groups
     @groups ||= Group.all(version)
   end

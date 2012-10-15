@@ -2,7 +2,7 @@
 module MongoDoc
   module ClassMethods
     def find(id, version = 'HEAD')
-      return nil unless doc = self.collection.find("_id" => id, 'version' => version).first
+      return nil unless doc = self.collection.find("name" => id, 'version' => version).first
       self.new(doc)
     end
 
@@ -26,14 +26,6 @@ module MongoDoc
 
   def self.included(base)
     base.extend(ClassMethods)
-  end
-
-  def version
-    @doc['version']
-  end
-
-  def name
-    @doc['_id']
   end
 
   def method_missing(meth, *args, &block)
