@@ -1,32 +1,27 @@
 require 'redcarpet'
 require 'pp'
 
-task 'library:import' => [:environment] do |t|
-  file = 'HEAD.json'
-  version = 'HEAD'
+def import_file(file, version)
   docs = JSON.parse(IO.read(file), :symbolize_names => true)
 
-  MongoMapper.connection.drop_database(MongoMapper.database.name)
-
-  docs[:groups].each do |(group_name, _)|
-    Group.create(:name => group_name, :function_ids => [], :version => version).save!
+  docs[:groups].each do |(group_name, functions)|
+    Group.create(:_id => group_name, :functions => functions, :version => version)
   end
 
   docs[:functions].each do |func_name, func|
-    func[:name] = func_name
+    func[:_id] = func_name
     func[:version] = version
     func[:examples] = func[:examples].to_a
-
-    group = Group.where(:name => func[:group]).first
-    func[:group] = group
-
     doc = Function.create(func)
-    doc.save!
-
-    group.function_ids << doc.id
-    group.save!
   end
 
-  Group.ensure_index([[:version, -1], [:name, 1]])
-  Function.ensure_index([[:version, -1], [:name, 1]])
+end
+
+task 'library:import' => [:environment] do |t|
+  db = Rails.configuration.mongo_db
+  db.connection.drop_database(db.name)
+
+  Dir.glob('library-data/*.json') do |json_file|
+    import_file(json_file, File.basename(json_file, '.json'))
+  end
 end

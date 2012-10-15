@@ -5,12 +5,12 @@ class LibraryController < ApplicationController
   end
 
   def group
-    @group = Group.where(:version => params[:version], :name => params[:gname]).first
+    @group = Group.find(params[:gname], params[:version])
     render_404 unless @group
   end
 
   def function
-    @function = Function.where(:version => params[:version], :name => params[:fname]).first
+    @function = Function.find(params[:fname], params[:version])
     render_404 unless @function
   end
 

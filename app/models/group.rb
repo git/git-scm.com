@@ -1,8 +1,18 @@
 class Group
-  include MongoMapper::Document
-  safe
-  key :version, String
+  include MongoDoc
 
-  key :name, String
-  many :functions, :class_name => "Function", :in => :function_ids
+  def function_names
+    @doc['functions']
+  end
+
+  def functions
+    @functions ||= Function.collection.find(
+      'group' => self.name, 'version' => self.version).map { |f| Function.new(f) }
+  end
+
+  def length
+    @doc['functions'].size
+  end
+
+  alias_method :size, :length
 end

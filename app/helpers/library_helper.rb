@@ -1,28 +1,22 @@
 module LibraryHelper
-
-
   def version
     params[:version] || 'HEAD'
   end
 
-  def functions_for(group)
-    Function.where(:version => version, :group => group)
-  end
-
   def all_groups
-    @groups ||= Group.where(:version => version).to_a
+    @groups || Group.all(version)
   end
 
   def each_column
     columns = ['left', 'right']
-    total_entries = all_groups.map{|g| g.functions.length}.inject(:+) || 0
+    total_entries = all_groups.map{|g| g.size}.inject(:+) || 0
     total_groups = all_groups.length
 
     columns.each do |col_class|
       entries = 0
       yield(col_class, all_groups.last(total_groups).take_while { |g|
         total_groups -= 1
-        entries += g.functions.length
+        entries += g.size
         entries < (total_entries / 3)
       })
     end
@@ -42,8 +36,12 @@ module LibraryHelper
     version == 'HEAD' ? '/library/api' : '/library/api/' + version
   end
 
+  def group_link(group)
+    link_to group.name, "#{api_route}/g/#{group.name}"
+  end
+
   def function_link(function)
-    link_to function.name, "#{api_route}/f/#{function.name}", {:class => Random.rand(3) == 1 ? 'important' : ''}
+    link_to function, "#{api_route}/f/#{function}", {:class => Random.rand(3) == 1 ? 'important' : ''}
   end
 
   def markdown(text)
