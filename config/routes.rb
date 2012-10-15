@@ -1,7 +1,5 @@
 Gitscm::Application.routes.draw do
 
-  get "library/index"
-
   constraints(:host => 'whygitisbetterthanx.com') do
     root :to => 'site#redirect_wgibtx'
   end
@@ -87,12 +85,10 @@ Gitscm::Application.routes.draw do
   match "/documentation/videos" => "doc#videos"
   match "/documentation/external-links" => "doc#ext"
 
-  namespace :library do
-    get "/" => "library#index"
-    get "/api(/:version)" => "library#api", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
-    get "/api/(:version)/f/:fname" => "library#function", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
-    get "/api/(:version)/g/:gname" => "library#group", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
-  end
+  get "/library" => "library#index"
+  get "/library/api(/:version)" => "library#api", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
+  get "/library/api/(:version)/f/:fname" => "library#function", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
+  get "/library/api/(:version)/g/:gname" => "library#group", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
