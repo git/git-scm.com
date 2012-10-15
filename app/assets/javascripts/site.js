@@ -373,9 +373,11 @@ var LibraryFunctions = {
     $('#version-selector').change(function(e) {
       e.preventDefault();
       var url = $(location).attr('href');
-      var re = /\/api\/([\w.]+)\//;
-      url.match(re);
-      window.location = url.replace(RegExp.$1, $(this).val());
+      if (url.match(/(v\d+\.\d+\.\d+|HEAD)/) === null) {
+        window.location += $(this).val();
+      } else {
+        window.location = url.replace(RegExp.$1, $(this).val());
+      }
     });
 
   }

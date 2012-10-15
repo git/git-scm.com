@@ -48,7 +48,7 @@ module LibraryHelper
   end
 
   def api_route
-    version == 'HEAD' ? '/library/api' : '/library/api/' + version
+    '/library/api/' + version
   end
 
   def group_link(group)
