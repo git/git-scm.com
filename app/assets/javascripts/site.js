@@ -12,6 +12,7 @@ $(document).ready(function() {
   DownloadBox.init();
   AboutContent.init();
   FlippyBook.init();
+  LibraryFunctions.init();
 
   var _gauges = _gauges || [];
   (function() {
@@ -347,3 +348,23 @@ var FlippyBook = {
   }
 }
 
+var LibraryFunctions = {
+
+  init: function() {
+    LibraryFunctions.observeFunctionTypeToggle();
+  },
+
+  observeFunctionTypeToggle: function() {
+    $('h3 a.toggle').click(function(e) {
+      e.preventDefault();
+      if ($(this).html() === "Show all") {
+        $(this).parent('h3').next('ul').find('a').not('.important').fadeIn();
+        $(this).html('Show most common');
+      }
+      else {
+        $(this).parent('h3').next('ul').find('a').not('.important').fadeOut();
+        $(this).html('Show all');
+      }
+    });
+  }
+}

@@ -14,7 +14,7 @@ module LibraryHelper
   end
 
   def each_column
-    columns = ['left', 'middle', 'right']
+    columns = ['left', 'right']
     total_entries = all_groups.map{|g| g.functions.length}.inject(:+) || 0
     total_groups = all_groups.length
 
@@ -22,7 +22,7 @@ module LibraryHelper
       entries = 0
       yield(col_class, all_groups.last(total_groups).take_while { |g|
         total_groups -= 1
-        entries += g.functions.length 
+        entries += g.functions.length
         entries < (total_entries / 3)
       })
     end
@@ -35,7 +35,7 @@ module LibraryHelper
   end
 
   def type_link(name)
-    link_to name, "#" 
+    link_to name, "#"
   end
 
   def api_route
@@ -43,7 +43,7 @@ module LibraryHelper
   end
 
   def function_link(function)
-    link_to function.name, "#{api_route}/f/#{function.name}"
+    link_to function.name, "#{api_route}/f/#{function.name}", {:class => Random.rand(3) == 1 ? 'important' : ''}
   end
 
   def markdown(text)
