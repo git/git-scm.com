@@ -28,7 +28,6 @@ gem 'exceptional'
 gem 'tire'
 gem 'bson_ext'
 gem 'mongo'
-gem "mongo_mapper"
 
 # Gems used only for assets and not required
 # in production environments by default.

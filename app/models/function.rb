@@ -1,18 +1,8 @@
 class Function
-  include MongoMapper::Document
-  safe
-  key :version, String
+  include MongoDoc
 
-  key :argline, String
-  key :args, Array
-  key :comments, String
-  key :description, String
-  key :file, String
-  key :line, Integer
-  key :lineto, Integer
-  key :return, Hash
-  key :sig, String
-  key :type, String
-
-  belongs_to :group
+  def group
+    @group ||= Group.new(
+      Function.collection.find('_id' => @doc['group'], 'version' => version))
+  end
 end
