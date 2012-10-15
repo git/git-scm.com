@@ -355,15 +355,15 @@ var LibraryFunctions = {
   },
 
   observeFunctionTypeToggle: function() {
-    $('h3 a.toggle').click(function(e) {
+    $('#function-library-toggle').click(function(e) {
       e.preventDefault();
-      if ($(this).html() === "Show all") {
-        $(this).parent('h3').next('ul').find('a').not('.important').fadeIn();
-        $(this).html('Show most common');
+      if ($(this).html() === "Show all of the functions") {
+        $('ul.library-functions li a').not('.important').fadeIn();
+        $(this).html('Show the most common functions');
       }
       else {
-        $(this).parent('h3').next('ul').find('a').not('.important').fadeOut();
-        $(this).html('Show all');
+        $('ul.library-functions li a').not('.important').fadeOut();
+        $(this).html('Show all of the functions');
       }
     });
   }
