@@ -352,6 +352,7 @@ var LibraryFunctions = {
 
   init: function() {
     LibraryFunctions.observeFunctionTypeToggle();
+    LibraryFunctions.observeVersionSelector();
   },
 
   observeFunctionTypeToggle: function() {
@@ -366,5 +367,16 @@ var LibraryFunctions = {
         $(this).html('Show all of the functions');
       }
     });
+  },
+
+  observeVersionSelector: function() {
+    $('#version-selector').change(function(e) {
+      e.preventDefault();
+      var url = $(location).attr('href');
+      var re = /\/api\/([\w.]+)\//;
+      url.match(re);
+      window.location = url.replace(RegExp.$1, $(this).val());
+    });
+
   }
 }
