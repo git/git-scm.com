@@ -4,7 +4,7 @@ module LibraryHelper
   end
 
   def all_groups
-    @groups || Group.all(version)
+    @groups ||= Group.all(version)
   end
 
   def each_column

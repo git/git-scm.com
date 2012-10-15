@@ -14,14 +14,19 @@ def import_file(file, version)
     func[:examples] = func[:examples].to_a
     doc = Function.create(func)
   end
-
 end
 
 task 'library:import' => [:environment] do |t|
   db = Rails.configuration.mongo_db
   db.connection.drop_database(db.name)
 
+  versions = []
+
   Dir.glob('library-data/*.json') do |json_file|
-    import_file(json_file, File.basename(json_file, '.json'))
+    version = File.basename(json_file, '.json')
+    import_file(json_file, version)
+    versions << version
   end
+
+  db['library_data'].insert(:_id => 'versions', :numbers => versions)
 end
