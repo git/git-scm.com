@@ -16,7 +16,7 @@ class DocController < ApplicationController
   def man
     latest = Rails.cache.read("latest-version")
     filename = params[:file]
-    version = params[:version] || latest
+    version = params[:version] # || latest
     @cache_key = "man-v3-#{filename}-#{latest}-#{version}"
 
     if !Rails.cache.exist?("views/" + @cache_key)
