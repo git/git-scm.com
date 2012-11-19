@@ -25,6 +25,7 @@ class BooksController < ApplicationController
     @content = @book.sections.where(:slug => params[:slug]).first
     return redirect_to "/book/#{@book.code}" unless @content 
     @related = @content.get_related(8)
+    @page_title = "Git - #{@content.title}"
   end
 
   def chapter
@@ -33,6 +34,7 @@ class BooksController < ApplicationController
     chapter = @book.chapters.where(:number => chapter).first
     @content = chapter.sections.where(:number => section).first
     raise PageNotFound unless @content
+    @page_title = "Git - #{@content.title}"
     render 'section'
   end
 

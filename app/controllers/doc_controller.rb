@@ -38,7 +38,7 @@ class DocController < ApplicationController
         @related = DocVersion.get_related(filename, 8)
         @version = doc_version.version
         @file = doc_version.doc_file
-        @page_title = "#{@file.name} #{@version.name}"
+        @page_title = "Git - #{@file.name} v#{@version.name} Documentation"
         @doc = doc_version.doc
       end
     end
