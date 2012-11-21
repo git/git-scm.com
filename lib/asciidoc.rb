@@ -918,7 +918,7 @@ module Asciidoc
       end
 
       def is_section_heading?(line1, line2)
-        !line1.nil? && !line2.nil? && line1.match(REGEXP[:name]) && line2.match(REGEXP[:line]) && (line1.size - line2.size).abs <= 1
+        !line1.nil? && !line2.nil? && line1.match(REGEXP[:name]) && line2.match(REGEXP[:line]) && line1.size - line2.size <= 1
       end
 
       # Private: Return the next section from the document.
