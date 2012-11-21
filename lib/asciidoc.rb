@@ -285,8 +285,8 @@ module Asciidoc
 
             CGI.escapeHTML(html).
               gsub(REGEXP[:biblio], '<a name="\1">[\1]</a>').
-              gsub(/`([^`]+)`/m) { "<tt>#{$1.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' )}</tt>" }.
               gsub(/``(.*?)''/m, '&#147;\1&#148;').
+              gsub(/`([^`]+)`/m) { "<tt>#{$1.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' )}</tt>" }.
               gsub(/(^|\W)'([^']+)'/m, '\1<em>\2</em>').
               gsub(/(^|\W)_([^_]+)_/m, '\1<em>\2</em>').
               gsub(/\*([^\*]+)\*/m, '<strong>\1</strong>').
