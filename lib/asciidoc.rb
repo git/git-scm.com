@@ -739,7 +739,7 @@ module Asciidoc
             title = match[1]
           elsif match = this_line.match(REGEXP[:caption])
             caption = match[1]
-          elsif this_line.match(REGEXP[:name]) && next_line.match(REGEXP[:line]) && (this_line.size - next_line.size).abs <= 1
+          elsif is_section_heading?(this_line, next_line)
             lines.unshift(this_line)
             lines.unshift(anchor) unless anchor.nil?
             block = next_section(lines)
