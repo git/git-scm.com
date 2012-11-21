@@ -31,7 +31,7 @@ require 'tilt'
 #   html = doc.render(template_path)
 module Asciidoc
   REGEXP = {
-    :name     => /^(["A-Za-z].*)\s*$/,
+    :name     => /^(["`A-Za-z].*)\s*$/,
     :line     => /^([=\-~^\+])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
     :note     => /^\[NOTE\]\s*$/,
