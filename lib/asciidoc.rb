@@ -31,7 +31,7 @@ require 'tilt'
 #   html = doc.render(template_path)
 module Asciidoc
   REGEXP = {
-    :name     => /^(["A-Za-z].*)\s*$/,
+    :name     => /^(["`A-Za-z].*)\s*$/,
     :line     => /^([=\-~^\+])+\s*$/,
     :verse    => /^\[verse\]\s*$/,
     :note     => /^\[NOTE\]\s*$/,
@@ -285,8 +285,8 @@ module Asciidoc
 
             CGI.escapeHTML(html).
               gsub(REGEXP[:biblio], '<a name="\1">[\1]</a>').
-              gsub(/`([^`]+)`/m) { "<tt>#{$1.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' )}</tt>" }.
               gsub(/``(.*?)''/m, '&#147;\1&#148;').
+              gsub(/`([^`]+)`/m) { "<tt>#{$1.gsub( '*', '{asterisk}' ).gsub( '\'', '{apostrophe}' )}</tt>" }.
               gsub(/(^|\W)'([^']+)'/m, '\1<em>\2</em>').
               gsub(/(^|\W)_([^_]+)_/m, '\1<em>\2</em>').
               gsub(/\*([^\*]+)\*/m, '<strong>\1</strong>').
@@ -739,7 +739,7 @@ module Asciidoc
             title = match[1]
           elsif match = this_line.match(REGEXP[:caption])
             caption = match[1]
-          elsif this_line.match(REGEXP[:name]) && next_line.match(REGEXP[:line]) && (this_line.size - next_line.size).abs <= 1
+          elsif is_section_heading?(this_line, next_line)
             lines.unshift(this_line)
             lines.unshift(anchor) unless anchor.nil?
             block = next_section(lines)
@@ -918,7 +918,7 @@ module Asciidoc
       end
 
       def is_section_heading?(line1, line2)
-        !line1.nil? && !line2.nil? && line1.match(REGEXP[:name]) && line2.match(REGEXP[:line]) && (line1.size - line2.size).abs <= 1
+        !line1.nil? && !line2.nil? && line1.match(REGEXP[:name]) && line2.match(REGEXP[:line]) && line1.size - line2.size <= 1
       end
 
       # Private: Return the next section from the document.
