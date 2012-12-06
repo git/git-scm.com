@@ -1,6 +1,7 @@
 require 'redcarpet'
 require 'nestful'
 require 'awesome_print'
+require 'octokit'
 
 # export GITBOOK_DIR=../../writing/progit/
 # export UPDATE_TOKEN=token
@@ -81,6 +82,27 @@ def generate_pages(lang, chapter, content)
     section += 1
   end
   toc
+end
+
+desc "Generate the book html for the sites (Using Octokit gem)"
+task :remote_genbook => :environment do
+  repo = 'progit/progit'
+  book = {}
+  blob_content = Hash.new do |blobs, sha|
+    content = Base64.decode64( Octokit.blob( repo, sha, :encoding => 'base64' ).content )
+    blobs[sha] = content.encode( 'utf-8', :undef => :replace )
+  end
+  repo_tree = Octokit.tree(repo, "HEAD", :recursive => true)
+  trees = repo_tree.tree.map {|tree| tree if tree.path =~ /\.markdown$/}.compact
+  trees.each do |tree|
+    lang, section, chapter = tree.path.split("/")
+    section_number = $1 if section =~ /^(\d+)/
+    chapter_number = $1 if chapter =~ /chapter(\d+)\.markdown/
+    book[lang] ||= []
+    puts "*** #{tree.sha}- #{lang} - #{section} - #{chapter} - #{section_number}:#{chapter_number}"
+    book[lang] << {:sha => tree.sha, :section => section, :chapter => chapter}#, :blob => blob_content[tree.sha]}
+  end
+  #p book
 end
 
 # generate the site
