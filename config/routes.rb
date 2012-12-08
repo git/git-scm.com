@@ -67,6 +67,7 @@ Gitscm::Application.routes.draw do
   match "/video/:id" => "doc#watch"
 
   match "/community" => "community#index"
+  match "/contributors" => "contributors#index"
 
   match "/admin" => "site#admin"
 

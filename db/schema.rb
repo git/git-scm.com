@@ -11,7 +11,17 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20120925124736) do
+ActiveRecord::Schema.define(:version => 20121208070451) do
+
+  create_table "authors", :force => true do |t|
+    t.string   "name"
+    t.integer  "commit_count"
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
+  end
+
+  add_index "authors", ["commit_count"], :name => "index_authors_on_commit_count"
+  add_index "authors", ["name"], :name => "index_authors_on_name"
 
   create_table "books", :force => true do |t|
     t.string   "code"
