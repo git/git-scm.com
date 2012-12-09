@@ -107,6 +107,16 @@ task :local_index => :environment do
       end
 
     end
+
+    # get the list of authors by # of commits
+    author_tag = tags.sort.last
+    puts "Fetching author list for #{author_tag}"
+    `git shortlog --no-merges -ns #{author_tag}`.each_line do |line|
+      count, name = line.chomp.split(' ', 2)
+      author = Author.where(:name => name).first_or_create
+      author.commit_count = count
+      author.save
+    end
   end
 end
 

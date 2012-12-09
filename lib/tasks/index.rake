@@ -127,5 +127,12 @@ task :preindex => :environment do
 
   end
   Rails.cache.write("latest-version", Version.latest_version.name)
-end
 
+  puts "Building author database"
+  Octokit.contributors(repo).each do |c|
+    name = Octokit.user(c.login).name
+    author = Author.where(:name => name).first_or_create
+    author.commit_count = c.contributions
+    author.save
+  end
+end
