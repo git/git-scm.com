@@ -95,12 +95,15 @@ task :remote_genbook => :environment do
   repo_tree = Octokit.tree(repo, "HEAD", :recursive => true)
   trees = repo_tree.tree.map {|tree| tree if tree.path =~ /\.markdown$/}.compact
   trees.each do |tree|
+    #tree = trees.first
     lang, section, chapter = tree.path.split("/")
     section_number = $1 if section =~ /^(\d+)/
     chapter_number = $1 if chapter =~ /chapter(\d+)\.markdown/
-    book[lang] ||= []
+    #book[lang] ||= []
+    content = blob_content[tree.sha]
     puts "*** #{tree.sha}- #{lang} - #{section} - #{chapter} - #{section_number}:#{chapter_number}"
-    book[lang] << {:sha => tree.sha, :section => section, :chapter => chapter}#, :blob => blob_content[tree.sha]}
+    #book[lang] << {:sha => tree.sha, :section => section, :chapter => chapter, :blob => content}
+    generate_pages(lang, chapter_number, content)
   end
   #p book
 end

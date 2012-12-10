@@ -62,8 +62,8 @@ ActiveRecord::Schema.define(:version => 20120925124736) do
     t.string   "filename"
     t.string   "platform"
     t.integer  "version_id"
-    t.datetime "created_at", :null => false
-    t.datetime "updated_at", :null => false
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
     t.datetime "release_date"
   end
 
