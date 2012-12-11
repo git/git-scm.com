@@ -93,7 +93,7 @@ task :remote_genbook => :environment do
   book = {}
   blob_content = Hash.new do |blobs, sha|
     content = Base64.decode64( @octokit.blob( repo, sha, :encoding => 'base64' ).content )
-    blobs[sha] = content.encode( 'utf-8', :undef => :replace )
+    blobs[sha] = content.force_encoding('UTF-8')
   end
   repo_tree = @octokit.tree(repo, "HEAD", :recursive => true)
   trees = repo_tree.tree.map {|tree| tree if tree.path =~ /\.markdown$/}.compact
@@ -113,6 +113,7 @@ task :remote_genbook => :environment do
     end
 
     skip = true if chapter_number.to_i == 0
+    skip = false if ENV['REGEN_ALL']
 
     puts "*** #{skip} #{tree.sha}- #{lang} - #{section} - #{chapter} - #{section_number}:#{chapter_number}"
 
