@@ -84,5 +84,7 @@ Gitscm::Application.routes.draw do
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
 
+  match "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
+
   root :to => 'site#index'
 end
