@@ -11,13 +11,19 @@ def gcode_downloads(project)
   downloads
 end
 
+def file_url(project, filename)
+  "https://#{project}.googlecode.com/files/#{filename}"
+end
+
 # find newest mac and windows binary downloads
 task :downloads => :environment do
   # find latest windows version
-  win_downloads = gcode_downloads("msysgit")
+  project = "msysgit"
+  win_downloads = gcode_downloads(project)
   win_downloads.each do |url, date|
     name = url.split('/').last
     if m = /^Git-(.*?)-(.*?)(\d{4})(\d{2})(\d{2})\.exe/.match(name)
+      url = file_url(project, name)
       version = m[1]
       puts version = version
       puts name
@@ -36,10 +42,12 @@ task :downloads => :environment do
   end
 
   # find latest mac version
-  mac_downloads = gcode_downloads("git-osx-installer")
+  project = "git-osx-installer"
+  mac_downloads = gcode_downloads(project)
   mac_downloads.each do |url, date|
     name = url.split('/').last
     if m = /git-(.*?)-/.match(name)
+      url = file_url(project, name)
       version = m[1]
       puts version = version
       puts name
