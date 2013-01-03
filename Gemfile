@@ -22,7 +22,7 @@ gem 'diff-lcs'
 gem 'redcarpet'
 gem 'nestful'
 gem "awesome_print"
-gem 'newrelic_rpm'
+gem 'newrelic_rpm',    '~> 3.5.3.25'
 gem 'exceptional'
 gem 'tire'
 gem "feedzirra"
