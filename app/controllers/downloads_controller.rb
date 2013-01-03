@@ -30,7 +30,7 @@ class DownloadsController < ApplicationController
         @project_url  = "http://msysgit.github.com/"
         @source_url   = "https://github.com/msysgit/git/"
       else
-        @project_url = "https://github.com/timcharper/git_osx_installer"
+        @project_url = "http://code.google.com/p/git-osx-installer/"
         @source_url   = "https://github.com/git/git/"
       end
 

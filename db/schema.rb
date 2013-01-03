@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20120925124736) do
+ActiveRecord::Schema.define(:version => 20121211011752) do
 
   create_table "books", :force => true do |t|
     t.string   "code"
@@ -27,6 +27,7 @@ ActiveRecord::Schema.define(:version => 20120925124736) do
     t.datetime "created_at", :null => false
     t.datetime "updated_at", :null => false
     t.integer  "number"
+    t.string   "sha"
   end
 
   add_index "chapters", ["book_id"], :name => "index_chapters_on_book_id"
@@ -62,8 +63,8 @@ ActiveRecord::Schema.define(:version => 20120925124736) do
     t.string   "filename"
     t.string   "platform"
     t.integer  "version_id"
-    t.datetime "created_at", :null => false
-    t.datetime "updated_at", :null => false
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
     t.datetime "release_date"
   end
 
