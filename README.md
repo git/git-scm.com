@@ -30,6 +30,15 @@ Now you need to get the latest downloads for the downloads pages:
 
     $ rake downloads
 
+Now you'll probably want some book data. You'll have
+to have access to the progit project on the Github through the API.
+
+    $ export API_USER=github_username
+    $ export API_PASS=github_password
+    $ rake remote_genbook
+
+That will generate the book content from the markdown files fetched from the online repository  and post it to the Rails server database.
+
 Now you can run the Rails site to take a look.  Specify an UPDATE_TOKEN so you
 can use the world's stupidest authentication mechanism:
 
@@ -37,18 +46,6 @@ can use the world's stupidest authentication mechanism:
 
 The site should be running on http://localhost:3000
 
-Now you'll probably want some book data.  This is more complicated.  You'll have
-to clone the [progit sources](https://github.com/progit/progit), run the server, and then run the populating rake
-task:
-
-    $ cd ../
-    $ git clone git://github.com/progit/progit.git
-    $ cd gitscm
-    $ UPDATE_TOKEN=something rake genbook GITBOOK_DIR=../progit/ GENLANG=en
-
-That will generate the book content from the markdown and post it to the Rails
-server.  If you have the server running elsewhere, you can overwrite the CONTENT_SERVER
-environment variable.
 
 ## Testing
 
