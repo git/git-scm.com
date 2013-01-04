@@ -5,7 +5,7 @@
 class Chapter < ActiveRecord::Base
   default_scope :order => 'number'
   belongs_to :book
-  has_many :sections
+  has_many :sections, :dependent => :destroy
   has_many :chapters, :through => :book
 
   def prev

@@ -38,6 +38,10 @@ def generate_pages(lang, chapter, content, sha)
     end
   end
 
+  # First delete all chapter
+  book = Book.where(:code => lang).first_or_create
+  book.chapters.where(:number => chapter).destroy_all
+
   sections = raw.split('<h2')
   section = 0
   sections.each do |sec|
@@ -63,9 +67,6 @@ def generate_pages(lang, chapter, content, sha)
 
     nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
     html += nav
-
-    # create book (if needed)
-    book = Book.where(:code => lang).first_or_create
 
     # create chapter (if needed)
     schapter = book.chapters.where(:number => chapter).first_or_create
