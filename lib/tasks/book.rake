@@ -39,7 +39,19 @@ def generate_pages(lang, chapter, content, sha)
   end
 
   sections = raw.split('<h2')
+  
   section = 0
+  # create book (if needed)
+  book = Book.where(:code => lang).first_or_create
+
+  # create chapter (if needed)
+  schapter = book.chapters.where(:number => chapter).first_or_create
+  schapter.title = chapter_title.to_s
+  schapter.sha = sha
+  schapter.save
+
+  schapter.destroy if sections.empty?
+
   sections.each do |sec|
 
     section_title = ''
@@ -64,15 +76,6 @@ def generate_pages(lang, chapter, content, sha)
     nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
     html += nav
 
-    # create book (if needed)
-    book = Book.where(:code => lang).first_or_create
-
-    # create chapter (if needed)
-    schapter = book.chapters.where(:number => chapter).first_or_create
-    schapter.title = chapter_title.to_s
-    schapter.sha = sha
-    schapter.save
-
     # create/update section
     csection = schapter.sections.where(:number => section).first_or_create
     csection.title = section_title.to_s
@@ -83,6 +86,7 @@ def generate_pages(lang, chapter, content, sha)
 
     section += 1
   end
+  schapter.sections.where("number >= #{section}").destroy_all
   toc
 end
 
