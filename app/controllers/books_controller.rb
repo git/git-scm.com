@@ -1,7 +1,7 @@
 class BooksController < ApplicationController
 
   before_filter :book_resource, :only => [:section, :chapter]
-  
+
   def show
     @book = Book.includes(:sections).where(:code => (params[:lang] || "en")).first
     raise PageNotFound unless @book
@@ -23,9 +23,13 @@ class BooksController < ApplicationController
 
   def section
     @content = @book.sections.where(:slug => params[:slug]).first
-    return redirect_to "/book/#{@book.code}" unless @content 
+    return redirect_to "/book/#{@book.code}" unless @content
     @related = @content.get_related(8)
-    @page_title = "Git - #{@content.title}"
+    if @content.title.blank?
+      @page_title = "Git - #{@content.chapter.title}"
+    else
+      @page_title = "Git - #{@content.title}"
+    end
   end
 
   def chapter
