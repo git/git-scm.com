@@ -7,18 +7,20 @@ require 'digest/sha1'
 task :preindex => :environment do
   ActiveRecord::Base.logger.level = Logger::WARN
 
+  @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
+
   template_dir = File.join(Rails.root, 'templates')
   repo = ENV['GIT_REPO'] || 'gitster/git'
   rebuild = ENV['REBUILD_DOC']
   rerun = ENV['RERUN'] || false
 
   blob_content = Hash.new do |blobs, sha|
-    content = Base64.decode64( Octokit.blob( repo, sha, :encoding => 'base64' ).content )
+    content = Base64.decode64( @octokit.blob( repo, sha, :encoding => 'base64' ).content )
     blobs[sha] = content.encode( 'utf-8', :undef => :replace )
   end
 
   # find all tags
-  tags = Octokit.tags( repo ).select { |tag| tag.name =~ /^v1[\d\.]+$/ }  # just get release tags
+  tags = @octokit.tags( repo ).select { |tag| tag.name =~ /^v1[\d\.]+$/ }  # just get release tags
 
   if rebuild
     tags = tags.select { |t| t.name == rebuild }
@@ -36,7 +38,7 @@ task :preindex => :environment do
     stag = Version.where(:name => tag.name.gsub('v','')).first_or_create
 
     # extract metadata
-    commit_info = Octokit.commit( repo, tag.name )
+    commit_info = @octokit.commit( repo, tag.name )
     commit_sha = commit_info.sha
     tree_sha = commit_info.commit.tree.sha
     ts = Time.parse( commit_info.commit.committer.date )
@@ -49,7 +51,7 @@ task :preindex => :environment do
     stag.save
 
     # find all the doc entries
-    tree_info = Octokit.tree( repo, tree_sha, :recursive => true )
+    tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
     tag_files = tree_info.tree
     doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index|user-manual)\.txt/ }
 
