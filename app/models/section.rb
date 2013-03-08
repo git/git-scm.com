@@ -37,12 +37,12 @@ class Section < ActiveRecord::Base
     lang = self.book.code
     prev_number = self.number - 1
     if section = self.sections.where(:number => prev_number).first
-      return "/book/#{lang}/#{section.slug}"
+      return "/book/#{lang}/#{ERB::Util.url_encode(section.slug)}"
     else
       # find previous chapter
       if ch = self.chapter.prev
         if section = ch.last_section
-          return "/book/#{lang}/#{section.slug}"
+          return "/book/#{lang}/#{ERB::Util.url_encode(section.slug)}"
         end
       end
     end
@@ -53,11 +53,11 @@ class Section < ActiveRecord::Base
     lang = self.book.code
     next_number = self.number + 1
     if section = self.sections.where(:number => next_number).first
-      return "/book/#{lang}/#{section.slug}"
+      return "/book/#{lang}/#{ERB::Util.url_encode(section.slug)}"
     else
       if ch = self.chapter.next
         if section = ch.first_section
-          return "/book/#{lang}/#{section.slug}"
+          return "/book/#{lang}/#{ERB::Util.url_encode(section.slug)}"
         end
       end
       # find next chapter
