@@ -20,7 +20,7 @@ task :preindex => :environment do
   end
 
   # find all tags
-  tags = @octokit.tags( repo ).select { |tag| tag.name =~ /^v1[\d\.]+$/ }  # just get release tags
+  tags = @octokit.tags( repo ).select { |tag| !tag.nil? && tag.name =~ /^v1[\d\.]+$/ }  # just get release tags
 
   if rebuild
     tags = tags.select { |t| t.name == rebuild }
