@@ -12,7 +12,7 @@ CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
 def generate_pages(lang, chapter, content, sha)
   toc = {:title => '', :sections => []}
 
-  markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML)
+  markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML, :tables => true)
   raw = markdown.render(content)
 
   if m = raw.match(/<h1(.*?)>(.*?)<\/h1>/)
