@@ -52,9 +52,11 @@ Gitscm::Application.routes.draw do
     end
   end
 
-  match "/:year/:month/:day/:slug" => "blog#progit",  :year   => /\d{4}/,
+  match "/blog/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
                                                       :month  => /\d{2}/,
                                                       :day    => /\d{2}/
+
+  match "/blog" => "blog#index"
 
   match "/publish" => "doc#book_update"
   match "/related" => "doc#related_update"

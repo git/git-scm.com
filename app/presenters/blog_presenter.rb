@@ -2,7 +2,7 @@ class BlogPresenter
   
   def initialize(file)
     @file = file
-    @path = "#{Rails.root}/app/views/blog/progit/#{@file}"
+    @path = "#{Rails.root}/app/views/blog/posts/#{@file}"
   end
 
   def exists?
