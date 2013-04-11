@@ -15,6 +15,21 @@ def generate_pages(lang, chapter, content, sha)
   toc = {:title => '', :sections => []}
 
   markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML, :tables => true)
+
+  content.gsub! /(\n(\n\t([^\t\n]+)\t([^\t\n]+))+\n\n)/ do
+    first_col=20
+    $1.gsub /(\n?)\n\t([^\t\n]+)\t([^\t\n]+)/ do
+      if $1=="\n"
+        # This is the header, need to add the dash line
+        $1 << "\n " << $2 <<  " "*(first_col-$2.length) + "| " << $3 <<
+          "\n " << "-"*first_col << "|-" << "-"*$3.length
+      else
+        # Table row : format the first column as typewriter and align
+        $1 << "\n `" << $2 << "`" + " "*(first_col-$2.length-2) + "| " << $3
+      end
+    end
+  end
+
   raw = markdown.render(content)
 
   if m = raw.match(/<h1(.*?)>(.*?)<\/h1>/)
@@ -39,6 +54,9 @@ def generate_pages(lang, chapter, content, sha)
       raw.gsub!(/<h3>#{sub}<\/h3>/, "<h3 id=\"#{id}\"><a href=\"##{id}\">#{sub}</a></h3>")
     end
   end
+
+  # add a class to tables
+  raw.gsub! /<table>/, "<table class='ref'>"
 
   sections = raw.split('<h2')
   
