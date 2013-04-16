@@ -11,7 +11,7 @@ and put the code <a href="http://github.com/progit/progit">up on GitHub</a>,
 several people have forked and started translating the book into other
 languages such as 
 <a href="/book/de">German</a>, 
-<a href="/book/zh">Chinese</a>, 
+<a href="/book/zh">中文</a>, 
 <a href="/book/ja">Japanese</a> and
 <a href="/book/ru">Russian</a>.
 
