@@ -1,7 +1,7 @@
 class BlogController < ApplicationController
 
   # for progit.org blog
-  def progit
+  def post
     year  = params[:year]
     month = params[:month]
     day   = params[:day]
@@ -13,7 +13,11 @@ class BlogController < ApplicationController
     else
       raise PageNotFound
     end
-    render :progit
+    render :post
+  end
+
+  def index
+    
   end
 
   # for Gitscm blog
