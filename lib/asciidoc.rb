@@ -909,11 +909,12 @@ module Asciidoc
       def section_level(line)
         char = line.strip.chars.to_a.uniq
         case char
-        when ['=']; 0
-        when ['-']; 1
-        when ['~']; 2
-        when ['^']; 3
-        when ['+']; 4
+        when ['_']; 0
+        when ['=']; 1
+        when ['-']; 2
+        when ['~']; 3
+        when ['^']; 4
+        when ['+']; 5
         end
       end
 
