@@ -2,17 +2,34 @@ require 'redcarpet'
 require 'nestful'
 require 'awesome_print'
 require 'octokit'
+require 'digest/sha1'
 
 # export GITBOOK_DIR=../../writing/progit/
 # export UPDATE_TOKEN=token
 # bundle exec rake genbook GENLANG=en
 
 CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+SCRIPT_SHA = Digest::SHA1.hexdigest(File.open('lib/tasks/book.rake', 'r').read)
 
 def generate_pages(lang, chapter, content, sha)
   toc = {:title => '', :sections => []}
 
-  markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML)
+  markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML, :tables => true)
+
+  content.gsub! /(\n(\n\t([^\t\n]+)\t([^\t\n]+))+\n\n)/ do
+    first_col=20
+    $1.gsub /(\n?)\n\t([^\t\n]+)\t([^\t\n]+)/ do
+      if $1=="\n"
+        # This is the header, need to add the dash line
+        $1 << "\n " << $2 <<  " "*(first_col-$2.length) + "| " << $3 <<
+          "\n " << "-"*first_col << "|-" << "-"*$3.length
+      else
+        # Table row : format the first column as typewriter and align
+        $1 << "\n `" << $2 << "`" + " "*(first_col-$2.length-2) + "| " << $3
+      end
+    end
+  end
+
   raw = markdown.render(content)
 
   if m = raw.match(/<h1(.*?)>(.*?)<\/h1>/)
@@ -38,6 +55,9 @@ def generate_pages(lang, chapter, content, sha)
     end
   end
 
+  # add a class to tables
+  raw.gsub! /<table>/, "<table class='ref'>"
+
   sections = raw.split('<h2')
   
   section = 0
@@ -47,7 +67,7 @@ def generate_pages(lang, chapter, content, sha)
   # create chapter (if needed)
   schapter = book.chapters.where(:number => chapter).first_or_create
   schapter.title = chapter_title.to_s
-  schapter.sha = sha
+  schapter.sha = sha + SCRIPT_SHA
   schapter.save
 
   schapter.destroy if sections.empty?
@@ -111,7 +131,7 @@ task :remote_genbook => :environment do
 
     if book = Book.where(:code => lang).first
       c = book.chapters.where(:number => chapter_number.to_i).first
-      if c && (c.sha == tree.sha)
+      if c && (c.sha == (tree.sha + SCRIPT_SHA))
         skip = true
       end
     end
