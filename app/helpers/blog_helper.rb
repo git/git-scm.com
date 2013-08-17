@@ -15,7 +15,7 @@ module BlogHelper
   end
 
   def format_path(post)
-    "/blog/#{post[:date_published].year}/#{post[:date_published].strftime('%m')}/#{post[:date_published].strftime('%d')}/#{post[:slug]}.html"
+    "#{request.protocol}#{request.host_with_port}/blog/#{post[:date_published].year}/#{post[:date_published].strftime('%m')}/#{post[:date_published].strftime('%d')}/#{post[:slug]}.html"
   end
 
   def preview_post(postURI)
