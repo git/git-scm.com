@@ -12,4 +12,9 @@ class BlogControllerTest < ActionController::TestCase
     assert_response :success
   end
 
+  test "gets the blog feed" do
+    get :feed
+    assert_response :success
+  end
+
 end
