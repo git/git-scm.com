@@ -22,7 +22,7 @@ directory without telling Git.
 	$ git log
 	fatal: Not a git repository (or any of the parent directories): .git
 
-Well, since Git can't find a `.git` direcotry, it appears that you are
+Well, since Git can't find a `.git` directory, it appears that you are
 simply in a directory that is not controlled by Git.  However, it's
 pretty easy to tell Git to look elsewhere by providing the `--git-dir`
 option to any Git call:
