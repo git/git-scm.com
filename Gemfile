@@ -2,54 +2,48 @@ source 'https://rubygems.org'
 
 gem 'rails', '3.2.15'
 
-# Bundle edge Rails instead:
-# gem 'rails', :git => 'git://github.com/rails/rails.git'
-
-gem 'json'
-gem 'thin'
+gem 'asciidoctor'
+gem 'dalli'
+gem 'exceptional'
 gem 'faraday'
 gem 'faraday_middleware'
-gem 'yajl-ruby'
-gem 'excon'
-gem 'haml'
+gem 'memcachier'
+gem 'newrelic_rpm',    '~> 3.5.3.25'
+gem 'octokit'
+gem "pg"
+gem 'thin'
 gem 'tilt'
+gem 'tire'
+
+# TODO: Remove HTTP Clients
+gem 'excon'
 gem 'rest-client'
+gem 'nestful'
+gem "feedzirra"
+
+
+gem 'json'
+gem 'yajl-ruby'
+gem 'haml'
 gem 'netrc'
 gem 'launchy'
 gem 'rubyzip'
-gem 'octokit'
-gem 'memcachier'
-gem 'dalli'
 gem 'diff-lcs'
 gem 'redcarpet'
-gem 'nestful'
-gem "awesome_print"
-gem 'newrelic_rpm',    '~> 3.5.3.25'
-gem 'exceptional'
-gem 'tire'
-gem "feedzirra"
 
-# Gems used only for assets and not required
-# in production environments by default.
-#group :assets do
-  gem 'sass-rails'
-  gem 'compass-rails'
-  gem 'coffee-rails'
-  gem 'uglifier'
-  gem 'therubyracer'
-#end
-
+# Assets
+gem 'compass-rails'
+gem 'coffee-rails'
 gem 'jquery-rails'
 gem 'less-rails-bootstrap'
-
-group :production do
-  gem "pg"
-end
+gem 'sass-rails'
+gem 'therubyracer'
+gem 'uglifier'
 
 group :development do
-  gem 'therubyracer'
-  gem "sqlite3"
+  gem "awesome_print"
   gem "shotgun"
+  gem "sqlite3"
   gem "taps"
 end
 
