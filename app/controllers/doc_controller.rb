@@ -18,6 +18,7 @@ class DocController < ApplicationController
     filename = params[:file]
     version = params[:version] # || latest
     @cache_key = "man-v4-#{filename}-#{latest}-#{version}"
+    @page_title = "Git - #{filename} Documentation"
 
     if !Rails.cache.exist?("views/" + @cache_key)
       doc_version = doc_for filename, version
@@ -38,7 +39,6 @@ class DocController < ApplicationController
         @related = DocVersion.get_related(filename, 8)
         @version = doc_version.version
         @file = doc_version.doc_file
-        @page_title = "Git - #{@file.name} v#{@version.name} Documentation"
         @doc = doc_version.doc
       end
     end
@@ -85,7 +85,7 @@ class DocController < ApplicationController
 
     render :text => 'ok'
   end
- 
+
   def videos
     @videos = VIDEOS
   end
