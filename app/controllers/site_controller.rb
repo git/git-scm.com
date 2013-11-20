@@ -1,6 +1,8 @@
 class SiteController < ApplicationController
 
   def index
+    @section    = "home"
+    @subsection = ""
   end
 
   def admin
@@ -22,7 +24,7 @@ class SiteController < ApplicationController
       type[:matches].each do |hit|
         if hit[:score] >= 1.0
           @top << hit
-        else 
+        else
           @rest << hit
         end
       end
@@ -55,21 +57,21 @@ class SiteController < ApplicationController
   def redirect_wgibtx
     redirect_to "http://git-scm.com/about"
   end
-  
+
   # like '5_submodules.html', etc
   def redirect_combook
     current_uri = request.env['PATH_INFO'].gsub('/', '')
     if slug = REDIRECT[current_uri]
       redirect_to "http://git-scm.com/book/#{slug}"
     else
-      redirect_to "http://git-scm.com/book" 
+      redirect_to "http://git-scm.com/book"
     end
   end
 
   def redirect_book
     current_uri = request.env['PATH_INFO']
     if current_uri == '/'
-      redirect_to "http://git-scm.com/book" 
+      redirect_to "http://git-scm.com/book"
     else
       redirect_to "http://git-scm.com#{current_uri}"
     end

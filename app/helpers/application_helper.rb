@@ -1,5 +1,15 @@
 module ApplicationHelper
 
+  def sidebar_link_options
+    if %w( about documentation reference book blog videos
+           external-links downloads guis logos community
+          ).include?(@section)
+      {class: "active"}
+    else
+      {}
+    end
+  end
+
   def partial(part)
     render part
   end

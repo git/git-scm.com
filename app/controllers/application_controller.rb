@@ -4,13 +4,15 @@ class ApplicationController < ActionController::Base
   protect_from_forgery
   before_filter :determine_os
 
-  layout 'layout'
-
   rescue_from PageNotFound, :with => :page_not_found
 
   # Mac, Windows, Linux are valid
   def determine_os
     @os = 'linux'
+  end
+
+  def set_title(title)
+    @page_title = "#{title} - Git"
   end
 
   private
