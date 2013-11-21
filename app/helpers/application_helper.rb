@@ -1,9 +1,9 @@
 module ApplicationHelper
 
-  def sidebar_link_options
+  def sidebar_link_options(section)
     if %w( about documentation reference book blog videos
            external-links downloads guis logos community
-          ).include?(@section)
+          ).include?(@section) && @section == section
       {class: "active"}
     else
       {}
