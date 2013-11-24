@@ -11,9 +11,10 @@ gem 'memcachier'
 gem 'newrelic_rpm',    '~> 3.5.3.25'
 gem 'octokit'
 gem "pg"
-gem 'thin'
+gem 'rack-timeout'
 gem 'tilt'
 gem 'tire'
+gem 'unicorn'
 
 # TODO: Remove HTTP Clients
 gem 'excon'
@@ -42,9 +43,12 @@ gem 'uglifier'
 
 group :development do
   gem "awesome_print"
-  gem "shotgun"
-  gem "sqlite3"
+  gem "foreman"
   gem "taps"
+end
+
+group :development, :test do
+  gem "sqlite3"
 end
 
 group :test do
