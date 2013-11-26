@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'rails', '3.2.15'
-gem 'rails_12factor'
+gem 'rails_12factor', group: :production
 
 gem 'asciidoctor'
 gem 'dalli'
