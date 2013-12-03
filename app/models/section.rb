@@ -29,7 +29,7 @@ class Section < ActiveRecord::Base
     if self.title
       title = (self.chapter.title + '-' + self.title)
       title = self.chapter.title if self.title.empty?
-      self.slug = title.gsub(' ', '-').gsub('&#39;', "'")
+      self.slug = title.parameterize
     end
   end
 

@@ -59,7 +59,7 @@ def generate_pages(lang, chapter, content, sha)
   raw.gsub! /<table>/, "<table class='ref'>"
 
   sections = raw.split('<h2')
-  
+
   section = 0
   # create book (if needed)
   book = Book.where(:code => lang).first_or_create
@@ -108,6 +108,18 @@ def generate_pages(lang, chapter, content, sha)
   end
   schapter.sections.where("number >= #{section}").destroy_all
   toc
+end
+
+namespace :book do
+  desc "Update slug name"
+  task :update_slug => :environment do
+    Book.includes(:chapters => :sections).all.each do |book|
+      book.sections.each do |section|
+        section.set_slug
+        section.save
+      end
+    end
+  end
 end
 
 desc "Generate the book html for the sites (Using Octokit gem)"
