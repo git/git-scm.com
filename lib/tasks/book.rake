@@ -1,6 +1,5 @@
 require 'redcarpet'
 require 'nestful'
-require 'awesome_print'
 require 'octokit'
 require 'digest/sha1'
 
