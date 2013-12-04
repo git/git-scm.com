@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'rails', '3.2.15'
+gem 'rails', '3.2.16'
 gem 'rails_12factor', group: :production
 
 gem 'asciidoctor'
@@ -9,7 +9,7 @@ gem 'exceptional'
 gem 'faraday'
 gem 'faraday_middleware'
 gem 'memcachier'
-gem 'newrelic_rpm',    '~> 3.5.3.25'
+gem 'newrelic_rpm'
 gem 'octokit'
 gem "pg"
 gem 'rack-timeout'
