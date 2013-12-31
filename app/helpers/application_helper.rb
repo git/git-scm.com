@@ -23,6 +23,16 @@ module ApplicationHelper
     @version.name
   end
 
+  def latest_mac_installer
+    @mac_installer ||= Download.latest_for 'mac'
+    @mac_installer.version.name
+  end
+
+  def latest_win_installer
+    @win_installer ||= Download.latest_for 'windows'
+    @win_installer.version.name
+  end
+
   def latest_release_date
     @version ||= Version.latest_version
     '(' + @version.committed.strftime("%Y-%m-%d") + ')'
