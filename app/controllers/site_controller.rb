@@ -58,16 +58,6 @@ class SiteController < ApplicationController
     redirect_to "http://git-scm.com/about"
   end
 
-  # like '5_submodules.html', etc
-  def redirect_combook
-    current_uri = request.env['PATH_INFO'].gsub('/', '')
-    if slug = REDIRECT[current_uri]
-      redirect_to "http://git-scm.com/book/#{slug}"
-    else
-      redirect_to "http://git-scm.com/book"
-    end
-  end
-
   def redirect_book
     current_uri = request.env['PATH_INFO']
     if current_uri == '/'

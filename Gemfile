@@ -58,4 +58,5 @@ end
 group :test do
   gem 'factory_girl_rails'
   gem 'shoulda', :require => false
+  gem 'rspec-rails'
 end

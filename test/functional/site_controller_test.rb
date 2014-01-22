@@ -12,17 +12,6 @@ class SiteControllerTest < ActionController::TestCase
     assert_redirected_to "http://git-scm.com/about"
   end
 
-  test "if no slug then should redirect to the book page" do
-    get :redirect_combook
-    assert_redirected_to "http://git-scm.com/book"
-  end
-
-  test "should redirect to particular book page" do
-    @request.env['PATH_INFO'] = "/5_submodules.html"
-    get :redirect_combook
-    assert_redirected_to "http://git-scm.com/book/en/Git-Tools-Submodules"
-  end
-
   test "should redirect to the book page" do
     get :redirect_book
     assert_redirected_to "http://git-scm.com/book"

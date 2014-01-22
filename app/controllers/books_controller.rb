@@ -1,6 +1,7 @@
 class BooksController < ApplicationController
 
-  before_filter :book_resource, :only => [:section, :chapter]
+  before_filter :book_resource, only: [:section, :chapter]
+  before_filter :redirect_book, only: [:show]
 
   def show
     @book = Book.includes(:sections).where(:code => (params[:lang] || "en")).first
@@ -43,6 +44,13 @@ class BooksController < ApplicationController
   end
 
   private
+
+  def redirect_book
+    uri_path = params[:lang]
+    if slug = REDIRECT[uri_path]
+      return redirect_to lang_book_path(lang: slug)
+    end
+  end
 
   def book_resource
     @book ||= Book.where(:code => (params[:lang] || "en")).first

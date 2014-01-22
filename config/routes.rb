@@ -9,10 +9,10 @@ Gitscm::Application.routes.draw do
     match '*path' => 'site#redirect_book'
   end
 
-  constraints(:subdomain => 'book') do
-    root :to => 'site#redirect_book'
-    match '*path' => 'site#redirect_combook'
-  end
+#  constraints(:subdomain => 'book') do
+#    root :to => 'site#redirect_book'
+#    match '*path' => 'site#redirect_combook'
+#  end
 
   get "site/index"
 
@@ -35,7 +35,7 @@ Gitscm::Application.routes.draw do
     match "/:lang/ch:chapter-:section.html" => "books#chapter"
     match "/index"                          => redirect("/book")
     match "/commands"                       => "books#commands"
-    match "/:lang"                          => "books#show"
+    match "/:lang"                          => "books#show", as: :lang
     match "/:lang/:slug"                    => "books#section"
   end
 
