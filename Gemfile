@@ -1,6 +1,5 @@
 source 'https://rubygems.org'
-
-ruby "1.9.2"
+#ruby "1.9.2"
 
 gem 'rails', '3.2.16'
 gem 'rails_12factor', group: :production
