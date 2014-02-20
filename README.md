@@ -1,7 +1,7 @@
 # Git Homepage [![Build Status](https://travis-ci.org/git/git-scm.com.png?branch=master)](https://travis-ci.org/git/git-scm.com)
 
 This is the web application for the [git-scm.com](http://git-scm.com) site.  It is meant to be the
-first place that a person new to Git will land and download or learn about the
+first place a person new to Git will land and download or learn about the
 Git SCM system.
 
 This app is written in Ruby on Rails and deployed on Heroku.
@@ -31,13 +31,13 @@ Now you need to get the latest downloads for the downloads pages:
     $ rake downloads
 
 Now you'll probably want some book data. You'll have
-to have access to the progit project on the Github through the API.
+to have access to the [Pro Git project on GitHub](https://github.com/progit/progit) through the API.
 
     $ export API_USER=github_username
     $ export API_PASS=github_password
     $ rake remote_genbook
 
-That will generate the book content from the markdown files fetched from the online repository  and post it to the Rails server database.
+That will generate the book content from the Markdown files fetched from the online repository and post it to the Rails server database.
 
 Now you can run the Rails site to take a look.  Specify an UPDATE_TOKEN so you
 can use the world's stupidest authentication mechanism:
@@ -60,13 +60,13 @@ To run the website for testing purposes, run:
 ## Contributing
 
 If you wish to contribute to this website, please [fork it on GitHub](https://github.com/git/git-scm.com), push your
-change to a named branch, then send me a pull request. If it is a big feature,
-you might want to contact me first to make sure it's something that I'll
-accept.  If it involves code, please also write tests for it.
+change to a named branch, then send a pull request. If it is a big feature,
+you might want to start an Issue first to make sure it's something that will
+be accepted.  If it involves code, please also write tests for it.
 
 ## License
 
-This source code for the site is licensed under the MIT, which you can find in
+The source code for the site is licensed under the MIT license, which you can find in
 the MIT-LICENSE.txt file.
 
 All graphical assets are licensed under the
