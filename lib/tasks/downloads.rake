@@ -1,29 +1,38 @@
 require 'octokit'
 require 'feedzirra'
 
-def gcode_downloads(project)
+# [OvD] note that Google uses Atom & Sourceforge uses RSS
+# however this isn't relevant when parsing the feeds for
+# name, version, url & date with Feedzirra
+GOOGLE_CODE_URL = "http://code.google.com/feeds/p/msysgit/downloads/basic"
+SOURCEFORGE_URL = "http://sourceforge.net/api/file/index/project-id/2063428/mtime/desc/limit/20/rss"
+
+def file_downloads(repository)
   downloads = []
-  atom_url = "http://code.google.com/feeds/p/#{project}/downloads/basic"
-  feed = Feedzirra::Feed.fetch_and_parse(atom_url)
+  feed = Feedzirra::Feed.fetch_and_parse(repository)
   feed.entries.each do |entry|
     downloads << [entry.entry_id, entry.published]
   end
   downloads
 end
 
-def file_url(project, filename)
+def googlecode_url(project, filename)
   "https://#{project}.googlecode.com/files/#{filename}"
+end
+
+def sourceforge_url(project, filename)
+  "http://sourceforge.net/projects/#{project}/files/#{filename}/download?use_mirror=autoselect"
 end
 
 # find newest mac and windows binary downloads
 task :downloads => :environment do
   # find latest windows version
   project = "msysgit"
-  win_downloads = gcode_downloads(project)
+  win_downloads = file_downloads(GOOGLE_CODE_URL)
   win_downloads.each do |url, date|
     name = url.split('/').last
     if m = /^Git-(.*?)-(.*?)(\d{4})(\d{2})(\d{2})\.exe/.match(name)
-      url = file_url(project, name)
+      url = googlecode_url(project, name)
       version = m[1]
       puts version = version
       puts name
@@ -43,11 +52,11 @@ task :downloads => :environment do
 
   # find latest mac version
   project = "git-osx-installer"
-  mac_downloads = gcode_downloads(project)
+  mac_downloads = file_downloads(SOURCEFORGE_URL)
   mac_downloads.each do |url, date|
-    name = url.split('/').last
+    name = url.split('/')[-2]
     if m = /git-(.*?)-/.match(name)
-      url = file_url(project, name)
+      url = sourceforge_url(project, name)
       version = m[1]
       puts version = version
       puts name
