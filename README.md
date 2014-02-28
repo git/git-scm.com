@@ -59,7 +59,7 @@ To run the website for testing purposes, run:
 
 ## Contributing
 
-If you wish to contribute to this website, please [fork it on GitHub](https://github.com/git/git-scm.com), push your
+If you wish to contribute to this website, please [fork it on GitHub](https://github.com/git/git-scm.com/fork), push your
 change to a named branch, then send a pull request. If it is a big feature,
 you might want to start an Issue first to make sure it's something that will
 be accepted.  If it involves code, please also write tests for it.
