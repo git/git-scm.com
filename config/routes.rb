@@ -1,5 +1,9 @@
 Gitscm::Application.routes.draw do
 
+  get '/auth/github/callback', to: 'sessions#create'
+  get '/sign_in', to: 'sessions#new'
+  get '/sign_out', to: 'sessions#destroy'
+
   constraints(:host => 'whygitisbetterthanx.com') do
     root :to => 'site#redirect_wgibtx'
   end
@@ -42,7 +46,7 @@ Gitscm::Application.routes.draw do
   match "/download"               => "downloads#index"
   match "/download/:platform"     => "downloads#download"
   match "/download/gui/:platform" => "downloads#gui"
-  
+
   resources :downloads, :only => [:index] do
     collection do
       match "/guis"       => "downloads#guis"

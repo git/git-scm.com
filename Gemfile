@@ -12,6 +12,7 @@ gem 'faraday_middleware'
 gem 'memcachier'
 gem 'newrelic_rpm'
 gem 'octokit'
+gem 'omniauth-github'
 gem "pg"
 gem 'rack-timeout'
 gem 'tilt'
