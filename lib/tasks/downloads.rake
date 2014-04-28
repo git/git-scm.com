@@ -4,7 +4,6 @@ require 'feedzirra'
 # [OvD] note that Google uses Atom & Sourceforge uses RSS
 # however this isn't relevant when parsing the feeds for
 # name, version, url & date with Feedzirra
-GOOGLE_CODE_URL = "http://code.google.com/feeds/p/msysgit/downloads/basic"
 SOURCEFORGE_URL = "http://sourceforge.net/api/file/index/project-id/2063428/mtime/desc/limit/20/rss"
 
 def file_downloads(repository)
@@ -16,8 +15,19 @@ def file_downloads(repository)
   downloads
 end
 
-def googlecode_url(project, filename)
-  "https://#{project}.googlecode.com/files/#{filename}"
+def file_downloads_from_github(repository)
+  downloads = []
+  releases = Octokit.client.releases(repository)
+  releases.each do |release|
+    release.assets.each do |asset|
+      url = ['https://github.com', repository, 'releases', 'download',
+             release.tag_name, asset.name].join('/')
+
+      downloads << [url, asset.updated_at]
+    end
+  end
+
+  downloads
 end
 
 def sourceforge_url(project, filename)
@@ -28,11 +38,10 @@ end
 task :downloads => :environment do
   # find latest windows version
   project = "msysgit"
-  win_downloads = file_downloads(GOOGLE_CODE_URL)
+  win_downloads = file_downloads_from_github("msysgit/msysgit")
   win_downloads.each do |url, date|
     name = url.split('/').last
     if m = /^Git-(.*?)-(.*?)(\d{4})(\d{2})(\d{2})\.exe/.match(name)
-      url = googlecode_url(project, name)
       version = m[1]
       puts version = version
       puts name
