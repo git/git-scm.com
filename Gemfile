@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 #ruby "1.9.2"
 
-gem 'rails', '3.2.16'
+gem 'rails', '3.2.17'
 gem 'rails_12factor', group: :production
 
 gem 'asciidoctor'
@@ -19,8 +19,6 @@ gem 'tire'
 gem 'unicorn'
 
 # TODO: Remove HTTP Clients
-gem 'excon'
-gem 'rest-client'
 gem 'nestful'
 gem "feedzirra"
 
