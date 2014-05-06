@@ -90,6 +90,7 @@ Gitscm::Application.routes.draw do
 
   match "/course/svn" => "site#svn"
   match "/sfc" => "site#sfc"
+  match "/trademark" => "site#trademark"
 
   match "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
 
