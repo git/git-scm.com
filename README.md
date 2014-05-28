@@ -51,7 +51,7 @@ The site should be running on http://localhost:3000
 
 To run the tests for this project, run:
 
-    $ rake test
+    $ rspec
 
 To run the website for testing purposes, run:
 
