@@ -18,11 +18,6 @@ gem 'tilt'
 gem 'tire'
 gem 'unicorn'
 
-# TODO: Remove HTTP Clients
-gem 'nestful'
-gem "feedzirra"
-
-
 gem 'json'
 gem 'yajl-ruby'
 gem 'haml'

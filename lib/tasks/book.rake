@@ -1,5 +1,4 @@
 require 'redcarpet'
-require 'nestful'
 require 'octokit'
 require 'digest/sha1'
 

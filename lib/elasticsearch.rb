@@ -20,7 +20,7 @@ module ElasticSearch
       builder.request  :json
       # builder.response :logger
       builder.use JSONResponse
-      builder.adapter :excon
+      builder.adapter Faraday.default_adapter
     end
   end
 
@@ -267,4 +267,3 @@ module ElasticSearch
     end
   end
 end
-
