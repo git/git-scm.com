@@ -1,5 +1,6 @@
 require 'octokit'
-require 'feedzirra'
+require 'open-uri'
+require 'rss'
 
 # [OvD] note that Google uses Atom & Sourceforge uses RSS
 # however this isn't relevant when parsing the feeds for
@@ -8,9 +9,10 @@ SOURCEFORGE_URL = "http://sourceforge.net/api/file/index/project-id/2063428/mtim
 
 def file_downloads(repository)
   downloads = []
-  feed = Feedzirra::Feed.fetch_and_parse(repository)
-  feed.entries.each do |entry|
-    downloads << [entry.entry_id, entry.published]
+  rss = open(repository).read
+  feed = RSS::Parser.parse(rss)
+  feed.items.each do |item|
+    downloads << [item.link, item.pubDate]
   end
   downloads
 end
