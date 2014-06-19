@@ -1,11 +1,23 @@
-require 'nestful'
+require 'faraday'
 
 # bundle exec rake related
-CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+CONTENT_SERVER  = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+UPDATE_TOKEN    = ENV["UPDATE_TOKEN"]
+
+def http_client(url)
+  @client ||= begin
+    Faraday.new(url: url)
+  end
+end
 
 def create_related_item(from, to)
   url = CONTENT_SERVER + "/related"
-  result = Nestful.post url, :format => :form, :params => {:from_content => from, :to_content => to, :token => ENV["UPDATE_TOKEN"]}
+  params = {
+    from_content: from,
+    to_content:   to,
+    token:        UPDATE_TOKEN 
+  }
+  http_client(url).post url, params 
 end
 
 desc "Generate the related sidebar content"
