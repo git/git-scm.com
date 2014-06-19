@@ -1,8 +1,7 @@
 source 'https://rubygems.org'
-#ruby "1.9.2"
-ruby "2.1.2"
+#ruby "2.1.2"
 
-gem 'rails', '3.2.17'
+gem 'rails', '3.2.18'
 gem 'rails_12factor', group: :production
 
 gem 'asciidoctor'
