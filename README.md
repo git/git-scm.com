@@ -23,7 +23,9 @@ source clone like this:
     $ GIT_REPO=../git/.git rake local_index
 
 Or you can do it from GitHub (much slower) like this:
-
+    
+    $ export API_USER=github_username
+    $ export API_PASS=github_password
     $ rake preindex
 
 Now you need to get the latest downloads for the downloads pages:
@@ -55,7 +57,7 @@ To run the tests for this project, run:
 
 To run the website for testing purposes, run:
 
-    $ bundle exec rackup config.ru
+    $ rails server
 
 ## Contributing
 
