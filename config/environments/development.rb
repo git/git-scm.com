@@ -1,3 +1,9 @@
+begin
+Dotenv.load
+rescue => e
+  # boom
+end
+
 Gitscm::Application.configure do
   # Settings specified here will take precedence over those in config/application.rb
 
