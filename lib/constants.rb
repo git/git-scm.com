@@ -18,7 +18,7 @@ CMD_GROUPS = [
   ['Patching', ['am', 'apply', 'cherry-pick', 'rebase']],
   ['Debugging', [ 'bisect', 'blame' ]],
   ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
-  ['External Sytems', ['svn', 'fast-import']],
+  ['External Systems', ['svn', 'fast-import']],
   ['Administration', [ 'clean', 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
   ['Server Admin', [ 'daemon', 'update-server-info' ]],
 ]
