@@ -32,9 +32,7 @@ class DocController < ApplicationController
         redirect_to '/docs'
       else
         key = "version-changes-#{doc_version.id}"
-        @versions = Rails.cache.fetch(key) do
-          DocVersion.version_changes(filename, 20)
-        end
+        @versions = DocVersion.version_changes(filename, 20)
         @last = DocVersion.last_changed(filename)
         @related = DocVersion.get_related(filename, 8)
         @version = doc_version.version

@@ -19,7 +19,7 @@ class DocVersion < ActiveRecord::Base
   def self.last_changed(doc_name)
     version = for_doc(doc_name).joins(:version).order('versions.vorder DESC').first
     sha = version.doc.blob_sha
-    for_doc(doc_name).joins(:version).where('docs.blob_sha = ?', sha).order('versions.vorder').first
+    for_doc(doc_name).joins([:version, :doc]).where('docs.blob_sha = ?', sha).order('versions.vorder').first
   end
 
   def self.latest_versions(doc_name)
