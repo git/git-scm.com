@@ -1,98 +1,98 @@
 Gitscm::Application.routes.draw do
 
   constraints(:host => 'whygitisbetterthanx.com') do
-    root :to => 'site#redirect_wgibtx'
+    root :to => 'site#redirect_wgibtx', as: :whygitisbetterthanx
   end
 
   constraints(:host => 'progit.org') do
-    root :to => 'site#redirect_book'
-    match '*path' => 'site#redirect_book'
+    root :to => 'site#redirect_book', as: :progit
+    get '*path' => 'site#redirect_book'
   end
 
 #  constraints(:subdomain => 'book') do
 #    root :to => 'site#redirect_book'
-#    match '*path' => 'site#redirect_combook'
+#    get '*path' => 'site#redirect_combook'
 #  end
 
   get "site/index"
 
-  match "/doc" => "doc#index"
-  match "/docs" => "doc#ref"
-  match "/docs/:file.html" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
-  match "/docs/:file" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
-  match "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
-  match "/test" => "doc#test"
-  match "/doc/ext" => "doc#ext"
+  get "/doc" => "doc#index"
+  get "/docs" => "doc#ref"
+  get "/docs/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-\.]+/
+  get "/docs/:file" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
+  get "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
+  get "/test" => "doc#test"
+  get "/doc/ext" => "doc#ext"
 
   %w{man ref git}.each do |path|
-    match "/#{path}/:file" => redirect("/docs/%{file}")
-    match "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"),
+    get "/#{path}/:file" => redirect("/docs/%{file}")
+    get "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"),
     :version => /[^\/]+/
   end
 
   resource :book do
-    match "/ch:chapter-:section.html"    => "books#chapter"
-    match "/:lang/ch:chapter-:section.html" => "books#chapter"
-    match "/index"                          => redirect("/book")
-    match "/commands"                       => "books#commands"
-    match "/:lang"                          => "books#show", as: :lang
-    match "/:lang/:slug"                    => "books#section"
+    get "/ch:chapter-:section.html"    => "books#chapter"
+    get "/:lang/ch:chapter-:section.html" => "books#chapter"
+    get "/index"                          => redirect("/book")
+    get "/commands"                       => "books#commands"
+    get "/:lang"                          => "books#show", as: :lang
+    get "/:lang/:slug"                    => "books#section"
   end
 
-  match "/download"               => "downloads#index"
-  match "/download/:platform"     => "downloads#download"
-  match "/download/gui/:platform" => "downloads#gui"
+  get "/download"               => "downloads#index"
+  get "/download/:platform"     => "downloads#download"
+  get "/download/gui/:platform" => "downloads#gui"
   
   resources :downloads, :only => [:index] do
     collection do
-      match "/guis"       => "downloads#guis"
-      match "/installers" => "downloads#installers"
-      match "/logos"       => "downloads#logos"
-      match "/latest"     => "downloads#latest"
+      get "/guis"       => "downloads#guis"
+      get "/installers" => "downloads#installers"
+      get "/logos"       => "downloads#logos"
+      get "/latest"     => "downloads#latest"
     end
   end
 
-  match "/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
+  get "/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
                                                     :month  => /\d{2}/,
                                                     :day    => /\d{2}/
 
-  match "/blog/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
+  get "/blog/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
                                                     :month  => /\d{2}/,
                                                     :day    => /\d{2}/
 
-  match "/blog.rss" => "blog#feed"
-  match "/blog" => "blog#index"
+  get "/blog.rss" => "blog#feed"
+  get "/blog" => "blog#index"
 
-  match "/publish" => "doc#book_update"
-  match "/related" => "doc#related_update"
+  get "/publish" => "doc#book_update"
+  get "/related" => "doc#related_update"
 
 
-  match "/about" => "about#index"
-  match "/about/:section" => "about#index"
+  get "/about" => "about#index"
+  get "/about/:section" => "about#index"
 
-  match "/videos" => "doc#videos"
-  match "/video/:id" => "doc#watch"
+  get "/videos" => "doc#videos"
+  get "/video/:id" => "doc#watch"
 
-  match "/community" => "community#index"
+  get "/community" => "community#index"
 
-  match "/admin" => "site#admin"
+  get "/admin" => "site#admin"
 
-  match "/search" => "site#search"
-  match "/search/results" => "site#search_results"
+  get "/search" => "site#search"
+  get "/search/results" => "site#search_results"
 
   # mapping for jasons mocks
-  match "/documentation" => "doc#index"
-  match "/documentation/reference" => "doc#ref"
-  match "/documentation/reference/:file.html" => "doc#man"
-  match "/documentation/book" => "doc#book"
-  match "/documentation/videos" => "doc#videos"
-  match "/documentation/external-links" => "doc#ext"
+  get "/documentation" => "doc#index"
+  get "/documentation/reference" => "doc#ref"
+  get "/documentation/reference/:file.html" => "doc#man"
+  get "/documentation/book" => "doc#book"
+  get "/documentation/videos" => "doc#videos"
+  get "/documentation/external-links" => "doc#ext"
 
-  match "/course/svn" => "site#svn"
-  match "/sfc" => "site#sfc"
-  match "/trademark" => "site#trademark"
+  get "/course/svn" => "site#svn"
+  get "/sfc" => "site#sfc"
+  get "/trademark" => "site#trademark"
 
-  match "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
+  get "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
 
   root :to => 'site#index'
 end

@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 #ruby "2.1.2"
 
-gem 'rails', '3.2.19'
+gem 'rails', '4.1.4'
 gem 'rails_12factor', group: :production
 
 gem 'asciidoctor'
@@ -32,7 +32,7 @@ gem 'compass-rails'
 gem 'coffee-rails'
 gem 'jquery-rails'
 gem 'less-rails-bootstrap'
-gem 'sass-rails'
+gem 'sass-rails', '4.0.3'
 gem 'therubyracer'
 gem 'uglifier'
 

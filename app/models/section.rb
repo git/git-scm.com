@@ -12,7 +12,7 @@ class Section < ActiveRecord::Base
 
   include Searchable
 
-  default_scope :order => 'number'
+  default_scope { order(:number) }
 
   belongs_to :chapter
   has_one :book, :through => :chapter
