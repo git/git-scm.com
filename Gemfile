@@ -38,6 +38,8 @@ gem 'uglifier'
 
 group :development do
   gem "awesome_print"
+  gem "better_errors"
+  gem "binding_of_caller"
   gem "foreman"
   gem "taps"
 end
