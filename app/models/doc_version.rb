@@ -22,8 +22,8 @@ class DocVersion < ActiveRecord::Base
     for_doc(doc_name).joins([:version, :doc]).where('docs.blob_sha = ?', sha).order('versions.vorder').first
   end
 
-  def self.latest_versions(doc_name)
-    for_doc(doc_name).includes(:version).order('versions.vorder DESC')
+  def self.latest_versions(doc_name, size=20)
+    for_doc(doc_name).includes(:version).order('versions.vorder DESC').limit(size)
   end
 
   def self.for_version(doc_name, version_name)
@@ -33,13 +33,12 @@ class DocVersion < ActiveRecord::Base
   def self.version_changes(file, size = 20)
     versions = []
     unchanged = []
-    vers = DocVersion.latest_versions(file)
-    (vers.size-2).times do |i|
-      v = vers[i]
-      prev = vers[i+1]
-      sha2 = v.doc.blob_sha
+    vers = includes(:doc, :version).order("versions.vorder DESC").limit(size)
+    vers.each_with_index do |v, i|
+      next unless prev = vers[i+1]
       sha1 = prev.doc.blob_sha
-      if sha1 == sha2
+      sha2 = v.doc.blob_sha
+      if sha1 == sha2 
         unchanged << v.version.name
       else
         if unchanged.size > 0
@@ -49,11 +48,38 @@ class DocVersion < ActiveRecord::Base
             versions << {:name => "#{unchanged.last} &rarr; #{unchanged.first} no changes", :changed => false}
           end
           unchanged = []
+        else
+          versions << {:name => v.version.name, :time => v.version.committed, :diff => v.diff(prev), :changed => true}
         end
-        versions << {:name => v.version.name, :time => v.version.committed, :diff => Doc.get_diff(sha2, sha1), :changed => true}
       end
     end
-    versions[0,size]
+    versions
+  end
+
+  # returns an array of the differences with 3 entries
+  # 0: additions
+  # 1: subtractions
+  # 2: 8 - (add + sub)
+  def diff(doc_version)
+    begin
+      to = self.doc.plain.split("\n")
+      from = doc_version.doc.plain.split("\n")
+      total = adds = mins = 0
+      diff = Diff::LCS.diff(to, from)
+      diff.first.each do |change|
+        adds += 1 if change.action == "+"
+        mins += 1 if change.action == "-"
+        total += 1 
+      end
+      if total > 8
+        min = (8.0 / total)
+        adds = (adds * min).floor
+        mins = (mins * min).floor
+      end
+      [adds, mins, (8 - total)]
+    rescue
+      [0, 0, 8]
+    end 
   end
 
   def index
