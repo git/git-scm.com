@@ -8,8 +8,8 @@ class DocVersion < ActiveRecord::Base
   belongs_to :doc_file
 
   def self.get_related(doc_name, limit = 10)
-    ri = RelatedItem.where(:related_type => 'reference', :related_id => doc_name).order('score DESC').limit(limit)
-    ri.sort { |a, b| a.content_type <=> b.content_type }
+    ri = RelatedItem.where(related_type: 'reference', related_id: doc_name).order('score DESC').limit(limit)
+    ri.sort_by(&:content_type)# { |a, b| a.content_type <=> b.content_type }
   end
 
   def self.latest_for(doc_name)
@@ -17,28 +17,32 @@ class DocVersion < ActiveRecord::Base
   end
 
   def self.last_changed(doc_name)
-    version = for_doc(doc_name).joins(:version).order('versions.vorder DESC').first
-    sha = version.doc.blob_sha
-    for_doc(doc_name).joins([:version, :doc]).where('docs.blob_sha = ?', sha).order('versions.vorder').first
+    includes(:doc, :version).joins(:doc_file).where(doc_files: {name: doc_name}).order("versions.vorder DESC").first
   end
 
-  def self.latest_versions(doc_name, size=20)
-    for_doc(doc_name).includes(:version).order('versions.vorder DESC').limit(size)
+  def self.latest_versions(doc_name)
+    for_doc(doc_name).includes(:version).order('versions.vorder DESC')
   end
 
   def self.for_version(doc_name, version_name)
-    for_doc(doc_name).joins(:version).where(['versions.name=?', version_name]).first
+    includes(:doc, :version)
+      .joins(:doc_file)
+      .where(doc_files: {name: doc_name})
+      .where(versions:  {name: version_name})
+      .order("versions.vorder DESC")
+      .first
   end
 
   def self.version_changes(file, size = 20)
     versions = []
     unchanged = []
-    vers = includes(:doc, :version).order("versions.vorder DESC").limit(size)
-    vers.each_with_index do |v, i|
-      next unless prev = vers[i+1]
-      sha1 = prev.doc.blob_sha
+    vers = includes(:doc, :version).joins(:doc_file).where(doc_files: {name: file}).order("versions.vorder DESC").limit(100)
+    (vers.size-2).times do |i|
+      v = vers[i]
+      prev = vers[i+1]
       sha2 = v.doc.blob_sha
-      if sha1 == sha2 
+      sha1 = prev.doc.blob_sha
+      if sha1 == sha2
         unchanged << v.version.name
       else
         if unchanged.size > 0
@@ -48,9 +52,8 @@ class DocVersion < ActiveRecord::Base
             versions << {:name => "#{unchanged.last} &rarr; #{unchanged.first} no changes", :changed => false}
           end
           unchanged = []
-        else
-          versions << {:name => v.version.name, :time => v.version.committed, :diff => v.diff(prev), :changed => true}
         end
+        versions << {:name => v.version.name, :time => v.version.committed, :diff => v.diff(prev), :changed => true}
       end
     end
     versions
