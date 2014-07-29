@@ -14,7 +14,7 @@ class DocController < ApplicationController
   end
 
   def man
-    latest = Version.latest_version.name)
+    latest = Version.latest_version.name
     filename = params[:file]
     version = params[:version] # || latest
     @page_title = "Git - #{filename} Documentation"
