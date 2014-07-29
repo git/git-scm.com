@@ -14,31 +14,28 @@ class DocController < ApplicationController
   end
 
   def man
-    latest = Rails.cache.read("latest-version")
+    latest = Version.latest_version.name)
     filename = params[:file]
     version = params[:version] # || latest
-    @cache_key = "man-v4-#{filename}-#{latest}-#{version}"
     @page_title = "Git - #{filename} Documentation"
 
-    if !Rails.cache.exist?("views/" + @cache_key)
+    doc_version = doc_for filename, version
+    if doc_version.nil?
+      filename = "git-#{filename}"
       doc_version = doc_for filename, version
-      if doc_version.nil?
-        filename = "git-#{filename}"
-        doc_version = doc_for filename, version
-        redirect_to doc_file_url(filename) unless doc_version.nil?
-      end
+      redirect_to doc_file_url(filename) unless doc_version.nil?
+    end
 
-      if doc_version.nil?
-        redirect_to '/docs'
-      else
-        key = "version-changes-#{doc_version.id}"
-        @versions = DocVersion.version_changes(filename, 20)
-        @last = DocVersion.last_changed(filename)
-        @related = DocVersion.get_related(filename, 8)
-        @version = doc_version.version
-        @file = doc_version.doc_file
-        @doc = doc_version.doc
-      end
+    if doc_version.nil?
+      redirect_to '/docs'
+    else
+      key = "version-changes-#{doc_version.id}"
+      @versions = DocVersion.version_changes(filename, 20)
+      @last = DocVersion.last_changed(filename)
+      @related = DocVersion.get_related(filename, 8)
+      @version = doc_version.version
+      @file = doc_version.doc_file
+      @doc = doc_version.doc
     end
   end
 

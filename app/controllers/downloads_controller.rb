@@ -4,7 +4,7 @@ class DownloadsController < ApplicationController
   end
 
   def latest
-    latest = Rails.cache.read("latest-version")
+    latest = Version.latest_version.name)
     render :text => latest
   end
 
