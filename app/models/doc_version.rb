@@ -6,31 +6,14 @@ class DocVersion < ActiveRecord::Base
   belongs_to :doc
   belongs_to :version
   belongs_to :doc_file
-
+  
+  scope :with_includes, -> { includes(:doc) }
+  scope :for_version, ->(version){ joins(:version).where(versions: {name: version}).limit(1).first }
+  scope :latest_version, ->{ joins(:version).order("versions.vorder DESC").limit(1).first }
+  
   def self.get_related(doc_name, limit = 10)
     ri = RelatedItem.where(related_type: 'reference', related_id: doc_name).order('score DESC').limit(limit)
-    ri.sort_by(&:content_type)# { |a, b| a.content_type <=> b.content_type }
-  end
-
-  def self.latest_for(doc_name)
-    for_doc(doc_name).joins(:version).order('versions.vorder DESC').first
-  end
-
-  def self.last_changed(doc_name)
-    includes(:doc, :version).joins(:doc_file).where(doc_files: {name: doc_name}).order("versions.vorder DESC").first
-  end
-
-  def self.latest_versions(doc_name)
-    for_doc(doc_name).includes(:version).order('versions.vorder DESC')
-  end
-
-  def self.for_version(doc_name, version_name)
-    includes(:doc, :version)
-      .joins(:doc_file)
-      .where(doc_files: {name: doc_name})
-      .where(versions:  {name: version_name})
-      .order("versions.vorder DESC")
-      .first
+    ri.sort_by(&:content_type)
   end
 
   def self.version_changes(file, size = 20)
@@ -102,12 +85,6 @@ class DocVersion < ActiveRecord::Base
     rescue Exception => e
       nil
     end
-  end
-
-  private
-
-  def self.for_doc(doc_name)
-    includes(:doc).joins(:doc_file).where('doc_files.name=?', doc_name)
   end
 
 end
