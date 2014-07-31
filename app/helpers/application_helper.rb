@@ -19,13 +19,21 @@ module ApplicationHelper
   end
 
   def latest_version
+    begin
     @version ||= Version.latest_version
     @version.name
+    rescue
+      ""
+    end
   end
 
   def latest_release_date
+    begin
     @version ||= Version.latest_version
     '(' + @version.committed.strftime("%Y-%m-%d") + ')'
+    rescue
+      ""
+    end
   end
 
   def latest_relnote_url
