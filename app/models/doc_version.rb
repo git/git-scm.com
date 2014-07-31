@@ -10,38 +10,16 @@ class DocVersion < ActiveRecord::Base
   scope :with_includes, -> { includes(:doc) }
   scope :for_version, ->(version){ joins(:version).where(versions: {name: version}).limit(1).first }
   scope :latest_version, ->{ joins(:version).order("versions.vorder DESC").limit(1).first }
+  scope :version_changes, ->{ with_includes.joins(:version).order("versions.vorder DESC") }
   
+  delegate :name, to: :version
+  delegate :committed, to: :version
+
   def self.get_related(doc_name, limit = 10)
     ri = RelatedItem.where(related_type: 'reference', related_id: doc_name).order('score DESC').limit(limit)
     ri.sort_by(&:content_type)
   end
-
-  def self.version_changes(file, size = 20)
-    versions = []
-    unchanged = []
-    vers = includes(:doc, :version).joins(:doc_file).where(doc_files: {name: file}).order("versions.vorder DESC").limit(100)
-    (vers.size-2).times do |i|
-      v = vers[i]
-      prev = vers[i+1]
-      sha2 = v.doc.blob_sha
-      sha1 = prev.doc.blob_sha
-      if sha1 == sha2
-        unchanged << v.version.name
-      else
-        if unchanged.size > 0
-          if unchanged.size == 1
-            versions << {:name => "#{unchanged.first} no changes", :changed => false}
-          else
-            versions << {:name => "#{unchanged.last} &rarr; #{unchanged.first} no changes", :changed => false}
-          end
-          unchanged = []
-        end
-        versions << {:name => v.version.name, :time => v.version.committed, :diff => v.diff(prev), :changed => true}
-      end
-    end
-    versions
-  end
-
+ 
   # returns an array of the differences with 3 entries
   # 0: additions
   # 1: subtractions

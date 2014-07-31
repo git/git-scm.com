@@ -24,8 +24,8 @@ class DocController < ApplicationController
     @doc      = @doc_version.doc
     @page_title = "Git - #{@doc_file.name} Documentation"
     return redirect_to docs_path unless @doc_version
-    @versions = DocVersion.version_changes(@doc_file.name)
     @last     = @doc_file.doc_versions.latest_version
+    # @versions = DocVersion.version_changes(@doc_file.name)
     # @related = DocVersion.get_related(filename, 8)
   end
 
