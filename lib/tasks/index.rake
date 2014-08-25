@@ -57,36 +57,6 @@ task :preindex => :environment do
 
     puts "Found #{doc_files.size} entries"
 
-    # Generate this tag's command list for includes
-    puts "building command list"
-    if cmd_file = tag_files.detect { |ent| ent.path == 'command-list.txt' }
-      commands = blob_content[cmd_file.sha]
-      cmd_list = commands.split( "\n" ).reject { |l| l =~ /^#/ }.inject( {} ) do |list, cmd|
-        name, kind, attr = cmd.split( /\s+/ )
-        list[kind] ||= []
-        list[kind] << [name, attr]
-        list
-      end
-    else
-      cmd_list = {}
-    end
-
-    # Build virtual category include files for inclusion by actual checked-in files
-    puts "building include files"
-    categories = cmd_list.keys.inject({}) do |list, category|
-      if category_file = tag_files.detect { |ent| ent.path == "Documentation/#{category}.txt" }
-        links = cmd_list[category].map do |cmd, attr|
-          if match = blob_content[category_file.sha].match( /NAME\n----\n\S+ - (.*)$/ )
-            "linkgit:#{cmd}[1]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
-          end
-        end
-
-        list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
-      else
-        list
-      end
-    end
-
     doc_limit = ENV['ONLY_BUILD_DOC']
     doc_files = doc_files.select { |df| df.path =~ /#{doc_limit}/ } if doc_limit
 
@@ -97,12 +67,16 @@ task :preindex => :environment do
       puts "   build: #{path}"
 
       content = blob_content[entry.sha]
-      content.gsub!(/::(.*)\.txt/,"::\\1")
+      content.gsub!(/include::(\S+)\.txt/,"gitdoc:\\1")
       asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir)
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
         html = asciidoc.render
+        html.gsub!(/gitdoc:(\S+)/) do |line|
+          line.gsub!("gitdoc:", "").gsub!(/\[\].*/,"")
+          "<a href='/docs/#{line}'>#{line}</a>"
+        end
         html.gsub!(/linkgit:(.*)\[(\d+)\]/) do |line|
           x = /^linkgit:(.*)\[(\d+)\]/.match(line)
           line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
