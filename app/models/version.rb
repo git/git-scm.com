@@ -17,7 +17,7 @@ class Version < ActiveRecord::Base
   end
 
   def self.latest_version
-    Version.order('versions.vorder DESC').first
+    Version.order('versions.vorder DESC').limit(1).first
   end
 
   def self.version_to_num(version)

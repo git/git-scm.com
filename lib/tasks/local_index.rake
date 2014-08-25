@@ -48,7 +48,7 @@ task :local_index => :environment do
         mode, type, sha, path = e.split(' ')
         [path, sha, type]
       end
-      tree = tree.select { |t| t.first =~ /^(git.*|everyday|howto-index|user-manual)\.txt/ }
+      tree = tree.select { |t| t.first =~ /^(git.*|everyday|howto-index|user-manual|diff.*|fetch.*|merge.*|rev.*|pretty.*|pull.*)\.txt/ }
 
       puts "Found #{tree.size} entries"
 
@@ -80,24 +80,19 @@ task :local_index => :environment do
         puts "   build: #{path}"
 
         content = `git cat-file blob #{sha}`.chomp
-        asciidoc = Asciidoctor::Document.new(content) do |inc|
-         if categories.has_key?(inc)
-           categories[inc]
-         else
-           if match = inc.match(/^\.\.\/(.*)$/)
-             git_path = match[1]
-           else
-             git_path = "Documentation/#{inc}"
-           end
-           `git cat-file blob #{tag}:#{git_path}`
-         end
-        end
+        content.gsub!(/::(.*)\.txt/,"::\\1")
+        asciidoc = Asciidoctor::Document.new(content, templates_dir: template_dir)
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
         doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
         if rerun || !doc.plain || !doc.html
-          doc.plain = asciidoc.source rescue ""
-          doc.html  = asciidoc.render(template_dir: template_dir)
+          html = asciidoc.render
+          html.gsub!(/linkgit:(.*)\[(\d+)\]/) do |line|
+            x = /^linkgit:(.*)\[(\d+)\]/.match(line)
+            line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
+          end
+          doc.plain = asciidoc.source
+          doc.html  = html
           doc.save
         end
         dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create

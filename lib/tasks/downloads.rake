@@ -37,7 +37,9 @@ def sourceforge_url(project, filename)
 end
 
 # find newest mac and windows binary downloads
-task :downloads => :environment do
+task :downloads => [:environment, :windows_downloads, :mac_downloads]
+
+task :windows_downloads => :environment do
   # find latest windows version
   project = "msysgit"
   win_downloads = file_downloads_from_github("msysgit/msysgit")
@@ -45,22 +47,29 @@ task :downloads => :environment do
     name = url.split('/').last
     if m = /^Git-(.*?)-(.*?)(\d{4})(\d{2})(\d{2})\.exe/.match(name)
       version = m[1]
-      puts version = version
+      puts version
       puts name
       puts url
       puts date
       puts
-      v = Version.where(:name => version).first
-      if v
-        d = v.downloads.where(:url => url).first_or_create
-        d.filename = name
-        d.platform = 'windows'
-        d.release_date = date
-        d.save
+      if v = Version.where(name: version).first
+        options = {version: v, url: url, filename: name, platform: 'windows', release_date: date}
+        unless Download.exists?(options)
+          d = Download.new(options)
+          begin
+            d.save
+            puts "saved"
+          rescue
+            puts "error"
+          end
+          puts
+        end
       end
     end
   end
+end
 
+task :mac_downloads => :environment do
   # find latest mac version
   project = "git-osx-installer"
   mac_downloads = file_downloads(SOURCEFORGE_URL)
@@ -69,18 +78,23 @@ task :downloads => :environment do
     if m = /git-(.*?)-/.match(name)
       url = sourceforge_url(project, name)
       version = m[1]
-      puts version = version
+      puts version
       puts name
       puts url
       puts date
       puts
-      v = Version.where(:name => version).first
-      if v
-        d = v.downloads.where(:url => url).first_or_create
-        d.filename = name
-        d.platform = 'mac'
-        d.release_date = date
-        d.save
+      if v = Version.where(name: version).first
+        options = {version: v, url: url, filename: name, platform: 'mac', release_date: date}
+        unless Download.exists?(options)
+          d = Download.new(options)
+          begin
+            d.save
+            puts "saved"
+          rescue
+            puts "error"
+          end
+          puts
+        end
       end
     end
   end
