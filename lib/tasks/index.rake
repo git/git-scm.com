@@ -67,16 +67,18 @@ task :preindex => :environment do
       puts "   build: #{path}"
 
       content = blob_content[entry.sha]
-      content.gsub!(/include::(\S+)\.txt/,"gitdoc:\\1")
+      content.gsub!(/include::(\S+)\.txt/) do |line|
+        line.gsub!("include::","")
+        category_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
+        if category_file
+          blob_content[category_file.sha]
+        end
+      end
       asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir)
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
         html = asciidoc.render
-        html.gsub!(/gitdoc:(\S+)/) do |line|
-          line.gsub!("gitdoc:", "").gsub!(/\[\].*/,"")
-          "<a href='/docs/#{line}'>#{line}</a>"
-        end
         html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
           x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
           line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
