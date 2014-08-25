@@ -41,8 +41,8 @@ task :preindex => :environment do
     commit_info = @octokit.commit( repo, tag.name )
     commit_sha = commit_info.sha
     tree_sha = commit_info.commit.tree.sha
-    ts = Time.parse( commit_info.commit.committer.date )
-
+    # ts = Time.parse( commit_info.commit.committer.date )
+    ts = commit_info.commit.committer.date
     # save metadata
     puts "#{tag.name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
     stag.commit_sha = commit_sha
@@ -53,7 +53,7 @@ task :preindex => :environment do
     # find all the doc entries
     tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
     tag_files = tree_info.tree
-    doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index|user-manual)\.txt/ }
+    doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index|user-manual|diff.*|fetch.*|merge.*|rev.*|pretty.*|pull.*)\.txt/ }
 
     puts "Found #{doc_files.size} entries"
 
