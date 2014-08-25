@@ -73,8 +73,8 @@ task :local_index => :environment do
             line.gsub!("gitdoc:", "").gsub!(/\[\].*/,"")
             "<a href='/docs/#{line}'>#{line}</a>"
           end
-          html.gsub!(/linkgit:(.*)\[(\d+)\]/) do |line|
-            x = /^linkgit:(.*)\[(\d+)\]/.match(line)
+          html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
+            x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
             line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
           end
           doc.plain = asciidoc.source
