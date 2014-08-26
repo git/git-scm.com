@@ -18,6 +18,9 @@ Gitscm::Application.routes.draw do
 
   get "/doc" => "doc#index"
   get "/docs" => "doc#ref"
+  get "/docs/howto/:file", to: redirect {|path_params, req|
+    "https://github.com/git/git/blob/master/Documentation/howto/#{path_params[:file]}.txt"
+  }
   get "/docs/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-\.]+/
   get "/docs/:file" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
   get "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
