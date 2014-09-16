@@ -1,5 +1,9 @@
 Gitscm::Application.routes.draw do
 
+  get '/auth/github/callback', to: 'sessions#create'
+  get '/sign_in', to: 'sessions#new'
+  get '/sign_out', to: 'sessions#destroy'
+
   constraints(:host => 'whygitisbetterthanx.com') do
     root :to => 'site#redirect_wgibtx', as: :whygitisbetterthanx
   end
