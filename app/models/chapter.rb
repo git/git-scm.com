@@ -9,12 +9,14 @@ class Chapter < ActiveRecord::Base
   has_many :chapters, :through => :book
 
   def prev
+    return false unless self.number
     num = self.number - 1
     return self.chapters.where(:number => num).first if num > 0
     false
   end
 
   def next
+    return false unless self.number
     num = self.number + 1
     return self.chapters.where(:number => num).first if num > 0
     false
