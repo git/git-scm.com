@@ -38,6 +38,8 @@ Gitscm::Application.routes.draw do
     get "/:lang/ch:chapter-:section.html" => "books#chapter"
     get "/index"                          => redirect("/book")
     get "/commands"                       => "books#commands"
+    get "/:lang/v:edition"                => "books#show"
+    get "/:lang/v:edition/:slug"          => "books#section"
     get "/:lang"                          => "books#show", as: :lang
     get "/:lang/:slug"                    => "books#section"
   end
@@ -45,7 +47,7 @@ Gitscm::Application.routes.draw do
   get "/download"               => "downloads#index"
   get "/download/:platform"     => "downloads#download"
   get "/download/gui/:platform" => "downloads#gui"
-  
+
   resources :downloads, :only => [:index] do
     collection do
       get "/guis"       => "downloads#guis"

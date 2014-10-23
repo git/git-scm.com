@@ -4,7 +4,11 @@ class BooksController < ApplicationController
   before_filter :redirect_book, only: [:show]
 
   def show
-    @book = Book.includes(:sections).where(:code => (params[:lang] || "en")).first
+    if edition = params[:edition]
+      @book ||= Book.where(:code => (params[:lang] || "en"), :edition => edition).first
+    else
+      @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
+    end
     raise PageNotFound unless @book
   end
 
@@ -53,7 +57,11 @@ class BooksController < ApplicationController
   end
 
   def book_resource
-    @book ||= Book.where(:code => (params[:lang] || "en")).first
+    if edition = params[:edition]
+      @book ||= Book.where(:code => (params[:lang] || "en"), :edition => edition).first
+    else
+      @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
+    end
     raise PageNotFound unless @book
     @book
   end

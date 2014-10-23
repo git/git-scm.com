@@ -1,7 +1,7 @@
 require 'faraday'
 
 # bundle exec rake related
-CONTENT_SERVER  = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+#CONTENT_SERVER  = ENV["CONTENT_SERVER"] || "http://localhost:3000"
 UPDATE_TOKEN    = ENV["UPDATE_TOKEN"]
 
 def http_client(url)
@@ -15,9 +15,9 @@ def create_related_item(from, to)
   params = {
     from_content: from,
     to_content:   to,
-    token:        UPDATE_TOKEN 
+    token:        UPDATE_TOKEN
   }
-  http_client(url).post url, params 
+  http_client(url).post url, params
 end
 
 desc "Generate the related sidebar content"
