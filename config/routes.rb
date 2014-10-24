@@ -69,7 +69,7 @@ Gitscm::Application.routes.draw do
   get "/blog" => "blog#index"
 
   get "/publish" => "doc#book_update"
-  get "/related" => "doc#related_update"
+  post "/related" => "doc#related_update"
 
 
   get "/about" => "about#index"
