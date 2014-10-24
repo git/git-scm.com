@@ -39,9 +39,12 @@ task :genbook2 => :environment do
         content = zip_file.find_entry(file).get_input_stream.read
 
         doc = Nokogiri::HTML(content)
-        chapter = doc.at("section[@data-type=#{chapter_type}]")
+        chapter =       doc.at("section[@data-type=#{chapter_type}]")
         chapter_title = doc.at("section[@data-type=#{chapter_type}] > h1").text
-        pretext = doc.at("section[@data-type=#{chapter_type}] > p").to_html
+
+        id_xref = chapter.attribute('id').to_s
+        pretext = "<a id=\"#{id_xref}\"></a>"
+        pretext += doc.at("section[@data-type=#{chapter_type}] > p").to_html
 
         schapter = book.chapters.where(:number => number).first_or_create
         schapter.title = chapter_title.to_s
@@ -50,11 +53,18 @@ task :genbook2 => :environment do
         schapter.sha = book.ebook_html
         schapter.save
 
-        schapter.sections.delete_all # clear out this chapter before rebuilding it
+        # create xref
+        csection = schapter.sections.where(:number => 1).first_or_create
+        xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+        xref.section = csection
+        xref.save
 
         section = 1
         chapter.search("section[@data-type=sect1]").each do |sec|
           section_title = sec.attribute('data-pdf-bookmark')
+
+          id_xref = sec.attribute('id').to_s
+          pretext += "<a id=\"#{id_xref}\"></a>"
           html = pretext + sec.inner_html.to_s + nav
 
           html.gsub!('<h3', '<h4')
@@ -63,6 +73,20 @@ task :genbook2 => :environment do
           html.gsub!(/\/h2>/, '/h3>')
           html.gsub!('<h1', '<h2')
           html.gsub!(/\/h1>/, '/h2>')
+
+          if xlink = html.scan(/\.html\#(.*?)\"/)
+            xlink.each do |link|
+              xref = link.first
+              html.gsub!(/\.html\##{xref}\"/, "/#{xref}\"") rescue nil
+            end
+          end
+
+          if xlink = html.scan(/href=\"\#(.*?)\"/)
+            xlink.each do |link|
+              xref = link.first
+              html.gsub!(/href=\"\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
+            end
+          end
 
           if subsec = html.scan(/<h3>(.*?)<\/h3>/)
             subsec.each do |sub|
@@ -78,6 +102,20 @@ task :genbook2 => :environment do
           csection.title = section_title.to_s
           csection.html = html
           csection.save
+
+          xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+          xref.section = csection
+          xref.save
+
+          # record all the xrefs
+          sec.search("section[@id]").each do |id|
+            id_xref = id.attribute('id').to_s
+            if id_xref[0,3] != 'idp'
+              xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+              xref.section = csection
+              xref.save
+            end
+          end
 
           section += 1
           pretext = ""

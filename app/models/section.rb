@@ -19,6 +19,7 @@ class Section < ActiveRecord::Base
   before_save :set_slug
   after_save :index
   has_many :sections, :through => :chapter
+  has_many :xrefs
 
   def get_related(limit = 10)
     ri = RelatedItem.where(:related_type => 'book', :related_id => slug).order('score DESC').limit(limit)

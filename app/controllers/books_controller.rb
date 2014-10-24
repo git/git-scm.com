@@ -26,6 +26,13 @@ class BooksController < ApplicationController
     @groups = CMD_GROUPS
   end
 
+  def link
+    link = params[:link]
+    @book = Book.where(:code => params[:lang], :edition => params[:edition]).first
+    xref = @book.xrefs.where(:name => link).first
+    return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{xref.section.slug}##{xref.name}" unless @content
+  end
+
   def section
     @content = @book.sections.where(:slug => params[:slug]).first
     return redirect_to "/book/#{@book.code}" unless @content
