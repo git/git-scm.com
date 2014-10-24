@@ -12,6 +12,7 @@ task :genbook2 => :environment do
     html_file = download(book.ebook_html) # download processed html ebook
     Zip::File.open(html_file) do |zip_file|
       # Handle entries one by one
+      max_chapter = 0
       zip_file.glob("ch*.html").each do |entry|
         # Extract to file/directory/symlink
         puts "Extracting #{entry.name}"
@@ -63,9 +64,13 @@ task :genbook2 => :environment do
             section += 1
             pretext = ""
           end
-          schapter.sections.where("number >= #{section}").destroy_all
+          extra = schapter.sections.where("number >= #{section}")
+          extra.delete_all
         end
+        max_chapter = chapter_number if chapter_number > max_chapter
       end
+      extra = book.chapters.where("number > #{max_chapter}")
+      extra.delete_all
     end
 
     book.processed = true
