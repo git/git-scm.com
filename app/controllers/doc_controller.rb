@@ -89,7 +89,7 @@ class DocController < ApplicationController
   private
 
   def set_book
-    @book ||= Book.where(:code => (params[:lang] || "en")).first
+    @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
     raise PageNotFound unless @book
   end
 
@@ -110,6 +110,6 @@ class DocController < ApplicationController
     else
       @doc_version = @doc_file.doc_versions.latest_version
     end
-  end 
+  end
 
 end
