@@ -9,7 +9,7 @@ end
 
 require 'pp'
 task :search_index_book => :environment do
-  book = Book.where(:code => 'en').first
+  book = Book.where(:code => 'en', :edition => 2).first
   book.sections.each do |sec|
     sec.index
   end

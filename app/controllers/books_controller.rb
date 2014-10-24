@@ -4,10 +4,12 @@ class BooksController < ApplicationController
   before_filter :redirect_book, only: [:show]
 
   def show
+    lang = params[:lang] || "en"
     if edition = params[:edition]
-      @book ||= Book.where(:code => (params[:lang] || "en"), :edition => edition).first
+      @book = Book.where(:code => lang, :edition => edition).first
     else
-      @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
+      @book = Book.where(:code => lang).order("percent_complete, edition DESC").first
+      redirect_to "/book/#{lang}/v#{@book.edition}"
     end
     raise PageNotFound unless @book
   end
@@ -36,6 +38,7 @@ class BooksController < ApplicationController
   def section
     @content = @book.sections.where(:slug => params[:slug]).first
     return redirect_to "/book/#{@book.code}" unless @content
+    return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}" if @no_edition
     @related = @content.get_related(8)
     if @content.title.blank?
       @page_title = "Git - #{@content.chapter.title}"
@@ -67,6 +70,7 @@ class BooksController < ApplicationController
     if edition = params[:edition]
       @book ||= Book.where(:code => (params[:lang] || "en"), :edition => edition).first
     else
+      @no_edition = true
       @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
     end
     raise PageNotFound unless @book
