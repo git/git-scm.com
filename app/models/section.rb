@@ -67,7 +67,11 @@ class Section < ActiveRecord::Base
   end
 
   def cs_number
-    self.chapter.number.to_s + '.' + self.number.to_s
+    if self.chapter.chapter_type == 'appendix'
+      'A' + self.chapter.chapter_number.to_s + '.' + self.number.to_s
+    else
+      self.chapter.chapter_number.to_s + '.' + self.number.to_s
+    end
   end
 
   def index
