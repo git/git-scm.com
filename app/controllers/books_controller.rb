@@ -37,8 +37,16 @@ class BooksController < ApplicationController
 
   def section
     @content = @book.sections.where(:slug => params[:slug]).first
-    return redirect_to "/book/#{@book.code}" unless @content
-    return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}" if @no_edition
+    if !@content
+      @book = Book.where(:code => @book.code, :edition => 1).first
+      if @content = @book.sections.where(:slug => params[:slug]).first
+        return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
+      else
+        return redirect_to "/book/#{@book.code}"
+      end
+    elsif @no_edition
+      return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
+    end
     @related = @content.get_related(8)
     if @content.title.blank?
       @page_title = "Git - #{@content.chapter.title}"
