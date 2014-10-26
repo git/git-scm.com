@@ -1,4 +1,5 @@
 class BooksController < ApplicationController
+  skip_before_filter  :verify_authenticity_token, only: [:update]
 
   before_filter :book_resource, only: [:section, :chapter]
   before_filter :redirect_book, only: [:show]
@@ -63,6 +64,24 @@ class BooksController < ApplicationController
     raise PageNotFound unless @content
     @page_title = "Git - #{@content.title}"
     render 'section'
+  end
+
+  def update
+    if params[:token] == ENV['UPDATE_TOKEN']
+      build = params[:build]
+      if book = Book.where(:code => build[:code], :edition => build[:edition].to_i).first
+        book.ebook_pdf  = build[:download][:pdf]
+        book.ebook_epub = build[:download][:epub]
+        book.ebook_mobi = build[:download][:mobi]
+        book.ebook_html = build[:download][:html]
+        book.processed  = true
+        book.percent_complete = build[:percent].to_i
+        book.save
+      end
+      render :text => 'OK'
+    else
+      render :text => 'NOPE - AUTH'
+    end
   end
 
   private

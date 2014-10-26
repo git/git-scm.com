@@ -44,6 +44,7 @@ Gitscm::Application.routes.draw do
     get "/:lang"                          => "books#show", as: :lang
     get "/:lang/:slug"                    => "books#section"
   end
+  post "/update"   => "books#update"
 
   get "/download"               => "downloads#index"
   get "/download/:platform"     => "downloads#download"
@@ -69,9 +70,8 @@ Gitscm::Application.routes.draw do
   get "/blog.rss" => "blog#feed"
   get "/blog" => "blog#index"
 
-  get "/publish" => "doc#book_update"
+  get "/publish"  => "doc#book_update"
   post "/related" => "doc#related_update"
-
 
   get "/about" => "about#index"
   get "/about/:section" => "about#index"
