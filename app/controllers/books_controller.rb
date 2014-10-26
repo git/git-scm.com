@@ -74,7 +74,7 @@ class BooksController < ApplicationController
         book.ebook_epub = build[:download][:epub]
         book.ebook_mobi = build[:download][:mobi]
         book.ebook_html = build[:download][:html]
-        book.processed  = true
+        book.processed  = false
         book.percent_complete = build[:percent].to_i
         book.save
       end
