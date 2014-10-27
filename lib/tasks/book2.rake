@@ -145,6 +145,7 @@ def self.download(url)
   begin
     uri = URI.parse(url)
     Net::HTTP.start(uri.host,uri.port) do |http|
+      http.use_ssl = true if uri.port == 443
       http.request_get(uri.path) do |resp|
         resp.read_body do |segment|
           file.write(segment)
