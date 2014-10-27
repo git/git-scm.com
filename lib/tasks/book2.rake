@@ -144,8 +144,7 @@ def self.download(url)
   file = File.new("#{Rails.root}/tmp/download" + Time.now.to_i.to_s + Random.new.rand(100).to_s, 'wb')
   begin
     uri = URI.parse(url)
-    Net::HTTP.start(uri.host,uri.port) do |http|
-      http.use_ssl = true if uri.port == 443
+    Net::HTTP.start(uri.host,uri.port, :use_ssl => uri.scheme == 'https') do |http|
       http.request_get(uri.path) do |resp|
         resp.read_body do |segment|
           file.write(segment)
