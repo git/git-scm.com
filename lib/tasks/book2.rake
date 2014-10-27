@@ -21,6 +21,7 @@ task :genbook2 => :environment do
       chapters = {}
       zip_file.glob("*.html").each do |entry|
         if m = /(app|ch)(.*?).html/.match(entry.name)
+          puts entry.name
           chapter_type = m[1]
           chapter_number = m[2]
           if chapter_type == 'app'
