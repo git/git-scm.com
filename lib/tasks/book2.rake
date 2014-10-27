@@ -128,7 +128,7 @@ task :genbook2 => :environment do
     end
 
     book.processed = true
-    # book.save
+    book.save
 
     book.sections.each do |section|
       section.set_slug
