@@ -98,7 +98,7 @@ class BooksController < ApplicationController
       @book ||= Book.where(:code => (params[:lang] || "en"), :edition => edition).first
     else
       @no_edition = true
-      @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
+      @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete DESC, edition DESC").first
     end
     raise PageNotFound unless @book
     @book
