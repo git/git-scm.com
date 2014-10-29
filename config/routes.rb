@@ -38,14 +38,18 @@ Gitscm::Application.routes.draw do
     get "/:lang/ch:chapter-:section.html" => "books#chapter"
     get "/index"                          => redirect("/book")
     get "/commands"                       => "books#commands"
+    get "/:lang/v:edition"                => "books#show"
+    get "/:lang/v:edition/:slug"          => "books#section"
+    get "/:lang/v:edition/:chapter/:link" => "books#link", chapter: /(ch|app)\d+/
     get "/:lang"                          => "books#show", as: :lang
     get "/:lang/:slug"                    => "books#section"
   end
+  post "/update"   => "books#update"
 
   get "/download"               => "downloads#index"
   get "/download/:platform"     => "downloads#download"
   get "/download/gui/:platform" => "downloads#gui"
-  
+
   resources :downloads, :only => [:index] do
     collection do
       get "/guis"       => "downloads#guis"
@@ -66,9 +70,8 @@ Gitscm::Application.routes.draw do
   get "/blog.rss" => "blog#feed"
   get "/blog" => "blog#index"
 
-  get "/publish" => "doc#book_update"
-  get "/related" => "doc#related_update"
-
+  get "/publish"  => "doc#book_update"
+  post "/related" => "doc#related_update"
 
   get "/about" => "about#index"
   get "/about/:section" => "about#index"

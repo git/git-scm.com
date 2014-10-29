@@ -19,6 +19,7 @@ class Section < ActiveRecord::Base
   before_save :set_slug
   after_save :index
   has_many :sections, :through => :chapter
+  has_many :xrefs
 
   def get_related(limit = 10)
     ri = RelatedItem.where(:related_type => 'book', :related_id => slug).order('score DESC').limit(limit)
@@ -54,20 +55,24 @@ class Section < ActiveRecord::Base
     lang = self.book.code
     next_number = self.number + 1
     if section = self.sections.where(:number => next_number).first
-      return "/book/#{lang}/#{ERB::Util.url_encode(section.slug)}"
+      return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
     else
       if ch = self.chapter.next
         if section = ch.first_section
-          return "/book/#{lang}/#{ERB::Util.url_encode(section.slug)}"
+          return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
         end
       end
       # find next chapter
     end
-    "/book/#{lang}"
+    "/book/#{lang}/v#{self.book.edition}"
   end
 
   def cs_number
-    self.chapter.number.to_s + '.' + self.number.to_s
+    if self.chapter.chapter_type == 'appendix'
+      'A' + self.chapter.chapter_number.to_s + '.' + self.number.to_s
+    else
+      self.chapter.chapter_number.to_s + '.' + self.number.to_s
+    end
   end
 
   def index

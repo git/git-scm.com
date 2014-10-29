@@ -1,10 +1,17 @@
 class BooksController < ApplicationController
+  skip_before_filter  :verify_authenticity_token, only: [:update]
 
   before_filter :book_resource, only: [:section, :chapter]
   before_filter :redirect_book, only: [:show]
 
   def show
-    @book = Book.includes(:sections).where(:code => (params[:lang] || "en")).first
+    lang = params[:lang] || "en"
+    if edition = params[:edition]
+      @book = Book.where(:code => lang, :edition => edition).first
+    else
+      @book = Book.where(:code => lang).order("percent_complete DESC, edition DESC").first
+      redirect_to "/book/#{lang}/v#{@book.edition}"
+    end
     raise PageNotFound unless @book
   end
 
@@ -22,9 +29,25 @@ class BooksController < ApplicationController
     @groups = CMD_GROUPS
   end
 
+  def link
+    link = params[:link]
+    @book = Book.where(:code => params[:lang], :edition => params[:edition]).first
+    xref = @book.xrefs.where(:name => link).first
+    return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{xref.section.slug}##{xref.name}" unless @content
+  end
+
   def section
     @content = @book.sections.where(:slug => params[:slug]).first
-    return redirect_to "/book/#{@book.code}" unless @content
+    if !@content
+      @book = Book.where(:code => @book.code, :edition => 1).first
+      if @content = @book.sections.where(:slug => params[:slug]).first
+        return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
+      else
+        return redirect_to "/book/#{@book.code}"
+      end
+    elsif @no_edition
+      return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
+    end
     @related = @content.get_related(8)
     if @content.title.blank?
       @page_title = "Git - #{@content.chapter.title}"
@@ -43,6 +66,24 @@ class BooksController < ApplicationController
     render 'section'
   end
 
+  def update
+    if params[:token] == ENV['UPDATE_TOKEN']
+      build = params[:build]
+      if book = Book.where(:code => build[:code], :edition => build[:edition].to_i).first
+        book.ebook_pdf  = build[:download][:pdf]
+        book.ebook_epub = build[:download][:epub]
+        book.ebook_mobi = build[:download][:mobi]
+        book.ebook_html = build[:download][:html]
+        book.processed  = false
+        book.percent_complete = build[:percent].to_i
+        book.save
+      end
+      render :text => 'OK'
+    else
+      render :text => 'NOPE - AUTH'
+    end
+  end
+
   private
 
   def redirect_book
@@ -53,7 +94,12 @@ class BooksController < ApplicationController
   end
 
   def book_resource
-    @book ||= Book.where(:code => (params[:lang] || "en")).first
+    if edition = params[:edition]
+      @book ||= Book.where(:code => (params[:lang] || "en"), :edition => edition).first
+    else
+      @no_edition = true
+      @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete DESC, edition DESC").first
+    end
     raise PageNotFound unless @book
     @book
   end
