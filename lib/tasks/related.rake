@@ -1,7 +1,7 @@
 require 'faraday'
 
 # bundle exec rake related
-CONTENT_SERVER  = ENV["CONTENT_SERVER"] || "http://localhost:3000"
+CONTENT_SERVER  = ENV["CONTENT_SERVER"] || "http://localhost:3001"
 UPDATE_TOKEN    = ENV["UPDATE_TOKEN"]
 
 def http_client(url)
@@ -15,9 +15,9 @@ def create_related_item(from, to)
   params = {
     from_content: from,
     to_content:   to,
-    token:        UPDATE_TOKEN 
+    token:        UPDATE_TOKEN
   }
-  http_client(url).post url, params 
+  http_client(url).post url, params
 end
 
 desc "Generate the related sidebar content"
@@ -40,7 +40,7 @@ CMD_IGNORE = ['aware', 'binaries', 'ci', 'co', 'com', 'directory', 'feature',
 #  - reference calls
 def find_book_links
   aindex = {}
-  book = Book.where(:code => 'en').first
+  book = Book.where(:code => 'en', :edition => 2).first
   book.sections.each do |section|
     content = section.html
     content.scan(/git (\-+[a-z\-=]+ )*([a-z][a-z\-]+)/) do |match|
@@ -59,7 +59,7 @@ def find_book_links
     sec_ids.each do |id, score|
       if section = Section.find(id)
         puts "linking #{section.title} with #{command}"
-        from = ['book', section.title, section.slug, "/book/en/#{section.slug}", score]
+        from = ['book', section.title, section.slug, "/book/en/v#{section.book.edition}/#{section.slug}", score]
         to   = ['reference', command, command, "/docs/#{command}", score]
         create_related_item(from, to)
       end
@@ -87,7 +87,9 @@ def find_reference_links
 
     related.each do |command, score|
       next if command == name
-      if rdv = DocVersion.latest_for(command)
+      doc_file = DocFile.with_includes.where(name: command).limit(1).first
+      rdv = doc_file.doc_versions.latest_version rescue nil
+      if rdv
         puts "linking #{name} with #{command}"
         from = ['reference', name, name, "/docs/#{name}", score]
         to   = ['reference', command, command, "/docs/#{command}", score]

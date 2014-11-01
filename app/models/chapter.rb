@@ -29,4 +29,12 @@ class Chapter < ActiveRecord::Base
   def first_section
     self.sections.first
   end
+
+  def cs_number
+    if self.chapter_type == 'appendix'
+      'A' + self.chapter_number
+    else
+      self.chapter_number
+    end
+  end
 end
