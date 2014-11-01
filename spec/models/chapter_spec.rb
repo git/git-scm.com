@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe Chapter do
 
@@ -18,7 +18,7 @@ describe Chapter do
   end
 
   it "should have sections" do
-    chapter.sections.any?.should be_true
+    chapter.sections.any?.should == true 
     chapter.sections.count.should == 3
   end
 

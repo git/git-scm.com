@@ -1,30 +1,29 @@
 source 'https://rubygems.org'
 #ruby "2.1.2"
 
-gem 'rails', '4.1.5'
-gem 'rails_12factor', group: :production
+gem 'rails', '4.1.6'
+
+group :production do
+  gem 'rails_12factor'
+  gem 'exceptional'
+  gem 'memcachier'
+  gem 'newrelic_rpm'
+end
 
 gem 'asciidoctor'
 gem 'dalli'
-gem 'exceptional'
 gem 'faraday'
 gem 'faraday_middleware'
-gem 'memcachier'
-gem 'newrelic_rpm'
 gem 'octokit'
 gem 'omniauth-github'
 gem "pg"
 gem 'rack-timeout'
+gem 'redcarpet'
 gem 'tilt'
 gem 'tire'
 gem 'unicorn'
 
-gem 'json'
-gem 'yajl-ruby'
 gem 'haml'
-gem 'netrc'
-gem 'launchy'
-gem 'rubyzip'
 gem 'diff-lcs'
 gem 'redcarpet'
 gem 'nokogiri'
@@ -43,7 +42,7 @@ group :development do
   gem "better_errors"
   gem "binding_of_caller"
   gem "foreman"
-  gem "taps"
+  # gem "taps"
 end
 
 group :development, :test do
@@ -60,4 +59,5 @@ group :test do
   gem 'shoulda-matchers'
   gem 'webmock'
   gem 'rails-perftest'
+  gem 'vcr'
 end

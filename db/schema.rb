@@ -13,16 +13,13 @@
 
 ActiveRecord::Schema.define(version: 20140916015423) do
 
-  # These are extensions that must be enabled in order to support this database
-  enable_extension "plpgsql"
-
   create_table "books", force: true do |t|
     t.string   "code"
     t.datetime "created_at"
     t.datetime "updated_at"
   end
 
-  add_index "books", ["code"], name: "index_books_on_code", using: :btree
+  add_index "books", ["code"], name: "index_books_on_code"
 
   create_table "chapters", force: true do |t|
     t.string   "title"
@@ -33,7 +30,7 @@ ActiveRecord::Schema.define(version: 20140916015423) do
     t.string   "sha"
   end
 
-  add_index "chapters", ["book_id"], name: "index_chapters_on_book_id", using: :btree
+  add_index "chapters", ["book_id"], name: "index_chapters_on_book_id"
 
   create_table "doc_files", force: true do |t|
     t.string   "name"
@@ -41,7 +38,7 @@ ActiveRecord::Schema.define(version: 20140916015423) do
     t.datetime "updated_at"
   end
 
-  add_index "doc_files", ["name"], name: "index_doc_files_on_name", using: :btree
+  add_index "doc_files", ["name"], name: "index_doc_files_on_name"
 
   create_table "doc_versions", force: true do |t|
     t.integer  "version_id"
@@ -59,7 +56,7 @@ ActiveRecord::Schema.define(version: 20140916015423) do
     t.datetime "updated_at"
   end
 
-  add_index "docs", ["blob_sha"], name: "index_docs_on_blob_sha", using: :btree
+  add_index "docs", ["blob_sha"], name: "index_docs_on_blob_sha"
 
   create_table "downloads", force: true do |t|
     t.string   "url"
@@ -94,8 +91,8 @@ ActiveRecord::Schema.define(version: 20140916015423) do
     t.integer  "number"
   end
 
-  add_index "sections", ["chapter_id"], name: "index_sections_on_chapter_id", using: :btree
-  add_index "sections", ["slug"], name: "index_sections_on_slug", using: :btree
+  add_index "sections", ["chapter_id"], name: "index_sections_on_chapter_id"
+  add_index "sections", ["slug"], name: "index_sections_on_slug"
 
   create_table "users", force: true do |t|
     t.string   "screen_name"
@@ -105,8 +102,8 @@ ActiveRecord::Schema.define(version: 20140916015423) do
     t.datetime "updated_at"
   end
 
-  add_index "users", ["github_id"], name: "index_users_on_github_id", using: :btree
-  add_index "users", ["remember_token"], name: "index_users_on_remember_token", using: :btree
+  add_index "users", ["github_id"], name: "index_users_on_github_id"
+  add_index "users", ["remember_token"], name: "index_users_on_remember_token"
 
   create_table "versions", force: true do |t|
     t.string   "name"
@@ -118,6 +115,6 @@ ActiveRecord::Schema.define(version: 20140916015423) do
     t.float    "vorder"
   end
 
-  add_index "versions", ["name"], name: "index_versions_on_name", using: :btree
+  add_index "versions", ["name"], name: "index_versions_on_name"
 
 end
