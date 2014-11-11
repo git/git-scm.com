@@ -97,6 +97,13 @@ task :genbook2 => :environment do
             end
           end
 
+          if subsec = html.scan(/<img src="(.*?)"/)
+            subsec.each do |sub|
+              sub = sub.first
+              html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"") rescue nil
+            end
+          end
+
           puts "\t\t#{chapter_type} #{chapter_number}.#{section} : #{chapter_title} . #{section_title} - #{html.size}"
 
           csection = schapter.sections.where(:number => section).first_or_create
