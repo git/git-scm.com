@@ -1,7 +1,12 @@
-require 'spec_helper'
+require 'rails_helper'
 
-describe AboutController do
+RSpec.describe AboutController, type: :controller do
+  render_views
 
+  before(:each) do
+    controller.prepend_view_path 'app/views'
+  end
+  
   it "GET index" do
     get :index
     expect(assigns(:section)).to eq("about")

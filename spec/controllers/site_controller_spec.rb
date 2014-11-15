@@ -1,7 +1,12 @@
-require 'spec_helper'
+require 'rails_helper'
 
-describe SiteController do
-  
+RSpec.describe SiteController do
+  render_views
+
+  before(:each) do
+    controller.prepend_view_path 'app/views'
+  end
+
   it "GET index" do
     get :index
     expect(response).to render_template("index")
@@ -10,7 +15,7 @@ describe SiteController do
   it "GET search" do
     get :search, {search: "git-init"}
     expect(assigns(:term)).to eq("git-init")
-    expect(response).to render_template("shared/search")
+    expect(response).to render_template("shared/_search")
   end
 
   it "GET search_results" do
@@ -30,7 +35,7 @@ describe SiteController do
   end
 
   describe "GET /book" do
-    
+
     it "get /git-doc" do
       request.env["PATH_INFO"] = "/git-doc"
       get :redirect_book
