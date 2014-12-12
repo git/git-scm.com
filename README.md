@@ -17,7 +17,7 @@ Then you need to create the database structure:
 
     $ rake db:migrate
 
-Now you'll want to populate the man pages.  You can do so from a local Git
+Now you'll want to populate the main pages.  You can do so from a local Git
 source clone like this:
 
     $ GIT_REPO=../git/.git rake local_index
