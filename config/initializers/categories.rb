@@ -20,7 +20,7 @@ module Gitscm
     ],['External Systems',
       ['git-svn', 'git-fast-import']
     ],['Administration',
-      ['git-clean', 'git-gc', 'git-fsck', 'git-reflog', 'git-filter-branch', 'git-instaweb', 'git-archive']
+      ['git-clean', 'git-gc', 'git-fsck', 'git-reflog', 'git-filter-branch', 'git-instaweb', 'git-archive', 'git-bundle']
     ],['Server Admin',
       ['git-daemon', 'git-update-server-info']
     ],['Plumbing Commands',
