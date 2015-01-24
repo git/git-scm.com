@@ -43,7 +43,7 @@ module SiteHelper
     l = labels.join('|')
 
     scale = vals.max
-    c = "<img src=\"http://chart.apis.google.com/chart?"
+    c = "<img src=\"https://chart.googleapis.com/chart?"
     c += "chxt=x" + "&amp;"
     c += "cht=bvs" + "&amp;"
     c += "chl=#{l}" + "&amp;"

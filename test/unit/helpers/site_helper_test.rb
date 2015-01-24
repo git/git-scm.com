@@ -20,7 +20,7 @@ class SiteHelperTest < ActionView::TestCase
 
   test "should create gchart" do
     src = gchart("git", [[0,1],[0,1]])
-    assert_equal "<img src=\"http://chart.apis.google.com/chart?chxt=x&amp;cht=bvs&amp;chl=0|0&amp;chd=t:1,1&amp;chds=0,1&amp;chs=100x125&amp;chco=E09FA0|E05F49&amp;chf=bg,s,fcfcfa&chtt=git\" alt=\"init benchmarks\" />", src
+    assert_equal "<img src=\"https://chart.googleapis.com/chart?chxt=x&amp;cht=bvs&amp;chl=0|0&amp;chd=t:1,1&amp;chds=0,1&amp;chs=100x125&amp;chco=E09FA0|E05F49&amp;chf=bg,s,fcfcfa&chtt=git\" alt=\"init benchmarks\" />", src
   end
   
 end
