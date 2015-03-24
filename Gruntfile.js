@@ -13,7 +13,7 @@ module.exports = function(grunt) {
       },
       dist: {
         files: {
-          'css/gitscm.css': 'app/assets/stylesheets/git-scm.css.scss'
+          'tmp/css/git-scm.css': 'app/assets/stylesheets/git-scm.scss'
         }
       }
     },
@@ -48,11 +48,11 @@ module.exports = function(grunt) {
           'TotalImportantKeywords',
           'TotalMediaQueries'
         ],
-        file: "css-stats.md",
+        file: "doc/css-stats.md",
         usePackage: true
       },
       src: [
-        'css/*.css'
+        'tmp/css/git-scm.css'
       ],
     },
 
