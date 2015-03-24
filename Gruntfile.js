@@ -13,8 +13,7 @@ module.exports = function(grunt) {
       },
       dist: {
         files: {
-          // 'css/gitscm.css': 'gitscm.css.scss'
-					'css/styles.css': 'sass/styles.scss'
+          'css/gitscm.css': 'app/assets/stylesheets/git-scm.css.scss'
         }
       }
     },
