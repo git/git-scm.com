@@ -32,29 +32,29 @@ var DownloadBox = {
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $(".monitor").addClass("mac");
-      $("#download-link").text("Downloads for Mac").attr("href", "/download/mac");
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
-      $("#gui-os-filter").attr('data-os', 'mac');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
+      $(".js-download-link").text("Downloads for Mac").attr("href", "/download/mac");
+      $(".js-gui-link").removeClass('mac').addClass('gui');
+      $(".js-gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
+      $(".js-gui-os-filter").attr('data-os', 'mac');
+      $(".js-gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
       $(".monitor").addClass("windows");
-      $("#download-link").text("Downloads for Windows").attr("href", "/download/win");
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
-      $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
-      $("#gui-os-filter").attr('data-os', 'windows');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Windows)")
+      $(".js-download-link").text("Downloads for Windows").attr("href", "/download/win");
+      $(".js-gui-link").removeClass('mac').addClass('gui');
+      $(".js-gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
+      $(".js-alt-link").removeClass("windows").addClass("mac");
+      $(".js-alt-link").text("Mac Build").attr("href", "/download/mac");
+      $(".js-gui-os-filter").attr('data-os', 'windows');
+      $(".js-gui-os-filter").text("Only show GUIs for my OS (Windows)")
     } else if (os == "Linux") {
       $(".monitor").addClass("linux");
-      $("#download-link").text("Downloads for Linux").attr("href", "/download/linux");
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
-      $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
-      $("#gui-os-filter").attr('data-os', 'linux');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
+      $(".js-download-link").text("Downloads for Linux").attr("href", "/download/linux");
+      $(".js-gui-link").removeClass('mac').addClass('gui');
+      $(".js-gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
+      $(".js-alt-link").removeClass("windows").addClass("mac");
+      $(".js-alt-link").text("Mac Build").attr("href", "/download/mac");
+      $(".js-gui-os-filter").attr('data-os', 'linux');
+      $(".js-gui-os-filter").text("Only show GUIs for my OS (Linux)")
     } else {
     }
   }
