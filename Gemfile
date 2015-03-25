@@ -50,6 +50,7 @@ group :development, :test do
   gem "sqlite3"
   gem 'byebug'
   gem 'ruby-prof'
+  gem 'scss-lint'
 end
 
 group :test do
