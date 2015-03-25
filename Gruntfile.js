@@ -19,14 +19,14 @@ module.exports = function(grunt) {
     },
 
     // Handle vendor prefixing
-    autoprefixer: {
-      options: {
-        browsers: ['last 2 versions', 'ie 8', 'ie 9']
-      },
-      dist: {
-        src: 'css/*.css'
-      },
-    },
+    // autoprefixer: {
+    //   options: {
+    //     browsers: ['last 2 versions', 'ie 8', 'ie 9']
+    //   },
+    //   dist: {
+    //     src: 'css/*.css'
+    //   },
+    // },
 
     // Runs CSS reporting
     parker: {
@@ -74,5 +74,5 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-sass');
 
   // Generate and format the CSS
-  grunt.registerTask('default', ['sass', 'autoprefixer', 'parker']);
+  grunt.registerTask('default', ['sass', 'parker']);
 };
