@@ -231,17 +231,16 @@ var Downloads = {
         $('ul.gui-thumbnails li').switchClass("masked", "", 200);
         $(this).html('Only show GUIs for my OS ('+ capitalizedOS +')');
         $(this).removeClass('filtering');
-        $('#os-filter-count').hide();
+        $('.js-os-filter-count').hide();
       }
       else {
         $('ul.gui-thumbnails li').not("."+Downloads.userOS).switchClass("", "masked", 200);
         $(this).html('Show GUIs for all OSes');
         $(this).addClass('filtering');
         var osCount = $('ul.gui-thumbnails li' + '.' + Downloads.userOS).length;
-        $('#os-filter-count strong').html(osCount);
-        $('#os-filter-count .os').html(capitalizedOS);
-        $('#os-filter-count').show();
-      }
+        $('.js-os-filter-count strong').html(osCount);
+        $('.js-os-filter-count .os').html(capitalizedOS);
+        $('.js-os-filter-count').show(); }
     });
   }
 }
