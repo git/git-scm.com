@@ -28,7 +28,7 @@ $(document).ready(function() {
 
 var DownloadBox = {
   init: function() {
-    $('#gui-os-filter').addClass('visible');
+    $('.js-gui-os-filter').addClass('visible');
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $(".monitor").addClass("mac");
@@ -223,7 +223,7 @@ var Downloads = {
   },
 
   observeGUIOSFilter: function() {
-    $('a#gui-os-filter').click(function(e) {
+    $('.js-gui-os-filter').click(function(e) {
       e.preventDefault();
       Downloads.userOS = $(this).attr('data-os');
       var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
