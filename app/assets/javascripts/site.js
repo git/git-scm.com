@@ -87,22 +87,22 @@ var Search = {
   },
 
   observeFocus: function() {
-    $('form#search input').focus(function() {
-      $(this).parent('form#search').switchClass("", "focus", 200);
+    $('.js-search-text').focus(function() {
+      $('.js-search-form').switchClass("", "focus", 200);
     });
-    $('form#search input').blur(function() {
+    $('.js-search-text').blur(function() {
       Search.resetForm();
     });
   },
 
   observeTextEntry: function() {
-    $('form#search input').keyup(function(e) {
+    $('.js-search-text').keyup(function(e) {
       Search.runSearch();
     });
 
-    $('form#search input').keydown(function(e) {
-      if ($('#search-results').not(':visible') && e.which != 27) {
-        $('#search-results').fadeIn(0.2);
+    $('.js-search-text').keydown(function(e) {
+      if ($('.js-search-results').not(':visible') && e.which != 27) {
+        $('.js-search-results').fadeIn(0.2);
         Search.highlight(Search.selectedIndex);
       }
       switch(e.which) {
@@ -126,13 +126,13 @@ var Search = {
   },
 
   observeResultsClicks: function() {
-    $('#search-results').mousedown(function(e) {
+    $('.js-search-results').mousedown(function(e) {
       e.preventDefault();
     });
   },
 
   runSearch: function() {
-    var term = $('#search-text').val();
+    var term = $('.js-search-text').val();
     if(term.length < 2) { return false };
 
     if(!Search.searching) {
@@ -141,7 +141,7 @@ var Search = {
       if(term != Search.currentSearch) {
         Search.currentSearch = term;
         $.get("/search", {search: term}, function(results) {
-          $("#search-results").html(results);
+          $(".js-search-results").html(results);
           Search.searching = false;
         }, 'html');
       };
@@ -156,10 +156,10 @@ var Search = {
   },
 
   selectResultOption: function() {
-    var link = $('#search-results a')[Search.selectedIndex];
+    var link = $('.js-search-results a')[Search.selectedIndex];
     var url = $(link).attr('href');
     if(!link) {
-      var term = $('#search-text').val();
+      var term = $('.js-search-text').val();
       url = "/search/results?search=" + term;
     }
     window.location.href = url;
@@ -172,13 +172,13 @@ var Search = {
   },
 
   highlight: function(index) {
-    var links = $('#search-results a').removeClass('highlight');
+    var links = $('.js-search-results a').removeClass('highlight');
     $(links[index]).addClass('highlight');
   },
 
   resetForm: function() {
-    $('form#search').switchClass("focus", "", 200);
-    $('#search-results').fadeOut(0.2);
+    $('.js-search-form').switchClass("focus", "", 200);
+    $('.js-search-results').fadeOut(0.2);
     Search.selectedIndex = 0;
   }
 }
