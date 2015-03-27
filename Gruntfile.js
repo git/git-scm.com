@@ -9,7 +9,7 @@ module.exports = function(grunt) {
       options: {
         precision: 6,
         sourceComments: false,
-        outputStyle: 'compressed'
+        // outputStyle: 'compressed'
       },
       dist: {
         files: {
@@ -19,14 +19,15 @@ module.exports = function(grunt) {
     },
 
     // Handle vendor prefixing
-    // autoprefixer: {
-    //   options: {
-    //     browsers: ['last 2 versions', 'ie 8', 'ie 9']
-    //   },
-    //   dist: {
-    //     src: 'css/*.css'
-    //   },
-    // },
+    autoprefixer: {
+      options: {
+        browsers: ['last 2 versions', 'ie 8', 'ie 9']
+      },
+      dist: {
+        src: 'tmp/css/git-scm.css',
+        dest: 'tmp/css/git-scm-ap.css'
+      },
+    },
 
     // Runs CSS reporting
     parker: {
@@ -52,7 +53,7 @@ module.exports = function(grunt) {
         usePackage: true
       },
       src: [
-        'tmp/css/git-scm.css'
+        'tmp/css/git-scm-ap.css'
       ],
     },
 
@@ -74,5 +75,5 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-sass');
 
   // Generate and format the CSS
-  grunt.registerTask('default', ['sass', 'parker']);
+  grunt.registerTask('default', ['sass', 'autoprefixer', 'parker']);
 };
