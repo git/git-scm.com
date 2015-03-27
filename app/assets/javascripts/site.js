@@ -68,7 +68,7 @@ var BrowserFallbacks = {
   initPlaceholders: function() {
     if (!Modernizr.input.placeholder) {
       $('input[placeholder], textarea[placeholder]').each(function(input) {
-        $(this).defaultValue($(this).attr('placeholder'), 'active', 'inactive');
+        $(this).defaultValue($(this).attr('placeholder'), 'input-active', 'input-inactive');
       });
     }
   }
