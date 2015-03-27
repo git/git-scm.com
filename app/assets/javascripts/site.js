@@ -316,31 +316,31 @@ var FlippyBook = {
     // janky when using z-index
     if (Modernizr.webkit) {
       FlippyBook.threeDee = true;
-      $('#book-container').addClass('three-dee');
+      $('.js-book-container').addClass('three-dee');
     }
-    $('#about-book').addClass('visible');
+    $('.js-flippy-book-about-link').addClass('visible');
   },
 
   observeOpenCloseClicks: function() {
-    $('#book-cover-outside, #open-book').click(function(e) {
+    $('.js-flippy-book-cover-outside, .open-book-link').click(function(e) {
       e.preventDefault();
-      $('#book-cover').removeClass('close').addClass('open');
-      $('#book-intro').css('z-index', '');
+      $('.js-flippy-book-cover').removeClass('close').addClass('open');
+      $('.js-book-intro').css('z-index', '');
       if (!FlippyBook.threeDee) {
-        $('#book-cover-inside').show();
-        $('#book-inside-page').show();
+        $('.js-flippy-book-cover-inside').show();
+        $('.js-flippy-book-inside-page').show();
       }
     });
-    $('#about-book').click(function(e) {
+    $('.js-flippy-book-about-link').click(function(e) {
       e.preventDefault();
-      $('#book-cover').removeClass('open').addClass('close');
+      $('.js-flippy-book-cover').removeClass('open').addClass('close');
       if (FlippyBook.threeDee) {
-        var t = setTimeout ("$('#book-intro').css('z-index', 100)", 1000);
+        var t = setTimeout ("$('.js-book-intro').css('z-index', 100)", 1000);
       }
       else {
-        $('#book-cover-inside').hide();
-        $('#book-inside-page').hide();
-        $('#book-intro').css('z-index', 100);
+        $('.js-flippy-book-cover-inside').hide();
+        $('.js-flippy-book-inside-page').hide();
+        $('.js-book-intro').css('z-index', 100);
       }
     });
   }
