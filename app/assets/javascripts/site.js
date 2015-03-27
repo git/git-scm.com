@@ -283,15 +283,15 @@ var AboutContent = {
 
   showSection: function(section) {
     if (section == 'about') section = AboutContent.defaultSection;
-    $('ol#about-nav a').removeClass('current');
-    $('ol#about-nav a#nav-' + section).addClass('current');
+    $('.js-about-nav a').removeClass('current');
+    $('.js-about-nav a#nav-' + section).addClass('current');
     $('section').hide(0, function(){
       $('section#' + section).show();
     });
   },
 
   observeNav: function() {
-    $('ol#about-nav a, .bottom-nav a').click(function(e) {
+    $('.js-about-nav a, .bottom-nav a').click(function(e) {
       e.preventDefault();
       var section = $(this).attr('data-section-id');
 
