@@ -189,7 +189,7 @@ var Dropdowns = {
   },
 
   observeTriggers: function() {
-    $('.dropdown-trigger').click(function(e) {
+    $('.js-dropdown-trigger').click(function(e) {
       e.preventDefault();
       var panelId = $(this).attr('data-panel-id');
       if ($(this).hasClass('active')) {
