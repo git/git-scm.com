@@ -29,7 +29,6 @@ gem 'redcarpet'
 gem 'nokogiri'
 
 # Assets
-gem 'compass-rails'
 gem 'coffee-rails'
 gem 'jquery-rails'
 gem 'less-rails-bootstrap'
