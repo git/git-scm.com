@@ -4,20 +4,20 @@
 
 ## Parker Report
 
-### tmp/css/git-scm.css
+### tmp/css/git-scm-ap.css
 
 - **Total Stylesheets:** 1
-- **Total Stylesheet Size:** 100283
+- **Total Stylesheet Size:** 76320
 - **Total Media Queries:** 5
-- **Total Rules:** 653
-- **Selectors Per Rule:** 1.8529862174578866
-- **Total Selectors:** 1210
-- **Identifiers Per Selector:** 3.4644628099173556
-- **Specificity Per Selector:** 22.730578512396693
+- **Total Rules:** 651
+- **Selectors Per Rule:** 1.8556067588325653
+- **Total Selectors:** 1208
+- **Identifiers Per Selector:** 3.439569536423841
+- **Specificity Per Selector:** 22.79635761589404
 - **Top Selector Specificity:** 61
 - **Top Selector Specificity Selector:** .edition2 pre[data-code-language="console"] .man-page .listingblock .go.content
 - **Total Id Selectors:** 0
-- **Total Identifiers:** 4192
-- **Total Declarations:** 1524
+- **Total Identifiers:** 4155
+- **Total Declarations:** 1522
 - **Total Unique Colors:** 106
-- **Total Important Keywords:** 34
+- **Total Important Keywords:** 33
