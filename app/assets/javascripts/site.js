@@ -28,33 +28,33 @@ $(document).ready(function() {
 
 var DownloadBox = {
   init: function() {
-    $('#gui-os-filter').addClass('visible');
+    $('.js-gui-os-filter').addClass('visible');
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $(".monitor").addClass("mac");
-      $("#download-link").text("Downloads for Mac").attr("href", "/download/mac");
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
-      $("#gui-os-filter").attr('data-os', 'mac');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
+      $(".js-download-link").text("Downloads for Mac").attr("href", "/download/mac");
+      $(".js-gui-link").removeClass('mac').addClass('gui');
+      $(".js-gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
+      $(".js-gui-os-filter").attr('data-os', 'mac');
+      $(".js-gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
       $(".monitor").addClass("windows");
-      $("#download-link").text("Downloads for Windows").attr("href", "/download/win");
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
-      $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
-      $("#gui-os-filter").attr('data-os', 'windows');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Windows)")
+      $(".js-download-link").text("Downloads for Windows").attr("href", "/download/win");
+      $(".js-gui-link").removeClass('mac').addClass('gui');
+      $(".js-gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
+      $(".js-alt-link").removeClass("windows").addClass("mac");
+      $(".js-alt-link").text("Mac Build").attr("href", "/download/mac");
+      $(".js-gui-os-filter").attr('data-os', 'windows');
+      $(".js-gui-os-filter").text("Only show GUIs for my OS (Windows)")
     } else if (os == "Linux") {
       $(".monitor").addClass("linux");
-      $("#download-link").text("Downloads for Linux").attr("href", "/download/linux");
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
-      $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
-      $("#gui-os-filter").attr('data-os', 'linux');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
+      $(".js-download-link").text("Downloads for Linux").attr("href", "/download/linux");
+      $(".js-gui-link").removeClass('mac').addClass('gui');
+      $(".js-gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
+      $(".js-alt-link").removeClass("windows").addClass("mac");
+      $(".js-alt-link").text("Mac Build").attr("href", "/download/mac");
+      $(".js-gui-os-filter").attr('data-os', 'linux');
+      $(".js-gui-os-filter").text("Only show GUIs for my OS (Linux)")
     } else {
     }
   }
@@ -68,7 +68,7 @@ var BrowserFallbacks = {
   initPlaceholders: function() {
     if (!Modernizr.input.placeholder) {
       $('input[placeholder], textarea[placeholder]').each(function(input) {
-        $(this).defaultValue($(this).attr('placeholder'), 'active', 'inactive');
+        $(this).defaultValue($(this).attr('placeholder'), 'input-active', 'input-inactive');
       });
     }
   }
@@ -87,22 +87,22 @@ var Search = {
   },
 
   observeFocus: function() {
-    $('form#search input').focus(function() {
-      $(this).parent('form#search').switchClass("", "focus", 200);
+    $('.js-search-text').focus(function() {
+      $('.js-search-form').switchClass("", "focus", 200);
     });
-    $('form#search input').blur(function() {
+    $('.js-search-text').blur(function() {
       Search.resetForm();
     });
   },
 
   observeTextEntry: function() {
-    $('form#search input').keyup(function(e) {
+    $('.js-search-text').keyup(function(e) {
       Search.runSearch();
     });
 
-    $('form#search input').keydown(function(e) {
-      if ($('#search-results').not(':visible') && e.which != 27) {
-        $('#search-results').fadeIn(0.2);
+    $('.js-search-text').keydown(function(e) {
+      if ($('.js-search-results').not(':visible') && e.which != 27) {
+        $('.js-search-results').fadeIn(0.2);
         Search.highlight(Search.selectedIndex);
       }
       switch(e.which) {
@@ -126,13 +126,13 @@ var Search = {
   },
 
   observeResultsClicks: function() {
-    $('#search-results').mousedown(function(e) {
+    $('.js-search-results').mousedown(function(e) {
       e.preventDefault();
     });
   },
 
   runSearch: function() {
-    var term = $('#search-text').val();
+    var term = $('.js-search-text').val();
     if(term.length < 2) { return false };
 
     if(!Search.searching) {
@@ -141,7 +141,7 @@ var Search = {
       if(term != Search.currentSearch) {
         Search.currentSearch = term;
         $.get("/search", {search: term}, function(results) {
-          $("#search-results").html(results);
+          $(".js-search-results").html(results);
           Search.searching = false;
         }, 'html');
       };
@@ -156,10 +156,10 @@ var Search = {
   },
 
   selectResultOption: function() {
-    var link = $('#search-results a')[Search.selectedIndex];
+    var link = $('.js-search-results a')[Search.selectedIndex];
     var url = $(link).attr('href');
     if(!link) {
-      var term = $('#search-text').val();
+      var term = $('.js-search-text').val();
       url = "/search/results?search=" + term;
     }
     window.location.href = url;
@@ -172,13 +172,13 @@ var Search = {
   },
 
   highlight: function(index) {
-    var links = $('#search-results a').removeClass('highlight');
+    var links = $('.js-search-results a').removeClass('highlight');
     $(links[index]).addClass('highlight');
   },
 
   resetForm: function() {
-    $('form#search').switchClass("focus", "", 200);
-    $('#search-results').fadeOut(0.2);
+    $('.js-search-form').switchClass("focus", "", 200);
+    $('.js-search-results').fadeOut(0.2);
     Search.selectedIndex = 0;
   }
 }
@@ -189,7 +189,7 @@ var Dropdowns = {
   },
 
   observeTriggers: function() {
-    $('.dropdown-trigger').click(function(e) {
+    $('.js-dropdown-trigger').click(function(e) {
       e.preventDefault();
       var panelId = $(this).attr('data-panel-id');
       if ($(this).hasClass('active')) {
@@ -223,7 +223,7 @@ var Downloads = {
   },
 
   observeGUIOSFilter: function() {
-    $('a#gui-os-filter').click(function(e) {
+    $('.js-gui-os-filter').click(function(e) {
       e.preventDefault();
       Downloads.userOS = $(this).attr('data-os');
       var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
@@ -231,17 +231,16 @@ var Downloads = {
         $('ul.gui-thumbnails li').switchClass("masked", "", 200);
         $(this).html('Only show GUIs for my OS ('+ capitalizedOS +')');
         $(this).removeClass('filtering');
-        $('#os-filter-count').hide();
+        $('.js-os-filter-count').hide();
       }
       else {
         $('ul.gui-thumbnails li').not("."+Downloads.userOS).switchClass("", "masked", 200);
         $(this).html('Show GUIs for all OSes');
         $(this).addClass('filtering');
         var osCount = $('ul.gui-thumbnails li' + '.' + Downloads.userOS).length;
-        $('#os-filter-count strong').html(osCount);
-        $('#os-filter-count .os').html(capitalizedOS);
-        $('#os-filter-count').show();
-      }
+        $('.js-os-filter-count strong').html(osCount);
+        $('.js-os-filter-count .os').html(capitalizedOS);
+        $('.js-os-filter-count').show(); }
     });
   }
 }
@@ -284,15 +283,15 @@ var AboutContent = {
 
   showSection: function(section) {
     if (section == 'about') section = AboutContent.defaultSection;
-    $('ol#about-nav a').removeClass('current');
-    $('ol#about-nav a#nav-' + section).addClass('current');
+    $('.js-about-nav a').removeClass('current');
+    $('.js-about-nav a#nav-' + section).addClass('current');
     $('section').hide(0, function(){
       $('section#' + section).show();
     });
   },
 
   observeNav: function() {
-    $('ol#about-nav a, .bottom-nav a').click(function(e) {
+    $('.js-about-nav a, .bottom-nav a').click(function(e) {
       e.preventDefault();
       var section = $(this).attr('data-section-id');
 
@@ -317,31 +316,31 @@ var FlippyBook = {
     // janky when using z-index
     if (Modernizr.webkit) {
       FlippyBook.threeDee = true;
-      $('#book-container').addClass('three-dee');
+      $('.js-book-container').addClass('three-dee');
     }
-    $('#about-book').addClass('visible');
+    $('.js-flippy-book-about-link').addClass('visible');
   },
 
   observeOpenCloseClicks: function() {
-    $('#book-cover-outside, #open-book').click(function(e) {
+    $('.js-flippy-book-cover-outside, .open-book-link').click(function(e) {
       e.preventDefault();
-      $('#book-cover').removeClass('close').addClass('open');
-      $('#book-intro').css('z-index', '');
+      $('.js-flippy-book-cover').removeClass('close').addClass('open');
+      $('.js-book-intro').css('z-index', '');
       if (!FlippyBook.threeDee) {
-        $('#book-cover-inside').show();
-        $('#book-inside-page').show();
+        $('.js-flippy-book-cover-inside').show();
+        $('.js-flippy-book-inside-page').show();
       }
     });
-    $('#about-book').click(function(e) {
+    $('.js-flippy-book-about-link').click(function(e) {
       e.preventDefault();
-      $('#book-cover').removeClass('open').addClass('close');
+      $('.js-flippy-book-cover').removeClass('open').addClass('close');
       if (FlippyBook.threeDee) {
-        var t = setTimeout ("$('#book-intro').css('z-index', 100)", 1000);
+        var t = setTimeout ("$('.js-book-intro').css('z-index', 100)", 1000);
       }
       else {
-        $('#book-cover-inside').hide();
-        $('#book-inside-page').hide();
-        $('#book-intro').css('z-index', 100);
+        $('.js-flippy-book-cover-inside').hide();
+        $('.js-flippy-book-inside-page').hide();
+        $('.js-book-intro').css('z-index', 100);
       }
     });
   }

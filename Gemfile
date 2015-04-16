@@ -20,7 +20,6 @@ gem 'unicorn'
 
 gem 'json'
 gem 'yajl-ruby'
-gem 'haml'
 gem 'netrc'
 gem 'launchy'
 gem 'rubyzip'
@@ -29,13 +28,13 @@ gem 'redcarpet'
 gem 'nokogiri'
 
 # Assets
-gem 'compass-rails'
 gem 'coffee-rails'
 gem 'jquery-rails'
 gem 'less-rails-bootstrap'
 gem 'sass-rails', '4.0.3'
 gem 'therubyracer'
 gem 'uglifier'
+gem 'autoprefixer-rails'
 
 group :development do
   gem "awesome_print"
@@ -50,6 +49,7 @@ group :development, :test do
   gem "sqlite3"
   gem 'byebug'
   gem 'ruby-prof'
+  gem 'scss-lint'
 end
 
 group :test do
