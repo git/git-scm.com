@@ -41,19 +41,25 @@ task :downloads => [:environment, :windows_downloads, :mac_downloads]
 
 task :windows_downloads => :environment do
   # find latest windows version
-  project = "msysgit"
-  win_downloads = file_downloads_from_github("msysgit/msysgit")
+  project = "git-for-windows"
+  win_downloads = file_downloads_from_github("git-for-windows/git")
   win_downloads.each do |url, date|
     name = url.split('/').last
-    if m = /^Git-(.*?)-(.*?)(\d{4})(\d{2})(\d{2})\.exe/.match(name)
-      version = m[1]
+    # Git for Windows uses the following naming system
+    # [Portable]Git-#.#.#.#[-dev-preview]-32/64-bit[.7z].exe
+    if m = /^(Portable|)Git-(\d+\.\d+\.\d+(?:\.\d+)?)-(?:.+-)*(32|64)-bit(?:\..*)?\.exe/.match(name)
+      portable = m[1]
+      version = m[2]
+      bitness = m[3]
+      puts portable
       puts version
+      puts bitness
       puts name
       puts url
       puts date
       puts
-      if v = Version.where(name: version).first
-        options = {version: v, url: url, filename: name, platform: 'windows', release_date: date}
+      if v = Version.where(name: version.slice(/^\d+\.\d+\.\d+/)).first
+        options = {version: v, url: url, filename: name, platform: 'windows' + bitness + portable, release_date: date}
         unless Download.exists?(options)
           d = Download.new(options)
           begin
