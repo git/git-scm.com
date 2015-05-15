@@ -4,7 +4,7 @@ source 'https://rubygems.org'
 gem 'rails', '4.2'
 gem 'rails_12factor', group: :production
 
-gem 'asciidoctor'
+gem 'asciidoctor', '>=1.5.0'
 gem 'dalli'
 gem 'exceptional'
 gem 'faraday'
