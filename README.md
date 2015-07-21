@@ -1,5 +1,5 @@
 # Git Homepage [![Build Status](https://travis-ci.org/git/git-scm.com.png?branch=master)](https://travis-ci.org/git/git-scm.com)
-
+I'm Evensmaxpierrelouis the CEO 
 This is the web application for the [git-scm.com](http://git-scm.com) site.  It is meant to be the
 first place a person new to Git will land and download or learn about the
 Git SCM system.
