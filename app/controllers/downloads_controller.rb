@@ -27,8 +27,8 @@ class DownloadsController < ApplicationController
     @platform = 'windows' if @platform == 'win'
     if @platform == 'windows' || @platform == 'mac'
       if @platform == 'windows'
-        @project_url  = "https://msysgit.github.io/"
-        @source_url   = "https://github.com/msysgit/git/"
+        @project_url  = "https://git-for-windows.github.io/"
+        @source_url   = "https://github.com/git-for-windows/git"
       else
         @project_url = "http://sourceforge.net/projects/git-osx-installer/"
         @source_url   = "https://github.com/git/git/"
