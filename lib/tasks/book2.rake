@@ -17,31 +17,48 @@ task :genbook2 => :environment do
       # Handle entries one by one
       max_chapter = 0
 
-      # go through all the files and order them properly
       chapters = {}
-      zip_file.glob("*.html").each do |entry|
-        if m = /(app|ch)(.*?).html/.match(entry.name)
-          puts entry.name
-          chapter_type = m[1]
-          chapter_number = m[2]
-          if chapter_type == 'app'
-            chapters["xapp#{chapter_number}"] = ['appendix', chapter_number.to_i, entry.name]
-          else
-            chapters["ch#{chapter_number}"] = ['chapter', chapter_number.to_i, entry.name]
-          end
+      appnumber = 0
+      chnumber = 0
+      ids = {}
+
+      toc = JSON.parse(zip_file.find_entry("build.json").get_input_stream.read)
+      navi = toc['navigations']['navigation']
+      navi.each_with_index do |chthing, index|
+        if chthing['type'] == 'appendix'
+          appnumber += 1
+          chapters["xapp#{index}"] = ['appendix', appnumber, chthing['href'], chthing['label']]
+        end
+        if chthing['type'] == 'chapter'
+          chnumber += 1
+          chapters["ch#{index}"] = ['chapter', chnumber, chthing['href'], chthing['label']]
+        end
+        chthing['children'].each do |child|
+          ids[child['id']] = child['label']
         end
       end
 
       # sort and create the numbers in order
       number = 0
-      chapters.sort.each_with_index do |data, index|
-        number = index + 1
-        chapter_type, chapter_number, file = data[1]
+      chapters.sort.each_with_index do |entry, index|
+        p entry
+        chapter_type, chapter_number, file, title = entry[1]
+        p file
         content = zip_file.find_entry(file).get_input_stream.read
 
         doc = Nokogiri::HTML(content)
         chapter =       doc.at("section[@data-type=#{chapter_type}]")
-        chapter_title = doc.at("section[@data-type=#{chapter_type}] > h1").text
+        chapter_title = title
+        
+        next if !chapter_title
+        next if !chapter_number
+
+        puts chapter_title
+        puts chapter_number
+        number = chapter_number
+        if chapter_type == 'appendix'
+          number = 100 + chapter_number
+        end
 
         id_xref = chapter.attribute('id').to_s
         pretext = "<a id=\"#{id_xref}\"></a>"
@@ -62,9 +79,8 @@ task :genbook2 => :environment do
 
         section = 1
         chapter.search("section[@data-type=sect1]").each do |sec|
-          section_title = sec.attribute('data-pdf-bookmark')
-
           id_xref = sec.attribute('id').to_s
+          section_title = ids[id_xref]
           pretext += "<a id=\"#{id_xref}\"></a>"
           html = pretext + sec.inner_html.to_s + nav
 
@@ -128,11 +144,11 @@ task :genbook2 => :environment do
           section += 1
           pretext = ""
         end # loop through sections
-        extra = schapter.sections.where("number >= #{section}")
-        extra.delete_all
+        #extra = schapter.sections.where("number >= #{section}")
+        #extra.delete_all
       end # if it's a chapter
-      extra = book.chapters.where("number > #{number}")
-      extra.delete_all
+      #extra = book.chapters.where("number > #{number}")
+      #extra.delete_all
     end
 
     book.processed = true
@@ -149,6 +165,7 @@ end
 
 def self.download(url)
   puts "downloading #{url}"
+  #return "/Users/schacon/github/progit/gitscm2/ugh/progit-en.661.zip" # for testing
   file = File.new("#{Rails.root}/tmp/download" + Time.now.to_i.to_s + Random.new.rand(100).to_s, 'wb')
   begin
     uri = URI.parse(url)
