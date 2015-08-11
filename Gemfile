@@ -32,9 +32,7 @@ gem 'nokogiri'
 gem 'compass-rails'
 gem 'coffee-rails'
 gem 'jquery-rails'
-gem 'less-rails-bootstrap'
 gem 'sass-rails', '4.0.3'
-gem 'therubyracer'
 gem 'uglifier'
 
 group :development do
