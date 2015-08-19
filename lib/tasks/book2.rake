@@ -23,7 +23,14 @@ task :genbook2 => :environment do
       ids = {}
 
       toc = JSON.parse(zip_file.find_entry("build.json").get_input_stream.read)
-      navi = toc['navigations']['navigation']
+
+      navi = nil
+      if toc['navigations']
+        navi = toc['navigations']['navigation']
+      elsif toc['navigation']
+        navi = toc['navigation']['navigation']
+      end 
+     
       navi.each_with_index do |chthing, index|
         if chthing['type'] == 'appendix'
           appnumber += 1
