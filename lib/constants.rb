@@ -87,3 +87,21 @@ REDIRECT = {
   "7_glossary"                             => "commands"
 }
 
+#BookController#section
+BOOKS = {
+  "en"  => {
+    "1-introduction"                         => "Getting-Started-About-Version-Control",
+    "1-git-basics"                           => "Git-Basics-Getting-a-Git-Repository",
+    "1-git-branching"                        => "Git-Branching-Branches-in-a-Nutshell",
+    "1-git-server"                           => "Git-on-the-Server-The-Protocols",
+    "1-distributed-git"                      => "Distributed-Git-Distributed-Workflows",
+    "1-github"                               => "GitHub-Account-Setup-and-Configuration",
+    "1-git-tools"                            => "Git-Tools-Revision-Selection",
+    "1-customizing-git"                      => "Customizing-Git-Git-Configuration",
+    "1-git-and-other-scms"                   => "Git-and-Other-Systems-Git-as-a-Client",
+    "1-git-internals"                        => "Git-Internals-Plumbing-and-Porcelain",
+    "1-git-other-environments"               => "Git-in-Other-Environments-Graphical-Interfaces",
+    "1-embedding-git"                        => "Embedding-Git-in-your-Applications-Command-line-Git",
+    "1-git-commands"                         => "Git-Commands-Setup-and-Config"
+  }
+}
