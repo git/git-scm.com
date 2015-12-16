@@ -56,7 +56,7 @@ class BooksController < ApplicationController
     end
 
     if @book.edition == 2
-      BOOKS[@book.code] and BOOKS[@book.code].each do |path, slug|
+      BOOKS[@book.code] && BOOKS[@book.code].each do |path, slug|
         @content.html = @content.html.gsub("#{path}/", "#{slug}#")
       end
     end
