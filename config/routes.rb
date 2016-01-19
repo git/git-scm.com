@@ -14,6 +14,10 @@ Gitscm::Application.routes.draw do
 #    get '*path' => 'site#redirect_combook'
 #  end
 
+  constraints(:host => 'libgit2.github.com') do
+    root :to => 'library#index'
+  end
+
   get "site/index"
 
   get "/doc" => "doc#index"
@@ -50,6 +54,13 @@ Gitscm::Application.routes.draw do
   get "/download/:platform"     => "downloads#download"
   get "/download/gui/:platform" => "downloads#gui"
 
+<<<<<<< HEAD
+=======
+  match "/download"               => "downloads#index"
+  match "/download/:platform"     => "downloads#download"
+  match "/download/gui/:platform" => "downloads#gui"
+
+>>>>>>> refs/remotes/origin/library
   resources :downloads, :only => [:index] do
     collection do
       get "/guis"       => "downloads#guis"
@@ -87,6 +98,7 @@ Gitscm::Application.routes.draw do
   get "/search/results" => "site#search_results"
 
   # mapping for jasons mocks
+<<<<<<< HEAD
   get "/documentation" => "doc#index"
   get "/documentation/reference" => "doc#ref"
   get "/documentation/reference/:file.html" => "doc#man"
@@ -99,6 +111,22 @@ Gitscm::Application.routes.draw do
   get "/trademark" => "site#trademark"
 
   get "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
+=======
+  match "/documentation" => "doc#index"
+  match "/documentation/reference" => "doc#ref"
+  match "/documentation/reference/:file.html" => "doc#man"
+  match "/documentation/book" => "doc#book"
+  match "/documentation/videos" => "doc#videos"
+  match "/documentation/external-links" => "doc#ext"
+
+  get "/library" => "library#index"
+  get "/library/api/(:version)" => "library#api", :version => /(HEAD|v\d+\.\d+\.\d+)/, :defaults => {:version => 'HEAD'} 
+  get "/library/api/:version/f/:fname" => "library#function", :version => /(HEAD|v\d+\.\d+\.\d+)/
+  get "/library/api/:version/g/:gname" => "library#group", :version => /(HEAD|v\d+\.\d+\.\d+)/
+
+  match "/course/svn" => "site#svn"
+  match "/sfc" => "site#sfc"
+>>>>>>> refs/remotes/origin/library
 
   root :to => 'site#index'
 end

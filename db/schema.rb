@@ -76,8 +76,13 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.string   "filename",     limit: 255
     t.string   "platform",     limit: 255
     t.integer  "version_id"
+<<<<<<< HEAD
     t.datetime "created_at"
     t.datetime "updated_at"
+=======
+    t.datetime "created_at",   :null => false
+    t.datetime "updated_at",   :null => false
+>>>>>>> refs/remotes/origin/library
     t.datetime "release_date"
   end
 

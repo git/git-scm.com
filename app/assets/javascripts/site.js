@@ -12,6 +12,7 @@ $(document).ready(function() {
   DownloadBox.init();
   AboutContent.init();
   FlippyBook.init();
+  LibraryFunctions.init();
 
   var _gauges = _gauges || [];
   (function() {
@@ -347,3 +348,37 @@ var FlippyBook = {
   }
 }
 
+var LibraryFunctions = {
+
+  init: function() {
+    LibraryFunctions.observeFunctionTypeToggle();
+    LibraryFunctions.observeVersionSelector();
+  },
+
+  observeFunctionTypeToggle: function() {
+    $('#function-library-toggle').click(function(e) {
+      e.preventDefault();
+      if ($(this).html() === "Show all of the functions") {
+        $('ul.library-functions li a').not('.important').fadeIn();
+        $(this).html('Show the most common functions');
+      }
+      else {
+        $('ul.library-functions li a').not('.important').fadeOut();
+        $(this).html('Show all of the functions');
+      }
+    });
+  },
+
+  observeVersionSelector: function() {
+    $('#version-selector').change(function(e) {
+      e.preventDefault();
+      var url = $(location).attr('href');
+      if (url.match(/(v\d+\.\d+\.\d+|HEAD)/) === null) {
+        window.location += $(this).val();
+      } else {
+        window.location = url.replace(RegExp.$1, $(this).val());
+      }
+    });
+
+  }
+}

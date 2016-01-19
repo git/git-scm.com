@@ -26,7 +26,26 @@ gem 'launchy'
 gem 'rubyzip'
 gem 'diff-lcs'
 gem 'redcarpet'
+<<<<<<< HEAD
 gem 'nokogiri'
+=======
+gem 'nestful'
+gem "awesome_print"
+gem 'newrelic_rpm'
+gem 'exceptional'
+gem 'tire'
+gem 'bson_ext'
+gem 'mongo'
+
+# Gems used only for assets and not required
+# in production environments by default.
+group :assets do
+  gem 'sass-rails'
+  gem 'compass-rails'
+  gem 'coffee-rails', '~> 3.2.1'
+  gem 'uglifier', '>= 1.0.3'
+end
+>>>>>>> refs/remotes/origin/library
 
 # Assets
 gem 'compass-rails'
