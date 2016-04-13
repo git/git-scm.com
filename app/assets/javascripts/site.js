@@ -12,6 +12,10 @@ $(document).ready(function() {
   DownloadBox.init();
   AboutContent.init();
   FlippyBook.init();
+  
+  $('pre').each(function(i, e) { 
+    e.innerText = e.innerText.replace(/&lt;/g,'<');
+  });
 
   var _gauges = _gauges || [];
   (function() {
