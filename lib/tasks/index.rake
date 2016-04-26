@@ -60,6 +60,15 @@ task :preindex => :environment do
     doc_limit = ENV['ONLY_BUILD_DOC']
     doc_files = doc_files.select { |df| df.path =~ /#{doc_limit}/ } if doc_limit
 
+    def expand!(content, tag_files, blob_content)
+      content.gsub!(/include::(\S+)\.txt/) do |line|
+        line.gsub!("include::","")
+        category_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
+        if category_file
+          expand!(blob_content[category_file.sha], tag_files, blob_content)
+        end
+      end
+    end
     doc_files.each do |entry|
       path = File.basename( entry.path, '.txt' )
       file = DocFile.where(:name => path).first_or_create
@@ -67,13 +76,7 @@ task :preindex => :environment do
       puts "   build: #{path}"
 
       content = blob_content[entry.sha]
-      content.gsub!(/include::(\S+)\.txt/) do |line|
-        line.gsub!("include::","")
-        category_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
-        if category_file
-          blob_content[category_file.sha]
-        end
-      end
+      expand!(content, tag_files, blob_content)
       asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir)
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
