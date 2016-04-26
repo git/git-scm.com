@@ -118,7 +118,7 @@ in the meantime, we can just re-merge it.
 
 So, I hope that's helpful.  This can be particularly useful if you have a merge-heavy
 development process.  In fact, if you work mostly in topic branches before
-merging for intergration purposes, you may want to use the `git merge --no-ff`
+merging for integration purposes, you may want to use the `git merge --no-ff`
 option so that the first merge is not a fast forward and can be reverted out
 in this manner.
 
