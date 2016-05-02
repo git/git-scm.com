@@ -68,6 +68,7 @@ task :preindex => :environment do
           expand!(blob_content[category_file.sha], tag_files, blob_content)
         end
       end
+      return content
     end
     doc_files.each do |entry|
       path = File.basename( entry.path, '.txt' )
