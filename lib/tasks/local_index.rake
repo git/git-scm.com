@@ -53,6 +53,15 @@ task :local_index => :environment do
       puts "Found #{tree.size} entries"
       doc_limit = ENV['ONLY_BUILD_DOC']
 
+      def expand!(content, tag)
+        content.gsub!(/include::(\S+)\.txt/) do |line|
+          line.gsub!("include::", "")
+          new_content = `git cat-file blob #{tag}:Documentation/#{line}`
+          expand!(new_content,tag)
+        end
+        return content
+      end
+
       tree.each do |entry|
         path, sha, type = entry
         path = path.gsub('.txt', '')
@@ -62,10 +71,8 @@ task :local_index => :environment do
         puts "   build: #{path}"
 
         content = `git cat-file blob #{sha}`.chomp
-        content.gsub!(/include::(\S+)\.txt/) do |line|
-          line.gsub!("include::", "")
-          `git cat-file blob #{tag}:Documentation/#{line}`
-        end
+        expand!(content, tag)
+
         asciidoc = Asciidoctor::Document.new(content, templates_dir: template_dir)
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
