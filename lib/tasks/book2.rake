@@ -112,6 +112,9 @@ task :genbook2 => :environment do
             end
           end
 
+          html.gsub!("&amp;gt;", "&gt;")
+          html.gsub!("&amp;lt;", "&lt;")
+
           if subsec = html.scan(/<h3>(.*?)<\/h3>/)
             subsec.each do |sub|
               sub = sub.first
