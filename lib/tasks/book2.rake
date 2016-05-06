@@ -69,7 +69,7 @@ task :genbook2 => :environment do
 
         id_xref = chapter.attribute('id').to_s
         pretext = "<a id=\"#{id_xref}\"></a>"
-        pretext += doc.at("section[@data-type=#{chapter_type}] > p").to_html
+        pretext += doc.search("section[@data-type=#{chapter_type}] > p").to_html
 
         schapter = book.chapters.where(:number => number).first_or_create
         schapter.title = chapter_title.to_s
