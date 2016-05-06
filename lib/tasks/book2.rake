@@ -113,6 +113,7 @@ task :genbook2 => :environment do
           end
 
           html.gsub!(%r{&amp;([gl]t);}, '&\1;')
+          html.gsub!(%r{&amp;</code>(<code class="n">)?([gl]t)(</code>)?<code class=".">;}, '&\2;')
 
           if subsec = html.scan(/<h3>(.*?)<\/h3>/)
             subsec.each do |sub|
