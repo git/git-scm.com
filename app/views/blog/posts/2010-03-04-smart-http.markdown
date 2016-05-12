@@ -37,13 +37,13 @@ the server from bare Git repositories, since it knows the layout of the repo.
 This functionality is documented fairly completely in <a href="http://progit.org/book/ch9-6.html">Chapter 9</a>.
 Conversations over this protocol used to look like this:
 
-	$ git clone http://github.com/schacon/simplegit-progit.git
+	$ git clone https://github.com/schacon/simplegit-progit.git
 	Initialized empty Git repository in /private/tmp/simplegit-progit/.git/
 	got ca82a6dff817ec66f44342007202690a93763949
 	walk ca82a6dff817ec66f44342007202690a93763949
 	got 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
-	Getting alternates list for http://github.com/schacon/simplegit-progit.git
-	Getting pack list for http://github.com/schacon/simplegit-progit.git
+	Getting alternates list for https://github.com/schacon/simplegit-progit.git
+	Getting pack list for https://github.com/schacon/simplegit-progit.git
 	Getting index for pack 816a9b2334da9953e530f27bcac22082a9f5b835
 	Getting pack 816a9b2334da9953e530f27bcac22082a9f5b835
 	 which contains cfda3bf379e4f8dba8717dee55aab78aef7f4daf
@@ -127,7 +127,7 @@ the dumb fallback reads, if you're interested.
 <h2>Rack-based Git Server</h2>
 
 If you're not a fan of Apache or you're running some other web server, you may
-want to take a look at an app that I wrote called <a href="http://github.com/schacon/grack">Grack</a>, which
+want to take a look at an app that I wrote called <a href="https://github.com/schacon/grack">Grack</a>, which
 is a <a href="http://rack.rubyforge.org/">Rack</a>-based application for Smart-HTTP Git.
 <a href="http://rack.rubyforge.org/">Rack</a> is a generic webserver interface
 for Ruby (similar to WSGI for Python) that has adapters for a ton of web servers.
@@ -142,7 +142,7 @@ and JRuby, you can generate a WAR file that is deployable in any Java web
 application server (Tomcat, Glassfish, Websphere, JBoss, etc).
 
 So, if you don't use Apache and you are interested in a Smart-HTTP Git server,
-you may want to check out Grack.  At <a href="http://github.com">GitHub</a>, this
+you may want to check out Grack.  At <a href="https://github.com">GitHub</a>, this
 is the adapter we're using to eventually implement Smart-HTTP support for all
 the GitHub repositories. (It's currently a tad bit behind, but I'll be starting
 up on it again soon as I get it into production at GitHub - send pull requests if you

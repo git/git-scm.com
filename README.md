@@ -10,7 +10,7 @@ This app is written in Ruby on Rails and deployed on Heroku.
 
 You'll need a Ruby environment to run Rails.  First do:
 
-    $ rvm use 2.1.2
+    $ rvm use 2.1.8
     $ bundle install
 
 Then you need to create the database structure:

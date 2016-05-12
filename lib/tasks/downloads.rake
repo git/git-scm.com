@@ -5,7 +5,7 @@ require 'rss'
 # [OvD] note that Google uses Atom & Sourceforge uses RSS
 # however this isn't relevant when parsing the feeds for
 # name, version, url & date with Feedzirra
-SOURCEFORGE_URL = "http://sourceforge.net/api/file/index/project-id/2063428/mtime/desc/limit/20/rss"
+SOURCEFORGE_URL = "https://sourceforge.net/projects/git-osx-installer/rss?limit=20"
 
 def file_downloads(repository)
   downloads = []

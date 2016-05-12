@@ -69,7 +69,7 @@ task :genbook2 => :environment do
 
         id_xref = chapter.attribute('id').to_s
         pretext = "<a id=\"#{id_xref}\"></a>"
-        pretext += doc.at("section[@data-type=#{chapter_type}] > p").to_html
+        pretext += doc.search("section[@data-type=#{chapter_type}] > p").to_html
 
         schapter = book.chapters.where(:number => number).first_or_create
         schapter.title = chapter_title.to_s
@@ -111,6 +111,9 @@ task :genbook2 => :environment do
               html.gsub!(/href=\"\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
             end
           end
+
+          html.gsub!(%r{&amp;(gt|lt|amp);}, '&\1;')
+          html.gsub!(%r{&amp;</code>(<code class="n">)?(gt|lt|amp)(</code>)?<code class=".">;}, '&\2;')
 
           if subsec = html.scan(/<h3>(.*?)<\/h3>/)
             subsec.each do |sub|
