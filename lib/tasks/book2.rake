@@ -98,10 +98,10 @@ task :genbook2 => :environment do
           html.gsub!('<h1', '<h2')
           html.gsub!(/\/h1>/, '/h2>')
 
-          if xlink = html.scan(/\.html\#(.*?)\"/)
+          if xlink = html.scan(/href=\"1-.*?\.html\#(.*?)\"/)
             xlink.each do |link|
               xref = link.first
-              html.gsub!(/\.html\##{xref}\"/, "/#{xref}\"") rescue nil
+              html.gsub!(/href=\"1-.*?\.html\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
             end
           end
 
@@ -142,7 +142,7 @@ task :genbook2 => :environment do
           xref.save
 
           # record all the xrefs
-          sec.search("section[@id]").each do |id|
+          (sec.search("section[@id]")+sec.search("figure[@id]")).each do |id|
             id_xref = id.attribute('id').to_s
             if id_xref[0,3] != 'idp'
               xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
