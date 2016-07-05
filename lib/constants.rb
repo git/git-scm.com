@@ -5,6 +5,7 @@ TAGLINES = %w{
     distributed-even-if-your-workflow-isnt
     local-branching-on-the-cheap
     distributed-is-the-new-centralized
+    import-from-other-vcs
 }
 
 # DocsController#commands
