@@ -4,7 +4,7 @@ ruby "2.1.8"
 gem 'rails', '4.2.6'
 gem 'rails_12factor', group: :production
 
-gem 'asciidoctor', '>=1.5.0'
+gem 'asciidoctor', '>=1.5.4'
 gem 'dalli'
 gem 'exceptional'
 gem 'faraday'
