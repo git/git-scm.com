@@ -83,6 +83,12 @@ task :local_index => :environment do
             x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
             line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
           end
+          #HTML anchor on hdlist1 (i.e. command options)
+          html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
+            text = $1.tr('^A-Za-z0-9-', '')
+            anchor = "#{path}-#{text}"
+            "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a href=\"##{anchor}\">#{$1}</a> </dt>"
+          end
           doc.plain = asciidoc.source
           doc.html  = html
           doc.save
