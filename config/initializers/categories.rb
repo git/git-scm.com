@@ -27,6 +27,9 @@ module Gitscm
       ['git-cat-file', 'git-commit-tree', 'git-count-objects', 'git-diff-index',
        'git-diff-tree', 'git-hash-object', 'git-merge-base', 'git-read-tree',
        'git-rev-list', '']
+    ],['Guides',
+      ['git-attributes', 'git-everyday', 'git-glossary', 'git-ignore',
+       'git-modules', 'git-revisions', 'git-tutorial', 'git-workflows']
     ]
   ]
 end
