@@ -9,18 +9,18 @@ class SiteControllerTest < ActionController::TestCase
 
   test "whygitisbetterthanx.com should redirect to about page" do
     get :redirect_wgibtx
-    assert_redirected_to "http://git-scm.com/about"
+    assert_redirected_to "https://git-scm.com/about"
   end
 
   test "should redirect to the book page" do
     get :redirect_book
-    assert_redirected_to "http://git-scm.com/book"
+    assert_redirected_to "https://git-scm.com/book"
   end
 
   test "should redirect to any book page" do
     @request.env['PATH_INFO'] = "/en/Git-Tools-Submodules"
     get :redirect_book
-    assert_redirected_to "http://git-scm.com/en/Git-Tools-Submodules"
+    assert_redirected_to "https://git-scm.com/en/Git-Tools-Submodules"
   end
 
   test "should get search page" do

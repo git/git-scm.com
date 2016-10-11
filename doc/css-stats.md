@@ -1,4 +1,4 @@
-# [git-scm]( http://git-scm.com )
+# [git-scm]( https://git-scm.com )
 
 **Version:** `1.0.0`
 
