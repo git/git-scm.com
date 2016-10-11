@@ -33,7 +33,7 @@ def file_downloads_from_github(repository)
 end
 
 def sourceforge_url(project, filename)
-  "http://sourceforge.net/projects/#{project}/files/#{filename}/download?use_mirror=autoselect"
+  "https://sourceforge.net/projects/#{project}/files/#{filename}/download?use_mirror=autoselect"
 end
 
 # find newest mac and windows binary downloads

@@ -26,7 +26,7 @@ class DownloadsController < ApplicationController
     @platform = params[:platform]
     @platform = 'windows' if @platform == 'win'
     if @platform == 'mac'
-      @project_url = "http://sourceforge.net/projects/git-osx-installer/"
+      @project_url = "https://sourceforge.net/projects/git-osx-installer/"
       @source_url   = "https://github.com/git/git/"
 
       @download = Download.latest_for(@platform)

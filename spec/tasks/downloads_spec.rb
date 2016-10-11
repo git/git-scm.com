@@ -30,7 +30,7 @@ describe 'downloads.rake' do
 
       it "should have matching items" do
         rss = RSS::Parser.parse(download_rss)
-        rss.items.first.link.should == "http://sourceforge.net/projects/git-osx-installer/files/git-1.9.0-intel-universal-snow-leopard.dmg/download"
+        rss.items.first.link.should == "https://sourceforge.net/projects/git-osx-installer/files/git-1.9.0-intel-universal-snow-leopard.dmg/download"
         rss.items.first.pubDate.should == "Wed, 23 Apr 2014 15:00:54 +0000"
       end
 
@@ -46,7 +46,7 @@ describe 'downloads.rake' do
 
       it "has link" do
         rake_task_invoke "downloads"
-        Download.first.url.should == "http://sourceforge.net/projects/git-osx-installer/files/git-1.9.0-intel-universal-snow-leopard.dmg/download"
+        Download.first.url.should == "https://sourceforge.net/projects/git-osx-installer/files/git-1.9.0-intel-universal-snow-leopard.dmg/download"
       end
 
       it "has published date" do
