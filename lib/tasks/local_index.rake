@@ -73,7 +73,7 @@ task :local_index => :environment do
         content = `git cat-file blob #{sha}`.chomp
         expand!(content, tag)
 
-        asciidoc = Asciidoctor::Document.new(content, templates_dir: template_dir)
+        asciidoc = Asciidoctor::Document.new(content, templates_dir: template_dir, attributes: {'sectanchors' => ''})
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
         doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
