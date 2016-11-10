@@ -78,7 +78,7 @@ task :preindex => :environment do
 
       content = blob_content[entry.sha]
       expand!(content, tag_files, blob_content)
-      asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir)
+      asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: {'sectanchors' => ''})
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
@@ -88,7 +88,7 @@ task :preindex => :environment do
           line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
         end
         doc.plain = asciidoc.source
-        doc.html  = html 
+        doc.html  = html
         doc.save
       end
       dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create
@@ -99,4 +99,3 @@ task :preindex => :environment do
   end
   Rails.cache.write("latest-version", Version.latest_version.name)
 end
-
