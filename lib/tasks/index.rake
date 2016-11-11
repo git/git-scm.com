@@ -9,7 +9,6 @@ task :preindex => :environment do
 
   @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
 
-  template_dir = File.join(Rails.root, 'templates')
   repo = ENV['GIT_REPO'] || 'gitster/git'
   rebuild = ENV['REBUILD_DOC']
   rerun = ENV['RERUN'] || false
@@ -78,7 +77,7 @@ task :preindex => :environment do
 
       content = blob_content[entry.sha]
       expand!(content, tag_files, blob_content)
-      asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: {'sectanchors' => ''})
+      asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html

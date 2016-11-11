@@ -2,7 +2,6 @@ require 'asciidoctor'
 
 # fill in the db from a local git clone
 task :local_index => :environment do
-  template_dir = File.join(Rails.root, 'templates')
   dir     = ENV["GIT_REPO"]
   rebuild = ENV['REBUILD_DOC']
   rerun   = ENV['RERUN'] || false
@@ -73,7 +72,7 @@ task :local_index => :environment do
         content = `git cat-file blob #{sha}`.chomp
         expand!(content, tag)
 
-        asciidoc = Asciidoctor::Document.new(content, templates_dir: template_dir, attributes: {'sectanchors' => ''})
+        asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
         doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
