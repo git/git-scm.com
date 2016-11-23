@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Pro Git CliffNotes
+author:
 ---
 
 Jason Meridth has gone through the whole Pro Git book and compiled a list of notes of some

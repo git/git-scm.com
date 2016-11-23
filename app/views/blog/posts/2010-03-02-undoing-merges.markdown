@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Undoing Merges
+author:
 ---
 
 I would like to start writing more here about general Git tips, tricks and
