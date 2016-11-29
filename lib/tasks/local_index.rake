@@ -86,7 +86,7 @@ task :local_index => :environment do
           html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
             text = $1.tr('^A-Za-z0-9-', '')
             anchor = "#{path}-#{text}"
-            "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a href=\"##{anchor}\">#{$1}</a> </dt>"
+            "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
           end
           doc.plain = asciidoc.source
           doc.html  = html
