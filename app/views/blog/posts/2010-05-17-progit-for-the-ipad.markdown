@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Pro Git on your iPad
+author:
 ---
 
 The awesome guys at <a href="http://mediatemple.net/">Media Temple</a> have converted

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Smart HTTP Transport
+author:
 ---
 
 When I was done writing Pro Git, the only transfer protocols that existed were

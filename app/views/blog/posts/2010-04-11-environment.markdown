@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Git Loves the Environment
+author:
 ---
 
 One of the things that people that come from the Subversion world tend

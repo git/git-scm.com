@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Welcome to the Pro Git website
+author:
 ---
 
 This is the first post on the Pro Git book website, which contains the
