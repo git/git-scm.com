@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Translate This
+author:
 ---
 
 One of the things I love about Git is how easy it is to fork and contribute.
