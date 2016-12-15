@@ -9,7 +9,6 @@ task :preindex => :environment do
 
   @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
 
-  template_dir = File.join(Rails.root, 'templates')
   repo = ENV['GIT_REPO'] || 'gitster/git'
   rebuild = ENV['REBUILD_DOC']
   rerun = ENV['RERUN'] || false
@@ -78,7 +77,7 @@ task :preindex => :environment do
 
       content = blob_content[entry.sha]
       expand!(content, tag_files, blob_content)
-      asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir)
+      asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
@@ -87,8 +86,14 @@ task :preindex => :environment do
           x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
           line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
         end
+        #HTML anchor on hdlist1 (i.e. command options)
+        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
+          text = $1.tr('^A-Za-z0-9-', '')
+          anchor = "#{path}-#{text}"
+          "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
+        end
         doc.plain = asciidoc.source
-        doc.html  = html 
+        doc.html  = html
         doc.save
       end
       dv = DocVersion.where(:version_id => stag.id, :doc_file_id => file.id).first_or_create
@@ -99,4 +104,3 @@ task :preindex => :environment do
   end
   Rails.cache.write("latest-version", Version.latest_version.name)
 end
-
