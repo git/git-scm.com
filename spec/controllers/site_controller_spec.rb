@@ -26,7 +26,7 @@ describe SiteController do
 
   it "GET redirect_wgibtx" do
     get :redirect_wgibtx
-    expect(response).to redirect_to("http://git-scm.com/about")
+    expect(response).to redirect_to("https://git-scm.com/about")
   end
 
   describe "GET /book" do
@@ -34,12 +34,12 @@ describe SiteController do
     it "get /git-doc" do
       request.env["PATH_INFO"] = "/git-doc"
       get :redirect_book
-      expect(response).to redirect_to("http://git-scm.com/git-doc")
+      expect(response).to redirect_to("https://git-scm.com/docs")
     end
 
     it "get /" do
       get :redirect_book
-      expect(response).to redirect_to("http://git-scm.com/book")
+      expect(response).to redirect_to("https://git-scm.com/book")
     end
 
   end

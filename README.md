@@ -1,6 +1,6 @@
 # Git Homepage [![Build Status](https://travis-ci.org/git/git-scm.com.svg?branch=master)](https://travis-ci.org/git/git-scm.com)
 
-This is the web application for the [git-scm.com](http://git-scm.com) site.  It is meant to be the
+This is the web application for the [git-scm.com](https://git-scm.com) site.  It is meant to be the
 first place a person new to Git will land and download or learn about the
 Git SCM system.
 
@@ -72,4 +72,4 @@ The source code for the site is licensed under the MIT license, which you can fi
 the MIT-LICENSE.txt file.
 
 All graphical assets are licensed under the
-[Creative Commons Attribution 3.0 Unported License](http://creativecommons.org/licenses/by/3.0/).
+[Creative Commons Attribution 3.0 Unported License](https://creativecommons.org/licenses/by/3.0/).

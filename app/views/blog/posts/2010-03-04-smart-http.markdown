@@ -89,7 +89,7 @@ rather than just dumbly pushing out data.
 
 So, Smart-HTTP is basically just enabling the new CGI script that is provided
 with Git called
-<a href="http://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html">`git-http-backend`</a>
+<a href="https://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html">`git-http-backend`</a>
 on the server.  This CGI will read the path and
 headers sent by the revamped `git fetch` and `git push` binaries who have
 learned to communicate in a specific way with a smart server.  If the CGI sees
@@ -98,7 +98,7 @@ simply fall back to the dumb behavior (so it is backward compatible for reads
 with older clients).
 
 To set it up, it's best to walk through the instructions on the
-<a href="http://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html">`git-http-backend`</a>
+<a href="https://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html">`git-http-backend`</a>
 documentation page.  Basically, you have to install Git v1.6.6 or higher on
 a server with an Apache 2.x webserver (it has to be Apache, currently - other
 CGI servers don't work, last I checked).  Then you add something similar to this
@@ -121,7 +121,7 @@ block like this:
 That is all that is really required to get this running.  Now you have a smart
 http-based Git server that can do anonymous reads and authenticated writes with
 clients that have upgraded to 1.6.6 and above.
-How awesome is that?  The <a href="http://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html">documentation</a>
+How awesome is that?  The <a href="https://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html">documentation</a>
 goes over more complex examples, like making it work with GitWeb and accelerating
 the dumb fallback reads, if you're interested.
 

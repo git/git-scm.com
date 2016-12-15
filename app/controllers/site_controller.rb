@@ -55,15 +55,15 @@ class SiteController < ApplicationController
   end
 
   def redirect_wgibtx
-    redirect_to "http://git-scm.com/about"
+    redirect_to "https://git-scm.com/about"
   end
 
   def redirect_book
     current_uri = request.env['PATH_INFO']
     if current_uri == '/'
-      redirect_to "http://git-scm.com/book"
+      redirect_to "https://git-scm.com/book"
     else
-      redirect_to "http://git-scm.com#{current_uri}"
+      redirect_to "https://git-scm.com#{current_uri}"
     end
   end
 
