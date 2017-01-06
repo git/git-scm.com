@@ -52,11 +52,31 @@ task :local_index => :environment do
       puts "Found #{tree.size} entries"
       doc_limit = ENV['ONLY_BUILD_DOC']
 
-      def expand!(content, tag)
+      # generate command-list content
+      categories = {}
+      if system("git cat-file -e #{tag}:command-list.txt > /dev/null 2>&1")
+        cmd_list = `git cat-file blob #{tag}:command-list.txt`.match(/(### command list.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
+          name, kind, attr = cmd.split(/\s+/)
+          list[kind] ||= []
+          list[kind] << [name, attr]
+          list
+        end
+
+        categories = cmd_list.keys.inject({}) do |list, category|
+          links = cmd_list[category].map do |cmd, attr|
+            if match = `git cat-file blob #{tag}:Documentation/#{cmd}.txt`.match(/NAME\n----\n\S+ - (.*)$/)
+              "linkgit:#{cmd}[1]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
+            end
+          end
+          list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
+        end
+      end
+
+      def expand!(content, tag, categories)
         content.gsub!(/include::(\S+)\.txt/) do |line|
           line.gsub!("include::", "")
-          new_content = `git cat-file blob #{tag}:Documentation/#{line}`
-          expand!(new_content,tag)
+          new_content = categories[line] || `git cat-file blob #{tag}:Documentation/#{line}`
+          expand!(new_content, tag, categories)
         end
         return content
       end
@@ -70,7 +90,7 @@ task :local_index => :environment do
         puts "   build: #{path}"
 
         content = `git cat-file blob #{sha}`.chomp
-        expand!(content, tag)
+        expand!(content, tag, categories)
 
         asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
