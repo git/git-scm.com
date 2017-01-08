@@ -59,16 +59,40 @@ task :preindex => :environment do
     doc_limit = ENV['ONLY_BUILD_DOC']
     doc_files = doc_files.select { |df| df.path =~ /#{doc_limit}/ } if doc_limit
 
-    def expand!(content, tag_files, blob_content)
+    # generate command-list content
+    categories = {}
+    if cmd_list_file = tag_files.detect { |ent| ent.path == "command-list.txt" }
+      cmd_list = blob_content[cmd_list_file.sha].match(/(### command list.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
+        name, kind, attr = cmd.split(/\s+/)
+        list[kind] ||= []
+        list[kind] << [name, attr]
+        list
+      end
+
+      categories = cmd_list.keys.inject({}) do |list, category|
+        links = cmd_list[category].map do |cmd, attr|
+          if cmd_file = tag_files.detect { |ent| ent.path == "Documentation/#{cmd}.txt" }
+            if match = blob_content[cmd_file.sha].match(/NAME\n----\n\S+ - (.*)$/)
+              "linkgit:#{cmd}[1]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
+            end
+          end
+        end
+        list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
+      end
+    end
+
+    def expand!(content, tag_files, blob_content, categories)
       content.gsub!(/include::(\S+)\.txt/) do |line|
         line.gsub!("include::","")
-        category_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
-        if category_file
-          expand!(blob_content[category_file.sha], tag_files, blob_content)
+        content_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
+        new_content = categories[line] || blob_content[content_file.sha]
+        if new_content
+          expand!(new_content, tag_files, blob_content, categories)
         end
       end
       return content
     end
+
     doc_files.each do |entry|
       path = File.basename( entry.path, '.txt' )
       file = DocFile.where(:name => path).first_or_create
@@ -76,7 +100,7 @@ task :preindex => :environment do
       puts "   build: #{path}"
 
       content = blob_content[entry.sha]
-      expand!(content, tag_files, blob_content)
+      expand!(content, tag_files, blob_content, categories)
       asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
