@@ -1,7 +1,7 @@
 module DocHelper
 
-  def man(name)
-    link_to name.gsub(/^git-/, ''), doc_file_path(:file => name)
+  def man(name, text = nil)
+    link_to text || name.gsub(/^git-/, ''), doc_file_path(:file => name)
   end
 
   def linkify(content, section)
