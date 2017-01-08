@@ -84,8 +84,15 @@ task :preindex => :environment do
     def expand!(content, tag_files, blob_content, categories)
       content.gsub!(/include::(\S+)\.txt/) do |line|
         line.gsub!("include::","")
-        content_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
-        new_content = categories[line] || blob_content[content_file.sha]
+        if categories[line]
+          new_content = categories[line]
+        else
+          content_file = tag_files.detect { |ent| ent.path == "Documentation/#{line}" }
+          if content_file
+              new_content = blob_content[content_file.sha]
+          end
+        end
+
         if new_content
           expand!(new_content, tag_files, blob_content, categories)
         end
