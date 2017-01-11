@@ -33,7 +33,7 @@ class BooksController < ApplicationController
     link = params[:link]
     @book = Book.where(:code => params[:lang], :edition => params[:edition]).first
     xref = @book.xrefs.where(:name => link).first
-    return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{xref.section.slug}##{xref.name}" unless @content
+    return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{ERB::Util.url_encode(xref.section.slug)}##{xref.name}" unless @content
   end
 
   def section
