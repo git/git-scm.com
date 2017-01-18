@@ -1,5 +1,195 @@
 require 'zip'
 require 'nokogiri'
+require 'octokit'
+require 'pathname'
+
+def expand(content, path, &get_content)
+  content.gsub(/include::(\S+)\[\]/) do |line|
+    if File.dirname(path)=="."
+      new_fname = $1
+    else
+      new_fname = (Pathname.new(path).dirname + Pathname.new($1)).cleanpath.to_s
+    end
+    new_content = get_content.call(new_fname)
+    if new_content
+      expand(new_content.gsub("\xEF\xBB\xBF".force_encoding("UTF-8"), ''), new_fname) {|c| get_content.call (c)}
+    else
+      puts "#{new_fname} could not be resolved for expansion"
+      ""
+    end
+  end
+end
+
+def repo_name(lang)
+  if lang == "en"
+    'progit/progit2'
+  else
+    'progit/progit2-'+ lang
+  end
+end
+
+desc "Generate book html directly from git repo"
+task :remote_genbook2 => :environment do
+  template_dir = File.join(Rails.root, 'templates')
+
+  nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
+  @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
+
+  if ENV['GENLANG']
+    books = Book.where(:edition => 2, :code => ENV['GENLANG'])
+  else
+    all_books = Book.where(:edition => 2)
+    books = all_books.select do |book|
+      repo_head = @octokit.ref(repo_name(book.code), "heads/master").object[:sha]
+      repo_head != book.ebook_html
+    end
+  end
+
+  books.each do |book|
+    repo = repo_name(book.code)
+    blob_content = Hash.new do |blobs, sha|
+      content = Base64.decode64( @octokit.blob(repo, sha, :encoding => 'base64' ).content )
+      blobs[sha] = content.force_encoding('UTF-8')
+    end
+
+    repo_tree = @octokit.tree(repo, "HEAD", :recursive => true)
+    atlas = JSON.parse(blob_content[repo_tree.tree.detect { |node| node[:path]=="atlas.json"}[:sha]])
+
+    chapters = {}
+    appnumber = 0
+    chnumber = 0
+    secnumber = 0
+    ids = {}
+
+    atlas['files'].each_with_index do |filename, index|
+      if filename =~ /book\/[0-9].*\/1-[^\/]*\.asc/
+        chnumber += 1
+        chapters ["ch#{secnumber}"] = ['chapter', chnumber, filename]
+        secnumber += 1
+      end
+      if filename =~ /book\/[A-C].*\.asc/
+        appnumber += 1
+        chapters ["ch#{secnumber}"] = ['appendix', appnumber, filename]
+        secnumber += 1
+      end
+    end
+    chapter_list = atlas['files'].select {|filename| filename =~ /book\/[0-9A-C].*\/1-[^\/]*\.asc/}
+
+    initial_content = "include::" + chapter_list.join("[]\n\ninclude::") + "[]\n"
+
+    content = expand(initial_content, "root.asc") do |filename|
+      file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
+      if file_handle
+        blob_content[file_handle[:sha]]
+      end
+    end
+
+    asciidoc = Asciidoctor::Document.new(content,template_dir: template_dir)
+    html = asciidoc.render
+    alldoc = Nokogiri::HTML(html)
+    number = 1
+
+    alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index |
+      chapter_type, chapter_number, filename = chapters ["ch#{index}"]
+      chapter = entry
+      chapter_title = entry.at("h2").content
+
+      next if !chapter_title
+      next if !chapter_number
+
+      number = chapter_number
+      if chapter_type == 'appendix'
+        puts "appendix #{chapter_number}"
+        number = 100 + chapter_number
+      end
+
+      pretext = entry.search("div[@class=sectionbody]/div/p").to_html
+      id_xref = chapter.at("h2").attribute('id').to_s
+
+      schapter = book.chapters.where(:number => number).first_or_create
+      schapter.title = chapter_title.to_s
+      schapter.chapter_type = chapter_type
+      schapter.chapter_number = chapter_number
+      schapter.sha = book.ebook_html
+      schapter.save
+
+      # create xref
+      csection = schapter.sections.where(:number => 1).first_or_create
+      xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+      xref.section = csection
+      xref.save
+
+      section = 1
+      chapter.search("div[@class=sect2]").each do |sec|
+
+        id_xref = sec.at("h3").attribute('id').to_s
+
+        section_title = sec.at("h3").content
+
+        html = sec.inner_html.to_s + nav
+
+        html.gsub!('<h3', '<h2')
+        html.gsub!(/\/h3>/, '/h2>')
+        html.gsub!('<h4', '<h3')
+        html.gsub!(/\/h4>/, '/h3>')
+        html.gsub!('<h5', '<h4')
+        html.gsub!(/\/h5>/, '/h4>')
+
+        if xlink = html.scan(/href=\"1-.*?\.html\#(.*?)\"/)
+          xlink.each do |link|
+            xref = link.first
+            html.gsub!(/href=\"1-.*?\.html\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
+          end
+        end
+
+        if xlink = html.scan(/href=\"\#(.*?)\"/)
+          xlink.each do |link|
+            xref = link.first
+            html.gsub!(/href=\"\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
+          end
+        end
+
+        if subsec = html.scan(/<img src="(.*?)"/)
+          subsec.each do |sub|
+            sub = sub.first
+            html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"") rescue nil
+          end
+        end
+
+        puts "\t\t#{chapter_type} #{chapter_number}.#{section} : #{chapter_title} . #{section_title} - #{html.size}"
+
+        csection = schapter.sections.where(:number => section).first_or_create
+        csection.title = section_title.to_s
+        csection.html = pretext + html
+        csection.save
+
+        xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+        xref.section = csection
+        xref.save
+
+        # record all the xrefs
+        (sec.search(".//*[@id]")).each do |id|
+          id_xref = id.attribute('id').to_s
+          puts id_xref
+          xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+          xref.section = csection
+          xref.save
+        end
+
+        section += 1
+        pretext = ""
+      end
+    end
+    repo_head = @octokit.ref(repo, "heads/master").object[:sha]
+    book.ebook_html = repo_head
+    book.save
+
+    book.sections.each do |section|
+      section.set_slug
+      section.save
+    end    
+  end
+end
 
 desc "Generate the book html for the sites (by downloading from atlas)"
 task :genbook2 => :environment do
@@ -29,8 +219,8 @@ task :genbook2 => :environment do
         navi = toc['navigations']['navigation']
       elsif toc['navigation']
         navi = toc['navigation']['navigation']
-      end 
-     
+      end
+
       navi.each_with_index do |chthing, index|
         if chthing['type'] == 'appendix'
           appnumber += 1
@@ -56,7 +246,7 @@ task :genbook2 => :environment do
         doc = Nokogiri::HTML(content)
         chapter =       doc.at("section[@data-type=#{chapter_type}]")
         chapter_title = title
-        
+
         next if !chapter_title
         next if !chapter_number
 
