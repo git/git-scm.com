@@ -20,6 +20,8 @@ def expand(content, path, &get_content)
   end
 end
 
+
+
 def repo_name(lang)
   if lang == "en"
     'progit/progit2'
@@ -35,18 +37,39 @@ task :remote_genbook2 => :environment do
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
   @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
 
+  all_books = {
+    "be" => "progit/progit2-be",
+    "en" => "progit/progit2",
+    "es" => "progit/progit2-es",
+    "fr" => "progit/progit2-fr",
+    "gr" => "progit2-gr/progit2",
+    "id" => "progit/progit2-id",
+    "it" => "progit/progit2-it",
+    "ja" => "progit/progit2-ja",
+    "ko" => "progit/progit2-ko",
+    "nl" => "progit/progit2-nl",
+    "ru" => "progit/progit2-ru",
+    "sl" => "progit/progit2-sl",
+    "sr" => "progit/progit2-sr",
+    "tr" => "progit/progit2-tr",
+    "uk" => "progit/progit2-uk",
+    "uz" => "progit/progit2-uz",
+    "zh" => "progit/progit2-zh",
+    "zh-tw" => "progit/progit2-zh-tw"
+  }
+  
   if ENV['GENLANG']
-    books = Book.where(:edition => 2, :code => ENV['GENLANG'])
+    books = all_books.select { |code, repo| code == ENV['GENLANG']}
   else
-    all_books = Book.where(:edition => 2)
-    books = all_books.select do |book|
-      repo_head = @octokit.ref(repo_name(book.code), "heads/master").object[:sha]
+    books = all_books.select do |code, repo|
+      repo_head = @octokit.ref(repo, "heads/master").object[:sha]
+      book = Book.where(:edition => 2, :code => code).first_or_create
       repo_head != book.ebook_html
     end
   end
 
-  books.each do |book|
-    repo = repo_name(book.code)
+  books.each do |code, repo|
+    book = Book.where(:edition => 2, :code => code).first_or_create
     blob_content = Hash.new do |blobs, sha|
       content = Base64.decode64( @octokit.blob(repo, sha, :encoding => 'base64' ).content )
       blobs[sha] = content.force_encoding('UTF-8')
@@ -170,7 +193,6 @@ task :remote_genbook2 => :environment do
         # record all the xrefs
         (sec.search(".//*[@id]")).each do |id|
           id_xref = id.attribute('id').to_s
-          puts id_xref
           xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
           xref.section = csection
           xref.save
