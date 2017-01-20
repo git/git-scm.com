@@ -108,7 +108,7 @@ task :preindex => :environment do
 
       content = blob_content[entry.sha]
       expand!(content, tag_files, blob_content, categories)
-      asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
+      asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => '', 'compat-mode' => true})
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
