@@ -84,7 +84,7 @@ task :remote_genbook2 => :environment do
       end
     end
 
-    asciidoc = Asciidoctor::Document.new(content,template_dir: template_dir)
+    asciidoc = Asciidoctor::Document.new(content,template_dir: template_dir, attributes: { 'compat-mode' => true})
     html = asciidoc.render
     alldoc = Nokogiri::HTML(html)
     number = 1
