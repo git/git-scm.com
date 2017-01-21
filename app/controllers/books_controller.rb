@@ -10,6 +10,7 @@ class BooksController < ApplicationController
       @book = Book.where(:code => lang, :edition => edition).first
     else
       @book = Book.where(:code => lang).order("percent_complete DESC, edition DESC").first
+      raise PageNotFound unless @book
       redirect_to "/book/#{lang}/v#{@book.edition}"
     end
     raise PageNotFound unless @book
