@@ -20,6 +20,13 @@ def expand(content, path, &get_content)
   end
 end
 
+desc "Reset book html to trigger re-build"
+task :reset_book2 => :environment do
+    Book.where(:edition => 2).each do |book|
+        book.ebook_html = '0000000000000000000000000000000000000000'
+        book.save
+    end
+end
 
 desc "Generate book html directly from git repo"
 task :remote_genbook2 => :environment do
