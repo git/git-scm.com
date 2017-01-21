@@ -113,7 +113,6 @@ task :remote_genbook2 => :environment do
 
       number = chapter_number
       if chapter_type == 'appendix'
-        puts "appendix #{chapter_number}"
         number = 100 + chapter_number
       end
 
