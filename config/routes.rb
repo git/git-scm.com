@@ -42,7 +42,7 @@ Gitscm::Application.routes.draw do
     get "/:lang/v:edition/:slug"          => "books#section"
     get "/:lang/v:edition/:chapter/:link" => "books#link", chapter: /(ch|app)\d+/
     get "/:lang"                          => "books#show", as: :lang
-    get "/:lang/:slug"                    => "books#section"
+    get "/:lang/:slug"                    => "books#section", as: :slug
   end
   post "/update"   => "books#update"
 
