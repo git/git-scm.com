@@ -10,6 +10,7 @@ class BooksController < ApplicationController
       @book = Book.where(:code => lang, :edition => edition).first
     else
       @book = Book.where(:code => lang).order("percent_complete DESC, edition DESC").first
+      raise PageNotFound unless @book
       redirect_to "/book/#{lang}/v#{@book.edition}"
     end
     raise PageNotFound unless @book
@@ -89,6 +90,9 @@ class BooksController < ApplicationController
   def redirect_book
     uri_path = params[:lang]
     if slug = REDIRECT[uri_path]
+      /^(.*?)\/(.*)/.match(slug) do |m|
+        return redirect_to slug_book_path(lang: m[1], slug: m[2])
+      end
       return redirect_to lang_book_path(lang: slug)
     end
   end
