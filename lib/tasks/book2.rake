@@ -21,15 +21,6 @@ def expand(content, path, &get_content)
 end
 
 
-
-def repo_name(lang)
-  if lang == "en"
-    'progit/progit2'
-  else
-    'progit/progit2-'+ lang
-  end
-end
-
 desc "Generate book html directly from git repo"
 task :remote_genbook2 => :environment do
   template_dir = File.join(Rails.root, 'templates')
