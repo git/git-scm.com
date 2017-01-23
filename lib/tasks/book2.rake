@@ -37,6 +37,7 @@ task :remote_genbook2 => :environment do
 
   all_books = {
     "be" => "progit/progit2-be",
+    "cs" => "progit-cs/progit2-cs",
     "en" => "progit/progit2",
     "es" => "progit/progit2-es",
     "fr" => "progit/progit2-fr",
