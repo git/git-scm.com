@@ -27,7 +27,6 @@ $(document).ready(function() {
   Forms.init();
   Downloads.init();
   DownloadBox.init();
-  AboutContent.init();
 });
 
 function onPopState(fn) {
@@ -290,60 +289,6 @@ var Downloads = {
   observePopState: function() {
     onPopState(function() {
       Downloads.filterGUIS();
-    });
-  }
-}
-
-var AboutContent = {
-  defaultSection: "branching-and-merging",
-
-  init: function() {
-    if ($('body#about').length === 0) return;
-    $('section.about').hide();
-    $('section.about .bottom-nav').show();
-    AboutContent.observeNav();
-    AboutContent.observePopState();
-    AboutContent.showSection(AboutContent.getSection());
-  },
-
-  observePopState: function() {
-    onPopState(function() {
-      section = AboutContent.getSection();
-      return AboutContent.showSection(section);
-    });
-  },
-
-  getSection: function(href) {
-    var section;
-    section = location.href.substring(location.href.lastIndexOf("/") + 1);
-    if (section.length === 0 || section == 'about') {
-      section = AboutContent.defaultSection;
-    }
-    return section;
-  },
-
-  showSection: function(section) {
-    if (section == 'about') section = AboutContent.defaultSection;
-    $('ol#about-nav a').removeClass('current');
-    $('ol#about-nav a#nav-' + section).addClass('current');
-    $('section').hide(0, function(){
-      $('section#' + section).show();
-    });
-
-    if (section == AboutContent.defaultSection) section = 'about';
-    $('.sidebar nav .expanded a').removeClass('active');
-    $('.sidebar nav .expanded a[href$=' + section + ']').addClass('active')
-  },
-
-  observeNav: function() {
-    $('ol#about-nav a, .bottom-nav a').click(function(e) {
-      e.preventDefault();
-      var section = $(this).attr('data-section-id');
-
-      if (window.history && window.history.pushState) {
-        history.pushState(null, $(this).html(), '/about/'+section);
-      }
-      AboutContent.showSection(section);
     });
   }
 }
