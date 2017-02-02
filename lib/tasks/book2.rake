@@ -207,13 +207,13 @@ task :remote_genbook2 => :environment do
         section.save
       end
 
+      repo_head = @octokit.ref(repo, "heads/master").object[:sha]
+      book.ebook_html = repo_head
+      book.save
+
     rescue Exception => msg
       puts msg
     end
-    # consider the revision as processed whatever the result
-    repo_head = @octokit.ref(repo, "heads/master").object[:sha]
-    book.ebook_html = repo_head
-    book.save
 
   end
 end
