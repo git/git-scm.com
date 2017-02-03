@@ -1,5 +1,6 @@
 class DocController < ApplicationController
 
+  before_filter :set_caching
   before_filter :set_doc_file, only: [:man]
   before_filter :set_doc_version, only: [:man]
   before_filter :set_book, only: [:index]
@@ -87,6 +88,10 @@ class DocController < ApplicationController
   end
 
   private
+
+  def set_caching
+    expires_in 10.minutes, :public => true
+  end
 
   def set_book
     @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
