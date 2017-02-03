@@ -1,6 +1,8 @@
 class SiteController < ApplicationController
 
   def index
+    expires_in 10.minutes, :public => true
+
     @section    = "home"
     @subsection = ""
   end
