@@ -7,7 +7,7 @@ module Gitscm
     ],['Basic Snapshotting',
       ['git-add', 'git-status', 'git-diff', 'git-commit', 'git-reset', 'git-rm', 'git-mv']
     ],['Branching and Merging',
-      ['git-branch', 'git-checkout', 'git-merge', 
+      ['git-branch', 'git-checkout', 'git-merge',
        'git-mergetool', 'git-log', 'git-stash', 'git-tag']
     ],['Inspection and Comparison',
       ['git-show', 'git-log', 'git-diff', 'git-describe']
@@ -24,7 +24,7 @@ module Gitscm
     ],['Server Admin',
       ['git-daemon', 'git-update-server-info']
     ],['Plumbing Commands',
-      ['git-cat-file', 'git-commit-tree', 'git-count-objects', 'git-diff-index',
+      ['git-cat-file', 'git-check-ignore','git-commit-tree', 'git-count-objects', 'git-diff-index',
        'git-diff-tree', 'git-hash-object', 'git-merge-base', 'git-read-tree',
        'git-rev-list', '']
     ],['Guides',
