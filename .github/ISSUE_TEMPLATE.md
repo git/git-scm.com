@@ -1,0 +1,4 @@
+ - [ ] This issue is about **specifically** the [git-scm.com](https://git-scm.com) website and is **not** an issue about
+     - [ ] Git (or its man pages), which should be raised with the [community](https://git-scm.com/community),
+     - [ ] Git for Windows, which should be raised at [git-for-windows/git](https://git-scm.com/community), or
+     - [ ] the contents of the Pro Git book, which should be raised at [progit/progit2](https://github.com/progit/progit2/issues).
