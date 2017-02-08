@@ -10,7 +10,6 @@ gem 'exceptional'
 gem 'faraday'
 gem 'faraday_middleware'
 gem 'memcachier'
-gem 'newrelic_rpm'
 gem 'octokit'
 gem "pg"
 gem 'rack-timeout'
