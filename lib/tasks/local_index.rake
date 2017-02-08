@@ -55,7 +55,7 @@ task :local_index => :environment do
       # generate command-list content
       categories = {}
       if system("git cat-file -e #{tag}:command-list.txt > /dev/null 2>&1")
-        cmd_list = `git cat-file blob #{tag}:command-list.txt`.match(/(### command list.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
+        cmd_list = `git cat-file blob #{tag}:command-list.txt`.match(/(### command list.*|# command name.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
           name, kind, attr = cmd.split(/\s+/)
           list[kind] ||= []
           list[kind] << [name, attr]

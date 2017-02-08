@@ -62,7 +62,7 @@ task :preindex => :environment do
     # generate command-list content
     categories = {}
     if cmd_list_file = tag_files.detect { |ent| ent.path == "command-list.txt" }
-      cmd_list = blob_content[cmd_list_file.sha].match(/(### command list.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
+      cmd_list = blob_content[cmd_list_file.sha].match(/(### command list.*|# command name.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
         name, kind, attr = cmd.split(/\s+/)
         list[kind] ||= []
         list[kind] << [name, attr]
