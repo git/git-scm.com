@@ -223,20 +223,20 @@ var Downloads = {
   },
 
   observeGUIOSFilter: function() {
-    $('a#gui-os-filter').click(function(e) {
+    $('a.gui-os-filter').click(function(e) {
       e.preventDefault();
       Downloads.userOS = $(this).attr('data-os');
       var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
-      if ($(this).hasClass('filtering')) {
-        $('ul.gui-thumbnails li').switchClass("masked", "", 200);
-        $(this).html('Only show GUIs for my OS ('+ capitalizedOS +')');
-        $(this).removeClass('filtering');
+      $('a.gui-os-filter').not("[data-os='"+Downloads.userOS+"']").removeClass('selected');
+      $('a.gui-os-filter').filter("[data-os='"+Downloads.userOS+"']").addClass('selected');
+
+      if (Downloads.userOS == '') {
+        $('ul.gui-thumbnails li').removeClass("masked");
         $('#os-filter-count').hide();
       }
       else {
-        $('ul.gui-thumbnails li').not("."+Downloads.userOS).switchClass("", "masked", 200);
-        $(this).html('Show GUIs for all OSes');
-        $(this).addClass('filtering');
+        $('ul.gui-thumbnails li').filter("."+Downloads.userOS).removeClass('masked');
+        $('ul.gui-thumbnails li').not("."+Downloads.userOS).addClass('masked');
         var osCount = $('ul.gui-thumbnails li' + '.' + Downloads.userOS).length;
         $('#os-filter-count strong').html(osCount);
         $('#os-filter-count .os').html(capitalizedOS);
