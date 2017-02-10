@@ -347,3 +347,4 @@ var FlippyBook = {
   }
 }
 
+;
