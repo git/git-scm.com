@@ -1,4 +1,5 @@
 - [ ] This issue is about **specifically** the [git-scm.com](https://git-scm.com) website and is **not** an issue about
-     - [ ] Git (or its man pages), which are located under https://git-scm.com/docs, should be raised with the [community](https://git-scm.com/community),
-     - [ ] Git for Windows, which should be raised at [git-for-windows/git](https://github.com/git-for-windows/git), or
-     - [ ] the contents of the Pro Git book, which are located under https://git-scm.com/book, should be raised at [progit/progit2](https://github.com/progit/progit2/issues).
+     - [ ] the Git documentation (a.k.a. man/help pages, i.e. anything with a URL starting with `https://git-scm.com/docs`), which should be raised with the [community](https://git-scm.com/community),
+     - [ ] the contents of the Pro Git book (i.e. anything with a URL starting with `https://git-scm.com/book` or its PDF versions), which should be raised at [progit/progit2](https://github.com/progit/progit2/issues).
+     - [ ] Git itself, which should also be raised with the [community](https://git-scm.com/community), or
+     - [ ] Git for Windows, which should be raised at [git-for-windows/git](https://github.com/git-for-windows/git).
