@@ -60,11 +60,11 @@ class BooksController < ApplicationController
   def chapter
     chapter = params[:chapter].to_i
     section = params[:section].to_i
+    lang = params[:lang] || "en"
     chapter = @book.chapters.where(:number => chapter).first
     @content = chapter.sections.where(:number => section).first
     raise PageNotFound unless @content
-    @page_title = "Git - #{@content.title}"
-    render 'section'
+    return redirect_to "/book/#{lang}/v2/#{@content.slug}"
   end
 
   def update
