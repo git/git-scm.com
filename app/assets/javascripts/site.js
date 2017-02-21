@@ -11,7 +11,6 @@ $(document).ready(function() {
   Downloads.init();
   DownloadBox.init();
   AboutContent.init();
-  FlippyBook.init();
 
   var _gauges = _gauges || [];
   (function() {
@@ -304,46 +303,4 @@ var AboutContent = {
   }
 }
 
-var FlippyBook = {
-  threeDee: false,
-
-  init: function() {
-    FlippyBook.initBrowsers();
-    FlippyBook.observeOpenCloseClicks();
-  },
-
-  initBrowsers: function() {
-    // only allow webkit since moz 3d transforms are still
-    // janky when using z-index
-    if (Modernizr.webkit) {
-      FlippyBook.threeDee = true;
-      $('#book-container').addClass('three-dee');
-    }
-    $('#about-book').addClass('visible');
-  },
-
-  observeOpenCloseClicks: function() {
-    $('#book-cover-outside, #open-book').click(function(e) {
-      e.preventDefault();
-      $('#book-cover').removeClass('close').addClass('open');
-      $('#book-intro').css('z-index', '');
-      if (!FlippyBook.threeDee) {
-        $('#book-cover-inside').show();
-        $('#book-inside-page').show();
-      }
-    });
-    $('#about-book').click(function(e) {
-      e.preventDefault();
-      $('#book-cover').removeClass('open').addClass('close');
-      if (FlippyBook.threeDee) {
-        var t = setTimeout ("$('#book-intro').css('z-index', 100)", 1000);
-      }
-      else {
-        $('#book-cover-inside').hide();
-        $('#book-inside-page').hide();
-        $('#book-intro').css('z-index', 100);
-      }
-    });
-  }
-}
 
