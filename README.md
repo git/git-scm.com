@@ -38,6 +38,8 @@ to have access to the [Pro Git project on GitHub](https://github.com/progit/prog
     $ export API_USER=github_username
     $ export API_PASS=github_password
     $ rake remote_genbook
+    
+If you have 2FA enabled, you'll need to create a [Personal Access Token](https://help.github.com/articles/creating-an-access-token-for-command-line-use/).    
 
 That will generate the book content from the Markdown files fetched from the online repository and post it to the Rails server database.
 
