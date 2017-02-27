@@ -16,6 +16,8 @@ You'll need a Ruby environment to run Rails.  First do:
 Then you need to create the database structure:
 
     $ rake db:migrate
+    
+Note that you will need to have an `config/database.yml` file. An example is provided in `config/database.yml.example`
 
 Now you'll want to populate the man pages.  You can do so from a local Git
 source clone like this:
