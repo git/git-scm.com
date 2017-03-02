@@ -16,6 +16,8 @@ You'll need a Ruby environment to run Rails.  First do:
 Then you need to create the database structure:
 
     $ rake db:migrate
+    
+Alternatively you can run the script at `script/bootstrap` which will set up Ruby dependencies and the local SQLite database.
 
 Now you'll want to populate the man pages.  You can do so from a local Git
 source clone like this:
