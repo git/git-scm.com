@@ -25,6 +25,20 @@ $(document).ready(function() {
   })();
 });
 
+function onPopState(fn) {
+  if (window.history && window.history.pushState) {
+    return $(window).bind('popstate', function(event) {
+      var section;
+      initialPop = !popped && location.href === initialURL;
+      popped = true;
+      if (initialPop) {
+        return;
+      }
+      fn();
+    });
+  }
+}
+
 var DownloadBox = {
   init: function() {
     $('#gui-os-filter').addClass('visible');
@@ -215,32 +229,58 @@ var Forms = {
   }
 }
 var Downloads = {
-  userOS: '',
-
   init: function() {
     Downloads.observeGUIOSFilter();
+    Downloads.observePopState();
+    Downloads.filterGUIS();
+  },
+
+  getOSFilter: function() {
+    var os = location.href.substring(location.href.lastIndexOf("/") + 1);
+    return os === 'linux' || os === 'mac' || os === 'windows'
+      ? os
+      : '';
+  },
+
+  filterGUIS: function() {
+    var osFilter = Downloads.getOSFilter();
+    var capitalizedOS = osFilter.charAt(0).toUpperCase() + osFilter.slice(1);
+    $('a.gui-os-filter').not("[data-os='"+osFilter+"']").removeClass('selected');
+    $('a.gui-os-filter').filter("[data-os='"+osFilter+"']").addClass('selected');
+
+    if (osFilter === '') {
+      $('ul.gui-thumbnails li').removeClass("masked");
+      $('#os-filter-count').hide();
+    }
+    else {
+      $('ul.gui-thumbnails li').filter("."+osFilter).removeClass('masked');
+      $('ul.gui-thumbnails li').not("."+osFilter).addClass('masked');
+      var osCount = $('ul.gui-thumbnails li' + '.' + osFilter).length;
+      $('#os-filter-count strong').html(osCount);
+      $('#os-filter-count .os').html(capitalizedOS);
+      $('#os-filter-count').show();
+    }
   },
 
   observeGUIOSFilter: function() {
     $('a.gui-os-filter').click(function(e) {
       e.preventDefault();
-      Downloads.userOS = $(this).attr('data-os');
-      var capitalizedOS = Downloads.userOS.charAt(0).toUpperCase() + Downloads.userOS.slice(1);
-      $('a.gui-os-filter').not("[data-os='"+Downloads.userOS+"']").removeClass('selected');
-      $('a.gui-os-filter').filter("[data-os='"+Downloads.userOS+"']").addClass('selected');
+      var os = $(this).attr('data-os');
 
-      if (Downloads.userOS == '') {
-        $('ul.gui-thumbnails li').removeClass("masked");
-        $('#os-filter-count').hide();
+      if (window.history && window.history.pushState) {
+        var url = os === ''
+          ? '/downloads/guis/'
+          : '/download/gui/'+os;
+        history.pushState(null, $(this).html(), url);
       }
-      else {
-        $('ul.gui-thumbnails li').filter("."+Downloads.userOS).removeClass('masked');
-        $('ul.gui-thumbnails li').not("."+Downloads.userOS).addClass('masked');
-        var osCount = $('ul.gui-thumbnails li' + '.' + Downloads.userOS).length;
-        $('#os-filter-count strong').html(osCount);
-        $('#os-filter-count .os').html(capitalizedOS);
-        $('#os-filter-count').show();
-      }
+
+      Downloads.filterGUIS();
+    });
+  },
+
+  observePopState: function() {
+    onPopState(function() {
+      Downloads.filterGUIS();
     });
   }
 }
@@ -258,18 +298,10 @@ var AboutContent = {
   },
 
   observePopState: function() {
-    if (window.history && window.history.pushState) {
-      return $(window).bind('popstate', function(event) {
-        var section;
-        initialPop = !popped && location.href === initialURL;
-        popped = true;
-        if (initialPop) {
-          return;
-        }
-        section = AboutContent.getSection();
-        return AboutContent.showSection(section);
-      });
-    }
+    onPopState(function() {
+      section = AboutContent.getSection();
+      return AboutContent.showSection(section);
+    });
   },
 
   getSection: function(href) {
