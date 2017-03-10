@@ -47,6 +47,7 @@ group :development, :test do
   gem "sqlite3"
   gem 'byebug'
   gem 'ruby-prof'
+  gem 'bullet'
 end
 
 group :test do
