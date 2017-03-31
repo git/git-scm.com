@@ -35,21 +35,15 @@ Now you need to get the latest downloads for the downloads pages:
     $ rake downloads
 
 Now you'll probably want some book data. You'll have
-to have access to the [Pro Git project on GitHub](https://github.com/progit/progit2) through the API.
+to have access to the [Pro Git project on GitHub](https://github.com/progit/progit) through the API.
 
     $ export API_USER=github_username
     $ export API_PASS=github_password
-    $ rake remote_genbook2
+    $ rake remote_genbook
     
 If you have 2FA enabled, you'll need to create a [Personal Access Token](https://help.github.com/articles/creating-an-access-token-for-command-line-use/).    
 
-That will generate the book content from the Asciidoc files fetched from the online repository and post it to the Rails server database. You can select a specific language by indicating it in the `GENLANG` environment variable:
-
-    $ GENLANG=zh rake remote_genbook2
-
-Alternatively, you can get the book content from a repository on your computer by specifying the path in the `GENPATH` environment variable to the `local_genbook2` target:
-
-    $ GENLANG=fr GENPATH=../progit2-fr rake local_genbook2 
+That will generate the book content from the Markdown files fetched from the online repository and post it to the Rails server database.
 
 Now you can run the Rails site to take a look.  Specify an UPDATE_TOKEN so you
 can use the world's stupidest authentication mechanism:
