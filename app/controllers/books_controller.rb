@@ -57,6 +57,12 @@ class BooksController < ApplicationController
     else
       @page_title = "Git - #{@content.title}"
     end
+
+    if @book.edition == 2
+      BOOKS[@book.code] && BOOKS[@book.code].each do |path, slug|
+        @content.html = @content.html.gsub("#{path}/", "#{slug}#")
+      end
+    end
   end
 
   def chapter
