@@ -7,7 +7,7 @@ task :search_clear => :environment do
 end
 
 task :search_index => :environment do
-  version = Version.all.last
+  version = Version.latest_version
   puts version.name
   version.doc_versions.each do |docv|
     p docv.index
