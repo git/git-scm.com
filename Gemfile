@@ -5,11 +5,10 @@ gem 'rails', '4.2.6'
 gem 'rails_12factor', group: :production
 
 gem 'asciidoctor', '>=1.5.4'
-gem 'dalli'
+gem 'redis-rails'
 gem 'exceptional'
 gem 'faraday'
 gem 'faraday_middleware'
-gem 'memcachier'
 gem 'octokit'
 gem "pg"
 gem 'rack-timeout'

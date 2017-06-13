@@ -7,6 +7,7 @@ require 'digest/sha1'
 task :preindex => :environment do
   ActiveRecord::Base.logger.level = Logger::WARN
 
+  Octokit.auto_paginate = true
   @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
 
   repo = ENV['GIT_REPO'] || 'gitster/git'
