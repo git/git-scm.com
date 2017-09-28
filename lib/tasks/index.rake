@@ -53,7 +53,7 @@ task :preindex => :environment do
     # find all the doc entries
     tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
     tag_files = tree_info.tree
-    doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index|user-manual|diff.*|fetch.*|merge.*|rev.*|pretty.*|pull.*)\.txt/ }
+    doc_files = tag_files.select { |ent| ent.path =~ /^Documentation\/(git.*|everyday|howto-index|user-manual|diff.*|fetch.*|merge.*|rev.*|pretty.*|pull.*|technical\/.*)\.txt/ }
 
     puts "Found #{doc_files.size} entries"
 
@@ -109,7 +109,8 @@ task :preindex => :environment do
 
       content = blob_content[entry.sha]
       expand!(content, tag_files, blob_content, categories)
-      asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
+      content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, "link:\1\[\2\]")
+      asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''}, doctype: 'book')
       asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
       doc = Doc.where( :blob_sha => asciidoc_sha ).first_or_create
       if rerun || !doc.plain || !doc.html
