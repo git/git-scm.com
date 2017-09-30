@@ -107,7 +107,7 @@ task :local_index => :environment do
         expand!(content, tag, categories)
         content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
 
-        asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
+        asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''}, doctype: 'book')
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
         doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
