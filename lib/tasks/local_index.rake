@@ -42,7 +42,7 @@ task :local_index => :environment do
       stag.save
 
       # find all the doc entries
-      entries = `git ls-tree #{tag}:Documentation`.strip.split("\n")
+      entries = `git ls-tree -r #{tag}:Documentation`.strip.split("\n")
       tree = entries.map do |e|
         mode, type, sha, path = e.split(' ')
         [path, sha, type]
@@ -58,7 +58,8 @@ task :local_index => :environment do
               merge.* |
               rev.* |
               pretty.* |
-              pull.*
+              pull.* |
+              technical\/.*
           )\.txt/x
       }
 
@@ -96,7 +97,7 @@ task :local_index => :environment do
 
       tree.each do |entry|
         path, sha, type = entry
-        path = path.gsub('.txt', '')
+        path = File.basename(path, '.txt' )
         next if doc_limit && path !~ /#{doc_limit}/
         file = DocFile.where(:name => path).first_or_create
 
