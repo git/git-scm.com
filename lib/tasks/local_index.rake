@@ -42,12 +42,26 @@ task :local_index => :environment do
       stag.save
 
       # find all the doc entries
-      entries = `git ls-tree #{tag}:Documentation`.strip.split("\n")
+      entries = `git ls-tree -r #{tag}:Documentation`.strip.split("\n")
       tree = entries.map do |e|
         mode, type, sha, path = e.split(' ')
         [path, sha, type]
       end
-      tree = tree.select { |t| t.first =~ /^(git.*|everyday|howto-index|user-manual|diff.*|fetch.*|merge.*|rev.*|pretty.*|pull.*)\.txt/ }
+      tree = tree.select { |t| t.first =~
+          /^(
+              git.* |
+              everyday  |
+              howto-index |
+              user-manual |
+              diff.* |
+              fetch.* |
+              merge.* |
+              rev.* |
+              pretty.* |
+              pull.* |
+              technical\/.*
+          )\.txt/x
+      }
 
       puts "Found #{tree.size} entries"
       doc_limit = ENV['ONLY_BUILD_DOC']
@@ -83,7 +97,7 @@ task :local_index => :environment do
 
       tree.each do |entry|
         path, sha, type = entry
-        path = path.gsub('.txt', '')
+        path = File.basename(path, '.txt' )
         next if doc_limit && path !~ /#{doc_limit}/
         file = DocFile.where(:name => path).first_or_create
 
@@ -91,8 +105,9 @@ task :local_index => :environment do
 
         content = `git cat-file blob #{sha}`.chomp
         expand!(content, tag, categories)
+        content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
 
-        asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
+        asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''}, doctype: 'book')
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
 
         doc = Doc.where(:blob_sha => asciidoc_sha).first_or_create
