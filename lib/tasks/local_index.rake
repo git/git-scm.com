@@ -105,7 +105,7 @@ task :local_index => :environment do
 
         content = `git cat-file blob #{sha}`.chomp
         expand!(content, tag, categories)
-        content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, "link:\1\[\2\]")
+        content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
 
         asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''})
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
