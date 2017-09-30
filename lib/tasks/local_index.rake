@@ -47,7 +47,20 @@ task :local_index => :environment do
         mode, type, sha, path = e.split(' ')
         [path, sha, type]
       end
-      tree = tree.select { |t| t.first =~ /^(git.*|everyday|howto-index|user-manual|diff.*|fetch.*|merge.*|rev.*|pretty.*|pull.*)\.txt/ }
+      tree = tree.select { |t| t.first =~
+          /^(
+              git.* |
+              everyday  |
+              howto-index |
+              user-manual |
+              diff.* |
+              fetch.* |
+              merge.* |
+              rev.* |
+              pretty.* |
+              pull.*
+          )\.txt/x
+      }
 
       puts "Found #{tree.size} entries"
       doc_limit = ENV['ONLY_BUILD_DOC']
