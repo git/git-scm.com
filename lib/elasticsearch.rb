@@ -91,7 +91,7 @@ module ElasticSearch
 
     # Force a refresh of this index
     #
-    # This basically tells elasticsearch to flush it's buffers
+    # This basically tells elasticsearch to flush its buffers
     # but not clear caches (unlike a commit in Solr)
     # "Commits" happen automatically and are managed by elasticsearch
     #
@@ -133,7 +133,7 @@ module ElasticSearch
 
     # Search this index using a post body
     #
-    #   types   - the type or types (comma seperated) to search
+    #   types   - the type or types (comma-separated) to search
     #   options - options hash for this search request
     #
     # Returns a hash, the parsed response body from elasticsearch
@@ -146,7 +146,7 @@ module ElasticSearch
 
     # Search this index using a query string
     #
-    #   types   - the type or types (comma seperated) to search
+    #   types   - the type or types (comma-separated) to search
     #   query   - the search query string
     #   options - options hash for this search request (optional)
     #
@@ -162,7 +162,7 @@ module ElasticSearch
 
     # Count results using a query string
     #
-    #   types   - the type or types (comma seperated) to search
+    #   types   - the type or types (comma-separated) to search
     #   query   - the search query string
     #   options - options hash for this search request (optional)
     #
