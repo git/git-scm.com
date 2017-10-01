@@ -91,7 +91,7 @@ module ElasticSearch
 
     # Force a refresh of this index
     #
-    # This basically tells elasticsearch to flush it's buffers
+    # This basically tells elasticsearch to flush its buffers
     # but not clear caches (unlike a commit in Solr)
     # "Commits" happen automatically and are managed by elasticsearch
     #
