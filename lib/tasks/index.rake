@@ -152,15 +152,13 @@ task :preindex => :environment do
   Rails.cache.write("latest-version", Version.latest_version.name)
 end
 
-def index_doc(filter_tags, tag_info, doc_list, get_content)
+def index_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV['REBUILD_DOC']
   rerun = ENV['RERUN'] || false
   
-  tags = filter_tags.call(rebuild)
-  
-  tags.sort_by { |tag| tag_info.call(tag).first}.each do |tag|
-    name, commit_sha, tree_sha, ts = tag_info.call tag
+  filter_tags.call(rebuild).sort_by { |tag| tag.first}.each do |tag|
+    name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
     
     stag = Version.where(:name => name.gsub('v','')).first
@@ -191,7 +189,7 @@ def index_doc(filter_tags, tag_info, doc_list, get_content)
 
     puts "Found #{tag_files.size} entries"
     doc_limit = ENV['ONLY_BUILD_DOC']
-    
+
     # generate command-list content
     categories = {}
     cmd = doc_list.call(tree_sha, /command-list\.txt/)
@@ -290,27 +288,31 @@ task :preindex2 => :environment do
     if tagname
       tags = tags.select { |t| t.name == tagname }
     end
+    tags.collect do |tag| 
+      # extract metadata
+      commit_info = @octokit.commit( repo, tag.name )
+      commit_sha = commit_info.sha
+      tree_sha = commit_info.commit.tree.sha
+      # ts = Time.parse( commit_info.commit.committer.date )
+      ts = commit_info.commit.committer.date
+      [tag.name, commit_sha, tree_sha, ts]
+    end
   end
-
-  tag_info = -> (tag) do
-    # extract metadata
-    commit_info = @octokit.commit( repo, tag.name )
-    commit_sha = commit_info.sha
-    tree_sha = commit_info.commit.tree.sha
-    # ts = Time.parse( commit_info.commit.committer.date )
-    ts = commit_info.commit.committer.date
-    [tag.name, commit_sha, tree_sha, ts]
-  end
-
-  get_content =   -> sha do blob_content[sha] end
   
-  get_file_list = -> (tree_sha, regex_filter) do 
-    tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
-    tag_files = tree_info.tree
+  get_content =   -> sha do blob_content[sha] end
+
+  ref_tree_sha = ""
+  tag_files = []
+  get_file_list = -> (tree_sha, regex_filter) do
+    if ref_tree_sha != tree_sha
+      tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
+      tag_files = tree_info.tree
+      ref_tree_sha = tree_sha
+    end
     tag_files.select { |ent| ent.path =~ regex_filter}.collect { |ent| [ent.path, ent.sha] }
   end
 
-  index_doc(tag_filter, tag_info, get_file_list, get_content)
+  index_doc(tag_filter, get_file_list, get_content)
 end
 
 task :local_index2 => :environment do
@@ -325,17 +327,16 @@ task :local_index2 => :environment do
       if tagname
         tags = tags.select { |t| t == tagname }
       end
-    end
-
-    tag_info = -> (tag) do
-      # extract metadata
-      commit_sha = `git rev-parse #{tag}`.chomp
-      tree_sha = `git rev-parse #{tag}^{tree}`.chomp
-      tagger = `git cat-file commit #{tag} | grep committer`.chomp.split(' ')
-      tz = tagger.pop
-      ts = tagger.pop
-      ts = Time.at(ts.to_i)
-      [tag, commit_sha, tree_sha, ts]
+      tags.collect do |tag|
+        # extract metadata
+        commit_sha = `git rev-parse #{tag}`.chomp
+        tree_sha = `git rev-parse #{tag}^{tree}`.chomp
+        tagger = `git cat-file commit #{tag} | grep committer`.chomp.split(' ')
+        tz = tagger.pop
+        ts = tagger.pop
+        ts = Time.at(ts.to_i)
+        [tag, commit_sha, tree_sha, ts]
+      end
     end
 
     get_content =   -> sha do `git cat-file blob #{sha}` end
@@ -348,7 +349,7 @@ task :local_index2 => :environment do
       end.select{ |ent| ent.first =~ regex_filter}
     end
 
-    index_doc(tag_filter, tag_info, get_file_list, get_content)
+    index_doc(tag_filter, get_file_list, get_content)
 
   end
 end
