@@ -171,30 +171,31 @@ def index_doc(filter_tags, doc_list, get_content)
     stag.committed = ts
     stag.save
 
-    regex_filter =  /^Documentation\/(
-        git.* |           
-        everyday |
-        howto-index |
-        user-manual |
-        diff.* |
-        fetch.* |
-        merge.* |
-        rev.* |
-        pretty.* |
-        pull.* |
-        technical\/.*
-        )\.txt/x
 
-    tag_files = doc_list.call(tree_sha, regex_filter)
-
-    puts "Found #{tag_files.size} entries"
+    tag_files = doc_list.call(tree_sha)
+    doc_files = tag_files.select { |ent| ent.first =~
+        /^Documentation\/(
+            git.* |
+            everyday |
+            howto-index |
+            user-manual |
+            diff.* |
+            fetch.* |
+            merge.* |
+            rev.* |
+            pretty.* |
+            pull.* |
+            technical\/.*
+        )\.txt/x }
+ 
+    puts "Found #{doc_files.size} entries"
     doc_limit = ENV['ONLY_BUILD_DOC']
 
     # generate command-list content
     categories = {}
-    cmd = doc_list.call(tree_sha, /command-list\.txt/)
-    if cmd.any?
-      cmd_list = get_content.call(cmd[0].second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
+    cmd = tag_files.detect {|f| f.first =~ /command-list\.txt/}
+    if cmd
+      cmd_list = get_content.call(cmd.second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject{|l| l =~ /^#/}.inject({}) do |list, cmd|
         name, kind, attr = cmd.split(/\s+/)
         list[kind] ||= []
         list[kind] << [name, attr]
@@ -229,7 +230,7 @@ def index_doc(filter_tags, doc_list, get_content)
         return content
       end
 
-      tag_files.each do |entry|
+      doc_files.each do |entry|
         path, sha = entry
         path = File.basename( path, '.txt' )
         next if doc_limit && path !~ /#{doc_limit}/
@@ -301,15 +302,9 @@ task :preindex2 => :environment do
   
   get_content =   -> sha do blob_content[sha] end
 
-  ref_tree_sha = ""
-  tag_files = []
-  get_file_list = -> (tree_sha, regex_filter) do
-    if ref_tree_sha != tree_sha
-      tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
-      tag_files = tree_info.tree
-      ref_tree_sha = tree_sha
-    end
-    tag_files.select { |ent| ent.path =~ regex_filter}.collect { |ent| [ent.path, ent.sha] }
+  get_file_list = -> (tree_sha) do
+    tree_info = @octokit.tree( repo, tree_sha, :recursive => true )
+    tree_info.tree.collect { |ent| [ent.path, ent.sha] }
   end
 
   index_doc(tag_filter, get_file_list, get_content)
@@ -341,12 +336,12 @@ task :local_index2 => :environment do
 
     get_content =   -> sha do `git cat-file blob #{sha}` end
   
-    get_file_list = -> (tree_sha, regex_filter) do
+    get_file_list = -> (tree_sha) do
       entries = `git ls-tree -r #{tree_sha}`.strip.split("\n")
       tree = entries. map do |e|
         mode, type, sha, path = e.split(' ')
         [path, sha]
-      end.select{ |ent| ent.first =~ regex_filter}
+      end
     end
 
     index_doc(tag_filter, get_file_list, get_content)
