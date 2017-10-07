@@ -15,6 +15,7 @@ gem 'rack-timeout'
 gem 'tilt'
 gem 'tire'
 gem 'unicorn'
+gem 'iso8601'
 
 gem 'json'
 gem 'yajl-ruby'
