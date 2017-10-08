@@ -62,20 +62,42 @@ def index_doc(filter_tags, doc_list, get_content)
         end
         list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
       end
-      
-      def expand!(content, tag_files, blob_content, categories)
+
+      tools = tag_files.select { |ent| ent.first =~/^mergetools\//}.map do |entry|
+        path, sha = entry
+        tool = File.basename path
+        content = get_content.call sha
+        merge = (content.include? "can_merge") ? "" : " * #{tool}\n"
+        diff = (content.include? "can_diff") ? "" : " * #{tool}\n"
+        [merge, diff]
+      end
+
+      can_merge, can_diff = tools.transpose.map {|strs| strs.join ""}
+
+      get_content_f = Proc.new do |name|
+        content_file = tag_files.detect { |ent| ent.first == "Documentation/#{name}" }
+        if content_file
+          new_content = get_content.call (content_file.second)
+        elsif name == "mergetools-diff.txt"
+          new_content = can_diff
+        elsif name == "mergetools-merge.txt"
+          new_content = can_merge
+        else
+          puts "can not resolve #{name}\n"
+        end
+        new_content
+      end
+
+      def expand!(content, get_f_content , categories)
         content.gsub!(/include::(\S+)\.txt/) do |line|
           line.gsub!("include::","")
           if categories[line]
             new_content = categories[line]
           else
-            content_file = tag_files.detect { |ent| ent.first == "Documentation/#{line}" }
-            if content_file
-              new_content = blob_content.call (content_file.second)
-            end
+            new_content = get_f_content.call(line)
           end
           if new_content
-            expand!(new_content, tag_files, blob_content, categories)
+            expand!(new_content, get_f_content, categories)
           end
         end
         return content
@@ -91,7 +113,7 @@ def index_doc(filter_tags, doc_list, get_content)
         puts "   build: #{path}"
         
         content = get_content.call sha
-        expand!(content, tag_files, get_content, categories)
+        expand!(content, get_content_f, categories)
         content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
         asciidoc = Asciidoctor::Document.new(content, attributes: {'sectanchors' => ''}, doctype: 'book')
         asciidoc_sha = Digest::SHA1.hexdigest( asciidoc.source )
