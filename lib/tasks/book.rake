@@ -6,7 +6,6 @@ require 'digest/sha1'
 # export UPDATE_TOKEN=token
 # bundle exec rake genbook GENLANG=en
 
-CONTENT_SERVER = ENV["CONTENT_SERVER"] || "http://localhost:3000"
 SCRIPT_SHA = Digest::SHA1.hexdigest(File.open('lib/tasks/book.rake', 'r').read)
 
 def generate_pages(lang, chapter, content, sha)
