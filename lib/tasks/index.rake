@@ -13,7 +13,7 @@ def index_doc(filter_tags, doc_list, get_content)
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
     
     stag = Version.where(:name => name.gsub('v','')).first
-    #next if stag && !rerun
+    next if stag && !rerun
 
     stag = Version.where(:name => name.gsub('v','')).first_or_create
     
