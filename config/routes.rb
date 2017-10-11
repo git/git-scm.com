@@ -80,8 +80,6 @@ Gitscm::Application.routes.draw do
 
   get "/community" => "community#index"
 
-  get "/admin" => "site#admin"
-
   get "/search" => "site#search"
   get "/search/results" => "site#search_results"
 
