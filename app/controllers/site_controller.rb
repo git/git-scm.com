@@ -7,10 +7,6 @@ class SiteController < ApplicationController
     @subsection = ""
   end
 
-  def admin
-    @downloads = Download.all
-  end
-
   def search
     @term = sname = params['search'].to_s.downcase
     @data = search_term(sname)
