@@ -24,7 +24,6 @@ Gitscm::Application.routes.draw do
   get "/docs/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-\.]+/
   get "/docs/:file" => "doc#man", :as => :doc_file, :file => /[\w\-\.]+/
   get "/docs/:file/:version" => "doc#man", :version => /[^\/]+/
-  get "/test" => "doc#test"
   get "/doc/ext" => "doc#ext"
 
   %w{man ref git}.each do |path|

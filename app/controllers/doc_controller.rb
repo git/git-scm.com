@@ -12,10 +12,6 @@ class DocController < ApplicationController
   def ref
   end
 
-  def test
-    render 'doc/rebase'
-  end
-
   def man
     return redirect_to docs_path unless @doc_file
     unless @doc_version.respond_to?(:version)
