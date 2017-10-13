@@ -6,10 +6,10 @@ class DocFile < ActiveRecord::Base
 
   scope :with_includes, ->{ includes(:doc_versions => [:doc, :version]) }
 
-  def version_changes()
+  def version_changes(limit_size = 100)
     unchanged_versions = []
     changes = []
-    doc_versions = self.doc_versions.includes(:version).version_changes.to_a
+    doc_versions = self.doc_versions.includes(:version).version_changes.limit(limit_size).to_a
     doc_versions.each_with_index do |doc_version, i|
       next unless previous_doc_version = doc_versions[i+1]
       sha2 = doc_version.doc.blob_sha
