@@ -4,6 +4,9 @@ require 'httparty'
 require 'nokogiri'
 require 'open-uri'
 
+# If any argument is given, it will scrap localhost (assuming port 3000)
+# This can easily be extended to check the arguments, or receiving some params.
+# By the sake of simplicity it just deals with the most basic use case
 url = if ARGV[0]
   then
     puts "Using localhost"
@@ -14,15 +17,20 @@ url = if ARGV[0]
   end
 
 page = HTTParty.get(url)
-
 parse_page = Nokogiri::HTML(page)
+
+# GUI clients are under h4 tags (at least for now)
 h4s = parse_page.css('h4')
 
+# There's an optional data-trend attribute on h4 elems which contains
+# another name to be used in the Google Trends query
+# because some names bring too much noise
 guis = h4s.map do |elem|
   trend_name = elem.attribute('data-trend')
   trend_name ? trend_name.value : elem.child.content
 end
 
+# Just checking duplicates because during manual sorting one may commit mistakes
 if guis.uniq.length != guis.length then
   puts "\n======= WARNING: THERE ARE DUPLICATED GUIS ======="
 end
@@ -30,10 +38,18 @@ end
 puts "\n=== GUIs (#{guis.size}) ==="
 puts guis
 
+# URL enconding GUI names
 encoded = guis.map { |e| URI::encode(e) }
 
+# Google trends currently one allows up to 5 terms in the comparison
+# For comparison we are using 'windows' of 5 elements, where the first element
+# of a window, is the last element of the previous window, so that new elements
+# can be compared with the previous window
 minIndex = 0
 maxIndex = 4
+
+# trend_groups is an array of pairs (abstracted as an array of size 2),
+# containing the min and max GUI index for the current iteration
 trend_groups = []
 
 last_idx = encoded.size - 1
@@ -43,6 +59,7 @@ while minIndex < last_idx do
   maxIndex += 4
 end
 
+# For each pair of indexes we fetch the GUI window and create the Google Trend URL
 trend_urls = trend_groups.map do |min_max|
   terms = (min_max[0]..min_max[1]).map { |idx| encoded[idx] }
   "https://trends.google.pt/trends/explore?cat=31&q=#{terms.join(",")}&hl=en_us"
