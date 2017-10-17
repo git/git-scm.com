@@ -6,7 +6,7 @@ require 'digest/sha1'
 def index_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV['REBUILD_DOC']
-  rerun = ENV['RERUN'] || false
+  rerun = ENV['RERUN'] || rebuild || false
   
   filter_tags.call(rebuild).sort_by { |tag| tag.first}.each do |tag|
     name, commit_sha, tree_sha, ts = tag
