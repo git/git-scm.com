@@ -1,45 +1,25 @@
 #!/usr/bin/env ruby
 
-require 'httparty'
-require 'nokogiri'
+require 'json'
 require 'open-uri'
 
-# If any argument is given, it will scrap localhost (assuming port 3000)
-# This can easily be extended to check the arguments, or receiving some params.
-# By the sake of simplicity it just deals with the most basic use case
-url = if ARGV[0]
-  then
-    puts "Using localhost"
-    "http://localhost:3000/downloads/guis"
-  else
-    puts "Using live site"
-    "https://git-scm.com/downloads/guis"
-  end
+file = File.read('resources/guis.json')
+parsed = JSON.parse(file)
 
-page = HTTParty.get(url)
-parse_page = Nokogiri::HTML(page)
-
-# GUI clients are under h4 tags (at least for now)
-h4s = parse_page.css('h4')
-
-# There's an optional data-trend attribute on h4 elems which contains
-# another name to be used in the Google Trends query
-# because some names bring too much noise
-guis = h4s.map do |elem|
-  trend_name = elem.attribute('data-trend')
-  trend_name ? trend_name.value : elem.child.content
-end
+guis_info = parsed["guis"]
 
 # Just checking duplicates because during manual sorting one may commit mistakes
-if guis.uniq.length != guis.length then
+if guis_info.map { |e| e["name"] }.uniq.length != guis_info.length then
   puts "\n======= WARNING: THERE ARE DUPLICATED GUIS ======="
 end
 
-puts "\n=== GUIs (#{guis.size}) ==="
-puts guis
+puts "\n=== GUIs (#{guis_info.size}) ==="
+puts guis_info
 
-# URL enconding GUI names
-encoded = guis.map { |e| URI::encode(e) }
+encoded = guis_info.sort_by { |g| g["order"] }.map do |g|
+  key = g.key?("trend_name") ? g["trend_name"] : g["name"]
+  URI::encode(key)
+end
 
 # Google trends currently one allows up to 5 terms in the comparison
 # For comparison we are using 'windows' of 5 elements, where the first element
