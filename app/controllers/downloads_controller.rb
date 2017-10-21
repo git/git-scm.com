@@ -9,7 +9,12 @@ class DownloadsController < ApplicationController
   end
 
   def guis
-    render "downloads/guis/index"
+    file = File.read('resources/guis.json')
+    parsed = JSON.parse(file)
+
+    guis_info = parsed["guis"]
+
+    render "downloads/guis/index", :locals => {:guis_info => guis_info}
   end
 
   def logos
