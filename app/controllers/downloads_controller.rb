@@ -9,10 +9,8 @@ class DownloadsController < ApplicationController
   end
 
   def guis
-    file = File.read('resources/guis.json')
-    parsed = JSON.parse(file)
-
-    guis_info = parsed["guis"]
+    yaml = YAML.load_file('resources/guis.yml')
+    guis_info = yaml["guis"]
 
     render "downloads/guis/index", :locals => {:guis_info => guis_info}
   end
