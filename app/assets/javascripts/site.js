@@ -45,14 +45,14 @@ var DownloadBox = {
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $(".monitor").addClass("mac");
-      $("#download-link").text("Downloads for Mac").attr("href", "/download/mac");
+      $("#download-link").text("Download " + $("#installer-version").attr('data-mac') + " for Mac").attr("href", "/download/mac");
       $("#gui-link").removeClass('mac').addClass('gui');
       $("#gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
       $("#gui-os-filter").attr('data-os', 'mac');
       $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
       $(".monitor").addClass("windows");
-      $("#download-link").text("Downloads for Windows").attr("href", "/download/win");
+      $("#download-link").text("Download " + $("#installer-version").attr('data-win') + " for Windows").attr("href", "/download/win");
       $("#gui-link").removeClass('mac').addClass('gui');
       $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
       $("#alt-link").removeClass("windows").addClass("mac");
@@ -334,5 +334,3 @@ var AboutContent = {
     });
   }
 }
-
-

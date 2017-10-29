@@ -29,6 +29,16 @@ module ApplicationHelper
     end
   end
 
+  def latest_mac_installer
+    @mac_installer ||= Download.latest_for 'mac'
+    @mac_installer ? @mac_installer.version.name : ''
+  end
+
+  def latest_win_installer
+    @win_installer ||= Download.latest_for 'windows32'
+    @win_installer ? @win_installer.version.name : ''
+  end
+
   def latest_release_date
     begin
     @version ||= Version.latest_version
