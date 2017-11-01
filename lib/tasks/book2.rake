@@ -395,9 +395,11 @@ task :genbook2 => :environment do
           (sec.search("section[@id]")+sec.search("figure[@id]")+sec.search("table[@id]")).each do |id|
             id_xref = id.attribute('id').to_s
             if id_xref[0,3] != 'idp'
-              xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
-              xref.section = csection
-              xref.save
+              Xref.Transaction do
+                xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+                xref.section = csection
+                xref.save
+              end
             end
           end
 
