@@ -6,7 +6,6 @@ gem 'rails_12factor', group: :production
 
 gem 'asciidoctor', '>=1.5.4'
 gem 'redis-rails'
-gem 'exceptional'
 gem 'faraday'
 gem 'faraday_middleware'
 gem 'octokit'
