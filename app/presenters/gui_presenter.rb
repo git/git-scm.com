@@ -3,8 +3,8 @@ class GuiPresenter
   attr_reader :guis_info
 
   def initialize
-    @yaml = YAML.load_file('resources/guis.yml')
-    @guis_info = @yaml["guis"]
+    yaml = YAML.load_file('resources/guis.yml')
+    @guis_info = yaml["guis"]
   end
 
   @@instance = GuiPresenter.new
