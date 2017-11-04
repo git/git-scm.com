@@ -9,8 +9,7 @@ class DownloadsController < ApplicationController
   end
 
   def guis
-    yaml = YAML.load_file('resources/guis.yml')
-    guis_info = yaml["guis"]
+    guis_info = GuiPresenter.instance.guis_info
 
     render "downloads/guis/index", :locals => {:guis_info => guis_info}
   end
