@@ -33,7 +33,7 @@ def genbook (code, &get_content)
 
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 
-  atlas = JSON.parse(get_content.call("atlas.json"))
+  progit = get_content.call("progit.asc")
 
   chapters = {}
   appnumber = 0
@@ -41,23 +41,32 @@ def genbook (code, &get_content)
   secnumber = 0
   ids = {}
 
-  atlas['files'].each_with_index do |filename, index|
-    if filename =~ /book\/[0-9].*\/1-[^\/]*\.asc/
+  chaps = progit.scan( /(book\/[0-9A-C].*\/1-[^\/]*\.asc|[01A-C].*\.asc)/).flatten
+
+  chaps.each_with_index do |filename, index |
+    if filename =~ /(book\/[0-9].*\/1-[^\/]*\.asc|^[01].*\.asc)/
       chnumber += 1
       chapters ["ch#{secnumber}"] = ['chapter', chnumber, filename]
       secnumber += 1
     end
-    if filename =~ /book\/[A-C].*\.asc/
+    if filename =~ /(book\/[A-C].*\.asc|^[A-C].*\.asc)/
       appnumber += 1
       chapters ["ch#{secnumber}"] = ['appendix', appnumber, filename]
       secnumber += 1
     end
   end
-  chapter_list = atlas['files'].select {|filename| filename =~ /book\/[0-9A-C].*\/1-[^\/]*\.asc/}
 
-  initial_content = "include::" + chapter_list.join("[]\n\ninclude::") + "[]\n"
+  initial_content = progit.gsub(/include::(.*\.asc)\[\]/) do |match|
+    if $1 !~ /(book\/[0-9A-C].*\/1-[^\/]*\.asc|^[01A-C].*\.asc)/
+      ""
+    else
+      match
+    end
+  end
 
-  content = expand(initial_content, "root.asc") { |filename| get_content.call(filename) }
+  content = expand(initial_content, "progit.asc") { |filename| get_content.call(filename) }
+  # revert internal links decorations for ebooks
+  content.gsub!(/<<[01ABC].*?\#(.*?)>>/, "<<\\1>>")
 
   asciidoc = Asciidoctor::Document.new(content,template_dir: template_dir, attributes: { 'compat-mode' => true})
   html = asciidoc.render
@@ -67,9 +76,13 @@ def genbook (code, &get_content)
   book = Book.where(:edition => 2, :code => code).first_or_create
 
   alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index |
+    chapter_title = entry.at("h2").content
+    if !chapters["ch#{index}"]
+      puts "not including #{chapter_title}\n"
+      break
+    end
     chapter_type, chapter_number, filename = chapters ["ch#{index}"]
     chapter = entry
-    chapter_title = entry.at("h2").content
 
     next if !chapter_title
     next if !chapter_number
@@ -233,7 +246,7 @@ task :remote_genbook2 => :environment do
         book.ebook_epub = nil
         book.ebook_mobi  = nil
       end
-        
+
       book.save
 
     rescue Exception => msg
