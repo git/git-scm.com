@@ -1,10 +1,13 @@
 class GuiPresenter
 
-  attr_reader :guis_info
+  def read_gui_yaml
+    puts "READING YML"
+    yaml = YAML.load_file('resources/guis.yml')
+    return yaml["guis"]
+  end
 
   def initialize
-    yaml = YAML.load_file('resources/guis.yml')
-    @guis_info = yaml["guis"]
+    @guis_info = read_gui_yaml
   end
 
   @@instance = GuiPresenter.new
@@ -13,5 +16,14 @@ class GuiPresenter
     return @@instance
   end
 
+  def guis_info
+    if Rails.env.production?
+      return @guis_info
+    else
+      return read_gui_yaml
+    end
+  end
+
   private_class_method :new
+  private :read_gui_yaml
 end
