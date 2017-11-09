@@ -1,7 +1,6 @@
 class GuiPresenter
 
   def read_gui_yaml
-    puts "READING YML"
     yaml = YAML.load_file('resources/guis.yml')
     return yaml["guis"]
   end
