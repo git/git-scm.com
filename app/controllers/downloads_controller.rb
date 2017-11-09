@@ -9,7 +9,9 @@ class DownloadsController < ApplicationController
   end
 
   def guis
-    render "downloads/guis/index"
+    guis_info = GuiPresenter.instance.guis_info
+
+    render "downloads/guis/index", :locals => {:guis_info => guis_info}
   end
 
   def logos
