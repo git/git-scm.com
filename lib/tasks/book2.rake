@@ -41,26 +41,32 @@ def genbook (code, &get_content)
   secnumber = 0
   ids = {}
 
-  chaps = progit.scan( /(book\/[0-9A-C].*\/1-[^\/]*\.asc|[01A-C].*\.asc)/).flatten
+  # The chapter files are historically located in book/<chapter_name>/1-<chapter_name>.asc
+  # The new localisation of these files are at the root of the project
+  chapter_files = /(book\/[01A-C].*\/1-[^\/]*\.asc|[01A-C].*\.asc)/
+  chaps = progit.scan(chapter_files).flatten
 
   chaps.each_with_index do |filename, index |
-    if filename =~ /(book\/[0-9].*\/1-[^\/]*\.asc|^[01].*\.asc)/
+    # select the chapter files
+    if filename =~ /(book\/[01].*\/1-[^\/]*\.asc|^[01].*\.asc)/
       chnumber += 1
       chapters ["ch#{secnumber}"] = ['chapter', chnumber, filename]
       secnumber += 1
     end
-    if filename =~ /(book\/[A-C].*\.asc|^[A-C].*\.asc)/
+    # detect the appendices
+    if filename =~ /(book\/[ABC].*\.asc|^[ABC].*\.asc)/
       appnumber += 1
       chapters ["ch#{secnumber}"] = ['appendix', appnumber, filename]
       secnumber += 1
     end
   end
 
+  # we strip the includes that don't match the chapters we want to include
   initial_content = progit.gsub(/include::(.*\.asc)\[\]/) do |match|
-    if $1 !~ /(book\/[0-9A-C].*\/1-[^\/]*\.asc|^[01A-C].*\.asc)/
-      ""
-    else
+    if $1 =~ chapter_files
       match
+    else
+      ""
     end
   end
 
