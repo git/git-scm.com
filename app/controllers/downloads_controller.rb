@@ -21,7 +21,10 @@ class DownloadsController < ApplicationController
   def gui
     @platform = params[:platform]
     @platform = 'windows' if @platform == 'win'
-    render "downloads/guis/index"
+
+    guis_info = GuiPresenter.instance.guis_info
+
+    render "downloads/guis/index", :locals => {:guis_info => guis_info}
   end
 
   def download

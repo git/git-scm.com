@@ -237,14 +237,17 @@ var Downloads = {
 
   getOSFilter: function() {
     var os = location.href.substring(location.href.lastIndexOf("/") + 1);
-    return os === 'linux' || os === 'mac' || os === 'windows'
-      ? os
-      : '';
+    return os === 'linux' || os === 'mac' || os === 'windows' || os === 'android' || os === 'ios' ? os : '';
+  },
+
+  capitalizeOS: function(os) {
+    const platforms = {"linux": "Linux", "mac": "Mac", "windows": "Windows", "android": "Android", "ios": "iOS"};
+    return platforms[os];
   },
 
   filterGUIS: function() {
     var osFilter = Downloads.getOSFilter();
-    var capitalizedOS = osFilter.charAt(0).toUpperCase() + osFilter.slice(1);
+    var capitalizedOS = Downloads.capitalizeOS(osFilter);
     $('a.gui-os-filter').not("[data-os='"+osFilter+"']").removeClass('selected');
     $('a.gui-os-filter').filter("[data-os='"+osFilter+"']").addClass('selected');
 
