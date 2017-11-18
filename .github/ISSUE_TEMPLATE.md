@@ -1,3 +1,6 @@
+**Please make sure you are NOT reporting a problem about git itself**
+
+
 - [ ] This is **not** an issue about 
      - the Git documentation (a.k.a. man/help pages, i.e. anything with a URL starting with `https://git-scm.com/docs`), which should be raised with the [community](https://git-scm.com/community),
      - the contents of the Pro Git book (i.e. anything with a URL starting with `https://git-scm.com/book` or its PDF versions), which should be raised at [progit/progit2](https://github.com/progit/progit2/issues).
