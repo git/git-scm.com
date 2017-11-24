@@ -87,7 +87,7 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
     4. `order` can be filled with the biggest number already existing, plus 1 (Adding to the bottom - this will be covered in the following steps)
     5. `trend_name` is an optional field that can be used for helping sorting the clients (also covered in the next steps)
 
-2. Add the image to `public/images/guis/<GUI_CLIENT_NAME>@2x.png` and `public/images/guis/<GUI_CLIENT_NAME>.png`
+2. Add the image to `public/images/guis/<GUI_CLIENT_NAME>@2x.png` and `public/images/guis/<GUI_CLIENT_NAME>.png` making sure the aspect ratio matches a 588:332 image.
 
 3. Sort the tools
     1. From the root of the repository, run: `$ ./script/sort-gui`
