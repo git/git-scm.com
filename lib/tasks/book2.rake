@@ -72,7 +72,7 @@ def genbook (code, &get_content)
 
   content = expand(initial_content, "progit.asc") { |filename| get_content.call(filename) }
   # revert internal links decorations for ebooks
-  content.gsub!(/<<[01ABC].*?\#(.*?)>>/, "<<\\1>>")
+  content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
   asciidoc = Asciidoctor::Document.new(content,template_dir: template_dir, attributes: { 'compat-mode' => true})
   html = asciidoc.render
