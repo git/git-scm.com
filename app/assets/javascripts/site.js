@@ -11,18 +11,6 @@ $(document).ready(function() {
   Downloads.init();
   DownloadBox.init();
   AboutContent.init();
-
-  var _gauges = _gauges || [];
-  (function() {
-    var t   = document.createElement('script');
-    t.type  = 'text/javascript';
-    t.async = true;
-    t.id    = 'gauges-tracker';
-    t.setAttribute('data-site-id', '4f919d1df5a1f504b3000026');
-    t.src = '//secure.gaug.es/track.js';
-    var s = document.getElementsByTagName('script')[0];
-    s.parentNode.insertBefore(t, s);
-  })();
 });
 
 function onPopState(fn) {
