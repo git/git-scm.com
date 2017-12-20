@@ -93,6 +93,7 @@ Gitscm::Application.routes.draw do
 
   get "/course/svn" => "site#svn"
   get "/sfc" => "site#sfc"
+  get "/trademark" => redirect("/about/trademark")
 
   get "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
 
