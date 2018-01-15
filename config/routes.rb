@@ -66,7 +66,6 @@ Gitscm::Application.routes.draw do
                                                     :month  => /\d{2}/,
                                                     :day    => /\d{2}/
 
-  get "/blog.rss" => "blog#feed"
   get "/blog" => "blog#index"
 
   get "/publish"  => "doc#book_update"
