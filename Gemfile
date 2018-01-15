@@ -18,7 +18,6 @@ gem 'iso8601'
 
 gem 'json'
 gem 'yajl-ruby'
-gem 'haml'
 gem 'netrc'
 gem 'launchy'
 gem 'rubyzip'
