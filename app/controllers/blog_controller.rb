@@ -17,19 +17,11 @@ class BlogController < ApplicationController
   end
 
   def index
-    
-  end
-
-  def feed
-    render :action => "feed", :layout => false
   end
 
   # for Gitscm blog
   def gitscm
-
   end
 
   private
-
- 
 end
