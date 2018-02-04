@@ -43,18 +43,18 @@ def genbook (code, &get_content)
 
   # The chapter files are historically located in book/<chapter_name>/1-<chapter_name>.asc
   # The new localisation of these files are at the root of the project
-  chapter_files = /(book\/[01A-C].*\/1-[^\/]*\.asc|[01A-C].*\.asc)/
+  chapter_files = /(book\/[01A-C].*\/1-[^\/]*?\.asc|(?:ch[0-9]{2}|[ABC])-[^\/]*?\.asc)/
   chaps = progit.scan(chapter_files).flatten
 
   chaps.each_with_index do |filename, index |
     # select the chapter files
-    if filename =~ /(book\/[01].*\/1-[^\/]*\.asc|^[01].*\.asc)/
+    if filename =~ /(book\/[01].*\/1-[^\/]*\.asc|ch[0-9]{2}-.*\.asc)/
       chnumber += 1
       chapters ["ch#{secnumber}"] = ['chapter', chnumber, filename]
       secnumber += 1
     end
     # detect the appendices
-    if filename =~ /(book\/[ABC].*\.asc|^[ABC].*\.asc)/
+    if filename =~ /(book\/[ABC].*\.asc|[ABC].*\.asc)/
       appnumber += 1
       chapters ["ch#{secnumber}"] = ['appendix', appnumber, filename]
       secnumber += 1
