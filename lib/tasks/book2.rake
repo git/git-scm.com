@@ -200,6 +200,7 @@ task :remote_genbook2 => :environment do
     "ru" => "progit/progit2-ru",
     "sl" => "progit/progit2-sl",
     "sr" => "progit/progit2-sr",
+    "tl" => "progit2-tl/progit2",    
     "tr" => "progit/progit2-tr",
     "uk" => "progit/progit2-uk",
     "uz" => "progit/progit2-uz",
