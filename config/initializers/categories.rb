@@ -8,7 +8,7 @@ module Gitscm
       ['git-add', 'git-status', 'git-diff', 'git-commit', 'git-reset', 'git-rm', 'git-mv']
     ],['Branching and Merging',
       ['git-branch', 'git-checkout', 'git-merge',
-       'git-mergetool', 'git-log', 'git-stash', 'git-tag']
+       'git-mergetool', 'git-log', 'git-stash', 'git-tag', 'git-worktree']
     ],['Inspection and Comparison',
       ['git-show', 'git-log', 'git-diff', 'git-describe']
     ],['Patching',
