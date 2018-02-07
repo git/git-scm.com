@@ -82,13 +82,13 @@ Gitscm::Application.routes.draw do
   get "/search" => "site#search"
   get "/search/results" => "site#search_results"
 
-  # mapping for jasons mocks
-  get "/documentation" => "doc#index"
-  get "/documentation/reference" => "doc#ref"
-  get "/documentation/reference/:file.html" => "doc#man"
+  # historical synonyms
+  get "/documentation" => redirect("/doc")
+  get "/documentation/reference" => redirect("/docs")
+  get "/documentation/reference/:file.html" => redirect {|path_params, req| "/docs/#{path_params[:file]}" }
   get "/documentation/book" => redirect("/book")
-  get "/documentation/videos" => "doc#videos"
-  get "/documentation/external-links" => "doc#ext"
+  get "/documentation/videos" => redirect("/videos")
+  get "/documentation/external-links" => redirect("doc/ext")
 
   get "/course/svn" => "site#svn"
   get "/sfc" => "site#sfc"
