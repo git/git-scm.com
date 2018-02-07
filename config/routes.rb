@@ -86,7 +86,7 @@ Gitscm::Application.routes.draw do
   get "/documentation" => "doc#index"
   get "/documentation/reference" => "doc#ref"
   get "/documentation/reference/:file.html" => "doc#man"
-  get "/documentation/book" => "doc#book"
+  get "/documentation/book" => redirect("/book")
   get "/documentation/videos" => "doc#videos"
   get "/documentation/external-links" => "doc#ext"
 
