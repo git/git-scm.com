@@ -7,22 +7,6 @@ TAGLINES = %w{
     distributed-is-the-new-centralized
 }
 
-# DocsController#commands
-CMD_GROUPS = [
-  ['Setup and Config', [ 'config', 'help' ]],
-  ['Getting and Creating Projects', [ 'init', 'clone']],
-  ['Basic Snapshotting', [ 'add', 'status', 'diff', 'commit', 'reset', 'rm', 'mv']],
-  ['Branching and Merging', [ 'branch', 'checkout', 'merge', 'mergetool', 'log', 'stash', 'tag', 'worktree' ]],
-  ['Sharing and Updating Projects', [ 'fetch', 'pull', 'push', 'remote', 'submodule' ]],
-  ['Inspection and Comparison', [ 'show', 'log', 'diff', 'shortlog', 'describe' ]],
-  ['Patching', ['am', 'apply', 'cherry-pick', 'rebase']],
-  ['Debugging', [ 'bisect', 'blame' ]],
-  ['Email', ['am', 'apply', 'format-patch', 'send-email', 'request-pull']],
-  ['External Systems', ['svn', 'fast-import']],
-  ['Administration', [ 'clean', 'gc', 'fsck', 'reflog', 'filter-branch', 'instaweb', 'archive' ]],
-  ['Server Admin', [ 'daemon', 'update-server-info' ]],
-]
-
 #DocsControllers#watch
 VIDEOS = [
   [1, "41027679", "Git Basics", "What is Version Control?", "what-is-version-control", "05:59"],

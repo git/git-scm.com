@@ -36,7 +36,7 @@ Gitscm::Application.routes.draw do
     get "/ch:chapter-:section.html"    => "books#chapter"
     get "/:lang/ch:chapter-:section.html" => "books#chapter"
     get "/index"                          => redirect("/book")
-    get "/commands"                       => "books#commands"
+    get "/commands"                       => redirect("/docs")
     get "/:lang/v:edition"                => "books#show"
     get "/:lang/v:edition/:slug"          => "books#section"
     get "/:lang/v:edition/:chapter/:link" => "books#link", chapter: /(ch|app)\d+/

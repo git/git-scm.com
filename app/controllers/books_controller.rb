@@ -16,20 +16,6 @@ class BooksController < ApplicationController
     raise PageNotFound unless @book
   end
 
-  def commands
-    @related = {}
-    ri = RelatedItem.where(:content_type => 'reference', :related_type => 'book')
-    ri.each do |item|
-      cmd = item.name.gsub('git-', '')
-      if s = Section.where(:slug => item.related_id).first
-        @related[cmd] ||= []
-        @related[cmd] << [s.cs_number, s.slug, item.score]
-        @related[cmd].sort!
-      end
-    end
-    @groups = CMD_GROUPS
-  end
-
   def link
     link = params[:link]
     @book = Book.where(:code => params[:lang], :edition => params[:edition]).first
