@@ -23,18 +23,6 @@ class DocController < ApplicationController
     return redirect_to docs_path unless @doc_version
     @last     = @doc_file.doc_versions.latest_version
     # @versions = DocVersion.version_changes(@doc_file.name)
-    # @related = DocVersion.get_related(filename, 8)
-  end
-
-  def related_update
-    if params[:token] != ENV['UPDATE_TOKEN']
-      return render :text => 'nope'
-    end
-
-    fromc = params[:from_content]
-    toc = params[:to_content]
-    RelatedItem.create_both(fromc, toc)
-    render :text => 'ok'
   end
 
   # API Methods to update book content #

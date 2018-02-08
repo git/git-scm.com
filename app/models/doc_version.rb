@@ -15,11 +15,6 @@ class DocVersion < ActiveRecord::Base
   delegate :name, to: :version
   delegate :committed, to: :version
 
-  def self.get_related(doc_name, limit = 10)
-    ri = RelatedItem.where(related_type: 'reference', related_id: doc_name).order('score DESC').limit(limit)
-    ri.sort_by(&:content_type)
-  end
- 
   # returns an array of the differences with 3 entries
   # 0: additions
   # 1: subtractions

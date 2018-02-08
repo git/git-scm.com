@@ -37,7 +37,6 @@ class BooksController < ApplicationController
     elsif @no_edition
       return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
     end
-    @related = @content.get_related(8)
     if @content.title.blank?
       @page_title = "Git - #{@content.chapter.title}"
     else
