@@ -1,6 +1,4 @@
 class BooksController < ApplicationController
-  skip_before_filter  :verify_authenticity_token, only: [:update]
-
   before_filter :book_resource, only: [:section, :chapter]
   before_filter :redirect_book, only: [:show]
 
@@ -53,26 +51,6 @@ class BooksController < ApplicationController
     raise PageNotFound unless @content
     return redirect_to "/book/#{lang}/v2/#{@content.slug}"
   end
-
-  def update
-    if params[:token] == ENV['UPDATE_TOKEN']
-      build = params[:build]
-      if book = Book.where(:code => build[:code], :edition => build[:edition].to_i).first
-        book.ebook_pdf  = build[:download][:pdf]
-        book.ebook_epub = build[:download][:epub]
-        book.ebook_mobi = build[:download][:mobi]
-        book.ebook_html = build[:download][:html]
-        book.processed  = false
-        book.percent_complete = build[:percent].to_i
-        book.save
-      end
-      render :text => 'OK'
-    else
-      render :text => 'NOPE - AUTH'
-    end
-  end
-
-  private
 
   def redirect_book
     uri_path = params[:lang]

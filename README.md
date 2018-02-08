@@ -51,10 +51,9 @@ Alternatively, you can get the book content from a repository on your computer b
 
     $ GENLANG=fr GENPATH=../progit2-fr rake local_genbook2
 
-Now you can run the Rails site to take a look.  Specify an UPDATE_TOKEN so you
-can use the world's stupidest authentication mechanism:
+Now you can run the Rails site to take a look.
 
-    $ UPDATE_TOKEN=something rails server
+    $ rails server
 
 The site should be running on http://localhost:3000
 
