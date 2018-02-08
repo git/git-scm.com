@@ -57,15 +57,8 @@ Gitscm::Application.routes.draw do
     end
   end
 
-  get "/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
-                                                    :month  => /\d{2}/,
-                                                    :day    => /\d{2}/
-
-  get "/blog/:year/:month/:day/:slug" => "blog#post",  :year   => /\d{4}/,
-                                                    :month  => /\d{2}/,
-                                                    :day    => /\d{2}/
-
   get "/blog" => "blog#index"
+  get "/blog/*post" => redirect("/blog")
 
   get "/about" => "about#index"
   get "/about/:section" => "about#index"

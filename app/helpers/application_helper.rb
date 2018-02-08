@@ -3,7 +3,7 @@ require 'iso8601'
 module ApplicationHelper
 
   def sidebar_link_options(section)
-    if %w( about documentation reference book blog videos
+    if %w( about documentation reference book videos
            external-links downloads guis logos community
           ).include?(@section) && @section == section
       {class: "active"}
