@@ -1,6 +1,4 @@
 class BooksController < ApplicationController
-  skip_before_filter  :verify_authenticity_token, only: [:update]
-
   before_filter :book_resource, only: [:section, :chapter]
   before_filter :redirect_book, only: [:show]
 
@@ -14,20 +12,6 @@ class BooksController < ApplicationController
       redirect_to "/book/#{lang}/v#{@book.edition}"
     end
     raise PageNotFound unless @book
-  end
-
-  def commands
-    @related = {}
-    ri = RelatedItem.where(:content_type => 'reference', :related_type => 'book')
-    ri.each do |item|
-      cmd = item.name.gsub('git-', '')
-      if s = Section.where(:slug => item.related_id).first
-        @related[cmd] ||= []
-        @related[cmd] << [s.cs_number, s.slug, item.score]
-        @related[cmd].sort!
-      end
-    end
-    @groups = CMD_GROUPS
   end
 
   def link
@@ -51,7 +35,6 @@ class BooksController < ApplicationController
     elsif @no_edition
       return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
     end
-    @related = @content.get_related(8)
     if @content.title.blank?
       @page_title = "Git - #{@content.chapter.title}"
     else
@@ -68,26 +51,6 @@ class BooksController < ApplicationController
     raise PageNotFound unless @content
     return redirect_to "/book/#{lang}/v2/#{@content.slug}"
   end
-
-  def update
-    if params[:token] == ENV['UPDATE_TOKEN']
-      build = params[:build]
-      if book = Book.where(:code => build[:code], :edition => build[:edition].to_i).first
-        book.ebook_pdf  = build[:download][:pdf]
-        book.ebook_epub = build[:download][:epub]
-        book.ebook_mobi = build[:download][:mobi]
-        book.ebook_html = build[:download][:html]
-        book.processed  = false
-        book.percent_complete = build[:percent].to_i
-        book.save
-      end
-      render :text => 'OK'
-    else
-      render :text => 'NOPE - AUTH'
-    end
-  end
-
-  private
 
   def redirect_book
     uri_path = params[:lang]

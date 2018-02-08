@@ -3,7 +3,6 @@ require 'octokit'
 require 'digest/sha1'
 
 # export GITBOOK_DIR=../../writing/progit/
-# export UPDATE_TOKEN=token
 # bundle exec rake genbook GENLANG=en
 
 SCRIPT_SHA = Digest::SHA1.hexdigest(File.open('lib/tasks/book.rake', 'r').read)

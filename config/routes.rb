@@ -36,14 +36,13 @@ Gitscm::Application.routes.draw do
     get "/ch:chapter-:section.html"    => "books#chapter"
     get "/:lang/ch:chapter-:section.html" => "books#chapter"
     get "/index"                          => redirect("/book")
-    get "/commands"                       => "books#commands"
+    get "/commands"                       => redirect("/docs")
     get "/:lang/v:edition"                => "books#show"
     get "/:lang/v:edition/:slug"          => "books#section"
     get "/:lang/v:edition/:chapter/:link" => "books#link", chapter: /(ch|app)\d+/
     get "/:lang"                          => "books#show", as: :lang
     get "/:lang/:slug"                    => "books#section", as: :slug
   end
-  post "/update"   => "books#update"
 
   get "/download"               => "downloads#index"
   get "/download/:platform"     => "downloads#download"
@@ -68,9 +67,6 @@ Gitscm::Application.routes.draw do
 
   get "/blog" => "blog#index"
 
-  get "/publish"  => "doc#book_update"
-  post "/related" => "doc#related_update"
-
   get "/about" => "about#index"
   get "/about/:section" => "about#index"
 
@@ -82,13 +78,13 @@ Gitscm::Application.routes.draw do
   get "/search" => "site#search"
   get "/search/results" => "site#search_results"
 
-  # mapping for jasons mocks
-  get "/documentation" => "doc#index"
-  get "/documentation/reference" => "doc#ref"
-  get "/documentation/reference/:file.html" => "doc#man"
-  get "/documentation/book" => "doc#book"
-  get "/documentation/videos" => "doc#videos"
-  get "/documentation/external-links" => "doc#ext"
+  # historical synonyms
+  get "/documentation" => redirect("/doc")
+  get "/documentation/reference" => redirect("/docs")
+  get "/documentation/reference/:file.html" => redirect {|path_params, req| "/docs/#{path_params[:file]}" }
+  get "/documentation/book" => redirect("/book")
+  get "/documentation/videos" => redirect("/videos")
+  get "/documentation/external-links" => redirect("doc/ext")
 
   get "/course/svn" => "site#svn"
   get "/sfc" => "site#sfc"

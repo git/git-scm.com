@@ -81,17 +81,6 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.datetime "release_date"
   end
 
-  create_table "related_items", force: :cascade do |t|
-    t.string   "name",         limit: 255
-    t.string   "content_type", limit: 255
-    t.string   "content_url",  limit: 255
-    t.string   "related_type", limit: 255
-    t.string   "related_id",   limit: 255
-    t.integer  "score"
-    t.datetime "created_at"
-    t.datetime "updated_at"
-  end
-
   create_table "sections", force: :cascade do |t|
     t.string   "title",      limit: 255
     t.string   "slug",       limit: 255
