@@ -22,7 +22,6 @@ class DocController < ApplicationController
     @page_title = "Git - #{@doc_file.name} Documentation"
     return redirect_to docs_path unless @doc_version
     @last     = @doc_file.doc_versions.latest_version
-    # @versions = DocVersion.version_changes(@doc_file.name)
   end
 
   def videos
@@ -54,7 +53,7 @@ class DocController < ApplicationController
   def set_doc_file
     file  = params[:file]
     if DocFile.exists?(name: file)
-      @doc_file = DocFile.with_includes.where(name: file).limit(1).first
+      @doc_file = DocFile.where(name: file).limit(1).first
     elsif DocFile.exists?(name: "git-#{file}")
       return redirect_to doc_file_path(file: "git-#{file}")
     end
