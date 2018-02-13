@@ -48,14 +48,6 @@ class DownloadsController < ApplicationController
       @download64portable = Download.latest_for(@platform + "64Portable")
       @latest = Version.latest_version
 
-      if request.env["HTTP_USER_AGENT"] =~ /WOW64|Win64/
-        @download = @download64
-        @bitness = "64-bit"
-      else
-        @download = @download32
-        @bitness = "32-bit"
-      end
-
       render "downloads/download_windows"
     elsif @platform == 'linux'
       render "downloads/download_linux"
