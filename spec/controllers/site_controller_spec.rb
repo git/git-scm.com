@@ -34,7 +34,7 @@ RSpec.describe SiteController, type: :controller do
     it "get /git-doc" do
       request.env["PATH_INFO"] = "/git-doc"
       get :redirect_book
-      expect(response).to redirect_to("https://git-scm.com/docs")
+      expect(response).to redirect_to("https://git-scm.com/git-doc")
     end
 
     it "get /" do
