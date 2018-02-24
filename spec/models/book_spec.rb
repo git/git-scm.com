@@ -8,7 +8,7 @@ RSpec.describe Book, type: :model do
   it { should have_many(:sections).through(:chapters) }
 
   it "has chapters" do
-    book.chapters.any?.should be_true
+    book.chapters.any?.should be_truthy
     book.chapters.count.should == 3
   end
 

@@ -18,7 +18,7 @@ RSpec.describe Chapter, type: :model do
   end
 
   it "should have sections" do
-    chapter.sections.any?.should be_true
+    chapter.sections.any?.should be_truthy
     chapter.sections.count.should == 3
   end
 

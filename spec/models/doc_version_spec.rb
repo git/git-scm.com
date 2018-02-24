@@ -12,7 +12,7 @@ RSpec.describe DocVersion, type: :model do
     docs = range.map{|i| Fabricate(:doc, :plain => "Doc #{i}")}
     vers = range.map{|i| Fabricate(:version, :name => "#{i}.0", :vorder => Version.version_to_num("#{i}.0"))}
     dver = range.map{|i| Fabricate(:doc_version, :doc_file => file, :version => vers[i], :doc => docs[i])}
-    dv = DocVersion.latest_for('test-command')
+    dv = DocVersion.latest_version
     docs[3].should == dv.doc
   end
 
@@ -23,7 +23,7 @@ RSpec.describe DocVersion, type: :model do
     vers = range.map{|i| Fabricate(:version, :name => "v#{i}.0")}
     dver = range.map{|i| Fabricate(:doc_version, :doc_file => file, :version => vers[i], :doc => docs[i])}
 
-    dv = DocVersion.for_version('test-command', 'v2.0')
+    dv = DocVersion.for_version('v2.0')
     docs[2].should == dv.doc
   end
 end
