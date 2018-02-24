@@ -10,7 +10,7 @@ RSpec.describe SiteController, type: :controller do
   it "GET search" do
     get :search, {search: "git-init"}
     expect(assigns(:term)).to eq("git-init")
-    expect(response).to render_template("shared/search")
+    expect(response).to render_template("shared/_search")
   end
 
   it "GET search_results" do
