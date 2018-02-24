@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Book do
+RSpec.describe Book, type: :model do
 
   let(:book) { Fabricate(:book) }
 

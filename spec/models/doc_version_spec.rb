@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe DocVersion do
+RSpec.describe DocVersion, type: :model do
 
   it { should belong_to :doc }
   it { should belong_to :version }
