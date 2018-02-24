@@ -100,13 +100,13 @@ class DownloadService
       }
 
       if (download = Download.find_by(options))
-        Rails.logger.info("[SUCCESS] Download record found #{download.inspect}")
+        Rails.logger.info("Download record found #{download.inspect}")
       else
         begin
           download = Download.create!(options)
-          Rails.logger.info("[SUCCESS] Download record created #{download.inspect}")
+          Rails.logger.info("Download record created #{download.inspect}")
         rescue ActiveRecord::RecordInvalid => e
-          Rail.logger.error("[FAILURE] #{e.message}")
+          Rail.logger.error("#{e.message}")
         end
       end
     end
