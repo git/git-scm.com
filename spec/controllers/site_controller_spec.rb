@@ -1,7 +1,7 @@
 require 'spec_helper'
 
-describe SiteController do
-  
+RSpec.describe SiteController, type: :controller do
+
   it "GET index" do
     get :index
     expect(response).to render_template("index")
@@ -30,7 +30,7 @@ describe SiteController do
   end
 
   describe "GET /book" do
-    
+
     it "get /git-doc" do
       request.env["PATH_INFO"] = "/git-doc"
       get :redirect_book
