@@ -13,14 +13,11 @@
 
 ActiveRecord::Schema.define(version: 20141027114732) do
 
-  # These are extensions that must be enabled in order to support this database
-  enable_extension "plpgsql"
-
   create_table "books", force: :cascade do |t|
-    t.string   "code",             limit: 255
+    t.string   "code"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.integer  "edition",                      default: 1
+    t.integer  "edition",          default: 1
     t.string   "ebook_pdf"
     t.string   "ebook_epub"
     t.string   "ebook_mobi"
@@ -30,28 +27,28 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.string   "language"
   end
 
-  add_index "books", ["code"], name: "index_books_on_code", using: :btree
+  add_index "books", ["code"], name: "index_books_on_code"
 
   create_table "chapters", force: :cascade do |t|
-    t.string   "title",          limit: 255
+    t.string   "title"
     t.integer  "book_id"
     t.datetime "created_at"
     t.datetime "updated_at"
     t.integer  "number"
-    t.string   "sha",            limit: 255
-    t.string   "chapter_type",               default: "chapter"
+    t.string   "sha"
+    t.string   "chapter_type",   default: "chapter"
     t.string   "chapter_number"
   end
 
-  add_index "chapters", ["book_id"], name: "index_chapters_on_book_id", using: :btree
+  add_index "chapters", ["book_id"], name: "index_chapters_on_book_id"
 
   create_table "doc_files", force: :cascade do |t|
-    t.string   "name",       limit: 255
+    t.string   "name"
     t.datetime "created_at"
     t.datetime "updated_at"
   end
 
-  add_index "doc_files", ["name"], name: "index_doc_files_on_name", using: :btree
+  add_index "doc_files", ["name"], name: "index_doc_files_on_name"
 
   create_table "doc_versions", force: :cascade do |t|
     t.integer  "version_id"
@@ -62,19 +59,19 @@ ActiveRecord::Schema.define(version: 20141027114732) do
   end
 
   create_table "docs", force: :cascade do |t|
-    t.string   "blob_sha",   limit: 255
+    t.string   "blob_sha"
     t.text     "plain"
     t.text     "html"
     t.datetime "created_at"
     t.datetime "updated_at"
   end
 
-  add_index "docs", ["blob_sha"], name: "index_docs_on_blob_sha", using: :btree
+  add_index "docs", ["blob_sha"], name: "index_docs_on_blob_sha"
 
   create_table "downloads", force: :cascade do |t|
-    t.string   "url",          limit: 255
-    t.string   "filename",     limit: 255
-    t.string   "platform",     limit: 255
+    t.string   "url"
+    t.string   "filename"
+    t.string   "platform"
     t.integer  "version_id"
     t.datetime "created_at"
     t.datetime "updated_at"
@@ -82,42 +79,31 @@ ActiveRecord::Schema.define(version: 20141027114732) do
   end
 
   create_table "sections", force: :cascade do |t|
-    t.string   "title",      limit: 255
-    t.string   "slug",       limit: 255
+    t.string   "title"
+    t.string   "slug"
     t.text     "plain"
     t.text     "html"
     t.integer  "chapter_id"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.string   "source_url", limit: 255
+    t.string   "source_url"
     t.integer  "number"
   end
 
-  add_index "sections", ["chapter_id"], name: "index_sections_on_chapter_id", using: :btree
-  add_index "sections", ["slug"], name: "index_sections_on_slug", using: :btree
-
-  create_table "users", force: :cascade do |t|
-    t.string   "screen_name",    limit: 255
-    t.string   "github_id",      limit: 255
-    t.string   "remember_token", limit: 255
-    t.datetime "created_at"
-    t.datetime "updated_at"
-  end
-
-  add_index "users", ["github_id"], name: "index_users_on_github_id", using: :btree
-  add_index "users", ["remember_token"], name: "index_users_on_remember_token", using: :btree
+  add_index "sections", ["chapter_id"], name: "index_sections_on_chapter_id"
+  add_index "sections", ["slug"], name: "index_sections_on_slug"
 
   create_table "versions", force: :cascade do |t|
-    t.string   "name",       limit: 255
-    t.string   "commit_sha", limit: 255
-    t.string   "tree_sha",   limit: 255
+    t.string   "name"
+    t.string   "commit_sha"
+    t.string   "tree_sha"
     t.datetime "committed"
     t.datetime "created_at"
     t.datetime "updated_at"
     t.float    "vorder"
   end
 
-  add_index "versions", ["name"], name: "index_versions_on_name", using: :btree
+  add_index "versions", ["name"], name: "index_versions_on_name"
 
   create_table "xrefs", force: :cascade do |t|
     t.integer "section_id"
