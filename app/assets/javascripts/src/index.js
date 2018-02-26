@@ -1,1 +1,1 @@
-require("details")
+require("./details");
