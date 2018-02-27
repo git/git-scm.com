@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe CommunityController do
+RSpec.describe CommunityController, type: :controller do
 
   it "GET index" do
     get :index

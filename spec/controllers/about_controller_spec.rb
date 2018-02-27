@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe AboutController do
+RSpec.describe AboutController, type: :controller do
 
   it "GET index" do
     get :index

@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Chapter do
+RSpec.describe Chapter, type: :model do
 
   let(:book) { Fabricate(:book) }
   let(:chapter) { Fabricate(:chapter, book: book) }
@@ -18,7 +18,7 @@ describe Chapter do
   end
 
   it "should have sections" do
-    chapter.sections.any?.should be_true
+    chapter.sections.any?.should be_truthy
     chapter.sections.count.should == 3
   end
 
