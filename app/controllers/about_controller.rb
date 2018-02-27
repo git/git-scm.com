@@ -4,6 +4,8 @@ class AboutController < ApplicationController
     @section = "about"
     set_title "About"
 
+    return render 'about/index' unless params.key?(:section)
+
     begin
       render "about/#{params[:section].to_s.underscore}"
     rescue ActionView::MissingTemplate
