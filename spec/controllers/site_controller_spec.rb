@@ -1,7 +1,7 @@
 require 'spec_helper'
 
-describe SiteController do
-  
+RSpec.describe SiteController, type: :controller do
+
   it "GET index" do
     get :index
     expect(response).to render_template("index")
@@ -10,7 +10,7 @@ describe SiteController do
   it "GET search" do
     get :search, {search: "git-init"}
     expect(assigns(:term)).to eq("git-init")
-    expect(response).to render_template("shared/search")
+    expect(response).to render_template("shared/_search")
   end
 
   it "GET search_results" do
@@ -30,11 +30,11 @@ describe SiteController do
   end
 
   describe "GET /book" do
-    
+
     it "get /git-doc" do
       request.env["PATH_INFO"] = "/git-doc"
       get :redirect_book
-      expect(response).to redirect_to("https://git-scm.com/docs")
+      expect(response).to redirect_to("https://git-scm.com/git-doc")
     end
 
     it "get /" do

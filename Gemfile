@@ -42,7 +42,7 @@ end
 group :development, :test do
   gem 'dotenv-rails'
   gem "sqlite3"
-  gem 'byebug'
+  gem 'pry-byebug'
   gem 'ruby-prof'
   gem 'bullet'
 end
@@ -53,5 +53,6 @@ group :test do
   gem 'rspec-rails'
   gem 'shoulda-matchers'
   gem 'webmock'
+  gem 'vcr'
   gem 'rails-perftest'
 end

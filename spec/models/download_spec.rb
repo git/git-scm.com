@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Download do
+RSpec.describe Download, type: :model do
 
   let(:version) { Fabricate(:version) }
   let(:download) { Fabricate(:download, version: version) }
