@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 RSpec.describe Download, type: :model do
 
@@ -10,7 +10,7 @@ RSpec.describe Download, type: :model do
   it "should have url" do
     download.url.should == "http://git-scm.com/git.zip"
   end
-    
+
   it "should have version" do
     download.version == version
   end
