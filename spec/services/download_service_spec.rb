@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-describe DownloadService do
+RSpec.describe DownloadService do
   subject { DownloadService }
 
   context 'windows', :vcr do
