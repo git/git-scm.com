@@ -12,15 +12,15 @@ RSpec.describe Section, type: :model do
 
 
   it "should have title" do
-    section.title.should == "Git Section"
+    expect(section.title).to eql("Git Section")
   end
 
   it "should have chapter" do
-    section.chapter.should == chapter
+    expect(section.chapter).to eql(chapter)
   end
 
   it "should have book" do
-    section.book.should == book
+    expect(section.book).to eql(book)
   end
 
 end

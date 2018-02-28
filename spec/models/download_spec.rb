@@ -8,11 +8,11 @@ RSpec.describe Download, type: :model do
   it { should belong_to :version }
 
   it "should have url" do
-    download.url.should == "http://git-scm.com/git.zip"
+    expect(download.url).to eql('http://git-scm.com/git.zip')
   end
 
   it "should have version" do
-    download.version == version
+    expect(download.version).to eql(version)
   end
 
 end
