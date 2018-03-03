@@ -185,6 +185,7 @@ task :remote_genbook2 => :environment do
   @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
   all_books = {
     "be" => "progit/progit2-be",
+    "bg" => "progit/progit2-bg",
     "cs" => "progit-cs/progit2-cs",
     "de" => "progit-de/progit2",
     "en" => "progit/progit2",
@@ -207,7 +208,8 @@ task :remote_genbook2 => :environment do
     "uk" => "progit/progit2-uk",
     "uz" => "progit/progit2-uz",
     "zh" => "progit/progit2-zh",
-    "zh-tw" => "progit/progit2-zh-tw"
+    "zh-tw" => "progit/progit2-zh-tw",
+    "fa" => "progit2-fa/progit2"
   }
 
   if ENV['GENLANG']
