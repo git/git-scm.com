@@ -99,6 +99,12 @@ The Cloudflare setup is mostly pretty simple:
    setup needs to be tweaked to send more reasonable caching headers,
    but this has been simple and effective so far).
 
+   There are a few special page rules to lift this caching for cases
+   where we do server-side logic (e.g.,
+   https://github.com/git/git-scm.com/issues/1129#issuecomment-363067019"),
+   but the long-term goal is to push that logic onto the client side as
+   much as possible.
+
 There's a single Cloudflare account/password that controls the site.
 There's no team setup, but the information is in escrow with the Git PLC
 at Software Freedom Conservancy. Cloudflare provides the project with
