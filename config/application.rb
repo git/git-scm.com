@@ -22,10 +22,5 @@ module Gitscm
 
     config.assets.enabled = true
     config.assets.initialize_on_precompile = false
-
-    initializer(:load_constants) do
-      require Rails.root.join("lib/constants.rb").to_s
-    end
-
   end
 end
