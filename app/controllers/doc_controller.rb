@@ -25,12 +25,12 @@ class DocController < ApplicationController
   end
 
   def videos
-    @videos = VIDEOS
+    @videos = Gitscm::VIDEOS
   end
 
   def watch
     slug = params[:id]
-    @video = VIDEOS.select{|a| a[4] == slug}.first
+    @video = Gitscm::VIDEOS.select{|a| a[4] == slug}.first
     if !@video
       redirect_to :videos
     end

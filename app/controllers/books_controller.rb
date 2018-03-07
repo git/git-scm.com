@@ -54,7 +54,7 @@ class BooksController < ApplicationController
 
   def redirect_book
     uri_path = params[:lang]
-    if slug = REDIRECT[uri_path]
+    if slug = Gitscm::REDIRECT[uri_path]
       /^(.*?)\/(.*)/.match(slug) do |m|
         return redirect_to slug_book_path(lang: m[1], slug: m[2])
       end
