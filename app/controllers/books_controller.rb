@@ -1,6 +1,5 @@
 class BooksController < ApplicationController
   before_filter :book_resource, only: [:section, :chapter]
-  before_filter :redirect_book, only: [:show]
 
   def show
     lang = params[:lang] || "en"
@@ -50,16 +49,6 @@ class BooksController < ApplicationController
     @content = chapter.sections.where(:number => section).first
     raise PageNotFound unless @content
     return redirect_to "/book/#{lang}/v2/#{@content.slug}"
-  end
-
-  def redirect_book
-    uri_path = params[:lang]
-    if slug = Gitscm::REDIRECT[uri_path]
-      /^(.*?)\/(.*)/.match(slug) do |m|
-        return redirect_to slug_book_path(lang: m[1], slug: m[2])
-      end
-      return redirect_to lang_book_path(lang: slug)
-    end
   end
 
   def book_resource
