@@ -17,7 +17,7 @@ module ApplicationHelper
   end
 
   def random_tagline
-    content_tag(:em, '-' * 2) + TAGLINES.sample
+    content_tag(:em, '-' * 2) + Gitscm::TAGLINES.sample
   end
 
   def latest_version
