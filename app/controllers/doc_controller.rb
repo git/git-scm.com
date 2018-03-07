@@ -6,7 +6,7 @@ class DocController < ApplicationController
   before_filter :set_book, only: [:index]
 
   def index
-    @videos = VIDEOS
+    @videos = Gitscm::VIDEOS
   end
 
   def ref
