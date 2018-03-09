@@ -9,7 +9,7 @@ gem 'redis-rails'
 gem 'faraday'
 gem 'faraday_middleware'
 gem 'octokit'
-gem "pg"
+gem "pg", '0.21.0'
 gem 'rack-timeout'
 gem 'tilt'
 gem 'tire'

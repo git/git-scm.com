@@ -1,6 +1,5 @@
 class BooksController < ApplicationController
   before_filter :book_resource, only: [:section, :chapter]
-  before_filter :redirect_book, only: [:show]
 
   def show
     lang = params[:lang] || "en"
