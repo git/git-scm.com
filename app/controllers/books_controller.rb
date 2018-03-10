@@ -35,9 +35,9 @@ class BooksController < ApplicationController
       return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
     end
     if @content.title.blank?
-      @page_title = "Git - #{@content.chapter.title}"
+      @page_title = "#{@content.chapter.title} · Git"
     else
-      @page_title = "Git - #{@content.title}"
+      @page_title = "#{@content.title} · Git"
     end
   end
 
@@ -49,6 +49,16 @@ class BooksController < ApplicationController
     @content = chapter.sections.where(:number => section).first
     raise PageNotFound unless @content
     return redirect_to "/book/#{lang}/v2/#{@content.slug}"
+  end
+
+  def redirect_book
+    uri_path = params[:lang]
+    if (slug = REDIRECT[uri_path])
+      /^(.*?)\/(.*)/.match(slug) do |m|
+        return redirect_to book_slug_path(lang: m[1], slug: m[2])
+      end
+      return redirect_to book_lang_path(lang: slug)
+    end
   end
 
   def book_resource
