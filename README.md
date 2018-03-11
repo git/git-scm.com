@@ -53,9 +53,9 @@ Alternatively, you can get the book content from a repository on your computer b
 
 Now you can run the Rails site to take a look.
 
-    $ rails server
+    $ ./script/server
 
-The site should be running on http://localhost:3000
+The site should be running on http://localhost:5000
 
 
 ## Testing
@@ -66,7 +66,7 @@ To run the tests for this project, run:
 
 To run the website for testing purposes, run:
 
-    $ rails server
+    $ ./script/server
 
 ## Contributing
 
