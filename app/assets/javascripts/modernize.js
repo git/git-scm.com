@@ -1,3 +1,5 @@
+//= require modernizr
+
 Modernizr.addTest('webkit', function(){
   return RegExp(" AppleWebKit/").test(navigator.userAgent);
 });
