@@ -23,8 +23,6 @@ gem 'nokogiri'
 
 # Assets
 gem 'compass-rails'
-gem 'coffee-rails'
-gem 'jquery-rails'
 gem 'sass-rails', '4.0.3'
 gem 'uglifier'
 
