@@ -24,7 +24,7 @@ gem 'nokogiri'
 # Assets
 gem 'compass-rails'
 gem 'sass-rails', '4.0.3'
-gem 'uglifier'
+gem 'uglifier', '3.2.0'
 
 group :development do
   gem "awesome_print"
