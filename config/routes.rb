@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-Gitscm::Application.routes.draw do
+Rails.application.routes.draw do
   constraints(host: 'whygitisbetterthanx.com') do
     root to: 'site#redirect_wgibtx', as: :whygitisbetterthanx
   end
