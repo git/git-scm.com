@@ -2,18 +2,14 @@ source 'https://rubygems.org'
 ruby "2.4.2"
 
 gem 'rails', '4.2.10'
-gem 'rails_12factor', group: :production
 
 gem 'asciidoctor', '>=1.5.4'
-gem 'redis-rails'
 gem 'faraday'
 gem 'faraday_middleware'
 gem 'octokit'
-gem "pg", '0.21.0'
-gem 'rack-timeout'
+gem 'puma'
 gem 'tilt'
 gem 'tire'
-gem 'unicorn'
 gem 'iso8601'
 
 gem 'json'
@@ -27,10 +23,8 @@ gem 'nokogiri'
 
 # Assets
 gem 'compass-rails'
-gem 'coffee-rails'
-gem 'jquery-rails'
 gem 'sass-rails', '4.0.3'
-gem 'uglifier'
+gem 'uglifier', '3.2.0'
 
 group :development do
   gem "awesome_print"
@@ -55,4 +49,11 @@ group :test do
   gem 'webmock'
   gem 'vcr'
   gem 'rails-perftest'
+end
+
+group :production do
+  gem 'pg', '0.21.0'
+  gem 'rack-timeout'
+  gem 'rails_12factor'
+  gem 'redis-rails'
 end
