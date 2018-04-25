@@ -26,6 +26,8 @@ def index_doc(filter_tags, doc_list, get_content)
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select { |ent| ent.first =~
         /^Documentation\/(
+          SubmittingPatches |
+          (
             git.* |
             everyday |
             howto-index |
@@ -37,7 +39,7 @@ def index_doc(filter_tags, doc_list, get_content)
             pretty.* |
             pull.* |
             technical\/.*
-        )\.txt/x }
+        )\.txt)/x }
  
     puts "Found #{doc_files.size} entries"
     doc_limit = ENV['ONLY_BUILD_DOC']
