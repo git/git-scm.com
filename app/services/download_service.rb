@@ -23,9 +23,10 @@ class DownloadService
         next unless match
 
         portable = match[1]
+        version_name = match [2]
         bitness  = match[3]
 
-        version = find_or_create_version_by_name(name)
+        version = find_or_create_version_by_name(version_name)
 
         find_or_create_download(
           filename:     name,
