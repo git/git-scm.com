@@ -23,9 +23,11 @@ class DownloadService
         next unless match
 
         portable = match[1]
-        version_name = match [2]
         bitness  = match[3]
 
+        # Git for windows sometimes creates extra releases all based off of the same upstream Git version
+        # so we want to crop versions like 2.16.1.4 to just 2.16.1
+        version_name = match[2].slice(/^\d+\.\d+\.\d+/)
         version = find_or_create_version_by_name(version_name)
 
         find_or_create_download(
