@@ -26,7 +26,7 @@ RSpec.describe DownloadService do
       subject.download_mac_versions
     end
 
-    it 'reaches out to Sourceforge for relases' do
+    it 'reaches out to Sourceforge for releases' do
       expect(WebMock).to have_requested(:get, 'https://sourceforge.net/projects/git-osx-installer/rss?limit=20')
     end
 

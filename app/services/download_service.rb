@@ -25,15 +25,22 @@ class DownloadService
         portable = match[1]
         bitness  = match[3]
 
-        version = find_or_create_version_by_name(name)
+        # Git for windows sometimes creates extra releases all based off of the same upstream Git version
+        # so we want to crop versions like 2.16.1.4 to just 2.16.1
+        version_name = match[2].slice(/^\d+\.\d+\.\d+/)
+        version = find_version_by_name(version_name)
 
-        find_or_create_download(
-          filename:     name,
-          platform:     "windows#{bitness}#{portable}",
-          release_date: date,
-          version:      version,
-          url:          url
-        )
+        if version
+          find_or_create_download(
+              filename: name,
+              platform: "windows#{bitness}#{portable}",
+              release_date: date,
+              version: version,
+              url: url
+          )
+        else
+          Rails.logger.info("Could not find version #{version_name}")
+        end
       end
     end
 
@@ -47,15 +54,19 @@ class DownloadService
         url  = sourceforge_project_download_url('git-osx-installer', name)
         name = match[1]
 
-        version = find_or_create_version_by_name(name)
+        version = find_version_by_name(name)
 
-        find_or_create_download(
-          filename:     name,
-          platform:     'mac',
-          release_date: date,
-          version:      version,
-          url:          url
-        )
+        if version
+          find_or_create_download(
+              filename: name,
+              platform: 'mac',
+              release_date: date,
+              version: version,
+              url: url
+          )
+        else
+          Rails.logger.info("Could not find version #{name}")
+        end
       end
     end
 
@@ -111,10 +122,12 @@ class DownloadService
       end
     end
 
-    def find_or_create_version_by_name(name)
-      Version.find_by(name: name) || Version.create(name: name)
-    rescue ActiveRecord::RecordNotUnique
-      retry
+    def find_version_by_name(name)
+      # We assume the preindex rake task ran previously and saved possible new versions into the storage.
+      # Otherwise this code should also create the versions, while the preindex task needs to be updated to deal
+      # with versions imported by other tasks without importing the docs.
+      # More details at https://github.com/git/git-scm.com/pull/1207.
+      Version.find_by(name: name)
     end
   end
 end
