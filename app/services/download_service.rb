@@ -30,13 +30,17 @@ class DownloadService
         version_name = match[2].slice(/^\d+\.\d+\.\d+/)
         version = find_version_by_name(version_name)
 
-        find_or_create_download(
-          filename:     name,
-          platform:     "windows#{bitness}#{portable}",
-          release_date: date,
-          version:      version,
-          url:          url
-        )
+        if version
+          find_or_create_download(
+              filename: name,
+              platform: "windows#{bitness}#{portable}",
+              release_date: date,
+              version: version,
+              url: url
+          )
+        else
+          Rails.logger.info("Could not find version #{version_name}")
+        end
       end
     end
 
@@ -52,13 +56,17 @@ class DownloadService
 
         version = find_version_by_name(name)
 
-        find_or_create_download(
-          filename:     name,
-          platform:     'mac',
-          release_date: date,
-          version:      version,
-          url:          url
-        )
+        if version
+          find_or_create_download(
+              filename: name,
+              platform: 'mac',
+              release_date: date,
+              version: version,
+              url: url
+          )
+        else
+          Rails.logger.info("Could not find version #{name}")
+        end
       end
     end
 
