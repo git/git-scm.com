@@ -73,8 +73,9 @@ class DownloadService
     private
 
     def files_from_github(repository)
+      @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
       downloads = []
-      releases  = Octokit.client.releases(repository)
+      releases  = @octokit.releases(repository)
 
       releases.each do |release|
         release.assets.each do |asset|
