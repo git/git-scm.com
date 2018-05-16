@@ -8,7 +8,7 @@ def index_doc(filter_tags, doc_list, get_content)
   rebuild = ENV['REBUILD_DOC']
   rerun = ENV['RERUN'] || rebuild || false
   
-  filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..-1])}.reverse.each do |tag|
+  filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..-1])}.each do |tag|
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
     
