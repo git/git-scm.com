@@ -74,6 +74,7 @@ var DownloadBox = {
       $("#gui-os-filter").attr('data-os', 'linux');
       $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
     } else {
+      $("#download-link").text("Download Source Code").attr("href", "https://www.kernel.org/pub/software/scm/git/");
     }
   }
 }
