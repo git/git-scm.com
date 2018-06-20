@@ -23,7 +23,7 @@ gem 'nokogiri'
 
 # Assets
 gem 'compass-rails'
-gem 'sass-rails', '4.0.3'
+gem 'sass-rails'
 gem 'uglifier', '3.2.0'
 
 group :development do
