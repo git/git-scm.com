@@ -79,7 +79,12 @@ def genbook (code, &get_content)
   alldoc = Nokogiri::HTML(html)
   number = 1
 
-  book = Book.where(:edition => 2, :code => code).first_or_create
+  book = Book.where(:edition => 2, :code => code).first
+  if book
+      book.destroy
+  end
+
+  book = Book.where(:edition => 2, :code => code).create
 
   alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index |
     chapter_title = entry.at("h2").content
