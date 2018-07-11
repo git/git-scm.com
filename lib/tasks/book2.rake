@@ -230,38 +230,39 @@ task :remote_genbook2 => :environment do
         blobs[sha] = content.force_encoding('UTF-8')
       end
       repo_tree = @octokit.tree(repo, "HEAD", :recursive => true)
-      genbook(code) do |filename|
-        file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
-        if file_handle
-          blob_content[file_handle[:sha]]
-        end
-      end
-      repo_head = @octokit.ref(repo, "heads/master").object[:sha]
-
-      book = Book.where(:edition => 2, :code => code).first_or_create
-      book.ebook_html = repo_head
-
-      begin
-        rel = @octokit.latest_release(repo)
-        get_url =   -> content_type do
-          asset = rel.assets.select { |asset| asset.content_type==content_type}.first
-          if asset
-            asset.browser_download_url
-          else
-            nil
+      Book.transaction do
+        genbook(code) do |filename|
+          file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
+          if file_handle
+            blob_content[file_handle[:sha]]
           end
         end
-        book.ebook_pdf  = get_url.call("application/pdf")
-        book.ebook_epub = get_url.call("application/epub+zip")
-        book.ebook_mobi  = get_url.call("application/x-mobipocket-ebook")
-      rescue Octokit::NotFound
-        book.ebook_pdf  = nil
-        book.ebook_epub = nil
-        book.ebook_mobi  = nil
+        repo_head = @octokit.ref(repo, "heads/master").object[:sha]
+
+        book = Book.where(:edition => 2, :code => code).first_or_create
+        book.ebook_html = repo_head
+
+        begin
+          rel = @octokit.latest_release(repo)
+          get_url =   -> content_type do
+            asset = rel.assets.select { |asset| asset.content_type==content_type}.first
+            if asset
+              asset.browser_download_url
+            else
+              nil
+            end
+          end
+          book.ebook_pdf  = get_url.call("application/pdf")
+          book.ebook_epub = get_url.call("application/epub+zip")
+          book.ebook_mobi  = get_url.call("application/x-mobipocket-ebook")
+        rescue Octokit::NotFound
+          book.ebook_pdf  = nil
+          book.ebook_epub = nil
+          book.ebook_mobi  = nil
+        end
+
+        book.save
       end
-
-      book.save
-
     rescue Exception => msg
       puts msg
     end
