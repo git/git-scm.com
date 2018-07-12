@@ -174,6 +174,10 @@ def genbook (code, &get_content)
       section += 1
       pretext = ""
     end
+    while (schapter.sections.where(:number => section).any?)
+      schapter.sections.where(:number => section).destroy_all
+      section += 1
+    end
   end
   book.sections.each do |section|
     section.set_slug
