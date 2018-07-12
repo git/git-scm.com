@@ -79,7 +79,7 @@ def genbook (code, &get_content)
   alldoc = Nokogiri::HTML(html)
   number = 1
 
-  book = Book.destroy_all(:edition => 2, :code => code)
+  Book.destroy_all(:edition => 2, :code => code)
   book = Book.create(:edition => 2, :code => code)
 
   alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index |
