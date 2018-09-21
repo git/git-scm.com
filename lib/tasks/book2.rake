@@ -277,23 +277,3 @@ task :local_genbook2 => :environment do
     end
   end
 end
-
-def self.download(url)
-  puts "downloading #{url}"
-  #return "/Users/schacon/github/progit/gitscm2/ugh/progit-en.661.zip" # for testing
-  file = File.new("#{Rails.root}/tmp/download" + Time.now.to_i.to_s + Random.new.rand(100).to_s, 'wb')
-  begin
-    uri = URI.parse(url)
-    Net::HTTP.start(uri.host,uri.port, :use_ssl => uri.scheme == 'https') do |http|
-      http.request_get(uri.path) do |resp|
-        resp.read_body do |segment|
-          file.write(segment)
-        end
-      end
-    end
-    puts "Done."
-  ensure
-    file.close
-  end
-  file.path
-end
