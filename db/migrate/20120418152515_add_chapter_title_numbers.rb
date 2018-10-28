@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddChapterTitleNumbers < ActiveRecord::Migration
   def up
     add_column :chapters, :number, :integer

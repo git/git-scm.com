@@ -1,4 +1,6 @@
-require 'iso8601'
+# frozen_string_literal: true
+
+require "iso8601"
 
 module ApplicationHelper
 
@@ -13,7 +15,7 @@ module ApplicationHelper
   end
 
   def random_tagline
-    content_tag(:em, '-' * 2) + Gitscm::TAGLINES.sample
+    content_tag(:em, "-" * 2) + Gitscm::TAGLINES.sample
   end
 
   def latest_version
@@ -26,19 +28,19 @@ module ApplicationHelper
   end
 
   def latest_mac_installer
-    @mac_installer ||= Download.latest_for 'mac'
-    @mac_installer ? @mac_installer.version.name : ''
+    @mac_installer ||= Download.latest_for "mac"
+    @mac_installer ? @mac_installer.version.name : ""
   end
 
   def latest_win_installer
-    @win_installer ||= Download.latest_for 'windows32'
-    @win_installer ? @win_installer.version.name : ''
+    @win_installer ||= Download.latest_for "windows32"
+    @win_installer ? @win_installer.version.name : ""
   end
 
   def latest_release_date
     begin
     @version ||= Version.latest_version
-    '(' + @version.committed.strftime("%Y-%m-%d") + ')'
+    "(" + @version.committed.strftime("%Y-%m-%d") + ")"
     rescue
       ""
     end

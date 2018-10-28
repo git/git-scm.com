@@ -1,4 +1,6 @@
-require 'rails_helper'
+# frozen_string_literal: true
+
+require "rails_helper"
 
 RSpec.describe Download, type: :model do
 
@@ -8,7 +10,7 @@ RSpec.describe Download, type: :model do
   it { should belong_to :version }
 
   it "should have url" do
-    expect(download.url).to eql('http://git-scm.com/git.zip')
+    expect(download.url).to eql("http://git-scm.com/git.zip")
   end
 
   it "should have version" do

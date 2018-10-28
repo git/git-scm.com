@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddXrefs < ActiveRecord::Migration
   def change
     create_table :xrefs do |t|
