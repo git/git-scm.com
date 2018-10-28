@@ -55,66 +55,17 @@ module ApplicationHelper
   def image_tag(image, options = {})
     options = options.symbolize_keys
 
-  def banner(id, options = {}, &content)
-    dismissible = options.fetch(:dismissible, false)
-    duration = options.fetch(:duration, '')
-    class_name = options.fetch(class_name, '')
     src = options[:src] = "/images/#{image}"
 
-    if dismissible and not duration.empty?
-      begin
-        duration = ISO8601::Duration.new(duration).to_seconds.round * 1000
-      rescue
-        duration = ''
-      end
     unless src =~ /^(?:cid|data):/ || src.blank?
       options[:alt] = options.fetch(:alt) { image_alt(src) }
     end
 
-    config = {
-      :id => "banner-#{id}",
-      :duration => duration
-    }
-
-    out = "<div class=\"banner-message #{class_name}\" id=\"#{config[:id]}\">"
-    out += capture(&content)
-
-    if dismissible
-      js = <<-END_JS
-      <script>
-        (function(config) {
-          var banner = document.getElementById(config.id);
-          var button = banner.querySelector('.dismiss');
-          var dismissed = parseInt(localStorage.getItem(config.id),10);
-          var duration = config.duration;
-
-          if (dismissed && (!duration || (dismissed > Date.now() - duration))) {
-            return banner.parentElement.removeChild(banner);
-          }
-
-          button && button.addEventListener('click', function() {
-            localStorage.setItem(config.id, Date.now());
-            return banner.parentElement.removeChild(banner);
-          });
-        })(#{JSON.generate(config)});
-      </script>
-      END_JS
-
-      label = "Dismiss this message"
-      button = <<-END_BUTTON
-        <button type="button"
-                class="dismiss"
-                aria-controls="#{config[:id]}"
-                aria-label="#{label}">&times;</button>
-      END_BUTTON
-      out += button
-      out += js
-    end
-
-    out += "</div>"
-
-    raw out
     tag("img", options)
   end
 
+  def banner_duration(duration)
+    return "" unless duration.present?
+    ISO8601::Duration.new(duration).to_seconds.round * 1000
+  end
 end
