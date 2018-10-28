@@ -12,10 +12,6 @@ module ApplicationHelper
     end
   end
 
-  def partial(part)
-    render part
-  end
-
   def random_tagline
     content_tag(:em, '-' * 2) + Gitscm::TAGLINES.sample
   end
