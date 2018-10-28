@@ -48,20 +48,18 @@ module ApplicationHelper
     "https://raw.github.com/git/git/master/Documentation/RelNotes/#{self.latest_version}.txt"
   end
 
-  # overriding this because we're not using asset pipeline for images,
-  # but jason is using image_tag
+  # Overriding this because we're not using asset pipeline for images,
+  # but Jason is using image_tag
+  #
+  # See https://github.com/rails/rails/blob/6b9a1ac484a4eda1b43aba7ed864952aac743ab9/actionview/lib/action_view/helpers/asset_tag_helper.rb#L180-L219
   def image_tag(image, options = {})
-    out = "<img src='/images/" + image + "'"
-    out += " width='" + options[:width].to_s + "'" if options[:width]
-    out += " height='" + options[:height].to_s + "'" if options[:height]
-    out += " />"
-    raw out
-  end
+    options = options.symbolize_keys
 
   def banner(id, options = {}, &content)
     dismissible = options.fetch(:dismissible, false)
     duration = options.fetch(:duration, '')
     class_name = options.fetch(class_name, '')
+    src = options[:src] = "/images/#{image}"
 
     if dismissible and not duration.empty?
       begin
@@ -69,6 +67,8 @@ module ApplicationHelper
       rescue
         duration = ''
       end
+    unless src =~ /^(?:cid|data):/ || src.blank?
+      options[:alt] = options.fetch(:alt) { image_alt(src) }
     end
 
     config = {
@@ -114,6 +114,7 @@ module ApplicationHelper
     out += "</div>"
 
     raw out
+    tag("img", options)
   end
 
 end
