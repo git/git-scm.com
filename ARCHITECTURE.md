@@ -136,3 +136,26 @@ Conservancy have credentials to modify the setup.
 
 Note that we own both git-scm.com and git-scm.org; the latter redirects
 to the former.
+
+
+## Manual Intervention
+
+The site mostly just runs without intervention:
+
+  - code merged to `master` is auto-deployed
+
+  - new git versions are detected daily and manpages and download links
+    updated
+
+  - book updates (including translations) are picked up daily
+
+There are a few tasks that still need to be handled by a human:
+
+  - new images added to the book have to be copied manually from
+    progit/progit2
+
+  - new languages for book translations need to be added to
+    `lib/tasks/book2.rake`
+
+  - forced re-imports of content (e.g., a formatting fix to imported
+    manpages) must be triggered manually
