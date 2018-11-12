@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 FactoryGirl.define do
 
   sequence :number do |n|
@@ -38,9 +40,9 @@ FactoryGirl.define do
   end
 
   factory :book do
-    code 'en'
+    code "en"
   end
-  
+
   factory :section do
     chapter
     html "<html></html>"
@@ -53,7 +55,7 @@ FactoryGirl.define do
   factory :chapter do
     book
     number { FactoryGirl.generate(:number) }
-    title { FactoryGirl.generate(:title) } 
+    title { FactoryGirl.generate(:title) }
   end
 
 end

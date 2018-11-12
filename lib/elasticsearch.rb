@@ -1,6 +1,8 @@
-require 'faraday'
-require 'yajl'
-require 'time'
+# frozen_string_literal: true
+
+require "faraday"
+require "yajl"
+require "time"
 
 module ElasticSearch
   class JSONResponse < Faraday::Response::Middleware
@@ -15,7 +17,7 @@ module ElasticSearch
   def self.get_connection(server)
     return unless server
 
-    Faraday.new(:url => server) do |builder|
+    Faraday.new(url: server) do |builder|
       # TODO: add timeout middleware
       builder.request  :json
       # builder.response :logger
@@ -26,7 +28,7 @@ module ElasticSearch
 
   def self.available?
     conn = get_connection
-    resp = conn.get '/'
+    resp = conn.get "/"
     resp.status == 200
   end
 
@@ -60,7 +62,7 @@ module ElasticSearch
     #
     # Returns true if the index exists, false otherwise.
     def exists?
-      get("/#{@name}/_status")['error'].nil?
+      get("/#{@name}/_status")["error"].nil?
     rescue ElasticSearch::Error
       false
     end
@@ -85,7 +87,7 @@ module ElasticSearch
     #   create_options - a hash of index creation options
     #
     # Returns a hash, the parsed response body from elasticsearch.
-    def create(create_options={})
+    def create(create_options = {})
       self.class.create @name, @server, create_options
     end
 
@@ -116,7 +118,7 @@ module ElasticSearch
     def mget(type, ids)
       get do |req|
         req.url "#{@name}/#{type}/_mget"
-        req.body = {'ids' => ids}
+        req.body = {"ids" => ids}
       end
     end
 
@@ -127,7 +129,7 @@ module ElasticSearch
     # Returns a hash, the parsed response body from elasticsearch
     def all(type)
       get do |req|
-        req.url "#{@name}/#{type}/_search", 'q' => '*'
+        req.url "#{@name}/#{type}/_search", "q" => "*"
       end
     end
 
@@ -151,8 +153,8 @@ module ElasticSearch
     #   options - options hash for this search request (optional)
     #
     # Returns a hash, the parsed response body from elasticsearch
-    def query(types, query, options={})
-      query = {'q' => query} if query.is_a?(String)
+    def query(types, query, options = {})
+      query = {"q" => query} if query.is_a?(String)
 
       get do |req|
         req.url "#{@name}/#{types}/_search", query.merge(options)
@@ -167,8 +169,8 @@ module ElasticSearch
     #   options - options hash for this search request (optional)
     #
     # Returns a hash, the parsed response body from elasticsearch
-    def count(types, query={}, options=nil)
-      query = {'q' => query} if query.is_a?(String)
+    def count(types, query = {}, options = nil)
+      query = {"q" => query} if query.is_a?(String)
 
       get do |req|
         req.url "#{@name}/#{types}/_count", query
@@ -183,7 +185,7 @@ module ElasticSearch
     #   doc  - the document to be indexed
     #
     # Returns a hash, the parsed response body from elasticsearch
-    def add(type, id, doc, params={})
+    def add(type, id, doc, params = {})
       doc.each do |key, val|
         # make sure dates are in a consistent format for indexing
         doc[key] = val.iso8601 if val.respond_to?(:iso8601)
@@ -241,12 +243,12 @@ module ElasticSearch
       properties_for_body = {}
 
       properties.each do |property|
-        properties_for_body[property.name] = { 'type' => property.type }
+        properties_for_body[property.name] = { "type" => property.type }
       end
 
       put do |req|
         req.url "#{@name}/#{type}/_mapping"
-        req.body = { type => { 'properties' => properties_for_body } }
+        req.body = { type => { "properties" => properties_for_body } }
       end
     end
 
@@ -257,7 +259,7 @@ module ElasticSearch
     #   create_options - a hash of index creation options
     #
     # Returns a new ElasticSearch::Index instance
-    def self.create(name, server, create_options={})
+    def self.create(name, server, create_options = {})
       ElasticSearch.get_connection(server).put do |req|
         req.url "/#{name}"
         req.body = create_options

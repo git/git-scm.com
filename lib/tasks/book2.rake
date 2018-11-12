@@ -1,6 +1,8 @@
-require 'nokogiri'
-require 'octokit'
-require 'pathname'
+# frozen_string_literal: true
+
+require "nokogiri"
+require "octokit"
+require "pathname"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |line|
@@ -11,7 +13,7 @@ def expand(content, path, &get_content)
     end
     new_content = get_content.call(new_fname)
     if new_content
-      expand(new_content.gsub("\xEF\xBB\xBF".force_encoding("UTF-8"), ''), new_fname) {|c| get_content.call (c)}
+      expand(new_content.gsub("\xEF\xBB\xBF".force_encoding("UTF-8"), ""), new_fname) { |c| get_content.call (c) }
     else
       puts "#{new_fname} could not be resolved for expansion"
       ""
@@ -20,15 +22,15 @@ def expand(content, path, &get_content)
 end
 
 desc "Reset book html to trigger re-build"
-task :reset_book2 => :environment do
-    Book.where(:edition => 2).each do |book|
-        book.ebook_html = '0000000000000000000000000000000000000000'
+task reset_book2: :environment do
+    Book.where(edition: 2).each do |book|
+        book.ebook_html = "0000000000000000000000000000000000000000"
         book.save
     end
 end
 
-def genbook (code, &get_content)
-  template_dir = File.join(Rails.root, 'templates')
+def genbook(code, &get_content)
+  template_dir = File.join(Rails.root, "templates")
 
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 
@@ -45,17 +47,17 @@ def genbook (code, &get_content)
   chapter_files = /(book\/[01A-C].*\/1-[^\/]*?\.asc|(?:ch[0-9]{2}|[ABC])-[^\/]*?\.asc)/
   chaps = progit.scan(chapter_files).flatten
 
-  chaps.each_with_index do |filename, index |
+  chaps.each_with_index do |filename, index|
     # select the chapter files
     if filename =~ /(book\/[01].*\/1-[^\/]*\.asc|ch[0-9]{2}-.*\.asc)/
       chnumber += 1
-      chapters ["ch#{secnumber}"] = ['chapter', chnumber, filename]
+      chapters ["ch#{secnumber}"] = ["chapter", chnumber, filename]
       secnumber += 1
     end
     # detect the appendices
     if filename =~ /(book\/[ABC].*\.asc|[ABC].*\.asc)/
       appnumber += 1
-      chapters ["ch#{secnumber}"] = ['appendix', appnumber, filename]
+      chapters ["ch#{secnumber}"] = ["appendix", appnumber, filename]
       secnumber += 1
     end
   end
@@ -73,15 +75,15 @@ def genbook (code, &get_content)
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content,template_dir: template_dir, attributes: { 'compat-mode' => true})
+  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "compat-mode" => true})
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
 
-  Book.destroy_all(:edition => 2, :code => code)
-  book = Book.create(:edition => 2, :code => code)
+  Book.destroy_all(edition: 2, code: code)
+  book = Book.create(edition: 2, code: code)
 
-  alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index |
+  alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index|
     chapter_title = entry.at("h2").content
     if !chapters["ch#{index}"]
       puts "not including #{chapter_title}\n"
@@ -94,14 +96,14 @@ def genbook (code, &get_content)
     next if !chapter_number
 
     number = chapter_number
-    if chapter_type == 'appendix'
+    if chapter_type == "appendix"
       number = 100 + chapter_number
     end
 
     pretext = entry.search("div[@class=sectionbody]/div/p").to_html
-    id_xref = chapter.at("h2").attribute('id').to_s
+    id_xref = chapter.at("h2").attribute("id").to_s
 
-    schapter = book.chapters.where(:number => number).first_or_create
+    schapter = book.chapters.where(number: number).first_or_create
     schapter.title = chapter_title.to_s
     schapter.chapter_type = chapter_type
     schapter.chapter_number = chapter_number
@@ -109,26 +111,26 @@ def genbook (code, &get_content)
     schapter.save
 
     # create xref
-    csection = schapter.sections.where(:number => 1).first_or_create
-    xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+    csection = schapter.sections.where(number: 1).first_or_create
+    xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
     xref.section = csection
     xref.save
 
     section = 1
     chapter.search("div[@class=sect2]").each do |sec|
 
-      id_xref = sec.at("h3").attribute('id').to_s
+      id_xref = sec.at("h3").attribute("id").to_s
 
       section_title = sec.at("h3").content
 
       html = sec.inner_html.to_s + nav
 
-      html.gsub!('<h3', '<h2')
-      html.gsub!(/\/h3>/, '/h2>')
-      html.gsub!('<h4', '<h3')
-      html.gsub!(/\/h4>/, '/h3>')
-      html.gsub!('<h5', '<h4')
-      html.gsub!(/\/h5>/, '/h4>')
+      html.gsub!("<h3", "<h2")
+      html.gsub!(/\/h3>/, "/h2>")
+      html.gsub!("<h4", "<h3")
+      html.gsub!(/\/h4>/, "/h3>")
+      html.gsub!("<h5", "<h4")
+      html.gsub!(/\/h5>/, "/h4>")
 
       if xlink = html.scan(/href=\"1-.*?\.html\#(.*?)\"/)
         xlink.each do |link|
@@ -153,19 +155,19 @@ def genbook (code, &get_content)
 
       puts "\t\t#{chapter_type} #{chapter_number}.#{section} : #{chapter_title} . #{section_title} - #{html.size}"
 
-      csection = schapter.sections.where(:number => section).first_or_create
+      csection = schapter.sections.where(number: section).first_or_create
       csection.title = section_title.to_s
       csection.html = pretext + html
       csection.save
 
-      xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+      xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
       xref.section = csection
       xref.save
 
       # record all the xrefs
       (sec.search(".//*[@id]")).each do |id|
-        id_xref = id.attribute('id').to_s
-        xref = Xref.where(:book_id => book.id, :name => id_xref).first_or_create
+        id_xref = id.attribute("id").to_s
+        xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
         xref.section = csection
         xref.save
       end
@@ -181,8 +183,8 @@ def genbook (code, &get_content)
 end
 
 desc "Generate book html directly from git repo"
-task :remote_genbook2 => :environment do
-  @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
+task remote_genbook2: :environment do
+  @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
   all_books = {
     "be" => "progit/progit2-be",
     "bg" => "progit/progit2-bg",
@@ -212,12 +214,12 @@ task :remote_genbook2 => :environment do
     "fa" => "progit2-fa/progit2"
   }
 
-  if ENV['GENLANG']
-    books = all_books.select { |code, repo| code == ENV['GENLANG']}
+  if ENV["GENLANG"]
+    books = all_books.select { |code, repo| code == ENV["GENLANG"] }
   else
     books = all_books.select do |code, repo|
       repo_head = @octokit.ref(repo, "heads/master").object[:sha]
-      book = Book.where(:edition => 2, :code => code).first_or_create
+      book = Book.where(edition: 2, code: code).first_or_create
       repo_head != book.ebook_html
     end
   end
@@ -225,10 +227,10 @@ task :remote_genbook2 => :environment do
   books.each do |code, repo|
     begin
       blob_content = Hash.new do |blobs, sha|
-        content = Base64.decode64( @octokit.blob(repo, sha, :encoding => 'base64' ).content )
-        blobs[sha] = content.force_encoding('UTF-8')
+        content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
+        blobs[sha] = content.force_encoding("UTF-8")
       end
-      repo_tree = @octokit.tree(repo, "HEAD", :recursive => true)
+      repo_tree = @octokit.tree(repo, "HEAD", recursive: true)
       Book.transaction do
         genbook(code) do |filename|
           file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
@@ -238,13 +240,13 @@ task :remote_genbook2 => :environment do
         end
         repo_head = @octokit.ref(repo, "heads/master").object[:sha]
 
-        book = Book.where(:edition => 2, :code => code).first_or_create
+        book = Book.where(edition: 2, code: code).first_or_create
         book.ebook_html = repo_head
 
         begin
           rel = @octokit.latest_release(repo)
-          get_url =   -> content_type do
-            asset = rel.assets.select { |asset| asset.content_type==content_type}.first
+          get_url =   -> (content_type) do
+            asset = rel.assets.select { |asset| asset.content_type==content_type }.first
             if asset
               asset.browser_download_url
             else
@@ -262,17 +264,17 @@ task :remote_genbook2 => :environment do
 
         book.save
       end
-    rescue Exception => msg
-      puts msg
+    rescue StandardError => err
+      puts err.message
     end
   end
 end
 
 desc "Generate book html directly from git repo"
-task :local_genbook2 => :environment do
-  if (ENV['GENLANG'] && ENV['GENPATH'])
-    genbook(ENV['GENLANG']) do |filename|
-      File.open(File.join(ENV['GENPATH'], filename), "r") {|infile| File.read(infile)}
+task local_genbook2: :environment do
+  if (ENV["GENLANG"] && ENV["GENPATH"])
+    genbook(ENV["GENLANG"]) do |filename|
+      File.open(File.join(ENV["GENPATH"], filename), "r") { |infile| File.read(infile) }
     end
   end
 end

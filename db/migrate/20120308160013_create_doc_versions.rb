@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateDocVersions < ActiveRecord::Migration
   def change
     create_table :doc_versions do |t|

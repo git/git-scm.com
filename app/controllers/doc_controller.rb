@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class DocController < ApplicationController
 
   before_filter :set_caching
@@ -30,7 +32,7 @@ class DocController < ApplicationController
 
   def watch
     slug = params[:id]
-    @video = Gitscm::VIDEOS.select{|a| a[4] == slug}.first
+    @video = Gitscm::VIDEOS.select { |a| a[4] == slug }.first
     if !@video
       redirect_to :videos
     end
@@ -42,11 +44,11 @@ class DocController < ApplicationController
   private
 
   def set_caching
-    expires_in 10.minutes, :public => true
+    expires_in 10.minutes, public: true
   end
 
   def set_book
-    @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
+    @book ||= Book.where(code: (params[:lang] || "en")).order("percent_complete, edition DESC").first
     raise PageNotFound unless @book
   end
 
