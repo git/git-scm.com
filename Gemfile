@@ -22,6 +22,7 @@ gem 'nokogiri'
 
 # Assets
 gem 'webpacker'
+gem 'pg', '0.21.0'
 
 group :development do
   gem "awesome_print"
@@ -49,7 +50,6 @@ group :test do
 end
 
 group :production do
-  gem 'pg', '0.21.0'
   gem 'rack-timeout'
   gem 'rails_12factor'
   gem 'redis-rails'
