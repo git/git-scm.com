@@ -1,14 +1,16 @@
+# frozen_string_literal: true
+
 PageNotFound = Class.new(Exception)
 
 class ApplicationController < ActionController::Base
   protect_from_forgery
   before_filter :determine_os
 
-  rescue_from PageNotFound, :with => :page_not_found
+  rescue_from PageNotFound, with: :page_not_found
 
   # Mac, Windows, Linux are valid
   def determine_os
-    @os = 'linux'
+    @os = "linux"
   end
 
   def set_title(title)
@@ -18,7 +20,7 @@ class ApplicationController < ActionController::Base
   private
 
   def page_not_found
-    render :file => not_found_template, :layout => false
+    render file: not_found_template, layout: false
   end
 
   def not_found_template

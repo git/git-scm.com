@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 module SiteHelper
   def highlight_no_html(high)
     strip_tags(high.to_s)
-      .gsub('[highlight]', '<span class="highlight">')
-      .gsub('[xhighlight]', '</span>')
+      .gsub("[highlight]", '<span class="highlight">')
+      .gsub("[xhighlight]", "</span>")
   end
 
   def rchart(title, data, extra = nil)
@@ -36,11 +38,11 @@ module SiteHelper
 
 
   def gchart(title, data)
-    labels = data.map {|v| v[0] }
-    vals = data.map {|v| v[1] }
-    
-    v = vals.join(',')
-    l = labels.join('|')
+    labels = data.map { |v| v[0] }
+    vals = data.map { |v| v[1] }
+
+    v = vals.join(",")
+    l = labels.join("|")
 
     scale = vals.max
     c = "<img src=\"https://chart.googleapis.com/chart?"

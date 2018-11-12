@@ -1,12 +1,14 @@
+# frozen_string_literal: true
+
 Rails.application.routes.draw do
 
-  constraints(:host => 'whygitisbetterthanx.com') do
-    root :to => 'site#redirect_wgibtx', as: :whygitisbetterthanx
+  constraints(host: "whygitisbetterthanx.com") do
+    root to: "site#redirect_wgibtx", as: :whygitisbetterthanx
   end
 
-  constraints(:host => 'progit.org') do
-    root :to => 'site#redirect_book', as: :progit
-    get '*path' => 'site#redirect_book'
+  constraints(host: "progit.org") do
+    root to: "site#redirect_book", as: :progit
+    get "*path" => "site#redirect_book"
   end
 
 #  constraints(:subdomain => 'book') do
@@ -18,7 +20,7 @@ Rails.application.routes.draw do
 
   get "/doc" => "doc#index"
   get "/docs" => "doc#ref"
-  get "/docs/howto/:file", to: redirect {|path_params, req|
+  get "/docs/howto/:file", to: redirect { |path_params, req|
     "https://github.com/git/git/blob/master/Documentation/howto/#{path_params[:file]}.txt"
   }
   get "/docs/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-\.]+/
@@ -39,16 +41,16 @@ Rails.application.routes.draw do
     get "/commands"                       => redirect("/docs")
     get "/:lang/v:edition"                => "books#show"
     get "/:lang/v:edition/:slug"          => "books#section"
-    get "/:lang/v:edition/:chapter/:link" => "books#link", chapter: /(ch|app)\d+/
-    get "/:lang"                          => "books#show", as: :lang
-    get "/:lang/:slug"                    => "books#section", as: :slug
+    get "/:lang/v:edition/:chapter/:link" => "books#link", :chapter => /(ch|app)\d+/
+    get "/:lang"                          => "books#show", :as => :lang
+    get "/:lang/:slug"                    => "books#section", :as => :slug
   end
 
   get "/download"               => "downloads#index"
   get "/download/:platform"     => "downloads#download"
   get "/download/gui/:platform" => "downloads#gui"
 
-  resources :downloads, :only => [:index] do
+  resources :downloads, only: [:index] do
     collection do
       get "/guis"       => "downloads#guis"
       get "/installers" => "downloads#installers"
@@ -76,7 +78,7 @@ Rails.application.routes.draw do
   # historical synonyms
   get "/documentation" => redirect("/doc")
   get "/documentation/reference" => redirect("/docs")
-  get "/documentation/reference/:file.html" => redirect {|path_params, req| "/docs/#{path_params[:file]}" }
+  get "/documentation/reference/:file.html" => redirect { |path_params, req| "/docs/#{path_params[:file]}" }
   get "/documentation/book" => redirect("/book")
   get "/documentation/videos" => redirect("/videos")
   get "/documentation/external-links" => redirect("doc/ext")
@@ -88,5 +90,5 @@ Rails.application.routes.draw do
 
   get "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
 
-  root :to => 'site#index'
+  root to: "site#index"
 end

@@ -1,5 +1,7 @@
-require 'test_helper'
-require 'rails/performance_test_help'
+# frozen_string_literal: true
+
+require "test_helper"
+require "rails/performance_test_help"
 require "database_cleaner"
 class BrowsingDocTest < ActionDispatch::PerformanceTest
   self.profile_options = {runs: 10, metrics: [:wall_time, :process_time]}
@@ -23,7 +25,7 @@ class BrowsingDocTest < ActionDispatch::PerformanceTest
   end
 
   test "browsing git-config" do
-    get '/docs/git-config'
+    get "/docs/git-config"
   end
 
 end

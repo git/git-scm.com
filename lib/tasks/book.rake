@@ -1,16 +1,18 @@
-require 'redcarpet'
-require 'octokit'
-require 'digest/sha1'
+# frozen_string_literal: true
+
+require "redcarpet"
+require "octokit"
+require "digest/sha1"
 
 # export GITBOOK_DIR=../../writing/progit/
 # bundle exec rake genbook GENLANG=en
 
-SCRIPT_SHA = Digest::SHA1.hexdigest(File.open('lib/tasks/book.rake', 'r').read)
+SCRIPT_SHA = Digest::SHA1.hexdigest(File.open("lib/tasks/book.rake", "r").read)
 
 def generate_pages(lang, chapter, content, sha)
-  toc = {:title => '', :sections => []}
+  toc = {title: "", sections: []}
 
-  markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML, :tables => true)
+  markdown = Redcarpet::Markdown.new(Redcarpet::Render::HTML, tables: true)
 
   content.gsub! /(\n(\n\t([^\t\n]+)\t([^\t\n]+))+\n\n)/ do
     first_col=20
@@ -46,7 +48,7 @@ def generate_pages(lang, chapter, content, sha)
   if subsec = raw.scan(/<h3>(.*?)<\/h3>/)
     subsec.each do |sub|
       sub = sub.first
-      id = sub.gsub(' ', '-')
+      id = sub.gsub(" ", "-")
       raw.gsub!(/<h3>#{sub}<\/h3>/, "<h3 id=\"#{id}\"><a href=\"##{id}\">#{sub}</a></h3>")
     end
   end
@@ -54,14 +56,14 @@ def generate_pages(lang, chapter, content, sha)
   # add a class to tables
   raw.gsub! /<table>/, "<table class='ref'>"
 
-  sections = raw.split('<h2')
+  sections = raw.split("<h2")
 
   section = 0
   # create book (if needed)
-  book = Book.where(:edition => 1, :code => lang).first_or_create
+  book = Book.where(edition: 1, code: lang).first_or_create
 
   # create chapter (if needed)
-  schapter = book.chapters.where(:number => chapter).first_or_create
+  schapter = book.chapters.where(number: chapter).first_or_create
   schapter.title = chapter_title.to_s
   schapter.sha = sha + SCRIPT_SHA
   schapter.save
@@ -70,7 +72,7 @@ def generate_pages(lang, chapter, content, sha)
 
   sections.each do |sec|
 
-    section_title = ''
+    section_title = ""
     if section_match = sec.match(/>(.*?)<\/h2>/)
       section_title = section_match[1]
       toc[:sections] << [section, section_title]
@@ -80,9 +82,9 @@ def generate_pages(lang, chapter, content, sha)
 
     full_title = section_match ? "#{chapter_title} #{section_title}" : chapter_title
 
-    html = ''
+    html = ""
     if section_match
-      sec = '<h2' + sec
+      sec = "<h2" + sec
     else
       html += "<h1>Chapter #{chapter}</h1>"
     end
@@ -93,7 +95,7 @@ def generate_pages(lang, chapter, content, sha)
     html += nav
 
     # create/update section
-    csection = schapter.sections.where(:number => section).first_or_create
+    csection = schapter.sections.where(number: section).first_or_create
     csection.title = section_title.to_s
     csection.html = html.to_s
     csection.save
@@ -108,8 +110,8 @@ end
 
 namespace :book do
   desc "Update slug name"
-  task :update_slug => :environment do
-    Book.includes(:chapters => :sections).all.each do |book|
+  task update_slug: :environment do
+    Book.includes(chapters: :sections).all.each do |book|
       book.sections.each do |section|
         section.set_slug
         section.save
@@ -119,16 +121,16 @@ namespace :book do
 end
 
 desc "Generate the book html for the sites (Using Octokit gem)"
-task :remote_genbook => :environment do
-  @octokit = Octokit::Client.new(:login => ENV['API_USER'], :password => ENV['API_PASS'])
-  repo = 'progit/progit'
+task remote_genbook: :environment do
+  @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+  repo = "progit/progit"
   book = {}
   blob_content = Hash.new do |blobs, sha|
-    content = Base64.decode64( @octokit.blob( repo, sha, :encoding => 'base64' ).content )
-    blobs[sha] = content.force_encoding('UTF-8')
+    content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
+    blobs[sha] = content.force_encoding("UTF-8")
   end
-  repo_tree = @octokit.tree(repo, "HEAD", :recursive => true)
-  trees = repo_tree.tree.map {|tree| tree if tree.path =~ /\.markdown$/}.compact
+  repo_tree = @octokit.tree(repo, "HEAD", recursive: true)
+  trees = repo_tree.tree.map { |tree| tree if tree.path =~ /\.markdown$/ }.compact
   trees.each do |tree|
     #tree = trees.first
     lang, section, chapter = tree.path.split("/")
@@ -137,15 +139,15 @@ task :remote_genbook => :environment do
 
     skip = false
 
-    if book = Book.where(:edition => 1, :code => lang).first
-      c = book.chapters.where(:number => chapter_number.to_i).first
+    if book = Book.where(edition: 1, code: lang).first
+      c = book.chapters.where(number: chapter_number.to_i).first
       if c && (c.sha == (tree.sha + SCRIPT_SHA))
         skip = true
       end
     end
 
     skip = true if chapter_number.to_i == 0
-    skip = false if ENV['REGEN_ALL']
+    skip = false if ENV["REGEN_ALL"]
 
     puts "*** #{skip} #{tree.sha}- #{lang} - #{section} - #{chapter} - #{section_number}:#{chapter_number}"
 

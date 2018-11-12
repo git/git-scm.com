@@ -1,20 +1,22 @@
+# frozen_string_literal: true
+
 class SiteController < ApplicationController
 
   def index
-    expires_in 10.minutes, :public => true
+    expires_in 10.minutes, public: true
 
     @section    = "home"
     @subsection = ""
   end
 
   def search
-    @term = sname = params['search'].to_s.downcase
+    @term = sname = params["search"].to_s.downcase
     @data = search_term(sname)
-    render :partial => 'shared/search'
+    render partial: "shared/search"
   end
 
   def search_results
-    @term = sname = params['search'].to_s.downcase
+    @term = sname = params["search"].to_s.downcase
     data = search_term(sname, true)
     @top = []
     @rest = []
@@ -29,20 +31,20 @@ class SiteController < ApplicationController
     end
     @top.sort! { |a, b| b[:score] <=> a[:score] }
     @rest.sort! { |a, b| b[:score] <=> a[:score] }
-    render "results"
+    render "site/results"
   end
 
   def search_term(sname, highlight = false)
     data = {
-      :term => sname,
-      :results => []
+      term: sname,
+      results: []
     }
 
     if results = Doc.search(sname)
       data[:results] << results
     end
 
-    if results = Section.search(sname, :lang => 'en')
+    if results = Section.search(sname, lang: "en")
       data[:results] << results
     end
 
@@ -57,8 +59,8 @@ class SiteController < ApplicationController
   end
 
   def redirect_book
-    current_uri = request.env['PATH_INFO']
-    if current_uri == '/'
+    current_uri = request.env["PATH_INFO"]
+    if current_uri == "/"
       redirect_to "https://git-scm.com/book"
     else
       redirect_to "https://git-scm.com#{current_uri}"
