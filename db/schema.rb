@@ -1,5 +1,4 @@
-# frozen_string_literal: true
-#
+# encoding: UTF-8
 # This file is auto-generated from the current state of the database. Instead
 # of editing this file, please use the migrations feature of Active Record to
 # incrementally modify your database, and then regenerate this schema definition.
@@ -13,6 +12,9 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema.define(version: 20141027114732) do
+
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "plpgsql"
 
   create_table "books", force: :cascade do |t|
     t.string   "code"
@@ -28,7 +30,7 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.string   "language"
   end
 
-  add_index "books", ["code"], name: "index_books_on_code"
+  add_index "books", ["code"], name: "index_books_on_code", using: :btree
 
   create_table "chapters", force: :cascade do |t|
     t.string   "title"
@@ -41,7 +43,7 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.string   "chapter_number"
   end
 
-  add_index "chapters", ["book_id"], name: "index_chapters_on_book_id"
+  add_index "chapters", ["book_id"], name: "index_chapters_on_book_id", using: :btree
 
   create_table "doc_files", force: :cascade do |t|
     t.string   "name"
@@ -49,7 +51,7 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.datetime "updated_at"
   end
 
-  add_index "doc_files", ["name"], name: "index_doc_files_on_name"
+  add_index "doc_files", ["name"], name: "index_doc_files_on_name", using: :btree
 
   create_table "doc_versions", force: :cascade do |t|
     t.integer  "version_id"
@@ -67,7 +69,7 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.datetime "updated_at"
   end
 
-  add_index "docs", ["blob_sha"], name: "index_docs_on_blob_sha"
+  add_index "docs", ["blob_sha"], name: "index_docs_on_blob_sha", using: :btree
 
   create_table "downloads", force: :cascade do |t|
     t.string   "url"
@@ -91,8 +93,8 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.integer  "number"
   end
 
-  add_index "sections", ["chapter_id"], name: "index_sections_on_chapter_id"
-  add_index "sections", ["slug"], name: "index_sections_on_slug"
+  add_index "sections", ["chapter_id"], name: "index_sections_on_chapter_id", using: :btree
+  add_index "sections", ["slug"], name: "index_sections_on_slug", using: :btree
 
   create_table "versions", force: :cascade do |t|
     t.string   "name"
@@ -104,7 +106,7 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.float    "vorder"
   end
 
-  add_index "versions", ["name"], name: "index_versions_on_name"
+  add_index "versions", ["name"], name: "index_versions_on_name", using: :btree
 
   create_table "xrefs", force: :cascade do |t|
     t.integer "section_id"
