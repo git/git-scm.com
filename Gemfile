@@ -13,6 +13,7 @@ gem "octokit"
 gem "puma"
 gem "tilt"
 gem "tire"
+gem "typhoeus", "~> 1.3", ">= 1.3.1"
 
 gem "diff-lcs"
 gem "json"
@@ -41,6 +42,7 @@ group :development, :test do
   gem "rubocop-github"
   gem "ruby-prof"
   gem "sqlite3"
+  gem "vcr"
 end
 
 group :test do
@@ -49,7 +51,6 @@ group :test do
   gem "rails-perftest"
   gem "rspec-rails"
   gem "shoulda-matchers"
-  gem "vcr"
   gem "webmock"
 end
 
