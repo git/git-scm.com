@@ -32,7 +32,21 @@ end
 def genbook(code, &get_content)
   template_dir = File.join(Rails.root, "templates")
 
-  nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
+  nav = '
+    <div class="flex flex-row justify-between items-center w-100">
+      <a href="[[nav-prev]]" class="link blue b">
+        <!-- Arrow left icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="v-btm"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Previous
+      </a>
+
+      <a href="[[nav-next]]" class="link blue b">
+        Next
+        <!-- Arrow right icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="v-btm"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </a>
+    </div>
+  '
 
   progit = get_content.call("progit.asc")
 
