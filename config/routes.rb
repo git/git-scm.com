@@ -17,9 +17,11 @@ Rails.application.routes.draw do
     get "/ext" => "doc#ext"
   end
 
-  scope :docs do
+  scope :docs, as: :docs do
     get "/" => "doc#ref"
+  end
 
+  scope :docs do
     get "/howto/:file", to: redirect { |path_params, _req|
       "https://github.com/git/git/blob/master/Documentation/howto/#{path_params[:file]}.txt"
     }
