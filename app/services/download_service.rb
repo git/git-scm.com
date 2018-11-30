@@ -80,7 +80,7 @@ class DownloadService
       releases  = @octokit.releases(repository)
 
       releases
-          .reject{ |release| release.prerelease || release.draft }
+          .reject { |release| release.prerelease || release.draft }
           .each do |release|
             release.assets.each do |asset|
               downloads << [
