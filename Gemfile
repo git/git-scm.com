@@ -12,7 +12,7 @@ gem "iso8601"
 gem "octokit"
 gem "puma"
 gem "tilt"
-gem "tire"
+gem "elasticsearch",  '2.0.2'
 
 gem "diff-lcs"
 gem "json"
