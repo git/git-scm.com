@@ -79,15 +79,17 @@ class DownloadService
       downloads = []
       releases  = @octokit.releases(repository)
 
-      releases.each do |release|
-        release.assets.each do |asset|
-          downloads << [
-            asset.name,
-            asset.updated_at,
-            asset.browser_download_url
-          ]
-        end
-      end
+      releases
+          .reject { |release| release.prerelease || release.draft }
+          .each do |release|
+            release.assets.each do |asset|
+              downloads << [
+                asset.name,
+                asset.updated_at,
+                asset.browser_download_url
+              ]
+            end
+          end
 
       downloads
     end
