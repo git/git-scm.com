@@ -50,7 +50,7 @@ class DocVersion < ApplicationRecord
 
     begin
       client.index index: ELASTIC_SEARCH_INDEX,
-                   type: 'man_doc',
+                   type: "man_doc",
                    id: file.name,
                    body: {
                        name: file.name,

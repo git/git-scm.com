@@ -78,7 +78,7 @@ class Section < ApplicationRecord
     code = self.book.code
     begin
       client.index index: ELASTIC_SEARCH_INDEX,
-                   type: 'book',
+                   type: "book",
                    id: "#{code}---#{self.slug}",
                    body: {
                        chapter: self.chapter.title,
