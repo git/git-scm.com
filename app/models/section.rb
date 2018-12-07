@@ -73,20 +73,20 @@ class Section < ApplicationRecord
   end
 
   def index
+    client = ElasticClient.instance
+
     code = self.book.code
-    data = {
-      "id"        => "#{code}---#{self.slug}",
-      "type"      => "book",
-      "chapter"   => self.chapter.title,
-      "section"   => self.title,
-      "number"    => self.cs_number,
-      "lang"      => code,
-      "html"      => self.html,
-    }
     begin
-      Tire.index ELASTIC_SEARCH_INDEX do
-        store data
-      end
+      client.index index: ELASTIC_SEARCH_INDEX,
+                   type: "book",
+                   id: "#{code}---#{self.slug}",
+                   body: {
+                       chapter: self.chapter.title,
+                       section: self.title,
+                       number: self.cs_number,
+                       lang: code,
+                       html: self.html
+                   }
     rescue StandardError
       nil
     end

@@ -2,10 +2,14 @@
 
 task search_clear: :environment do
   # BONSAI.clear
-  Tire.index ELASTIC_SEARCH_INDEX do
-    delete
-    create
+  client = ElasticClient.instance
+
+  if client.indices.exists? index: ELASTIC_SEARCH_INDEX
+    client.indices.delete index: ELASTIC_SEARCH_INDEX
   end
+
+  client.indices.create index: ELASTIC_SEARCH_INDEX
+
 end
 
 task search_index: :environment do

@@ -46,17 +46,17 @@ class DocVersion < ApplicationRecord
   def index
     file  = self.doc_file
     doc   = self.doc
-    data = {
-      "id"        => file.name,
-      "type"      => "doc",
-      "name"      => file.name,
-      "blob_sha"  => doc.blob_sha,
-      "text"      => doc.plain,
-    }
+    client = ElasticClient.instance
+
     begin
-      Tire.index ELASTIC_SEARCH_INDEX do
-        store data
-      end
+      client.index index: ELASTIC_SEARCH_INDEX,
+                   type: "man_doc",
+                   id: file.name,
+                   body: {
+                       name: file.name,
+                       blob_sha: doc.blob_sha,
+                       text: doc.plain
+                   }
     rescue StandardError
       nil
     end
