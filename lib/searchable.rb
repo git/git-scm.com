@@ -59,8 +59,6 @@ module Searchable
             highlight: highlight,
             url: (search_type == "book" ? "/book/#{slug}" : "/docs/#{name}")
           }
-          # TODO is meta populated?
-          hit[:meta] = result["meta"] if search_type == "book"
           ref_hits << hit
         end
         if ref_hits.size > 0
