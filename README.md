@@ -88,7 +88,7 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
 
 2. Add the image to `public/images/guis/<GUI_CLIENT_NAME>@2x.png` and `public/images/guis/<GUI_CLIENT_NAME>.png` making sure the aspect ratio matches a 588:332 image.
 
-3. Sort the tools
+3. Sort the toolscccc
     1. From the root of the repository, run: `$ ./script/sort-gui`
     2. A list of google trends url's will be displayed at the bottom if everything went well.
     3. Open each and check if the clients are sorted.
