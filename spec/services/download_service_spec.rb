@@ -7,7 +7,7 @@ RSpec.describe DownloadService do
 
   context "windows", :vcr do
     before do
-      mocked_version = Version.new(:id => 0, :name => "0.0.0", :commit_sha => "sha", :committed => Time.current, :created_at => Time.current, :updated_at => Time.current, :vorder => Version.version_to_num("0.0.0"))
+      mocked_version = Version.new(id: 0, name: "0.0.0", commit_sha: "sha", committed: Time.current, created_at: Time.current, updated_at: Time.current, vorder: Version.version_to_num("0.0.0"))
       allow(Version).to receive(:find_by).with(any_args).and_return(mocked_version)
       subject.download_windows_versions
     end
@@ -27,7 +27,7 @@ RSpec.describe DownloadService do
 
   context "mac", :vcr do
     before do
-      mocked_version = Version.new(:id => 0, :name => "0.0.0", :commit_sha => "sha", :committed => Time.current, :created_at => Time.current, :updated_at => Time.current, :vorder => Version.version_to_num("0.0.0"))
+      mocked_version = Version.new(id: 0, name: "0.0.0", commit_sha: "sha", committed: Time.current, created_at: Time.current, updated_at: Time.current, vorder: Version.version_to_num("0.0.0"))
       allow(Version).to receive(:find_by).with(any_args).and_return(mocked_version)
       subject.download_mac_versions
     end
