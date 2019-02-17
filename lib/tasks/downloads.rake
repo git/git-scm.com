@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+# rubocop:disable Style/FrozenStringLiteralComment
 
 desc "find newest mac and windows binary downloads"
 task downloads: %i[windows_downloads mac_downloads]

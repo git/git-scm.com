@@ -35,7 +35,7 @@ Rails.application.routes.draw do
     get "/ext" => redirect("/manual/ext")
   end
 
-  scope :docs do
+  scope :docs, as: :docs do
     get "/" => redirect("/manuals")
 
     get "/howto/:file", to: redirect { |path_params, _req|
@@ -113,9 +113,9 @@ Rails.application.routes.draw do
   end
 
   get "/course/svn" => "site#svn"
-  get "/sfc" => "site#sfc"
-  get "/site" => "site#about"
-  get "/trademark" => redirect("/about/trademark")
+  get "/sfc"        => "site#sfc"
+  get "/site"       => "site#about"
+  get "/trademark"  => redirect("/about/trademark")
 
   get "/contributors" => redirect("https://github.com/git/git/graphs/contributors")
 

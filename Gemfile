@@ -3,9 +3,10 @@
 source "https://rubygems.org"
 ruby "2.4.2"
 
-gem "rails", "4.2.10"
+gem "rails", "~> 4.2.10"
 
 gem "asciidoctor", ">=1.5.4"
+gem "elasticsearch", "2.0.2"
 gem "faraday"
 gem "faraday_middleware"
 gem "iso8601"
@@ -13,7 +14,6 @@ gem "octokit"
 gem "pg", "0.21.0"
 gem "puma"
 gem "tilt"
-gem "tire"
 
 gem "diff-lcs"
 gem "json"

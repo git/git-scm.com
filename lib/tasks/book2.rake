@@ -1,4 +1,4 @@
-# frozen_string_literal: true
+# rubocop:disable Style/FrozenStringLiteralComment
 
 require "nokogiri"
 require "octokit"
@@ -216,6 +216,7 @@ task remote_genbook2: :environment do
     "nl" => "progit/progit2-nl",
     "pl" => "progit2-pl/progit2-pl",
     "pt-br" => "progit2-pt-br/progit2",
+    "pt-pt" => "progit2-pt-pt/progit2",
     "ru" => "progit/progit2-ru",
     "sl" => "progit/progit2-sl",
     "sr" => "progit/progit2-sr",
