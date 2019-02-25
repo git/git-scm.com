@@ -141,6 +141,7 @@ def index_doc(filter_tags, doc_list, get_content)
         end
         dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id).first_or_create
         dv.doc_id = doc.id
+	dv.language = 'en'
         dv.save
       end
 
