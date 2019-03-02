@@ -17,7 +17,7 @@ The content is a mix of:
 
   - actual static content in this repository
 
-  - community book content brought in from https://github.com/progit2;
+  - community book content brought in from https://github.com/progit;
     see the `lib/tasks/book2.rake` file.
 
   - manpages from releases of the git project, imported and formatted
