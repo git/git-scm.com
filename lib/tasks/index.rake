@@ -80,12 +80,15 @@ def index_doc(filter_tags, doc_list, get_content)
       can_merge, can_diff = tools.transpose.map { |strs| strs.join "" }
 
       get_content_f = Proc.new do |name|
+	if name == "fmt-merge-msg.txt"
+          name = "config/fmt-merge-msg.txt"
+        end
         content_file = tag_files.detect { |ent| ent.first == "Documentation/#{name}" }
         if content_file
           new_content = get_content.call (content_file.second)
-        elsif name == "mergetools-diff.txt"
+        elsif name =~ /mergetools-diff.txt/
           new_content = can_diff
-        elsif name == "mergetools-merge.txt"
+        elsif name =~ /mergetools-merge.txt/
           new_content = can_merge
         else
           puts "can not resolve #{name}\n"
