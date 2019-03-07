@@ -48,7 +48,7 @@ def index_doc(filter_tags, doc_list, get_content)
     doc_limit = ENV["ONLY_BUILD_DOC"]
 
     # generate command-list content
-    categories = {}
+    generated = {}
     cmd = tag_files.detect { |f| f.first =~ /command-list\.txt/ }
     if cmd
       cmd_list = get_content.call(cmd.second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject { |l| l =~ /^#/ }.inject({}) do |list, cmd|
@@ -57,7 +57,7 @@ def index_doc(filter_tags, doc_list, get_content)
         list[kind] << [name, attr]
         list
       end
-      categories = cmd_list.keys.inject({}) do |list, category|
+      generated = cmd_list.keys.inject({}) do |list, category|
         links = cmd_list[category].map do |cmd, attr|
           if cmd_file = tag_files.detect { |ent| ent.first == "Documentation/#{cmd}.txt" }
             if match = get_content.call(cmd_file.second).match(/NAME\n----\n\S+ - (.*)$/)
@@ -65,7 +65,7 @@ def index_doc(filter_tags, doc_list, get_content)
             end
           end
         end
-        list.merge!("cmds-#{category}.txt" => links.compact.join("\n"))
+        list.merge!("Documentation/cmds-#{category}.txt" => links.compact.join("\n"))
       end
 
       tools = tag_files.select { |ent| ent.first =~/^mergetools\// }.map do |entry|
@@ -78,47 +78,47 @@ def index_doc(filter_tags, doc_list, get_content)
       end
 
       can_merge, can_diff = tools.transpose.map { |strs| strs.join "" }
+      generated["Documentation/mergetools-diff.txt"] = can_diff
+      generated["Documentation/mergetools-merge.txt"] = can_merge
 
       get_content_f = Proc.new do |name|
-        content_file = tag_files.detect { |ent| ent.first == "Documentation/#{name}" }
+        content_file = tag_files.detect { |ent| ent.first == name }
         if content_file
           new_content = get_content.call (content_file.second)
-        elsif name == "mergetools-diff.txt"
-          new_content = can_diff
-        elsif name == "mergetools-merge.txt"
-          new_content = can_merge
-        else
-          puts "can not resolve #{name}\n"
         end
         new_content
       end
 
-      def expand!(content, get_f_content , categories)
-        content.gsub!(/include::(\S+)\.txt/) do |line|
-          line.gsub!("include::", "")
-          if categories[line]
-            new_content = categories[line]
+      def expand(content, path, get_f_content , generated)
+        content.gsub(/include::(\S+)\.txt\[\]/) do |line|
+          if File.dirname(path)=="."
+            new_fname = "#{$1}.txt"
           else
-            new_content = get_f_content.call(line)
+            new_fname = (Pathname.new(path).dirname + Pathname.new("#{$1}.txt")).cleanpath.to_s
           end
-          if new_content
-            expand!(new_content, get_f_content, categories)
+          if generated[new_fname]
+            new_content = generated[new_fname]
+          else
+            new_content = get_f_content.call(new_fname)
+            if new_content
+              expand(new_content, new_fname, get_f_content, generated)
+            else
+              puts "#{new_fname} could not be resolved for expansion"
+            end
           end
         end
-        return content
       end
 
       doc_files.each do |entry|
         path, sha = entry
-        path = File.basename(path, ".txt")
+        docname = File.basename(path, ".txt")
         next if doc_limit && path !~ /#{doc_limit}/
 
-        file = DocFile.where(name: path).first_or_create
+        file = DocFile.where(name: docname).first_or_create
 
-        puts "   build: #{path}"
+        puts "   build: #{docname}"
 
-        content = get_content.call sha
-        expand!(content, get_content_f, categories)
+        content = expand((get_content.call sha), path, get_content_f, generated)
         content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
         asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
