@@ -89,7 +89,7 @@ def index_doc(filter_tags, doc_list, get_content)
         new_content
       end
 
-      def expand(content, path, get_f_content , generated)
+      def expand_content(content, path, get_f_content , generated)
         content.gsub(/include::(\S+)\.txt\[\]/) do |line|
           if File.dirname(path)=="."
             new_fname = "#{$1}.txt"
@@ -101,7 +101,7 @@ def index_doc(filter_tags, doc_list, get_content)
           else
             new_content = get_f_content.call(new_fname)
             if new_content
-              expand(new_content, new_fname, get_f_content, generated)
+              expand_content(new_content, new_fname, get_f_content, generated)
             else
               puts "#{new_fname} could not be resolved for expansion"
             end
@@ -118,7 +118,7 @@ def index_doc(filter_tags, doc_list, get_content)
 
         puts "   build: #{docname}"
 
-        content = expand((get_content.call sha), path, get_content_f, generated)
+        content = expand_content((get_content.call sha), path, get_content_f, generated)
         content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
         asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
