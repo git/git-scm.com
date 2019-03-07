@@ -78,8 +78,8 @@ def index_doc(filter_tags, doc_list, get_content)
       end
 
       can_merge, can_diff = tools.transpose.map { |strs| strs.join "" }
-      generated.merge!("Documentation/mergetools-diff.txt" => can_diff)
-      generated.merge!("Documentation/mergetools-merge.txt" => can_merge)
+      generated["Documentation/mergetools-diff.txt"] = can_diff
+      generated["Documentation/mergetools-merge.txt"] = can_merge
 
       get_content_f = Proc.new do |name|
         content_file = tag_files.detect { |ent| ent.first == name }
@@ -105,7 +105,7 @@ def index_doc(filter_tags, doc_list, get_content)
             else
               puts "#{new_fname} could not be resolved for expansion"
             end
-	  end
+          end
         end
       end
 
