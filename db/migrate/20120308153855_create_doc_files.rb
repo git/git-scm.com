@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class CreateDocFiles < ActiveRecord::Migration
   def change
     create_table :doc_files do |t|

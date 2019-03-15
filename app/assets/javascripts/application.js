@@ -176,7 +176,7 @@ var Search = {
   selectResultOption: function() {
     var link = $('#search-results a')[Search.selectedIndex];
     var url = $(link).attr('href');
-    if(!link) {
+    if(!url) {
       var term = $('#search-text').val();
       url = "/search/results?search=" + term;
     }

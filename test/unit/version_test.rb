@@ -1,7 +1,9 @@
-require 'test_helper'
+# frozen_string_literal: true
+
+require "test_helper"
 
 class VersionTest < ActiveSupport::TestCase
-  
+
   should have_many :doc_versions
   should have_many(:docs).through(:doc_versions)
   should have_many :downloads

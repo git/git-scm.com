@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Fabricator(:version) do
   name "1.0"
   commit_sha { SecureRandom.hex }

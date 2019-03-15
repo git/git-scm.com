@@ -1,4 +1,6 @@
-require 'test_helper'
+# frozen_string_literal: true
+
+require "test_helper"
 
 class ApplicationHelperTest < ActionView::TestCase
 
@@ -21,5 +23,5 @@ class ApplicationHelperTest < ActionView::TestCase
     url = latest_relnote_url
     assert_equal "https://raw.github.com/git/git/master/Documentation/RelNotes/MyString.txt", url
   end
-  
+
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddBookStuff < ActiveRecord::Migration
   def up
     create_table :books do |t|

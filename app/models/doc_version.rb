@@ -1,17 +1,19 @@
+# frozen_string_literal: true
+
 # t.belongs_to :version
 # t.belongs_to :doc
 # t.belongs_to :doc_file
 # t.timestamps
-class DocVersion < ActiveRecord::Base
+class DocVersion < ApplicationRecord
   belongs_to :doc
   belongs_to :version
   belongs_to :doc_file
-  
+
   scope :with_includes, -> { includes(:doc) }
-  scope :for_version, ->(version){ joins(:version).where(versions: {name: version}).limit(1).first }
-  scope :latest_version, ->{ joins(:version).order("versions.vorder DESC").limit(1).first }
-  scope :version_changes, ->{ with_includes.joins(:version).order("versions.vorder DESC") }
-  
+  scope :for_version, ->(version) { joins(:version).where(versions: {name: version}).limit(1).first }
+  scope :latest_version, -> { joins(:version).order("versions.vorder DESC").limit(1).first }
+  scope :version_changes, -> { with_includes.joins(:version).order("versions.vorder DESC") }
+
   delegate :name, to: :version
   delegate :committed, to: :version
 
@@ -28,7 +30,7 @@ class DocVersion < ActiveRecord::Base
       diff.first.each do |change|
         adds += 1 if change.action == "+"
         mins += 1 if change.action == "-"
-        total += 1 
+        total += 1
       end
       if total > 8
         min = (8.0 / total)
@@ -38,24 +40,24 @@ class DocVersion < ActiveRecord::Base
       [adds, mins, (8 - total)]
     rescue
       [0, 0, 8]
-    end 
+    end
   end
 
   def index
     file  = self.doc_file
     doc   = self.doc
-    data = {
-      'id'        => file.name,
-      'type'      => 'doc',
-      'name'      => file.name,
-      'blob_sha'  => doc.blob_sha,
-      'text'      => doc.plain,
-    }
+    client = ElasticClient.instance
+
     begin
-      Tire.index ELASTIC_SEARCH_INDEX do
-        store data
-      end
-    rescue Exception => e
+      client.index index: ELASTIC_SEARCH_INDEX,
+                   type: "man_doc",
+                   id: file.name,
+                   body: {
+                       name: file.name,
+                       blob_sha: doc.blob_sha,
+                       text: doc.plain
+                   }
+    rescue StandardError
       nil
     end
   end

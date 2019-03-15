@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
@@ -22,8 +24,8 @@ Rails.application.configure do
 
   # Disable serving static files from the `/public` folder by default since
   # Apache or NGINX already handles this.
-  config.serve_static_files = ENV['RAILS_SERVE_STATIC_FILES'].present?
-  config.static_cache_control = 'public, max-age=31536000'
+  config.serve_static_files = ENV["RAILS_SERVE_STATIC_FILES"].present?
+  config.static_cache_control = "public, max-age=31536000"
 
   # Compress JavaScripts and CSS.
   config.assets.js_compressor = :uglifier
@@ -56,7 +58,7 @@ Rails.application.configure do
   # config.logger = ActiveSupport::TaggedLogging.new(SyslogLogger.new)
 
   # Use a different cache store in production.
-  config.cache_store = :redis_store, ENV['REDIS_URL']
+  config.cache_store = :redis_store, ENV["REDIS_URL"]
 
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.action_controller.asset_host = 'http://assets.example.com'

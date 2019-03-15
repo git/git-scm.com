@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AddVersionOrder < ActiveRecord::Migration
   def up
     add_column :versions, :vorder, :float

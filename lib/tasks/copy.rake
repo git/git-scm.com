@@ -1,3 +1,5 @@
+# rubocop:disable Style/FrozenStringLiteralComment
+
 task :copy do
   puts "copying images"
   `cp -Rf ../scm-mock/source/images/* public/images/`
@@ -5,7 +7,7 @@ task :copy do
   `cp -Rf ../scm-mock/source/stylesheets/* app/assets/stylesheets/`
   puts "copying js"
   `cp -Rf ../scm-mock/source/javascripts/* app/assets/javascripts/`
-  puts 'copying layouts'
+  puts "copying layouts"
   `cp ../scm-mock/source/layout.haml app/views/layouts/layout.html.haml`
   `cp ../scm-mock/source/index.html.haml app/views/site/`
   `cp ../scm-mock/source/about/index.html.haml app/views/about/`
