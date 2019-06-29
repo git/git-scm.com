@@ -20,6 +20,7 @@ class DocController < ApplicationController
       return redirect_to doc_file_path(file: @doc_file.name)
     end
     @version  = @doc_version.version
+    @language = @doc_version.language
     @doc      = @doc_version.doc
     @page_title = "Git - #{@doc_file.name} Documentation"
     return redirect_to docs_path unless @doc_version
@@ -64,11 +65,10 @@ class DocController < ApplicationController
   def set_doc_version
     return unless @doc_file
     version = params[:version]
-    if version
+    if version && /\d+\.\d+\.\d+/ =~ version
       @doc_version = @doc_file.doc_versions.for_version(version)
     else
-      @doc_version = @doc_file.doc_versions.latest_version
+      @doc_version = @doc_file.doc_versions.latest_version(version || "en")
     end
   end
-
 end

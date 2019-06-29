@@ -11,9 +11,9 @@ class DocVersion < ApplicationRecord
   belongs_to :doc_file
 
   scope :with_includes, -> { includes(:doc) }
-  scope :for_version, ->(version) { where(:language => 'en').joins(:version).where(versions: {name: version}).limit(1).first }
-  scope :latest_version, -> {  where(:language => 'en').joins(:version).order("versions.vorder DESC").limit(1).first }
-  scope :version_changes, -> {  where(:language => 'en').with_includes.joins(:version).order("versions.vorder DESC") }
+  scope :for_version, ->(version) { where(language: "en").joins(:version).where(versions: {name: version}).limit(1).first }
+  scope :latest_version, ->(lang = "en") {  where(language: lang).joins(:version).order("versions.vorder DESC").limit(1).first }
+  scope :version_changes, -> {  where(language: "en").with_includes.joins(:version).order("versions.vorder DESC") }
 
   delegate :name, to: :version
   delegate :committed, to: :version

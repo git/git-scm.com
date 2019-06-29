@@ -1,3 +1,4 @@
+# coding: utf-8
 # frozen_string_literal: true
 
 # t.string :name
@@ -7,6 +8,18 @@ class DocFile < ApplicationRecord
   has_many :versions, through: :doc_versions
 
   scope :with_includes, -> { includes(doc_versions: [:doc, :version]) }
+
+  def languages
+    true_lang={
+      "de"=>"Deutsch",
+      "en"=>"English",
+      "fr"=>"Français",
+      "pt_BR"=>"Português (Brasil)"
+    }
+    self.doc_versions.select(:language).distinct.collect do |v|
+      [v[:language], true_lang[v[:language]] || v[:language]]
+    end
+  end
 
   def version_changes(limit_size = 100)
     unchanged_versions = []
