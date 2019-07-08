@@ -30,6 +30,16 @@ Or you can do it from GitHub (much slower) like this:
     $ export API_PASS=github_password
     $ rake preindex
 
+Similarly, you can also populate the localized man pages. From a local clone of https://github.com/jnavila/git-html-l10n :
+
+    $ GIT_REPO=../git-html-l10n/.git rake local_index_l10n
+
+Or you can do it from GitHub (much slower) like this:
+
+    $ export API_USER=github_username
+    $ export API_PASS=github_password
+    $ rake preindex_l10n
+
 Now you need to get the latest downloads for the downloads pages:
 
     $ rake downloads
