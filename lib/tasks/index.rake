@@ -42,7 +42,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         if content_file
           new_content = get_content.call (content_file.second)
         else
-          puts "can not resolve #{name}\n"
+          puts "Included file #{name} was not translated. Processing anyway\n"
         end
         [new_content, name]
     end
