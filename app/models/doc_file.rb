@@ -9,15 +9,20 @@ class DocFile < ApplicationRecord
 
   scope :with_includes, -> { includes(doc_versions: [:doc, :version]) }
 
-  def languages
-    true_lang={
+  @@true_lang={
       "de"=>"Deutsch",
       "en"=>"English",
       "fr"=>"Français",
       "pt_BR"=>"Português (Brasil)"
     }
+
+  def true_lang
+    @@true_lang
+  end
+
+  def languages
     self.doc_versions.select(:language).distinct.collect do |v|
-      [v[:language], true_lang[v[:language]] || v[:language]]
+      [v[:language], @@true_lang[v[:language]] || v[:language]]
     end
   end
 
