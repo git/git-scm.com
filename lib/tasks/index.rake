@@ -5,6 +5,106 @@ require "octokit"
 require "time"
 require "digest/sha1"
 
+
+def index_l10n_doc(filter_tags, doc_list, get_content)
+
+  ActiveRecord::Base.logger.level = Logger::WARN
+  rebuild = ENV["REBUILD_DOC"]
+  rerun = ENV["RERUN"] || rebuild || false
+
+  filter_tags.call(rebuild, false).sort_by { |tag| Version.version_to_num(tag.first[1..-1]) }.each do |tag|
+    name, commit_sha, tree_sha, ts = tag
+    puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
+
+    stag = Version.where(name: name.gsub("v", "l10n")).first_or_create
+
+    next if (stag.commit_sha == commit_sha) && !rerun
+
+    stag.commit_sha = commit_sha
+    stag.tree_sha = tree_sha
+    stag.committed = ts
+    stag.save
+
+    tag_files = doc_list.call(tree_sha)
+    doc_files = tag_files.select { |ent| ent.first =~
+        /^([_\w]+)\/(
+          (
+            git.*
+        )\.txt)/x
+    }
+
+    puts "Found #{doc_files.size} entries"
+    doc_limit = ENV["ONLY_BUILD_DOC"]
+
+    get_content_f = Proc.new do |source, target|
+      name = File.join(File.dirname(source), target)
+        content_file = tag_files.detect { |ent| ent.first == name }
+        if content_file
+          new_content = get_content.call (content_file.second)
+        else
+          puts "Included file #{name} was not translated. Processing anyway\n"
+        end
+        [new_content, name]
+    end
+
+    def expand!(path, content, get_f_content , categories)
+      content.gsub!(/include::(\S+)\.txt/) do |line|
+        line.gsub!("include::", "")
+        if categories[line]
+          new_content = categories[line]
+        else
+          new_content, path = get_f_content.call(path, line)
+        end
+        if new_content
+          expand!(path, new_content, get_f_content, categories)
+        else
+          "\n\n[WARNING]\n====\nMissing `#{path}`\n\nSee original version for this content.\n====\n\n"
+        end
+      end
+      return content
+    end
+
+    doc_files.each do |entry|
+      full_path, sha = entry
+      lang = File.dirname(full_path)
+      path = File.basename(full_path, ".txt")
+      #next if doc_limit && path !~ /#{doc_limit}/
+
+      file = DocFile.where(name: path).first_or_create
+
+      puts "   build: #{path} for #{lang}"
+
+      content = get_content.call sha
+      categories = {}
+      expand!(full_path, content, get_content_f, categories)
+      content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
+      asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
+      asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
+      doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
+      if rerun || !doc.plain || !doc.html
+        html = asciidoc.render
+        html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
+          x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
+          line = "<a href='/docs/#{x[1]}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
+        end
+        #HTML anchor on hdlist1 (i.e. command options)
+        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
+          text = $1.tr("^A-Za-z0-9-", "")
+          anchor = "#{path}-#{text}"
+          "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
+        end
+        doc.plain = asciidoc.source
+        doc.html  = html
+        doc.save
+      end
+      dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id, language: lang).first_or_create
+      dv.doc_id = doc.id
+      dv.language = lang
+      dv.save
+    end
+  end
+end
+
 def index_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV["REBUILD_DOC"]
@@ -101,7 +201,7 @@ def index_doc(filter_tags, doc_list, get_content)
           else
             new_content = get_f_content.call(new_fname)
             if new_content
-              expand_content(new_content, new_fname, get_f_content, generated)
+              expand_content(new_content.force_encoding("UTF-8"), new_fname, get_f_content, generated)
             else
               puts "#{new_fname} could not be resolved for expansion"
             end
@@ -118,7 +218,7 @@ def index_doc(filter_tags, doc_list, get_content)
 
         puts "   build: #{docname}"
 
-        content = expand_content((get_content.call sha), path, get_content_f, generated)
+        content = expand_content((get_content.call sha).force_encoding("UTF-8"), path, get_content_f, generated)
         content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
         asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
@@ -139,8 +239,9 @@ def index_doc(filter_tags, doc_list, get_content)
           doc.html  = html
           doc.save
         end
-        dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id).first_or_create
+        dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id, language: "en").first_or_create
         dv.doc_id = doc.id
+        dv.language = "en"
         dv.save
       end
 
@@ -149,23 +250,30 @@ def index_doc(filter_tags, doc_list, get_content)
   end
 end
 
-task preindex: :environment do
-
+def github_index_doc(index_fun, repo)
   Octokit.auto_paginate = true
-  @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+  if ENV["GITHUB_API_TOKEN"]
+    @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
+  else
+    @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+  end
 
-  repo = ENV["GIT_REPO"] || "gitster/git"
+  repo = ENV["GIT_REPO"] || repo
 
   blob_content = Hash.new do |blobs, sha|
     content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
-    blobs[sha] = content.encode("utf-8", undef: :replace)
+    blobs[sha] = content.force_encoding("UTF-8")
   end
 
-  tag_filter = -> (tagname) do
+  tag_filter = -> (tagname, gettags = true) do
     # find all tags
-    tags = @octokit.tags(repo).select { |tag| !tag.nil? && tag.name =~ /v\d([\.\d])+$/ }  # just get release tags
-    if tagname
-      tags = tags.select { |t| t.name == tagname }
+    if gettags
+      tags = @octokit.tags(repo).select { |tag| !tag.nil? && tag.name =~ /v\d([\.\d])+$/ }  # just get release tags
+      if tagname
+        tags = tags.select { |t| t.name == tagname }
+      end
+    else
+      tags=[Struct.new(:name).new("heads/master")]
     end
     tags.collect do |tag|
       # extract metadata
@@ -185,20 +293,23 @@ task preindex: :environment do
     tree_info.tree.collect { |ent| [ent.path, ent.sha] }
   end
 
-  index_doc(tag_filter, get_file_list, get_content)
+  send(index_fun, tag_filter, get_file_list, get_content)
 end
 
-task local_index: :environment do
-  dir     = ENV["GIT_REPO"]
+def local_index_doc(index_fun)
+  dir = ENV["GIT_REPO"]
   Dir.chdir(dir) do
 
-    tag_filter = -> (tagname) do
-
-      # find all tags
-      tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
-      tags = tags.select { |tag| tag =~ /v\d([\.\d])+$/ }  # just get release tags
-      if tagname
-        tags = tags.select { |t| t == tagname }
+    tag_filter = -> (tagname, gettags = true) do
+      if gettags
+        # find all tags
+        tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
+        tags = tags.select { |tag| tag =~ /v\d([\.\d])+$/ }  # just get release tags
+        if tagname
+          tags = tags.select { |t| t == tagname }
+        end
+      else
+        tags=["master"]
       end
       tags.collect do |tag|
         # extract metadata
@@ -219,10 +330,27 @@ task local_index: :environment do
       tree = entries. map do |e|
         mode, type, sha, path = e.split(" ")
         [path, sha]
+
       end
     end
 
-    index_doc(tag_filter, get_file_list, get_content)
+    send(index_fun, tag_filter, get_file_list, get_content)
 
   end
+end
+
+task local_index: :environment do
+  local_index_doc(:index_doc)
+end
+
+task local_index_l10n: :environment do
+  local_index_doc(:index_l10n_doc)
+end
+
+task preindex: :environment do
+  github_index_doc(:index_doc, "gitster/git")
+end
+
+task preindex_l10n: :environment do
+  github_index_doc(:index_l10n_doc, "jnavila/git-html-l10n")
 end

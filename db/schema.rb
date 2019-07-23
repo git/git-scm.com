@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20141027114732) do
+ActiveRecord::Schema.define(version: 20190131210305) do
 
   create_table "books", force: :cascade do |t|
     t.string   "code"
@@ -56,6 +56,7 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.integer  "doc_file_id"
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.string   "language",    default: "en"
   end
 
   create_table "docs", force: :cascade do |t|
@@ -76,6 +77,17 @@ ActiveRecord::Schema.define(version: 20141027114732) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.datetime "release_date"
+  end
+
+  create_table "related_items", force: :cascade do |t|
+    t.string   "name"
+    t.string   "content_type"
+    t.string   "content_url"
+    t.string   "related_type"
+    t.string   "related_id"
+    t.integer  "score"
+    t.datetime "created_at"
+    t.datetime "updated_at"
   end
 
   create_table "sections", force: :cascade do |t|
