@@ -62,10 +62,15 @@ class DocController < ApplicationController
     end
   end
 
+  helper_method :revision?
+  def revision?(name)
+    /\d+(\.\d+)+/ =~ name
+  end
+
   def set_doc_version
     return unless @doc_file
     version = params[:version]
-    if version && /\d+\.\d+\.\d+/ =~ version
+    if version && revision?(version)
       @doc_version = @doc_file.doc_versions.for_version(version)
     else
       @doc_version = @doc_file.doc_versions.latest_version(version || "en")

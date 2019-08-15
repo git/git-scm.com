@@ -3,7 +3,11 @@
 module DocHelper
 
   def man(name, text = nil)
-    link_to text || name.gsub(/^git-/, ""), doc_file_path(file: name)
+    if @language && @language != "en"
+      link_to text || name.gsub(/^git-/, ""), doc_file_path(file: name,) +"/#{@language}"
+    else
+      link_to text || name.gsub(/^git-/, ""), doc_file_path(file: name)
+    end
   end
 
   def linkify(content, section)
