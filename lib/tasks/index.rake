@@ -129,6 +129,7 @@ def index_doc(filter_tags, doc_list, get_content)
     doc_files = tag_files.select { |ent| ent.first =~
         /^Documentation\/(
           SubmittingPatches |
+          MyFirstContribution.txt |
           (
             git.* |
             everyday |
