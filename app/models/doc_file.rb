@@ -13,7 +13,11 @@ class DocFile < ApplicationRecord
       "de"=>"Deutsch",
       "en"=>"English",
       "fr"=>"Français",
-      "pt_BR"=>"Português (Brasil)"
+      "hu"=>"magyar",
+      "nb_NO"=>"Norsk bokmål",
+      "nl"=>"Nederlands",
+      "pt_BR"=>"Português (Brasil)",
+      "zh_HANS-CN" =>"简体中文"
     }
 
   def true_lang
