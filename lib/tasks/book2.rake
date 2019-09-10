@@ -189,7 +189,7 @@ task remote_genbook2: :environment do
     "be" => "progit/progit2-be",
     "bg" => "progit/progit2-bg",
     "cs" => "progit-cs/progit2-cs",
-    "de" => "progit-de/progit2",
+    "de" => "progit/progit2-de",
     "en" => "progit/progit2",
     "es" => "progit/progit2-es",
     "fr" => "progit/progit2-fr",
