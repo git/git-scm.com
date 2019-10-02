@@ -186,6 +186,7 @@ desc "Generate book html directly from git repo"
 task remote_genbook2: :environment do
   @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
   all_books = {
+    "az" => "progit2-aze/progit2",
     "be" => "progit/progit2-be",
     "bg" => "progit/progit2-bg",
     "cs" => "progit-cs/progit2-cs",
