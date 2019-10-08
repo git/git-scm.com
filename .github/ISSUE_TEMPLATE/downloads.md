@@ -1,5 +1,5 @@
 ---
-name: 'Donwloads on git-scm not working'
+name: 'Downloads on git-scm not working'
 about: 'If you are experiencing problems downloading git from git-scm.com'
 ---
 
