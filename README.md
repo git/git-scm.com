@@ -24,21 +24,29 @@ source clone like this:
 
     $ GIT_REPO=../git/.git rake local_index
 
-Or you can do it from GitHub (much slower) like this:
+This will populate the man pages for all Git versions. You can also populate them only for a specific Git version (faster):
+
+    $ version=v2.23.0
+    $ GIT_REPO=../git/.git REBUILD_DOC=$version rake local_index
+
+Or you can populate the man pages from GitHub (much slower) like this:
 
     $ export API_USER=github_username
     $ export API_PASS=github_password
-    $ rake preindex
+    $ rake preindex  # all versions
+    $ REBUILD_DOC=$version rake preindex  # specific version
 
 Similarly, you can also populate the localized man pages. From a local clone of https://github.com/jnavila/git-html-l10n :
 
-    $ GIT_REPO=../git-html-l10n/.git rake local_index_l10n
+    $ GIT_REPO=../git-html-l10n/.git rake local_index_l10n  # all versions
+    $ GIT_REPO=../git-html-l10n/.git REBUILD_DOC=$version rake local_index_l10n  # specific version
 
 Or you can do it from GitHub (much slower) like this:
 
     $ export API_USER=github_username
     $ export API_PASS=github_password
-    $ rake preindex_l10n
+    $ rake preindex_l10n  # all versions
+    $ REBUILD_DOC=$version rake preindex_l10n  # specific version
 
 Now you need to get the latest downloads for the downloads pages:
 
