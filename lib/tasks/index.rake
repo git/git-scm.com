@@ -77,7 +77,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       content = get_content.call sha
       categories = {}
       expand!(full_path, content, get_content_f, categories)
-      content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
+      content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1/#{lang}\\2[\\3]")
       asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
       asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
       doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
@@ -220,7 +220,7 @@ def index_doc(filter_tags, doc_list, get_content)
         puts "   build: #{docname}"
 
         content = expand_content((get_content.call sha).force_encoding("UTF-8"), path, get_content_f, generated)
-        content.gsub!(/link:technical\/(.*?)\.html\[(.*?)\]/, 'link:\1[\2]')
+        content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
         asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
         doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
