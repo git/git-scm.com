@@ -328,6 +328,10 @@ var AboutContent = {
     $('section').hide(0, function(){
       $('section#' + section).show();
     });
+
+    if (section == AboutContent.defaultSection) section = 'about';
+    $('.sidebar nav .expanded a').removeClass('active');
+    $('.sidebar nav .expanded a[href$=' + section + ']').addClass('active')
   },
 
   observeNav: function() {
