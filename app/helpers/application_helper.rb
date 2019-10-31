@@ -5,9 +5,11 @@ require "iso8601"
 module ApplicationHelper
 
   def sidebar_link_options(section)
-    if %w( about documentation reference book videos
-           external-links downloads guis logos community
-          ).include?(@section) && @section == section
+    if %w( about documentation downloads community
+         ).include?(@section) && @section == section ||
+       %w( reference book videos external-links
+           guis logos
+         ).include?(@subsection) && @subsection == section
       {class: "active"}
     else
       {}
