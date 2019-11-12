@@ -22,6 +22,7 @@ class DocController < ApplicationController
     @version  = @doc_version.version
     @language = @doc_version.language
     @doc      = @doc_version.doc
+    @name     = @doc_file.name
     @page_title = "Git - #{@doc_file.name} Documentation"
     return redirect_to docs_path unless @doc_version
     @last     = @doc_file.doc_versions.latest_version
