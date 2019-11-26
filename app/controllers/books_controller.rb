@@ -27,7 +27,7 @@ class BooksController < ApplicationController
   def section
     @content = @book.sections.where(slug: params[:slug]).first
     if !@content
-      @book = Book.where(code: @book.code, edition: 1).first
+      @book = Book.where(code: @book.code, edition: 2).first
       if @content = @book.sections.where(slug: params[:slug]).first
         return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
       else
