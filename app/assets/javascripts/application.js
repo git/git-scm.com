@@ -238,18 +238,16 @@ var Downloads = {
     Downloads.observeGUIOSFilter();
     Downloads.observePopState();
     Downloads.filterGUIS();
-    Downloads.autoDownload();
+    Downloads.triggerAutoDownload();
   },
 
-  autoDownload: function() {
+  triggerAutoDownload: function() {
     var ref = document.referrer;
     var src = $('#auto-download-link').attr('href');
 
     if (ref && src && ref.indexOf(document.location.origin) === 0) {
-      $('.download .hide').removeClass('hide');
-      $('<iframe frameborder="0" height="1" width="1"></iframe>')
-        .attr('src', src)
-        .appendTo('body');
+      $('.downloading .hide').show();
+      document.location = src;
     }
   },
 
