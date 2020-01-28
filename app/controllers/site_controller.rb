@@ -53,9 +53,6 @@ class SiteController < ApplicationController
     data
   end
 
-  def svn
-  end
-
   def redirect_wgibtx
     redirect_to "https://git-scm.com/about"
   end

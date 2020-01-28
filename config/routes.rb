@@ -100,7 +100,6 @@ Rails.application.routes.draw do
     get "/external-links"       => redirect("doc/ext")
   end
 
-  get "/course/svn" => "site#svn"
   get "/sfc"        => "site#sfc"
   get "/site"       => "site#about"
   get "/trademark"  => redirect("/about/trademark")
