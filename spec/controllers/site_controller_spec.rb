@@ -21,11 +21,6 @@ RSpec.describe SiteController, type: :controller do
     expect(response).to render_template("results")
   end
 
-  it "GET svn" do
-    get :svn
-    expect(response).to render_template("svn")
-  end
-
   it "GET redirect_wgibtx" do
     get :redirect_wgibtx
     expect(response).to redirect_to("https://git-scm.com/about")
