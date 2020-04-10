@@ -27,7 +27,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
 
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select { |ent| ent.first =~
-        /^([_\w]+)\/(
+        /^([-_\w]+)\/(
           (
             git.*
         )\.txt)/x
