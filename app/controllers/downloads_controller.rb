@@ -32,14 +32,11 @@ class DownloadsController < ApplicationController
   def download
     @platform = params[:platform]
     @platform = "windows" if @platform == "win"
+    @latest = Version.latest_version
     if @platform == "mac"
-      @project_url = "https://sourceforge.net/projects/git-osx-installer/"
-      @source_url   = "https://github.com/git/git/"
-
       @download = Download.latest_for(@platform)
-      @latest = Version.latest_version
 
-      render "downloads/downloading"
+      render "downloads/download_mac"
     elsif @platform == "windows"
       @project_url = "https://git-for-windows.github.io/"
       @source_url = "https://github.com/git-for-windows/git"
@@ -48,7 +45,6 @@ class DownloadsController < ApplicationController
       @download64 = Download.latest_for(@platform + "64")
       @download32portable = Download.latest_for(@platform + "32Portable")
       @download64portable = Download.latest_for(@platform + "64Portable")
-      @latest = Version.latest_version
 
       if request.env["HTTP_USER_AGENT"] =~ /WOW64|Win64/
         @download = @download64
