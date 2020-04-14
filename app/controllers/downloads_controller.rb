@@ -39,7 +39,7 @@ class DownloadsController < ApplicationController
       @download = Download.latest_for(@platform)
       @latest = Version.latest_version
 
-      render "downloads/downloading"
+      render "downloads/download_mac"
     elsif @platform == "windows"
       @project_url = "https://git-for-windows.github.io/"
       @source_url = "https://github.com/git-for-windows/git"
