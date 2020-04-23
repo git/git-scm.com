@@ -9,6 +9,7 @@ def make_asciidoc(content)
     Asciidoctor::Document.new(content,
                               attributes: {
                                 "sectanchors" => "",
+                                "litdd" => "&\#x2d;&\#x2d;",
                               },
                               doctype: "book")
 end
