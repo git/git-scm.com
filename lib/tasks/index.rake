@@ -10,7 +10,7 @@ def make_asciidoc(content)
                               attributes: {
                                 "sectanchors" => "",
                                 "litdd" => "&\#x2d;&\#x2d;",
-				"compat-mode" => "",
+                                "compat-mode" => "",
                               },
                               doctype: "book")
 end
