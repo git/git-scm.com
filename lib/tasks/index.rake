@@ -159,6 +159,7 @@ def index_doc(filter_tags, doc_list, get_content)
         /^Documentation\/(
           SubmittingPatches |
           MyFirstContribution.txt |
+          MyFirstObjectWalk.txt |
           (
             git.* |
             everyday |
