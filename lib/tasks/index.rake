@@ -62,10 +62,10 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         if categories[line]
           new_content = categories[line]
         else
-          new_content, path = get_f_content.call(path, line)
+          new_content, new_path = get_f_content.call(path, line)
         end
         if new_content
-          expand!(path, new_content, get_f_content, categories)
+          expand!(new_path, new_content, get_f_content, categories)
         else
           "\n\n[WARNING]\n====\nMissing `#{path}`\n\nSee original version for this content.\n====\n\n"
         end
