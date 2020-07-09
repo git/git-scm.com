@@ -67,7 +67,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         if new_content
           expand!(new_path, new_content, get_f_content, categories)
         else
-          "\n\n[WARNING]\n====\nMissing `#{path}`\n\nSee original version for this content.\n====\n\n"
+          "\n\n[WARNING]\n====\nMissing `#{new_path}`\n\nSee original version for this content.\n====\n\n"
         end
       end
       return content
