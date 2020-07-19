@@ -5,6 +5,15 @@ require "octokit"
 require "time"
 require "digest/sha1"
 
+def make_asciidoc(content)
+    Asciidoctor::Document.new(content,
+                              attributes: {
+                                "sectanchors" => "",
+                                "litdd" => "&\#x2d;&\#x2d;",
+                                "compat-mode" => "",
+                              },
+                              doctype: "book")
+end
 
 def index_l10n_doc(filter_tags, doc_list, get_content)
 
@@ -27,7 +36,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
 
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select { |ent| ent.first =~
-        /^([_\w]+)\/(
+        /^([-_\w]+)\/(
           (
             git.*
         )\.txt)/x
@@ -53,12 +62,12 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         if categories[line]
           new_content = categories[line]
         else
-          new_content, path = get_f_content.call(path, line)
+          new_content, new_path = get_f_content.call(path, line)
         end
         if new_content
-          expand!(path, new_content, get_f_content, categories)
+          expand!(new_path, new_content, get_f_content, categories)
         else
-          "\n\n[WARNING]\n====\nMissing `#{path}`\n\nSee original version for this content.\n====\n\n"
+          "\n\n[WARNING]\n====\nMissing `#{new_path}`\n\nSee original version for this content.\n====\n\n"
         end
       end
       return content
@@ -78,7 +87,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       categories = {}
       expand!(full_path, content, get_content_f, categories)
       content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1/#{lang}\\2[\\3]")
-      asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
+      asciidoc = make_asciidoc(content)
       asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
       doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
       if rerun || !doc.plain || !doc.html
@@ -105,12 +114,32 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
   end
 end
 
+def drop_uninteresting_tags(tags)
+    # proceed in reverse-chronological order, as we'll pick only the
+    # highest-numbered point release for older versions
+    ret = Array.new
+    tags.reverse_each do |tag|
+        numeric = Version.version_to_num(tag.first[1..-1])
+        # drop anything older than v2.0
+        next if numeric < 2000000
+        # older than v2.17, take only the highest release
+        if numeric < 2170000 and !ret.empty?
+            old = Version.version_to_num(ret[0].first[1..-1])
+            next if old.to_i.div(10000) == numeric.to_i.div(10000)
+        end
+        # keep everything else
+        ret.unshift(tag)
+    end
+    return ret
+end
+
 def index_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV["REBUILD_DOC"]
   rerun = ENV["RERUN"] || rebuild || false
 
-  filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..-1]) }.each do |tag|
+  tags = filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..-1]) }
+  drop_uninteresting_tags(tags).each do |tag|
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
@@ -130,6 +159,7 @@ def index_doc(filter_tags, doc_list, get_content)
         /^Documentation\/(
           SubmittingPatches |
           MyFirstContribution.txt |
+          MyFirstObjectWalk.txt |
           (
             git.* |
             everyday |
@@ -221,7 +251,7 @@ def index_doc(filter_tags, doc_list, get_content)
 
         content = expand_content((get_content.call sha).force_encoding("UTF-8"), path, get_content_f, generated)
         content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
-        asciidoc = Asciidoctor::Document.new(content, attributes: {"sectanchors" => ""}, doctype: "book")
+        asciidoc = make_asciidoc(content)
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
         doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
         if rerun || !doc.plain || !doc.html

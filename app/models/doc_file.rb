@@ -10,14 +10,23 @@ class DocFile < ApplicationRecord
   scope :with_includes, -> { includes(doc_versions: [:doc, :version]) }
 
   @@true_lang={
-      "de"=>"Deutsch",
-      "en"=>"English",
-      "fr"=>"Français",
-      "hu"=>"magyar",
-      "nb_NO"=>"Norsk bokmål",
-      "nl"=>"Nederlands",
-      "pt_BR"=>"Português (Brasil)",
-      "zh_HANS-CN" =>"简体中文"
+      "de" => "Deutsch",
+      "en" => "English",
+      "es_MX" => "Español (Mexico)",
+      "fr" => "Français",
+      "hu" => "magyar",
+      "id" => "Bahasa Indonesia",
+      "it" => "Italiano",
+      "mr" => "मराठी",
+      "nb_NO" => "Norsk bokmål",
+      "nl" => "Nederlands",
+      "pl" => "Polski",
+      "pt_BR" => "Português (Brasil)",
+      "pt_PT" => "Português (Portugal)",
+      "ru" => "Русский",
+      "tr" => "Türkçe",
+      "zh_HANS-CN" =>"简体中文",
+      "zh_HANT" =>"繁體中文"
     }
 
   def true_lang
