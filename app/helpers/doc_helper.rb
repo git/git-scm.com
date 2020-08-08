@@ -2,12 +2,17 @@
 
 module DocHelper
 
+<<<<<<< HEAD
   def man(name, text = nil)
     if @language && @language != "en"
       link_to text || name.gsub(/^git-/, ""), doc_file_path(file: name,) +"/#{@language}", class: ("active" if @name == name)
     else
       link_to text || name.gsub(/^git-/, ""), doc_file_path(file: name), class: ("active" if @name == name)
     end
+=======
+  def man(name, options = {})
+    link_to options[:text] || name.gsub(/^git-/, ""), doc_file_path(file: name), class: options[:class]
+>>>>>>> origin/v2
   end
 
   def linkify(content, section)

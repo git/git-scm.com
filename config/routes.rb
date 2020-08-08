@@ -12,16 +12,14 @@ Rails.application.routes.draw do
 
   get "site/index"
 
-  scope :doc, as: :doc do
+  scope :manual, as: :manual do
     get "/"    => "doc#index"
     get "/ext" => "doc#ext"
   end
 
-  scope :docs, as: :docs do
+  scope :manuals do
     get "/" => "doc#ref"
-  end
 
-  scope :docs do
     get "/howto/:file", to: redirect { |path_params, _req|
       "https://github.com/git/git/blob/master/Documentation/howto/#{path_params[:file]}.txt"
     }
@@ -29,12 +27,30 @@ Rails.application.routes.draw do
     get "/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-\.]+/
     get "/:file"      => "doc#man", :as => :doc_file,      :file => /[\w\-\.]+/
 
-    get "/:file/:version" => "doc#man", :version => /[^\/]+/
+    get "/:file/:version" => "doc#man", :version => %r{[^\/]+}
+  end
+
+  scope :doc, as: :doc do
+    get "/"    => redirect("/manual")
+    get "/ext" => redirect("/manual/ext")
+  end
+
+  scope :docs, as: :docs do
+    get "/" => redirect("/manuals")
+
+    get "/howto/:file", to: redirect { |path_params, _req|
+      "https://github.com/git/git/blob/master/Documentation/howto/#{path_params[:file]}.txt"
+    }
+
+    get "/:file.html" => redirect("/manuals/%<file>s.html"), :file => /[\w\-\.]+/
+    get "/:file"      => redirect("/manuals/%<file>s"),      :file => /[\w\-\.]+/
+
+    get "/:file/:version" => redirect("/manuals/%<file>s/%<version>s"), :version => %r{[^\/]+}
   end
 
   %w[man ref git].each do |path|
-    get "/#{path}/:file" => redirect("/docs/%{file}")
-    get "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"), :version => /[^\/]+/
+    get "/#{path}/:file" => redirect("/docs/%<file>s")
+    get "/#{path}/:file/:version" => redirect("/docs/%<file>s/%<version>s"), :version => %r{[^\/]+}
   end
 
   resource :book do
