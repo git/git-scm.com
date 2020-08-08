@@ -39,7 +39,7 @@ module Searchable
       end
 
       client = ElasticClient.instance
-      search = client.search index: ELASTIC_SEARCH_INDEX, body: query_options rescue nil
+      search = client.search index: ELASTIC_SEARCH_INDEX, body: query_options
 
       if search
         ref_hits = []
