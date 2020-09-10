@@ -202,7 +202,8 @@ task remote_genbook2: :environment do
         content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
         blobs[sha] = content.force_encoding("UTF-8")
       end
-      repo_tree = @octokit.tree(repo, "HEAD", recursive: true)
+      repo_head = @octokit.commit(repo, "HEAD").commit
+      repo_tree = @octokit.tree(repo, repo_head.tree.sha, recursive: true)
       Book.transaction do
         genbook(code) do |filename|
           file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
@@ -210,10 +211,9 @@ task remote_genbook2: :environment do
             blob_content[file_handle[:sha]]
           end
         end
-        repo_head = @octokit.commit(repo, "HEAD").commit.sha
 
         book = Book.where(edition: 2, code: code).first_or_create
-        book.ebook_html = repo_head
+        book.ebook_html = repo_head.sha
 
         begin
           rel = @octokit.latest_release(repo)
