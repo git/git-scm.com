@@ -190,7 +190,7 @@ task remote_genbook2: :environment do
     books = Book.all_books.select { |code, repo| code == ENV["GENLANG"] }
   else
     books = Book.all_books.select do |code, repo|
-      repo_head = @octokit.ref(repo, "heads/master").object[:sha]
+      repo_head = @octokit.commit(repo, "HEAD").commit.sha
       book = Book.where(edition: 2, code: code).first_or_create
       repo_head != book.ebook_html
     end
@@ -210,7 +210,7 @@ task remote_genbook2: :environment do
             blob_content[file_handle[:sha]]
           end
         end
-        repo_head = @octokit.ref(repo, "heads/master").object[:sha]
+        repo_head = @octokit.commit(repo, "HEAD").commit.sha
 
         book = Book.where(edition: 2, code: code).first_or_create
         book.ebook_html = repo_head
