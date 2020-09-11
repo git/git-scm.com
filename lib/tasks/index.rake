@@ -304,7 +304,7 @@ def github_index_doc(index_fun, repo)
         tags = tags.select { |t| t.name == tagname }
       end
     else
-      tags=[Struct.new(:name).new("heads/master")]
+      tags=[Struct.new(:name).new("HEAD")]
     end
     tags.collect do |tag|
       # extract metadata
@@ -340,7 +340,7 @@ def local_index_doc(index_fun)
           tags = tags.select { |t| t == tagname }
         end
       else
-        tags=["master"]
+        tags=["HEAD"]
       end
       tags.collect do |tag|
         # extract metadata
