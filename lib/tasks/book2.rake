@@ -190,7 +190,7 @@ task remote_genbook2: :environment do
     books = Book.all_books.select { |code, repo| code == ENV["GENLANG"] }
   else
     books = Book.all_books.select do |code, repo|
-      repo_head = @octokit.commit(repo, "HEAD").commit.sha
+      repo_head = @octokit.commit(repo, "HEAD").sha
       book = Book.where(edition: 2, code: code).first_or_create
       repo_head != book.ebook_html
     end
@@ -202,8 +202,8 @@ task remote_genbook2: :environment do
         content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
         blobs[sha] = content.force_encoding("UTF-8")
       end
-      repo_head = @octokit.commit(repo, "HEAD").commit
-      repo_tree = @octokit.tree(repo, repo_head.tree.sha, recursive: true)
+      repo_head = @octokit.commit(repo, "HEAD")
+      repo_tree = @octokit.tree(repo, repo_head.commit.tree.sha, recursive: true)
       Book.transaction do
         genbook(code) do |filename|
           file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
