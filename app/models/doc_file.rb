@@ -12,10 +12,12 @@ class DocFile < ApplicationRecord
   @@true_lang={
       "de" => "Deutsch",
       "en" => "English",
+      "es" => "Español",
       "es_MX" => "Español (Mexico)",
       "fr" => "Français",
       "hu" => "magyar",
       "id" => "Bahasa Indonesia",
+      "is" => "Íslenska",
       "it" => "Italiano",
       "mr" => "मराठी",
       "nb_NO" => "Norsk bokmål",
