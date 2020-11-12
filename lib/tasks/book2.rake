@@ -83,7 +83,7 @@ def genbook(code, &get_content)
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "compat-mode" => true, "lang" => code})
+  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "lang" => code})
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
