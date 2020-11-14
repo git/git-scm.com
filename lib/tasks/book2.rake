@@ -3,6 +3,7 @@
 require "nokogiri"
 require "octokit"
 require "pathname"
+require "open-uri"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |line|
@@ -71,11 +72,18 @@ def genbook(code, &get_content)
     end
   end
 
+  begin
+    l10n_file = open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
+  rescue
+    l10n_file = ""
+  end
+  initial_content.gsub!("include::ch01", l10n_file + "\ninclude::ch01")
+
   content = expand(initial_content, "progit.asc") { |filename| get_content.call(filename) }
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "compat-mode" => true})
+  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "lang" => code})
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
