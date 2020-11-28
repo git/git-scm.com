@@ -283,11 +283,7 @@ end
 
 def github_index_doc(index_fun, repo)
   Octokit.auto_paginate = true
-  if ENV["GITHUB_API_TOKEN"]
-    @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
-  else
-    @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
-  end
+  @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
 
   repo = ENV["GIT_REPO"] || repo
 

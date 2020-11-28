@@ -192,7 +192,7 @@ end
 
 desc "Generate book html directly from git repo"
 task remote_genbook2: :environment do
-  @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+  @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
 
   if ENV["GENLANG"]
     books = Book.all_books.select { |code, repo| code == ENV["GENLANG"] }
