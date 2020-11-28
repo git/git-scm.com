@@ -31,8 +31,7 @@ This will populate the man pages for all Git versions. You can also populate the
 
 Or you can populate the man pages from GitHub (much slower) like this:
 
-    $ export API_USER=github_username
-    $ export API_PASS=github_password
+    $ export GITHUB_API_TOKEN=github_personal_auth_token
     $ rake preindex  # all versions
     $ REBUILD_DOC=$version rake preindex  # specific version
 
@@ -43,8 +42,7 @@ Similarly, you can also populate the localized man pages. From a local clone of 
 
 Or you can do it from GitHub (much slower) like this:
 
-    $ export API_USER=github_username
-    $ export API_PASS=github_password
+    $ export GITHUB_API_TOKEN=github_personal_auth_token
     $ rake preindex_l10n  # all versions
     $ REBUILD_DOC=$version rake preindex_l10n  # specific version
 
@@ -55,8 +53,7 @@ Now you need to get the latest downloads for the downloads pages:
 Now you'll probably want some book data. You'll have
 to have access to the [Pro Git project on GitHub](https://github.com/progit/progit2) through the API.
 
-    $ export API_USER=github_username
-    $ export API_PASS=github_password
+    $ export GITHUB_API_TOKEN=github_personal_auth_token
     $ rake remote_genbook2
 
 If you have 2FA enabled, you'll need to create a [Personal Access Token](https://help.github.com/articles/creating-an-access-token-for-command-line-use/).    
