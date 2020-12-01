@@ -75,7 +75,7 @@ class DownloadService
     private
 
     def files_from_github(repository)
-      @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+      @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
       downloads = []
       releases  = @octokit.releases(repository)
 
