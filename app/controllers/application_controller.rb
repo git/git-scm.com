@@ -4,7 +4,7 @@ PageNotFound = Class.new(Exception)
 
 class ApplicationController < ActionController::Base
   protect_from_forgery
-  before_filter :determine_os
+  before_action :determine_os
 
   rescue_from PageNotFound, with: :page_not_found
 
