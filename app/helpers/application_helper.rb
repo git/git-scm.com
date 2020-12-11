@@ -61,10 +61,6 @@ module ApplicationHelper
 
     src = options[:src] = "/images/#{image}"
 
-    unless src =~ /^(?:cid|data):/ || src.blank?
-      options[:alt] = options.fetch(:alt) { image_alt(src) }
-    end
-
     tag("img", options)
   end
 
