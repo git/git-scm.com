@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-FactoryGirl.define do
+FactoryBot.define do
 
   sequence :number do |n|
     n
@@ -46,16 +46,16 @@ FactoryGirl.define do
   factory :section do
     chapter
     html "<html></html>"
-    number { FactoryGirl.generate(:number) }
-    title { FactoryGirl.generate(:title) }
-    slug { FactoryGirl.generate(:slug) }
-    plain { FactoryGirl.generate(:plain) }
+    number { FactoryBot.generate(:number) }
+    title { FactoryBot.generate(:title) }
+    slug { FactoryBot.generate(:slug) }
+    plain { FactoryBot.generate(:plain) }
   end
 
   factory :chapter do
     book
-    number { FactoryGirl.generate(:number) }
-    title { FactoryGirl.generate(:title) }
+    number { FactoryBot.generate(:number) }
+    title { FactoryBot.generate(:title) }
   end
 
 end

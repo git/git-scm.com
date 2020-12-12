@@ -10,7 +10,7 @@ class BooksControllerTest < ActionController::TestCase
   end
 
   test "gets the book page" do
-    book = FactoryGirl.create(:book, code: "en")
+    book = FactoryBot.create(:book, code: "en")
     get :show, lang: "en"
     assert_response :success
   end
@@ -19,7 +19,7 @@ class BooksControllerTest < ActionController::TestCase
   end
 
   test "gets the progit page" do
-    section = FactoryGirl.create(:section)
+    section = FactoryBot.create(:section)
     get :chapter, chapter: section.chapter.number, section: section.number
     assert_response :success
   end
