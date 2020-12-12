@@ -4,7 +4,7 @@ require "test_helper"
 require "rails/performance_test_help"
 require "database_cleaner"
 class BrowsingDocTest < ActionDispatch::PerformanceTest
-  self.profile_options = {runs: 10, metrics: [:wall_time, :process_time]}
+  self.profile_options = {runs: 10, formats: [:flat, :graph_html], metrics: [:wall_time, :process_time]}
 
   def setup
     DatabaseCleaner.strategy = :truncation
