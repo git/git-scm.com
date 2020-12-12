@@ -45,7 +45,6 @@ end
 group :test do
   gem "database_cleaner"
   gem "fabrication"
-  gem "rails-perftest"
   gem "rspec-rails"
   gem "shoulda"
   gem "vcr"
