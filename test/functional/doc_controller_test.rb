@@ -15,7 +15,7 @@ class DocControllerTest < ActionController::TestCase
     doc  = FactoryBot.create(:doc, plain: "Doc 1", blob_sha: "d670460b4b4aece5915caf5c68d12f560a9fe3e4")
     vers = FactoryBot.create(:version, name: "v1.0", vorder: Version.version_to_num("1.0"))
     dver = FactoryBot.create(:doc_version, doc_file: file, version: vers, doc: doc)
-    get :man, file: "test-command"
+    get :man, params: { file: "test-command" }
     assert_response :success
   end
 
@@ -24,7 +24,7 @@ class DocControllerTest < ActionController::TestCase
     doc  = FactoryBot.create(:doc, plain: "Doc 1", blob_sha: "d670460b4b4aece5915caf5c68d12f560a9fe3e4")
     vers = FactoryBot.create(:version, name: "v1.0", vorder: Version.version_to_num("1.0"))
     dver = FactoryBot.create(:doc_version, doc_file: file, version: vers, doc: doc)
-    get :man, file: "test-command", version: "v1.0"
+    get :man, params: { file: "test-command", version: "v1.0" }
     assert_response :success
   end
 
@@ -33,7 +33,7 @@ class DocControllerTest < ActionController::TestCase
     doc  = FactoryBot.create(:doc, plain: "Doc 1")
     vers = FactoryBot.create(:version, name: "v1.0")
     dver = FactoryBot.create(:doc_version, doc_file: file, version: vers, doc: doc)
-    get :man, file: "commit", version: "v1.0"
+    get :man, params: { file: "commit", version: "v1.0" }
     assert_redirected_to "/docs/git-commit"
   end
 
@@ -48,12 +48,12 @@ class DocControllerTest < ActionController::TestCase
   end
 
   test "should redirect to videos page" do
-    get :watch, id: "bad-slug"
+    get :watch, params: { id: "bad-slug" }
     assert_redirected_to videos_path
   end
 
   test "watches the video" do
-    get :watch, id: "get-going"
+    get :watch, params: { id: "get-going" }
     assert_response :success
   end
 
