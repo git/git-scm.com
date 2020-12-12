@@ -26,7 +26,7 @@ FactoryBot.define do
   end
 
   factory :doc do
-    plain :plain
+    plain { :plain }
   end
 
   factory :doc_version do
@@ -36,16 +36,16 @@ FactoryBot.define do
   end
 
   factory :version do
-    name :version_name
+    name { :version_name }
   end
 
   factory :book do
-    code "en"
+    code { "en" }
   end
 
   factory :section do
     chapter
-    html "<html></html>"
+    html { "<html></html>" }
     number { FactoryBot.generate(:number) }
     title { FactoryBot.generate(:title) }
     slug { FactoryBot.generate(:slug) }
