@@ -47,7 +47,7 @@ group :test do
   gem "fabrication"
   gem "rails-perftest"
   gem "rspec-rails"
-  gem "shoulda-matchers"
+  gem "shoulda"
   gem "vcr"
   gem "webmock"
   gem "factory_bot_rails"
