@@ -96,7 +96,7 @@ class DownloadService
 
     def files_from_sourceforge(repository)
       downloads = []
-      rss       = open(repository).read
+      rss       = URI.open(repository).read
       feed      = RSS::Parser.parse(rss)
 
       feed.items.each do |item|
