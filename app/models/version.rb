@@ -8,9 +8,9 @@
 class Version < ApplicationRecord
   validates :name, uniqueness: true
 
-  has_many :doc_versions
+  has_many :doc_versions, dependent: :delete_all
   has_many :docs, through: :doc_versions
-  has_many :downloads
+  has_many :downloads, dependent: :delete_all
 
   before_save :save_version_order
 

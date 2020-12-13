@@ -4,7 +4,7 @@
 # t.string :name
 # t.timestamps
 class DocFile < ApplicationRecord
-  has_many :doc_versions
+  has_many :doc_versions, dependent: :delete_all
   has_many :versions, through: :doc_versions
 
   scope :with_includes, -> { includes(doc_versions: [:doc, :version]) }

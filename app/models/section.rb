@@ -21,7 +21,7 @@ class Section < ApplicationRecord
   before_save :set_slug
   after_save :index
   has_many :sections, through: :chapter
-  has_many :xrefs
+  has_many :xrefs, dependent: :delete_all
 
   def set_slug
     if self.title
