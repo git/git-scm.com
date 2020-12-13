@@ -345,7 +345,7 @@ def local_index_doc(index_fun)
         tagger = `git cat-file commit #{tag} | grep committer`.chomp.split(" ")
         tz = tagger.pop
         ts = tagger.pop
-        ts = Time.zone.at(ts.to_i)
+        ts = Time.at(ts.to_i)
         [tag, commit_sha, tree_sha, ts]
       end
     end
