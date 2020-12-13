@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2019_01_31_210305) do
+ActiveRecord::Schema.define(version: 2020_12_13_045819) do
 
   create_table "books", force: :cascade do |t|
     t.string "code"
@@ -96,7 +96,7 @@ ActiveRecord::Schema.define(version: 2019_01_31_210305) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.float "vorder"
-    t.index ["name"], name: "index_versions_on_name"
+    t.index ["name"], name: "index_versions_on_name", unique: true
   end
 
   create_table "xrefs", force: :cascade do |t|
