@@ -22,8 +22,8 @@ gem "redcarpet"
 gem "yajl-ruby"
 
 # Assets
-gem "listen"
 gem "compass-rails"
+gem "listen"
 gem "sass-rails"
 gem "uglifier"
 
@@ -45,12 +45,12 @@ end
 group :test do
   gem "database_cleaner"
   gem "fabrication"
+  gem "factory_bot_rails"
+  gem "rails-controller-testing"
   gem "rspec-rails"
   gem "shoulda"
   gem "vcr"
   gem "webmock"
-  gem "factory_bot_rails"
-  gem "rails-controller-testing"
 end
 
 group :production do
