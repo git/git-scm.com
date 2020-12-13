@@ -65,7 +65,7 @@ module ApplicationHelper
   end
 
   def banner_duration(duration)
-    return "" unless duration.present?
+    return "" if duration.blank?
     ISO8601::Duration.new(duration).to_seconds.round * 1000
   end
 end
