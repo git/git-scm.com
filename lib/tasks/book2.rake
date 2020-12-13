@@ -31,7 +31,7 @@ task reset_book2: :environment do
 end
 
 def genbook(code, &get_content)
-  template_dir = File.join(Rails.root, "templates")
+  template_dir = Rails.root.join("templates")
 
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 

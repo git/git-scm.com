@@ -24,7 +24,7 @@ class ApplicationController < ActionController::Base
   end
 
   def not_found_template
-    File.join(Rails.root, "public/404.html")
+    Rails.root.join("public/404.html")
   end
 
 end
