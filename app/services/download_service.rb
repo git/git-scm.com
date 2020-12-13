@@ -62,7 +62,7 @@ class DownloadService
           find_or_create_download(
               filename: name,
               platform: "mac",
-              release_date: date,
+              release_date: Time.parse(date.iso8601),
               version: version,
               url: url
           )
