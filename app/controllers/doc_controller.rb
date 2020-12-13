@@ -34,7 +34,7 @@ class DocController < ApplicationController
 
   def watch
     slug = params[:id]
-    @video = Gitscm::VIDEOS.select { |a| a[4] == slug }.first
+    @video = Gitscm::VIDEOS.find { |a| a[4] == slug }
     if !@video
       redirect_to :videos
     end
