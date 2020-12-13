@@ -35,7 +35,7 @@ class Section < ApplicationRecord
   def prev_slug
     lang = self.book.code
     prev_number = self.number - 1
-    if section = self.sections.where(number: prev_number).first
+    if section = self.sections.find_by(number: prev_number)
       return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
     else
       # find previous chapter
@@ -51,7 +51,7 @@ class Section < ApplicationRecord
   def next_slug
     lang = self.book.code
     next_number = self.number + 1
-    if section = self.sections.where(number: next_number).first
+    if section = self.sections.find_by(number: next_number)
       return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
     else
       if ch = self.chapter.next
