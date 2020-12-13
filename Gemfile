@@ -22,7 +22,6 @@ gem "redcarpet"
 gem "yajl-ruby"
 
 # Assets
-gem "compass-rails"
 gem "listen"
 gem "sass-rails"
 gem "uglifier"
