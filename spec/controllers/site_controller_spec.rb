@@ -10,13 +10,13 @@ RSpec.describe SiteController, type: :controller do
   end
 
   it "GET search" do
-    get :search, {search: "git-init"}
+    get :search, params: { search: "git-init" }
     expect(assigns(:term)).to eq("git-init")
     expect(response).to render_template("shared/_search")
   end
 
   it "GET search_results" do
-    get :search_results, {search: "git-init"}
+    get :search_results, params: { search: "git-init" }
     expect(assigns(:term)).to eq("git-init")
     expect(response).to render_template("results")
   end
