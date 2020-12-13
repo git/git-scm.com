@@ -50,6 +50,7 @@ group :test do
   gem "vcr"
   gem "webmock"
   gem "factory_bot_rails"
+  gem "rails-controller-testing"
 end
 
 group :production do
