@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 source "https://rubygems.org"
-ruby "2.4.2"
+ruby "2.7.2"
 
-gem "rails", "~> 4.2.11"
+gem "rails", "~> 6.0"
 
 gem "asciidoctor", "~> 2.0.0"
 gem "elasticsearch", "2.0.2"
@@ -22,9 +22,9 @@ gem "redcarpet"
 gem "yajl-ruby"
 
 # Assets
-gem "compass-rails"
+gem "listen"
 gem "sass-rails"
-gem "uglifier", "3.2.0"
+gem "uglifier"
 
 group :development do
   gem "awesome_print"
@@ -34,7 +34,6 @@ group :development do
 end
 
 group :development, :test do
-  gem "bullet"
   gem "dotenv-rails"
   gem "pry-byebug"
   gem "rubocop-github"
@@ -45,15 +44,16 @@ end
 group :test do
   gem "database_cleaner"
   gem "fabrication"
-  gem "rails-perftest"
+  gem "factory_bot_rails"
+  gem "rails-controller-testing"
   gem "rspec-rails"
-  gem "shoulda-matchers"
+  gem "shoulda"
   gem "vcr"
   gem "webmock"
 end
 
 group :production do
-  gem "pg", "0.21.0"
+  gem "pg"
   gem "rack-timeout"
   gem "rails_12factor"
   gem "redis-rails"

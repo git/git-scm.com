@@ -4,11 +4,6 @@ require "test_helper"
 
 class ApplicationHelperTest < ActionView::TestCase
 
-  test "shows random tagline" do
-    tagline = random_tagline
-    assert tagline =~ /^<em>--<\/em>/
-  end
-
   test "gets the latest version" do
     version = latest_version
     assert_equal "MyString", version

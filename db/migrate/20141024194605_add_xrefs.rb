@@ -3,6 +3,8 @@
 class AddXrefs < ActiveRecord::Migration
   def change
     create_table :xrefs do |t|
+      t.datetime "created_at"
+      t.datetime "updated_at"
       t.integer :section_id
       t.integer :book_id
       t.string  :name

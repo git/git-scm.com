@@ -12,6 +12,6 @@ class Doc < ApplicationRecord
 
   include Searchable
 
-  has_many :doc_versions
+  has_many :doc_versions, dependent: :delete_all
 
 end

@@ -31,7 +31,7 @@ task reset_book2: :environment do
 end
 
 def genbook(code, &get_content)
-  template_dir = File.join(Rails.root, "templates")
+  template_dir = Rails.root.join("templates")
 
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 
@@ -226,7 +226,7 @@ task remote_genbook2: :environment do
         begin
           rel = @octokit.latest_release(repo)
           get_url =   -> (content_type) do
-            asset = rel.assets.select { |asset| asset.content_type==content_type }.first
+            asset = rel.assets.find { |asset| asset.content_type==content_type }
             if asset
               asset.browser_download_url
             else
