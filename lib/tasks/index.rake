@@ -189,10 +189,11 @@ def index_doc(filter_tags, doc_list, get_content)
         list
       end
       generated = cmd_list.keys.inject({}) do |list, category|
-        section = (category == "guide") ? 7 : 1
         links = cmd_list[category].map do |cmd, attr|
           if cmd_file = tag_files.detect { |ent| ent.first == "Documentation/#{cmd}.txt" }
-            if match = get_content.call(cmd_file.second).match(/NAME\n----\n\S+ - (.*)$/)
+            content = get_content.call(cmd_file.second)
+            section = content.match(/^git.*\(([1-9])\)/)[1]
+            if match = content.match(/NAME\n----\n\S+ - (.*)$/)
               "linkgit:#{cmd}[#{section}]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
             end
           end
