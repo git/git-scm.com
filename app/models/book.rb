@@ -3,9 +3,9 @@
 # t.string      :code
 # t.timestamps
 class Book < ApplicationRecord
-  has_many :chapters
+  has_many :chapters, dependent: :delete_all
   has_many :sections, through: :chapters
-  has_many :xrefs
+  has_many :xrefs, dependent: :delete_all
 
   @@all_books={
     "az" => "progit2-aze/progit2",
