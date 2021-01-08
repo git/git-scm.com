@@ -59,7 +59,7 @@ var DownloadBox = {
       $(".monitor").addClass("windows");
       $("#download-link").text("Download " + $("#installer-version").attr('data-win') + " for Windows").attr("href", "/download/win");
       $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/win");
+      $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/windows");
       $("#alt-link").removeClass("windows").addClass("mac");
       $("#alt-link").text("Mac Build").attr("href", "/download/mac");
       $("#gui-os-filter").attr('data-os', 'windows');
