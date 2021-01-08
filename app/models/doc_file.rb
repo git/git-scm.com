@@ -60,7 +60,7 @@ class DocFile < ApplicationRecord
           end
           unchanged_versions = []
         end
-        changes << {name: doc_version.name, time: doc_version.committed, diff: doc_version.diff(previous_doc_version), changed: true}
+        changes << {name: doc_version.name, time: doc_version.committed, changed: true}
       end
     end
     changes
