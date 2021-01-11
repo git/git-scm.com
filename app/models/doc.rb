@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "diff/lcs"
 require "pp"
 require "searchable"
+require "diffy"
 
 # t.text :blob_sha
 # t.text :plain

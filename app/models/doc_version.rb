@@ -24,21 +24,18 @@ class DocVersion < ApplicationRecord
   # 2: 8 - (add + sub)
   def diff(doc_version)
     begin
-      to = self.doc.plain.split("\n")
-      from = doc_version.doc.plain.split("\n")
-      total = adds = mins = 0
-      diff = Diff::LCS.diff(to, from)
-      diff.first.each do |change|
-        adds += 1 if change.action == "+"
-        mins += 1 if change.action == "-"
-        total += 1
-      end
-      if total > 8
+      diff_out = Diffy::Diff.new(self.doc.plain, doc_version.doc.plain)
+      first_chars=diff_out.to_s.gsub(/(.)[^\n]*\n/, '\1')
+      adds = first_chars.count("+")
+      mins = first_chars.count("-")
+      total = mins + adds
+      if total  > 8
         min = (8.0 / total)
-        adds = (adds * min).floor
-        mins = (mins * min).floor
+        adds = (adds * min).round
+        mins = (mins * min).round
+        total = 8
       end
-      [adds, mins, (8 - total)]
+      [adds, mins, 8 - total]
     rescue
       [0, 0, 8]
     end
