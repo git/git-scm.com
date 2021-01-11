@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class AddChapterType < ActiveRecord::Migration
+class AddChapterType < ActiveRecord::Migration[4.2]
   def change
     add_column :chapters, :chapter_type, :string, default: "chapter"
     add_column :chapters, :chapter_number, :string
