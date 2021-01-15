@@ -62,7 +62,7 @@ class DownloadService
           find_or_create_download(
               filename: name,
               platform: "mac",
-              release_date: date,
+              release_date: Time.parse(date.iso8601),
               version: version,
               url: url
           )
@@ -75,7 +75,7 @@ class DownloadService
     private
 
     def files_from_github(repository)
-      @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+      @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
       downloads = []
       releases  = @octokit.releases(repository)
 
@@ -96,7 +96,7 @@ class DownloadService
 
     def files_from_sourceforge(repository)
       downloads = []
-      rss       = open(repository).read
+      rss       = URI.open(repository).read
       feed      = RSS::Parser.parse(rss)
 
       feed.items.each do |item|

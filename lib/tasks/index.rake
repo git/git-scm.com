@@ -191,8 +191,10 @@ def index_doc(filter_tags, doc_list, get_content)
       generated = cmd_list.keys.inject({}) do |list, category|
         links = cmd_list[category].map do |cmd, attr|
           if cmd_file = tag_files.detect { |ent| ent.first == "Documentation/#{cmd}.txt" }
-            if match = get_content.call(cmd_file.second).match(/NAME\n----\n\S+ - (.*)$/)
-              "linkgit:#{cmd}[1]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
+            content = get_content.call(cmd_file.second)
+            section = content.match(/^git.*\(([1-9])\)/)[1]
+            if match = content.match(/NAME\n----\n\S+ - (.*)$/)
+              "linkgit:#{cmd}[#{section}]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
             end
           end
         end
@@ -283,11 +285,7 @@ end
 
 def github_index_doc(index_fun, repo)
   Octokit.auto_paginate = true
-  if ENV["GITHUB_API_TOKEN"]
-    @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
-  else
-    @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
-  end
+  @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
 
   repo = ENV["GIT_REPO"] || repo
 

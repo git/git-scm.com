@@ -8,7 +8,7 @@ maintainer is hit by a bus.
 
 ## Content
 
-Though the site is a rails app, it can _mostly_ be thought of a serving
+Though the site is a rails app, it can _mostly_ be thought of as serving
 static content. It's just that we suck in that static content and
 pre-process it using nightly scheduled jobs. We never write anything to
 the database on behalf of user requests.

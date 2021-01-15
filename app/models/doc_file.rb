@@ -4,7 +4,7 @@
 # t.string :name
 # t.timestamps
 class DocFile < ApplicationRecord
-  has_many :doc_versions
+  has_many :doc_versions, dependent: :delete_all
   has_many :versions, through: :doc_versions
 
   scope :with_includes, -> { includes(doc_versions: [:doc, :version]) }
@@ -12,10 +12,12 @@ class DocFile < ApplicationRecord
   @@true_lang={
       "de" => "Deutsch",
       "en" => "English",
+      "es" => "Español",
       "es_MX" => "Español (Mexico)",
       "fr" => "Français",
       "hu" => "magyar",
       "id" => "Bahasa Indonesia",
+      "is" => "Íslenska",
       "it" => "Italiano",
       "mr" => "मराठी",
       "nb_NO" => "Norsk bokmål",
@@ -58,7 +60,7 @@ class DocFile < ApplicationRecord
           end
           unchanged_versions = []
         end
-        changes << {name: doc_version.name, time: doc_version.committed, diff: doc_version.diff(previous_doc_version), changed: true}
+        changes << {name: doc_version.name, time: doc_version.committed, diff: previous_doc_version.diff(doc_version), changed: true}
       end
     end
     changes

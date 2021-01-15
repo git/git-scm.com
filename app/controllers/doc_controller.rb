@@ -2,10 +2,10 @@
 
 class DocController < ApplicationController
 
-  before_filter :set_caching
-  before_filter :set_doc_file, only: [:man]
-  before_filter :set_doc_version, only: [:man]
-  before_filter :set_book, only: [:index]
+  before_action :set_caching
+  before_action :set_doc_file, only: [:man]
+  before_action :set_doc_version, only: [:man]
+  before_action :set_book, only: [:index]
 
   def index
     @videos = Gitscm::VIDEOS
@@ -34,7 +34,7 @@ class DocController < ApplicationController
 
   def watch
     slug = params[:id]
-    @video = Gitscm::VIDEOS.select { |a| a[4] == slug }.first
+    @video = Gitscm::VIDEOS.find { |a| a[4] == slug }
     if !@video
       redirect_to :videos
     end

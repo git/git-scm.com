@@ -3,6 +3,7 @@
 require "nokogiri"
 require "octokit"
 require "pathname"
+require "open-uri"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |line|
@@ -30,7 +31,7 @@ task reset_book2: :environment do
 end
 
 def genbook(code, &get_content)
-  template_dir = File.join(Rails.root, "templates")
+  template_dir = Rails.root.join("templates")
 
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 
@@ -71,11 +72,18 @@ def genbook(code, &get_content)
     end
   end
 
+  begin
+    l10n_file = open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
+  rescue
+    l10n_file = ""
+  end
+  initial_content.gsub!("include::ch01", l10n_file + "\ninclude::ch01")
+
   content = expand(initial_content, "progit.asc") { |filename| get_content.call(filename) }
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "compat-mode" => true})
+  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "lang" => code})
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
@@ -184,7 +192,7 @@ end
 
 desc "Generate book html directly from git repo"
 task remote_genbook2: :environment do
-  @octokit = Octokit::Client.new(login: ENV["API_USER"], password: ENV["API_PASS"])
+  @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
 
   if ENV["GENLANG"]
     books = Book.all_books.select { |code, repo| code == ENV["GENLANG"] }
@@ -218,7 +226,7 @@ task remote_genbook2: :environment do
         begin
           rel = @octokit.latest_release(repo)
           get_url =   -> (content_type) do
-            asset = rel.assets.select { |asset| asset.content_type==content_type }.first
+            asset = rel.assets.find { |asset| asset.content_type==content_type }
             if asset
               asset.browser_download_url
             else

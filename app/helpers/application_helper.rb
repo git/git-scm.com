@@ -16,10 +16,6 @@ module ApplicationHelper
     end
   end
 
-  def random_tagline
-    content_tag(:em, "-" * 2) + Gitscm::TAGLINES.sample
-  end
-
   def latest_version
     begin
     @version ||= Version.latest_version
@@ -61,15 +57,11 @@ module ApplicationHelper
 
     src = options[:src] = "/images/#{image}"
 
-    unless src =~ /^(?:cid|data):/ || src.blank?
-      options[:alt] = options.fetch(:alt) { image_alt(src) }
-    end
-
     tag("img", options)
   end
 
   def banner_duration(duration)
-    return "" unless duration.present?
+    return "" if duration.blank?
     ISO8601::Duration.new(duration).to_seconds.round * 1000
   end
 end

@@ -20,17 +20,17 @@ class DownloadsControllerTest < ActionController::TestCase
   end
 
   test "should get gui page" do
-    get :gui, platform: "mac"
+    get :gui, params: { platform: "mac" }
     assert_response :success
   end
 
   test "should get download page" do
-    get :download, platform: "linux"
+    get :download, params: { platform: "linux" }
     assert_response :success
   end
 
   test "should redirect back to download page" do
-    get :download, platform: "test"
+    get :download, params: { platform: "test" }
     assert_redirected_to downloads_path
   end
 

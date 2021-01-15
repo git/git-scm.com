@@ -26,12 +26,12 @@ class SiteControllerTest < ActionController::TestCase
   end
 
   test "should get search page" do
-    get :search, search: "git-rebase"
+    get :search, params: { search: "git-rebase" }
     assert_response :success
   end
 
   test "should get some search results" do
-    get :search_results, search: "git-rebase"
+    get :search_results, params: { search: "git-rebase" }
     assert_response :success
   end
 

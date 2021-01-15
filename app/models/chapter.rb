@@ -7,20 +7,20 @@
 class Chapter < ApplicationRecord
   default_scope { order(:number) }
   belongs_to :book
-  has_many :sections
+  has_many :sections, dependent: :delete_all
   has_many :chapters, through: :book
 
   def prev
     return false unless self.number
     num = self.number - 1
-    return self.chapters.where(number: num).first if num > 0
+    return self.chapters.find_by(number: num) if num > 0
     false
   end
 
   def next
     return false unless self.number
     num = self.number + 1
-    return self.chapters.where(number: num).first if num > 0
+    return self.chapters.find_by(number: num) if num > 0
     false
   end
 

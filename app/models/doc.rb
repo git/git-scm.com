@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "diff/lcs"
 require "pp"
 require "searchable"
+require "diffy"
 
 # t.text :blob_sha
 # t.text :plain
@@ -12,6 +12,6 @@ class Doc < ApplicationRecord
 
   include Searchable
 
-  has_many :doc_versions
+  has_many :doc_versions, dependent: :delete_all
 
 end
