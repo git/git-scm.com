@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class AddXrefs < ActiveRecord::Migration
+class AddXrefs < ActiveRecord::Migration[4.2]
   def change
     create_table :xrefs do |t|
       t.datetime "created_at"
