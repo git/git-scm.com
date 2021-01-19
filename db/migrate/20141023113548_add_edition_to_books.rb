@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class AddEditionToBooks < ActiveRecord::Migration
+class AddEditionToBooks < ActiveRecord::Migration[4.2]
   def change
     add_column :books, :edition, :integer, default: 1
     add_column :books, :ebook_pdf,  :string
