@@ -14,7 +14,7 @@ gem "octokit"
 gem "puma"
 gem "tilt"
 
-gem "diff-lcs"
+gem "diffy"
 gem "launchy"
 gem "netrc"
 gem "nokogiri"
