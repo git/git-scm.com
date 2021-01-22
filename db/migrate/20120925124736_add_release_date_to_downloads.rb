@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class AddReleaseDateToDownloads < ActiveRecord::Migration
+class AddReleaseDateToDownloads < ActiveRecord::Migration[4.2]
   def change
     add_column :downloads, :release_date, :timestamp
 
