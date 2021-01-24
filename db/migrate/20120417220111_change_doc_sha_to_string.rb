@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class ChangeDocShaToString < ActiveRecord::Migration
+class ChangeDocShaToString < ActiveRecord::Migration[4.2]
   def up
     change_column :docs, :blob_sha, :string
   end

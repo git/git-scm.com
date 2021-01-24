@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class AddBookStuff < ActiveRecord::Migration
+class AddBookStuff < ActiveRecord::Migration[4.2]
   def up
     create_table :books do |t|
       t.string      :code
