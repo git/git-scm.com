@@ -100,6 +100,8 @@ ActiveRecord::Schema.define(version: 2020_12_13_045819) do
   end
 
   create_table "xrefs", force: :cascade do |t|
+    t.datetime "created_at"
+    t.datetime "updated_at"
     t.integer "section_id"
     t.integer "book_id"
     t.string "name"
