@@ -3,7 +3,6 @@
 require "nokogiri"
 require "octokit"
 require "pathname"
-require "open-uri"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |line|
@@ -71,7 +70,7 @@ def genbook(code, &get_content)
   end
 
   begin
-    l10n_file = open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
+    l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
   rescue
     l10n_file = ""
   end
