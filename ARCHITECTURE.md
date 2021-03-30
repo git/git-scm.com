@@ -61,7 +61,7 @@ know there's a new Git release out, then:
 
 will get it on the site without waiting for the nightly run.
 
-Merges to the `master` branch on GitHub auto-deploy to Heroku, so unless
+Merges to the `main` branch on GitHub auto-deploy to Heroku, so unless
 you're doing something tricky you generally shouldn't need to manually
 deploy.
 
@@ -143,7 +143,7 @@ to the former.
 
 The site mostly just runs without intervention:
 
-  - code merged to `master` is auto-deployed
+  - code merged to `main` is auto-deployed
 
   - new git versions are detected daily and manpages and download links
     updated
