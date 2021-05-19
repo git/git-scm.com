@@ -1,4 +1,4 @@
-# Git Homepage [![Build Status](https://travis-ci.org/git/git-scm.com.svg?branch=master)](https://travis-ci.org/git/git-scm.com) [![Help Contribute to Open Source](https://www.codetriage.com/git/git-scm.com/badges/users.svg)](https://www.codetriage.com/git/git-scm.com)
+# Git Homepage [![Build # Status](https://travis-ci.org/git/git-scm.com.svg?branch=main)](https://travis-ci.org/git/git-scm.com) [![Help Contribute to Open Source](https://www.codetriage.com/git/git-scm.com/badges/users.svg)](https://www.codetriage.com/git/git-scm.com)
 
 This is the web application for the [git-scm.com](https://git-scm.com) site.  It is meant to be the
 first place a person new to Git will land and download or learn about the
@@ -94,7 +94,7 @@ be accepted. If it involves code, please also write tests for it.
 
 The [list of GUI clients](https://git-scm.com/downloads/guis) has been constructed by the community for a long time. If you want to add another tool you'll need to follow a few steps:
 
-1. Add the GUI client details at the YAML file: https://github.com/git/git-scm.com/blob/master/resources/guis.yml
+1. Add the GUI client details at the YAML file: https://github.com/git/git-scm.com/blob/main/resources/guis.yml
     1. The fields `name`, `url`, `price`, `license` should be very straightforward to fill.
     2. The field `image_tag` corresponds to the filename of the image of the tool (without path, just the filename).
     3. `platforms` is a list of at least 1 platform in which the tool is supported. The possibilities are: `Windows`, `Mac`, `Linux`, `Android`, and `iOS`

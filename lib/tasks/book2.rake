@@ -3,7 +3,6 @@
 require "nokogiri"
 require "octokit"
 require "pathname"
-require "open-uri"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |line|
@@ -31,8 +30,6 @@ task reset_book2: :environment do
 end
 
 def genbook(code, &get_content)
-  template_dir = Rails.root.join("templates")
-
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 
   progit = get_content.call("progit.asc")
@@ -73,7 +70,7 @@ def genbook(code, &get_content)
   end
 
   begin
-    l10n_file = open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
+    l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
   rescue
     l10n_file = ""
   end
@@ -83,12 +80,12 @@ def genbook(code, &get_content)
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content, template_dir: template_dir, attributes: { "lang" => code})
+  asciidoc = Asciidoctor::Document.new(content, attributes: { "lang" => code})
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
 
-  Book.destroy_all(edition: 2, code: code)
+  Book.where(edition: 2, code: code).destroy_all
   book = Book.create(edition: 2, code: code)
 
   alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index|
