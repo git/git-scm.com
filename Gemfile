@@ -7,15 +7,12 @@ gem "rails", "~> 6.0"
 
 gem "asciidoctor", "~> 2.0.0"
 gem "elasticsearch", "2.0.2"
-gem "faraday"
-gem "faraday_middleware"
 gem "iso8601"
 gem "octokit"
 gem "puma"
 
 gem "diffy"
 gem "nokogiri"
-gem "yajl-ruby"
 
 # Assets
 gem "listen"
