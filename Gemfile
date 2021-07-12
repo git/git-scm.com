@@ -16,7 +16,6 @@ gem "tilt"
 
 gem "diffy"
 gem "nokogiri"
-gem "redcarpet"
 gem "yajl-ruby"
 
 # Assets
