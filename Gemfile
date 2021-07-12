@@ -12,7 +12,6 @@ gem "faraday_middleware"
 gem "iso8601"
 gem "octokit"
 gem "puma"
-gem "tilt"
 
 gem "diffy"
 gem "nokogiri"
