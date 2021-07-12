@@ -15,8 +15,6 @@ gem "puma"
 gem "tilt"
 
 gem "diffy"
-gem "launchy"
-gem "netrc"
 gem "nokogiri"
 gem "redcarpet"
 gem "yajl-ruby"
