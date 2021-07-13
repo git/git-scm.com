@@ -15,7 +15,6 @@ gem "diffy"
 gem "nokogiri"
 
 # Assets
-gem "listen"
 gem "sass-rails"
 gem "uglifier"
 
@@ -28,6 +27,7 @@ end
 
 group :development, :test do
   gem "dotenv-rails"
+  gem "listen"
   gem "pry-byebug"
   gem "rubocop-github"
   gem "ruby-prof"
