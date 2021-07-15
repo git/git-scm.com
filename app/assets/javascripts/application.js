@@ -50,14 +50,14 @@ var DownloadBox = {
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $(".monitor").addClass("mac");
-      $("#download-link").text("Download " + $("#installer-version").attr('data-mac') + " for Mac").attr("href", "/download/mac");
+      $("#download-link").text("Download for Mac").attr("href", "/download/mac");
       $("#gui-link").removeClass('mac').addClass('gui');
       $("#gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
       $("#gui-os-filter").attr('data-os', 'mac');
       $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
       $(".monitor").addClass("windows");
-      $("#download-link").text("Download " + $("#installer-version").attr('data-win') + " for Windows").attr("href", "/download/win");
+      $("#download-link").text("Download for Windows").attr("href", "/download/win");
       $("#gui-link").removeClass('mac').addClass('gui');
       $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/windows");
       $("#alt-link").removeClass("windows").addClass("mac");
@@ -66,7 +66,7 @@ var DownloadBox = {
       $("#gui-os-filter").text("Only show GUIs for my OS (Windows)")
     } else if (os == "Linux") {
       $(".monitor").addClass("linux");
-      $("#download-link").text("Downloads for Linux").attr("href", "/download/linux");
+      $("#download-link").text("Download for Linux").attr("href", "/download/linux");
       $("#gui-link").removeClass('mac').addClass('gui');
       $("#gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
       $("#alt-link").removeClass("windows").addClass("mac");
