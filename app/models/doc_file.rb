@@ -25,6 +25,7 @@ class DocFile < ApplicationRecord
       "pl" => "Polski",
       "pt_BR" => "Português (Brasil)",
       "pt_PT" => "Português (Portugal)",
+      "ro" => "Română",
       "ru" => "Русский",
       "tr" => "Türkçe",
       "zh_HANS-CN" =>"简体中文",
