@@ -19,6 +19,7 @@ class DocFile < ApplicationRecord
       "id" => "Bahasa Indonesia",
       "is" => "Íslenska",
       "it" => "Italiano",
+      "ja" => "日本語",
       "mr" => "मराठी",
       "nb_NO" => "Norsk bokmål",
       "nl" => "Nederlands",
@@ -28,6 +29,7 @@ class DocFile < ApplicationRecord
       "ro" => "Română",
       "ru" => "Русский",
       "tr" => "Türkçe",
+      "uk" => "українська мова",
       "zh_HANS-CN" =>"简体中文",
       "zh_HANT" =>"繁體中文"
     }
