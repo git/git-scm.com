@@ -8,7 +8,7 @@ maintainer is hit by a bus.
 
 ## Content
 
-Though the site is a rails app, it can _mostly_ be thought of a serving
+Though the site is a rails app, it can _mostly_ be thought of as serving
 static content. It's just that we suck in that static content and
 pre-process it using nightly scheduled jobs. We never write anything to
 the database on behalf of user requests.
@@ -17,7 +17,7 @@ The content is a mix of:
 
   - actual static content in this repository
 
-  - community book content brought in from https://github.com/progit2;
+  - community book content brought in from https://github.com/progit;
     see the `lib/tasks/book2.rake` file.
 
   - manpages from releases of the git project, imported and formatted
@@ -61,7 +61,7 @@ know there's a new Git release out, then:
 
 will get it on the site without waiting for the nightly run.
 
-Merges to the `master` branch on GitHub auto-deploy to Heroku, so unless
+Merges to the `main` branch on GitHub auto-deploy to Heroku, so unless
 you're doing something tricky you generally shouldn't need to manually
 deploy.
 
@@ -105,13 +105,14 @@ The Cloudflare setup is mostly pretty simple:
    but the long-term goal is to push that logic onto the client side as
    much as possible.
 
-There's a single Cloudflare account/password that controls the site.
-There's no team setup, but the information is in escrow with the Git PLC
-at Software Freedom Conservancy. Cloudflare provides the project with
-enough credits that it doesn't cost anything (though we're not using
-very many features, so it's possible that a free account would be
-sufficient, too).
-
+Both domains (c.f., the section on [DNS](#DNS) below) are owned by a
+Cloudflare "Team", and membership of that team is required to
+administrate the domains. Similar to the Heroku setup, you can ask to
+join this team if you wish to help out. The information about the team
+setup is in escrow with the Git PLC at Software Freedom Conservancy.
+Cloudflare provides the project with enough credits that it doesn't cost
+anything (though we're not using very many features, so it's possible
+that a free account would be sufficient, too).
 
 ## Bonsai Elasticsearch
 
@@ -142,7 +143,7 @@ to the former.
 
 The site mostly just runs without intervention:
 
-  - code merged to `master` is auto-deployed
+  - code merged to `main` is auto-deployed
 
   - new git versions are detected daily and manpages and download links
     updated

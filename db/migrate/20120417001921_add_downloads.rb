@@ -1,4 +1,6 @@
-class AddDownloads < ActiveRecord::Migration
+# frozen_string_literal: true
+
+class AddDownloads < ActiveRecord::Migration[4.2]
   def up
     create_table :downloads do |t|
       t.string :url

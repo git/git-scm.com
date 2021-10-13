@@ -1,30 +1,22 @@
-source 'https://rubygems.org'
-ruby "2.4.2"
+# frozen_string_literal: true
 
-gem 'rails', '4.2.10'
+source "https://rubygems.org"
+ruby "2.7.3"
 
-gem 'asciidoctor', '>=1.5.4'
-gem 'faraday'
-gem 'faraday_middleware'
-gem 'octokit'
-gem 'puma'
-gem 'tilt'
-gem 'tire'
-gem 'iso8601'
+gem "rails", "~> 6.0"
 
-gem 'json'
-gem 'yajl-ruby'
-gem 'netrc'
-gem 'launchy'
-gem 'rubyzip'
-gem 'diff-lcs'
-gem 'redcarpet'
-gem 'nokogiri'
+gem "asciidoctor", "~> 2.0.0"
+gem "elasticsearch", "2.0.2"
+gem "iso8601"
+gem "octokit"
+gem "puma"
+
+gem "diffy"
+gem "nokogiri"
 
 # Assets
-gem 'compass-rails'
-gem 'sass-rails', '4.0.3'
-gem 'uglifier', '3.2.0'
+gem "sass-rails"
+gem "uglifier"
 
 group :development do
   gem "awesome_print"
@@ -34,26 +26,28 @@ group :development do
 end
 
 group :development, :test do
-  gem 'dotenv-rails'
+  gem "dotenv-rails"
+  gem "listen"
+  gem "pry-byebug"
+  gem "rubocop-github"
+  gem "ruby-prof"
   gem "sqlite3"
-  gem 'pry-byebug'
-  gem 'ruby-prof'
-  gem 'bullet'
 end
 
 group :test do
-  gem 'database_cleaner'
-  gem 'fabrication'
-  gem 'rspec-rails'
-  gem 'shoulda-matchers'
-  gem 'webmock'
-  gem 'vcr'
-  gem 'rails-perftest'
+  gem "database_cleaner"
+  gem "fabrication"
+  gem "factory_bot_rails"
+  gem "rails-controller-testing"
+  gem "rspec-rails"
+  gem "shoulda"
+  gem "vcr"
+  gem "webmock"
 end
 
 group :production do
-  gem 'pg', '0.21.0'
-  gem 'rack-timeout'
-  gem 'rails_12factor'
-  gem 'redis-rails'
+  gem "pg"
+  gem "rack-timeout"
+  gem "rails_12factor"
+  gem "redis-rails"
 end

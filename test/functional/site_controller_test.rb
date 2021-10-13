@@ -1,4 +1,6 @@
-require 'test_helper'
+# frozen_string_literal: true
+
+require "test_helper"
 
 class SiteControllerTest < ActionController::TestCase
 
@@ -18,18 +20,18 @@ class SiteControllerTest < ActionController::TestCase
   end
 
   test "should redirect to any book page" do
-    @request.env['PATH_INFO'] = "/en/Git-Tools-Submodules"
+    @request.env["PATH_INFO"] = "/en/Git-Tools-Submodules"
     get :redirect_book
     assert_redirected_to "https://git-scm.com/en/Git-Tools-Submodules"
   end
 
   test "should get search page" do
-    get :search, :search => "git-rebase"
+    get :search, params: { search: "git-rebase" }
     assert_response :success
   end
 
   test "should get some search results" do
-    get :search_results, :search => "git-rebase"
+    get :search_results, params: { search: "git-rebase" }
     assert_response :success
   end
 

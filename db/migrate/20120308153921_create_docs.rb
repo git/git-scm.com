@@ -1,4 +1,6 @@
-class CreateDocs < ActiveRecord::Migration
+# frozen_string_literal: true
+
+class CreateDocs < ActiveRecord::Migration[4.2]
   def change
     create_table :docs do |t|
       t.text :blob_sha

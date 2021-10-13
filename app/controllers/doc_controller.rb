@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 class DocController < ApplicationController
 
-  before_filter :set_caching
-  before_filter :set_doc_file, only: [:man]
-  before_filter :set_doc_version, only: [:man]
-  before_filter :set_book, only: [:index]
+  before_action :set_caching
+  before_action :set_doc_file, only: [:man]
+  before_action :set_doc_version, only: [:man]
+  before_action :set_book, only: [:index]
 
   def index
     @videos = Gitscm::VIDEOS
@@ -18,7 +20,9 @@ class DocController < ApplicationController
       return redirect_to doc_file_path(file: @doc_file.name)
     end
     @version  = @doc_version.version
+    @language = @doc_version.language
     @doc      = @doc_version.doc
+    @name     = @doc_file.name
     @page_title = "Git - #{@doc_file.name} Documentation"
     return redirect_to docs_path unless @doc_version
     @last     = @doc_file.doc_versions.latest_version
@@ -30,7 +34,7 @@ class DocController < ApplicationController
 
   def watch
     slug = params[:id]
-    @video = Gitscm::VIDEOS.select{|a| a[4] == slug}.first
+    @video = Gitscm::VIDEOS.find { |a| a[4] == slug }
     if !@video
       redirect_to :videos
     end
@@ -42,11 +46,11 @@ class DocController < ApplicationController
   private
 
   def set_caching
-    expires_in 10.minutes, :public => true
+    expires_in 10.minutes, public: true
   end
 
   def set_book
-    @book ||= Book.where(:code => (params[:lang] || "en")).order("percent_complete, edition DESC").first
+    @book ||= Book.where(code: (params[:lang] || "en")).order("percent_complete, edition DESC").first
     raise PageNotFound unless @book
   end
 
@@ -59,14 +63,18 @@ class DocController < ApplicationController
     end
   end
 
+  helper_method :revision?
+  def revision?(name)
+    /\d+(\.\d+)+/ =~ name
+  end
+
   def set_doc_version
     return unless @doc_file
     version = params[:version]
-    if version
+    if version && revision?(version)
       @doc_version = @doc_file.doc_versions.for_version(version)
     else
-      @doc_version = @doc_file.doc_versions.latest_version
+      @doc_version = @doc_file.doc_versions.latest_version(version || "en")
     end
   end
-
 end
