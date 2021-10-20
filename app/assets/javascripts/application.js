@@ -28,6 +28,7 @@ $(document).ready(function() {
   Downloads.init();
   DownloadBox.init();
   AboutContent.init();
+  FloatSidebar.init();
 });
 
 function onPopState(fn) {
@@ -364,3 +365,57 @@ var AboutContent = {
     });
   }
 }
+
+var FloatSidebar = {
+  init: function() {
+    FloatSidebar.observeTriggers();
+  },
+  
+  observeTriggers: function() {
+    var sidebarId = $('#sidebar'),
+    sidebarBtn = $('.sidebar-btn');
+    if (window.matchMedia('(min-width: 992px)').matches) {
+      sidebarId.removeClass('active');
+    }
+    sidebarBtn.click(function(e) {
+      e.preventDefault();
+      if (sidebarId.hasClass('active')) {
+        toggleOverlay(0);
+        sidebarId.removeClass('active');
+        $('.sidebar-btn img').attr("src", "/images/icons/sidebar@2x.png");
+      }
+      else {
+        toggleOverlay(1);
+        sidebarId.addClass('active');
+        $('.sidebar-btn img').attr("src", "/images/icons/dismiss@2x.png");      
+      }
+    });
+    // Active slider over
+    function toggleOverlay(state){
+      if(state) {
+        $('html').css('overflow', 'hidden');
+        $('#overlay').css('z-index', 1);
+      } else {
+        $('html').css('overflow', 'unset');
+        $('#overlay').css('z-index', -1);
+      }
+    }
+
+    // About nav thumbnails collapse sidebar
+    $('#overlay').click(function () {
+      sidebarBtn.trigger('click');
+    })
+  }
+}
+// Scroll to Top
+$(window).scroll(function() {
+  $(this).scrollTop() > 150 
+    ? $('#scrollToTop').fadeIn() 
+    : $('#scrollToTop').fadeOut();
+});
+$('#scrollToTop').click(function() {
+  $("html, body").animate({
+      scrollTop: 0
+  }, "slow");
+  return false;
+});
