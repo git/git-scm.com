@@ -394,7 +394,7 @@ var FloatSidebar = {
     function toggleOverlay(state){
       if(state) {
         $('html').css('overflow', 'hidden');
-        $('#overlay').css('z-index', 1);
+        $('#overlay').css('z-index', 300);
       } else {
         $('html').css('overflow', 'unset');
         $('#overlay').css('z-index', -1);
