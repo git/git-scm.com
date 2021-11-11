@@ -368,8 +368,8 @@ var AboutContent = {
 // Scroll to Top
 $('#scrollToTop').removeClass('no-js');
 $(window).scroll(function() {
-  $(this).scrollTop() > 150 
-    ? $('#scrollToTop').fadeIn() 
+  $(this).scrollTop() > 150
+    ? $('#scrollToTop').fadeIn()
     : $('#scrollToTop').fadeOut();
 });
 $('#scrollToTop').click(function(e) {
