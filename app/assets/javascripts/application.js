@@ -238,17 +238,6 @@ var Downloads = {
     Downloads.observeGUIOSFilter();
     Downloads.observePopState();
     Downloads.filterGUIS();
-    Downloads.triggerAutoDownload();
-  },
-
-  triggerAutoDownload: function() {
-    var ref = document.referrer;
-    var src = $('#auto-download-link').attr('href');
-
-    if (this.shouldAutoDownload(ref, src)) {
-      $('.downloading .hide').show();
-      document.location = src;
-    }
   },
 
   shouldAutoDownload: function(ref, src) {
