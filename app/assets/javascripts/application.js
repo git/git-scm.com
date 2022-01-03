@@ -240,13 +240,6 @@ var Downloads = {
     Downloads.filterGUIS();
   },
 
-  shouldAutoDownload: function(ref, src) {
-    if (!ref || !src) {
-      return false;
-    }
-    return ref.indexOf(document.location.origin) === 0;
-  },
-
   getOSFilter: function() {
     var os = location.href.substring(location.href.lastIndexOf("/") + 1);
     return os === 'linux' || os === 'mac' || os === 'windows' || os === 'android' || os === 'ios' ? os : '';
