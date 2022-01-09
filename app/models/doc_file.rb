@@ -19,14 +19,17 @@ class DocFile < ApplicationRecord
       "id" => "Bahasa Indonesia",
       "is" => "Íslenska",
       "it" => "Italiano",
+      "ja" => "日本語",
       "mr" => "मराठी",
       "nb_NO" => "Norsk bokmål",
       "nl" => "Nederlands",
       "pl" => "Polski",
       "pt_BR" => "Português (Brasil)",
       "pt_PT" => "Português (Portugal)",
+      "ro" => "Română",
       "ru" => "Русский",
       "tr" => "Türkçe",
+      "uk" => "українська мова",
       "zh_HANS-CN" =>"简体中文",
       "zh_HANT" =>"繁體中文"
     }

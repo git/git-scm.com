@@ -11,14 +11,14 @@ class SiteController < ApplicationController
 
   # called when you start typing into search form
   def search
-    @term = sname = params["search"].to_s.downcase
+    @term = sname = request.query_parameters["search"].to_s.downcase
     @data = search_term(sname)
     render partial: "shared/search"
   end
 
   # called when you submit your search
   def search_results
-    @term = sname = params["search"].to_s.downcase
+    @term = sname = request.query_parameters["search"].to_s.downcase
     data = search_term(sname, true)
     @top = []
     @rest = []

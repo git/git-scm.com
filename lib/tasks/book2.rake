@@ -222,17 +222,17 @@ task remote_genbook2: :environment do
 
         begin
           rel = @octokit.latest_release(repo)
-          get_url =   -> (content_type) do
-            asset = rel.assets.find { |asset| asset.content_type==content_type }
+          get_url =   -> (name_re) do
+            asset = rel.assets.find { |asset| name_re.match(asset.name) }
             if asset
               asset.browser_download_url
             else
               nil
             end
           end
-          book.ebook_pdf  = get_url.call("application/pdf")
-          book.ebook_epub = get_url.call("application/epub+zip")
-          book.ebook_mobi  = get_url.call("application/x-mobipocket-ebook")
+          book.ebook_pdf  = get_url.call(/\.pdf$/)
+          book.ebook_epub = get_url.call(/\.epub$/)
+          book.ebook_mobi  = get_url.call(/\.mobi$/)
         rescue Octokit::NotFound
           book.ebook_pdf  = nil
           book.ebook_epub = nil
