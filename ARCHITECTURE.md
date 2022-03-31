@@ -30,8 +30,7 @@ The app itself is served by Heroku. The app name is `git-scm` (so you
 can visit it directly as https://git-scm.herokuapp.com). The site is
 owned by the git-scm.com team. If you want to be involved in managing
 uptime/deploys/etc, you'll need a Heroku account and request to be added
-to that team. The git-scm team receives credits from Heroku so that the
-hosting is free.
+to that team.
 
 We use a few Heroku add-ons:
 
