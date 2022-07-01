@@ -207,17 +207,18 @@ var Dropdowns = {
   },
 
   observeTriggers: function() {
-    $('.dropdown-trigger').click(function(e) {
+    var eles = $('.dropdown-trigger');
+    eles.click(function(e) {
       e.preventDefault();
-      var panelId = $(this).attr('data-panel-id');
-      if ($(this).hasClass('active')) {
-        $(this).removeClass('active');
-        $('#'+panelId).hide();
-      }
-      else {
-        $(this).addClass('active');
-        $('#'+panelId).show();
-      }
+      
+      $(this).toggleClass('active');
+      $('#' + $(this).attr('data-panel-id')).toggle();
+      
+      eles.each((_, ele)=>{
+        if(ele === this) return
+        $(ele).removeClass('active');
+        $('#' + $(ele).attr('data-panel-id')).hide();
+      })
     });
   }
 }
