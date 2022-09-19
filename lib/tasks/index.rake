@@ -4,6 +4,7 @@ require "asciidoctor"
 require "octokit"
 require "time"
 require "digest/sha1"
+require "set"
 
 def make_asciidoc(content)
     Asciidoctor::Document.new(content,
@@ -75,6 +76,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
 
     doc_files.each do |entry|
       full_path, sha = entry
+      ids = Set.new([])
       lang = File.dirname(full_path)
       path = File.basename(full_path, ".txt")
       #next if doc_limit && path !~ /#{doc_limit}/
@@ -100,6 +102,12 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
           text = $1.tr("^A-Za-z0-9-", "")
           anchor = "#{path}-#{text}"
+          # handle anchor collisions by appending -1
+          while ids.include?(anchor)
+            anchor += "-1"
+          end
+          ids.add(anchor)
+
           "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
         end
         doc.plain = asciidoc.source
@@ -244,6 +252,7 @@ def index_doc(filter_tags, doc_list, get_content)
 
       doc_files.each do |entry|
         path, sha = entry
+        ids = Set.new([])
         docname = File.basename(path, ".txt")
         next if doc_limit && path !~ /#{doc_limit}/
 
@@ -266,6 +275,11 @@ def index_doc(filter_tags, doc_list, get_content)
           html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
             text = $1.tr("^A-Za-z0-9-", "")
             anchor = "#{path}-#{text}"
+            # handle anchor collisions by appending -1
+            while ids.include?(anchor)
+              anchor += "-1"
+            end
+            ids.add(anchor)
             "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
           end
           doc.plain = asciidoc.source
