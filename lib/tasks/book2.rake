@@ -47,7 +47,7 @@ def genbook(code, &get_content)
 
   chaps.each_with_index do |filename, index|
     # select the chapter files
-    if filename =~ /(book\/[01].*\/1-[^\/]*\.asc|ch[0-9]{2}-.*\.asc)/
+    if /(book\/[01].*\/1-[^\/]*\.asc|ch[0-9]{2}-.*\.asc)/.match?(filename)
       chnumber += 1
       chapters ["ch#{secnumber}"] = ["chapter", chnumber, filename]
       secnumber += 1
