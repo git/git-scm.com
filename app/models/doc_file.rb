@@ -7,7 +7,7 @@ class DocFile < ApplicationRecord
   has_many :doc_versions, dependent: :delete_all
   has_many :versions, through: :doc_versions
 
-  scope :with_includes, -> { includes(doc_versions: [:doc, :version]) }
+  scope :with_includes, -> { includes(doc_versions: %i[doc version]) }
 
   @@true_lang = {
     "de" => "Deutsch",

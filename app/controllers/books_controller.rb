@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class BooksController < ApplicationController
-  before_action :book_resource, only: [:section, :chapter]
+  before_action :book_resource, only: %i[section chapter]
 
   def show
     lang = params[:lang] || "en"
