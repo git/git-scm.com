@@ -205,10 +205,10 @@ task remote_genbook2: :environment do
   if ENV["GENLANG"]
     books = Book.all_books.select { |code, _repo| code == ENV["GENLANG"] }
   else
-    books = Book.all_books.select do |code, repo|
+    books = Book.all_books.reject do |code, repo|
       repo_head = @octokit.commit(repo, "HEAD").sha
       book = Book.where(edition: 2, code: code).first_or_create
-      repo_head != book.ebook_html
+      repo_head == book.ebook_html
     end
   end
 
