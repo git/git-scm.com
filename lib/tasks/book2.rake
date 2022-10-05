@@ -180,7 +180,7 @@ def genbook(code, &get_content)
       xref.save
 
       # record all the xrefs
-      (sec.search(".//*[@id]")).each do |id|
+      sec.search(".//*[@id]").each do |id|
         id_xref = id.attribute("id").to_s
         xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
         xref.section = csection
