@@ -103,9 +103,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
           text = $1.tr("^A-Za-z0-9-", "")
           anchor = "#{path}-#{text}"
           # handle anchor collisions by appending -1
-          while ids.include?(anchor)
-            anchor += "-1"
-          end
+          anchor += "-1" while ids.include?(anchor)
           ids.add(anchor)
 
           "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
@@ -279,9 +277,7 @@ def index_doc(filter_tags, doc_list, get_content)
             text = $1.tr("^A-Za-z0-9-", "")
             anchor = "#{path}-#{text}"
             # handle anchor collisions by appending -1
-            while ids.include?(anchor)
-              anchor += "-1"
-            end
+            anchor += "-1" while ids.include?(anchor)
             ids.add(anchor)
             "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
           end
