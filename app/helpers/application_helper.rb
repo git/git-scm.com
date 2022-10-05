@@ -17,7 +17,7 @@ module ApplicationHelper
     begin
       @version ||= Version.latest_version
       @version.name
-    rescue
+    rescue StandardError
       ""
     end
   end
@@ -36,7 +36,7 @@ module ApplicationHelper
     begin
       @version ||= Version.latest_version
       "(" + @version.committed.strftime("%Y-%m-%d") + ")"
-    rescue
+    rescue StandardError
       ""
     end
   end

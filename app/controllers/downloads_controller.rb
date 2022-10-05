@@ -58,7 +58,7 @@ class DownloadsController < ApplicationController
     else
       redirect_to "/downloads"
     end
-  rescue
+  rescue StandardError
     redirect_to "/downloads"
   end
 end

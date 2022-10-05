@@ -40,7 +40,7 @@ class DocVersion < ApplicationRecord
         total = 8
       end
       [adds, mins, 8 - total]
-    rescue
+    rescue StandardError
       [0, 0, 8]
     end
   end

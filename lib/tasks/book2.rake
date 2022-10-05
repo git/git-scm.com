@@ -71,7 +71,7 @@ def genbook(code, &get_content)
 
   begin
     l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
-  rescue
+  rescue StandardError
     l10n_file = ""
   end
   initial_content.gsub!("include::ch01", l10n_file + "\ninclude::ch01")
