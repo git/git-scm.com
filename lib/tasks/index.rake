@@ -206,7 +206,7 @@ def index_doc(filter_tags, doc_list, get_content)
 
     # generate command-list content
     generated = {}
-    cmd = tag_files.detect { |f| f.first =~ /command-list\.txt/ }
+    cmd = tag_files.detect { |f| f.first == "command-list.txt" }
     if cmd
       cmd_list =
         get_content
