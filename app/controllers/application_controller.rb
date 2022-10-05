@@ -13,7 +13,7 @@ class ApplicationController < ActionController::Base
     @os = "linux"
   end
 
-  def set_title(title)
+  def title(title)
     @page_title = "#{title} - Git"
   end
 
