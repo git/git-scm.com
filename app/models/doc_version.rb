@@ -27,7 +27,6 @@ class DocVersion < ApplicationRecord
   # 1: subtractions
   # 2: 8 - (add + sub)
   def diff(doc_version)
-
       diff_out = Diffy::Diff.new(doc.plain, doc_version.doc.plain)
       first_chars = diff_out.to_s.gsub(/(.)[^\n]*\n/, '\1')
       adds = first_chars.count("+")
@@ -42,7 +41,6 @@ class DocVersion < ApplicationRecord
       [adds, mins, 8 - total]
     rescue StandardError
       [0, 0, 8]
-
   end
 
   def index
