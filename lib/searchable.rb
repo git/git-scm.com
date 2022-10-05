@@ -5,7 +5,7 @@ module Searchable
 
   included do
     def self.search(keywords, options = {})
-      # TODO find more OOP solution
+      # TODO: find more OOP solution
       # we should never look to search_type variable again here
       # nor when adding to index
       class_name    = name.to_s.downcase
