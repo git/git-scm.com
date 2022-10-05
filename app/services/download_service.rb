@@ -122,7 +122,7 @@ class DownloadService
           download = Download.create!(options)
           Rails.logger.info("Download record created #{download.inspect}")
         rescue ActiveRecord::RecordInvalid => e
-          Rail.logger.error("#{e.message}")
+          Rail.logger.error(e.message.to_s)
         end
       end
     end
