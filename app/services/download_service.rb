@@ -6,10 +6,10 @@ class DownloadService
   # [OvD] note that Google uses Atom & Sourceforge uses RSS
   # however this isn't relevant when parsing the feeds for
   # name, version, url & date with Feedzirra
-  SOURCEFORGE_URL = "https://sourceforge.net/projects/git-osx-installer/rss?limit=20".freeze
+  SOURCEFORGE_URL = "https://sourceforge.net/projects/git-osx-installer/rss?limit=20"
 
   GIT_FOR_WINDOWS_REGEX           = /^(Portable|)Git-(\d+\.\d+\.\d+(?:\.\d+)?)-(?:.+-)*(32|64)-bit(?:\..*)?\.exe/
-  GIT_FOR_WINDOWS_NAME_WITH_OWNER = "git-for-windows/git".freeze
+  GIT_FOR_WINDOWS_NAME_WITH_OWNER = "git-for-windows/git"
 
   class << self
     def sourceforge_project_download_url(project, filename)
