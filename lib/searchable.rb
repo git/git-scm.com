@@ -76,7 +76,7 @@ module Searchable
           }
           ref_hits << hit
         end
-        if ref_hits.size > 0
+        if !ref_hits.empty?
           { category: category_name, term: keywords, matches: ref_hits }
         end
       end

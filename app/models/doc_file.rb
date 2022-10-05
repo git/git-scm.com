@@ -55,7 +55,7 @@ class DocFile < ApplicationRecord
       if sha1 == sha2
         unchanged_versions << doc_version.name
       else
-        if unchanged_versions.size > 0
+        if !unchanged_versions.empty?
           if unchanged_versions.size == 1
             changes << { name: "#{unchanged_versions.first} no changes", changed: false }
           else
