@@ -93,7 +93,7 @@ def genbook(code, &get_content)
       puts "not including #{chapter_title}\n"
       break
     end
-    chapter_type, chapter_number, filename = chapters ["ch#{index}"]
+    chapter_type, chapter_number = chapters ["ch#{index}"]
     chapter = entry
 
     next if !chapter_title
