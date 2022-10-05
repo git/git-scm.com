@@ -36,13 +36,11 @@ class Section < ApplicationRecord
     prev_number = number - 1
     if section = sections.find_by(number: prev_number)
       return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
-    else
+    elsif ch = chapter.prev
       # find previous chapter
-      if ch = chapter.prev
-        if section = ch.last_section
+      if section = ch.last_section
           return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
         end
-      end
     end
 
     "/book"
@@ -53,12 +51,10 @@ class Section < ApplicationRecord
     next_number = number + 1
     if section = sections.find_by(number: next_number)
       return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
-    else
-      if ch = chapter.next
-        if section = ch.first_section
+    elsif ch = chapter.next
+      if section = ch.first_section
           return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
         end
-      end
       # find next chapter
     end
 
