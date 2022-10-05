@@ -31,11 +31,12 @@ class DownloadsController < ApplicationController
     @platform = params[:platform]
     @platform = "windows" if @platform == "win"
     @latest = Version.latest_version
-    if @platform == "mac"
+    case @platform
+    when "mac"
       @download = Download.latest_for(@platform)
 
       render "downloads/download_mac"
-    elsif @platform == "windows"
+    when "windows"
       @project_url = "https://git-for-windows.github.io/"
       @source_url = "https://github.com/git-for-windows/git"
 
@@ -53,7 +54,7 @@ class DownloadsController < ApplicationController
       end
 
       render "downloads/download_windows"
-    elsif @platform == "linux"
+    when "linux"
       render "downloads/download_linux"
     else
       redirect_to "/downloads"
