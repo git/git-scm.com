@@ -201,7 +201,7 @@ task remote_genbook2: :environment do
   end
 
   books.each do |code, repo|
-    
+
       blob_content = Hash.new do |blobs, sha|
         content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
         blobs[sha] = content.force_encoding("UTF-8")
@@ -242,7 +242,7 @@ task remote_genbook2: :environment do
       end
     rescue StandardError => err
       puts err.message
-    
+
   end
 end
 

@@ -14,12 +14,12 @@ module ApplicationHelper
   end
 
   def latest_version
-    
+
       @version ||= Version.latest_version
       @version.name
     rescue StandardError
       ""
-    
+
   end
 
   def latest_mac_installer
@@ -33,12 +33,12 @@ module ApplicationHelper
   end
 
   def latest_release_date
-    
+
       @version ||= Version.latest_version
       "(" + @version.committed.strftime("%Y-%m-%d") + ")"
     rescue StandardError
       ""
-    
+
   end
 
   def latest_relnote_url
