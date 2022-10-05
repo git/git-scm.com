@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe SiteController, type: :controller do
-
   it "GET index" do
     get :index
     expect(response).to render_template("index")
@@ -27,7 +26,6 @@ RSpec.describe SiteController, type: :controller do
   end
 
   describe "GET /book" do
-
     it "get /git-doc" do
       request.env["PATH_INFO"] = "/git-doc"
       get :redirect_book
@@ -38,7 +36,5 @@ RSpec.describe SiteController, type: :controller do
       get :redirect_book
       expect(response).to redirect_to("https://git-scm.com/book")
     end
-
   end
-
 end

@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe Version, type: :model do
-
   it { should have_many :doc_versions }
   it { should have_many(:docs).through(:doc_versions) }
   it { should have_many :downloads }
@@ -16,6 +15,4 @@ RSpec.describe Version, type: :model do
     expect(v1).to be < v2
     expect(v2).to be < v3
   end
-
-
 end

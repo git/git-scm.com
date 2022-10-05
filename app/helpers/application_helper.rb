@@ -3,26 +3,21 @@
 require "iso8601"
 
 module ApplicationHelper
-
   def sidebar_link_options(section)
-    if %w( about documentation downloads community
-         ).include?(@section) && @section == section ||
-       %w( reference book videos external-links
-           guis logos
-         ).include?(@subsection) && @subsection == section
-      {class: "active"}
+    if (%w[about documentation downloads community].include?(@section) && @section == section) ||
+       (%w[ reference book videos external-links
+            guis logos].include?(@subsection) && @subsection == section)
+      { class: "active" }
     else
       {}
     end
   end
 
   def latest_version
-    begin
     @version ||= Version.latest_version
     @version.name
-    rescue
-      ""
-    end
+  rescue StandardError
+    ""
   end
 
   def latest_mac_installer
@@ -36,16 +31,14 @@ module ApplicationHelper
   end
 
   def latest_release_date
-    begin
     @version ||= Version.latest_version
     "(" + @version.committed.strftime("%Y-%m-%d") + ")"
-    rescue
-      ""
-    end
+  rescue StandardError
+    ""
   end
 
   def latest_relnote_url
-    "https://raw.github.com/git/git/master/Documentation/RelNotes/#{self.latest_version}.txt"
+    "https://raw.github.com/git/git/master/Documentation/RelNotes/#{latest_version}.txt"
   end
 
   # Overriding this because we're not using asset pipeline for images,
@@ -55,13 +48,14 @@ module ApplicationHelper
   def image_tag(image, options = {})
     options = options.symbolize_keys
 
-    src = options[:src] = "/images/#{image}"
+    options[:src] = "/images/#{image}"
 
-    tag("img", options)
+    tag.img(options)
   end
 
   def banner_duration(duration)
     return "" if duration.blank?
+
     ISO8601::Duration.new(duration).to_seconds.round * 1000
   end
 end

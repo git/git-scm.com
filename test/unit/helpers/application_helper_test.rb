@@ -3,7 +3,6 @@
 require "test_helper"
 
 class ApplicationHelperTest < ActionView::TestCase
-
   test "gets the latest version" do
     version = latest_version
     assert_equal "MyString", version
@@ -18,5 +17,4 @@ class ApplicationHelperTest < ActionView::TestCase
     url = latest_relnote_url
     assert_equal "https://raw.github.com/git/git/master/Documentation/RelNotes/MyString.txt", url
   end
-
 end

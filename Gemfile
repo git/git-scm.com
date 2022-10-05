@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
 source "https://rubygems.org"
-ruby "2.7.3"
+ruby "3.1.2"
 
 gem "rails", "~> 6.0"
+
+# hacks for rails6 + ruby 3.1
+gem 'net-imap', require: false
+gem 'net-pop', require: false
+gem 'net-smtp', require: false
 
 gem "asciidoctor", "~> 2.0.0"
 gem "elasticsearch", "2.0.2"
@@ -13,6 +18,7 @@ gem "puma"
 
 gem "diffy"
 gem "nokogiri"
+gem "rss"
 
 # Assets
 gem "sass-rails"
@@ -29,7 +35,11 @@ group :development, :test do
   gem "dotenv-rails"
   gem "listen"
   gem "pry-byebug"
-  gem "rubocop-github"
+  gem "rubocop"
+  gem "rubocop-discourse"
+  gem "rubocop-performance"
+  gem "rubocop-rails"
+  gem "rubocop-rspec"
   gem "ruby-prof"
   gem "sqlite3"
 end

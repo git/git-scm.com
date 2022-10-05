@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class SiteController < ApplicationController
-
   def index
     expires_in 10.minutes, public: true
 
@@ -19,7 +18,7 @@ class SiteController < ApplicationController
   # called when you submit your search
   def search_results
     @term = sname = request.query_parameters["search"].to_s.downcase
-    data = search_term(sname, true)
+    data = search_term(sname)
     @top = []
     @rest = []
     data[:results].each do |type|
@@ -36,17 +35,17 @@ class SiteController < ApplicationController
     render "site/results"
   end
 
-  def search_term(sname, highlight = false)
+  def search_term(sname)
     data = {
       term: sname,
       results: []
     }
 
-    if results = Doc.search(sname)
+    if (results = Doc.search(sname))
       data[:results] << results
     end
 
-    if results = Section.search(sname, lang: "en")
+    if (results = Section.search(sname, lang: "en"))
       data[:results] << results
     end
 
@@ -65,5 +64,4 @@ class SiteController < ApplicationController
       redirect_to "https://git-scm.com#{current_uri}"
     end
   end
-
 end

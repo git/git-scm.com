@@ -6,7 +6,7 @@ VCR.configure do |c|
 
   c.default_cassette_options = {
     serialize_with: :json,
-    preserve_exact_body_bytes:  true,
+    preserve_exact_body_bytes: true,
     decode_compressed_response: true,
     record: ENV["TRAVIS"] ? :none : :once
   }

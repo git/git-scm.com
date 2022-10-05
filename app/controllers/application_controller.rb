@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-PageNotFound = Class.new(Exception)
+PageNotFound = Class.new(StandardError)
 
 class ApplicationController < ActionController::Base
   protect_from_forgery
@@ -13,7 +13,7 @@ class ApplicationController < ActionController::Base
     @os = "linux"
   end
 
-  def set_title(title)
+  def title(title)
     @page_title = "#{title} - Git"
   end
 
@@ -24,7 +24,6 @@ class ApplicationController < ActionController::Base
   end
 
   def not_found_template
-    Rails.root.join("public/404.html")
+    Rails.public_path.join('404.html')
   end
-
 end

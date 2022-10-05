@@ -1,4 +1,4 @@
-# rubocop:disable Style/FrozenStringLiteralComment
+# frozen_string_literal: true
 
 task search_clear: :environment do
   # BONSAI.clear
@@ -9,7 +9,6 @@ task search_clear: :environment do
   end
 
   client.indices.create index: ELASTIC_SEARCH_INDEX
-
 end
 
 task search_index: :environment do
@@ -22,7 +21,5 @@ end
 
 task search_index_book: :environment do
   book = Book.where(code: "en", edition: 2).first
-  book.sections.each do |sec|
-    sec.index
-  end
+  book.sections.each(&:index)
 end

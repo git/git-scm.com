@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 class AddIndexToVersions < ActiveRecord::Migration[6.1]
   def change
     remove_index :versions, :name

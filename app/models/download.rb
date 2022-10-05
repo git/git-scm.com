@@ -10,6 +10,7 @@ class Download < ApplicationRecord
   belongs_to :version
 
   def self.latest_for(platform)
-    includes(:version).where("platform=?", platform).order("versions.vorder DESC").order("downloads.release_date DESC").first
+    includes(:version).where("platform=?",
+                             platform).order("versions.vorder DESC").order("downloads.release_date DESC").first
   end
 end
