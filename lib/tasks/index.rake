@@ -16,6 +16,23 @@ def make_asciidoc(content)
                             doctype: "book")
 end
 
+def expand_l10n(path, content, get_f_content, categories)
+  content.gsub!(/include::(\S+)\.txt/) do |line|
+    line.gsub!("include::", "")
+    if categories[line]
+      new_content = categories[line]
+    else
+      new_content, new_path = get_f_content.call(path, line)
+    end
+    if new_content
+      expand_l10n(new_path, new_content, get_f_content, categories)
+    else
+      "\n\n[WARNING]\n====\nMissing `#{new_path}`\n\nSee original version for this content.\n====\n\n"
+    end
+  end
+  content
+end
+
 def index_l10n_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV["REBUILD_DOC"]
@@ -56,23 +73,6 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       [new_content, name]
     end
 
-    def expand!(path, content, get_f_content, categories)
-      content.gsub!(/include::(\S+)\.txt/) do |line|
-        line.gsub!("include::", "")
-        if categories[line]
-          new_content = categories[line]
-        else
-          new_content, new_path = get_f_content.call(path, line)
-        end
-        if new_content
-          expand!(new_path, new_content, get_f_content, categories)
-        else
-          "\n\n[WARNING]\n====\nMissing `#{new_path}`\n\nSee original version for this content.\n====\n\n"
-        end
-      end
-      content
-    end
-
     doc_files.each do |entry|
       full_path, sha = entry
       ids = Set.new([])
@@ -85,7 +85,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
 
       content = get_content.call sha
       categories = {}
-      expand!(full_path, content, get_content_f, categories)
+      expand_l10n(full_path, content, get_content_f, categories)
       content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1/#{lang}\\2[\\3]")
       asciidoc = make_asciidoc(content)
       asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
@@ -136,6 +136,27 @@ def drop_uninteresting_tags(tags)
     ret.unshift(tag)
   end
   ret
+end
+
+def expand_content(content, path, get_f_content, generated)
+  content.gsub(/include::(\S+)\.txt\[\]/) do |_line|
+    if File.dirname(path) == "."
+      new_fname = "#{$1}.txt"
+    else
+      new_fname = (Pathname.new(path).dirname + Pathname.new("#{$1}.txt")).cleanpath.to_s
+    end
+    if generated[new_fname]
+      new_content = generated[new_fname]
+    else
+      new_content = get_f_content.call(new_fname)
+      if new_content
+        expand_content(new_content.force_encoding("UTF-8"), new_fname, get_f_content, generated)
+      else
+        puts "#{new_fname} could not be resolved for expansion"
+      end
+    end
+    new_content
+  end
 end
 
 def index_doc(filter_tags, doc_list, get_content)
@@ -228,27 +249,6 @@ def index_doc(filter_tags, doc_list, get_content)
           new_content = get_content.call(content_file.second)
         end
         new_content
-      end
-
-      def expand_content(content, path, get_f_content, generated)
-        content.gsub(/include::(\S+)\.txt\[\]/) do |_line|
-          if File.dirname(path) == "."
-            new_fname = "#{$1}.txt"
-          else
-            new_fname = (Pathname.new(path).dirname + Pathname.new("#{$1}.txt")).cleanpath.to_s
-          end
-          if generated[new_fname]
-            new_content = generated[new_fname]
-          else
-            new_content = get_f_content.call(new_fname)
-            if new_content
-              expand_content(new_content.force_encoding("UTF-8"), new_fname, get_f_content, generated)
-            else
-              puts "#{new_fname} could not be resolved for expansion"
-            end
-          end
-          new_content
-        end
       end
 
       doc_files.each do |entry|
