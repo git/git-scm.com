@@ -60,7 +60,7 @@ class DocController < ApplicationController
     if DocFile.exists?(name: file)
       @doc_file = DocFile.where(name: file).limit(1).first
     elsif DocFile.exists?(name: "git-#{file}")
-      return redirect_to doc_file_path(file: "git-#{file}")
+      redirect_to doc_file_path(file: "git-#{file}")
     end
   end
 

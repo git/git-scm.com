@@ -71,7 +71,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
           "\n\n[WARNING]\n====\nMissing `#{new_path}`\n\nSee original version for this content.\n====\n\n"
         end
       end
-      return content
+      content
     end
 
     doc_files.each do |entry|
@@ -139,7 +139,7 @@ def drop_uninteresting_tags(tags)
     # keep everything else
     ret.unshift(tag)
   end
-  return ret
+  ret
 end
 
 def index_doc(filter_tags, doc_list, get_content)

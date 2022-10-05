@@ -53,7 +53,7 @@ class BooksController < ApplicationController
     @content = chapter.sections.where(number: section).first
     raise PageNotFound unless @content
 
-    return redirect_to "/book/#{lang}/v2/#{@content.slug}"
+    redirect_to "/book/#{lang}/v2/#{@content.slug}"
   end
 
   def book_resource

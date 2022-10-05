@@ -61,7 +61,7 @@ module Searchable
           ref_hits << hit
         end
         if ref_hits.size > 0
-          return { category: category_name, term: keywords, matches: ref_hits }
+          { category: category_name, term: keywords, matches: ref_hits }
         end
       end
     end

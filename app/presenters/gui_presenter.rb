@@ -3,7 +3,7 @@
 class GuiPresenter
   def read_gui_yaml
     yaml = YAML.load_file("resources/guis.yml")
-    return yaml["guis"]
+    yaml["guis"]
   end
 
   def initialize
@@ -13,14 +13,14 @@ class GuiPresenter
   @@instance = GuiPresenter.new
 
   def self.instance
-    return @@instance
+    @@instance
   end
 
   def guis_info
     if Rails.env.production?
-      return @guis_info
+      @guis_info
     else
-      return read_gui_yaml
+      read_gui_yaml
     end
   end
 
