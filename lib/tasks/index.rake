@@ -35,13 +35,13 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
     stag.save
 
     tag_files = doc_list.call(tree_sha)
-    doc_files = tag_files.select { |ent|
+    doc_files = tag_files.select do |ent|
       ent.first =~
         /^([-_\w]+)\/(
           (
             git.*
         )\.txt)/x
-    }
+    end
 
     puts "Found #{doc_files.size} entries"
     doc_limit = ENV["ONLY_BUILD_DOC"]
@@ -163,7 +163,7 @@ def index_doc(filter_tags, doc_list, get_content)
     stag.save
 
     tag_files = doc_list.call(tree_sha)
-    doc_files = tag_files.select { |ent|
+    doc_files = tag_files.select do |ent|
       ent.first =~
         /^Documentation\/(
           SubmittingPatches |
@@ -182,7 +182,7 @@ def index_doc(filter_tags, doc_list, get_content)
             pull.* |
             technical\/.*
         )\.txt)/x
-    }
+    end
 
     puts "Found #{doc_files.size} entries"
     doc_limit = ENV["ONLY_BUILD_DOC"]
@@ -191,9 +191,9 @@ def index_doc(filter_tags, doc_list, get_content)
     generated = {}
     cmd = tag_files.detect { |f| f.first =~ /command-list\.txt/ }
     if cmd
-      cmd_list = get_content.call(cmd.second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject { |l|
+      cmd_list = get_content.call(cmd.second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject do |l|
                    l =~ /^#/
-                 }.inject({}) do |list, cmd|
+                 end.inject({}) do |list, cmd|
         name, kind, attr = cmd.split(/\s+/)
         list[kind] ||= []
         list[kind] << [name, attr]
