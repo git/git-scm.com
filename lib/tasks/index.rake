@@ -21,7 +21,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
   rebuild = ENV["REBUILD_DOC"]
   rerun = ENV["RERUN"] || rebuild || false
 
-  filter_tags.call(rebuild, false).sort_by { |tag| Version.version_to_num(tag.first[1..-1]) }.each do |tag|
+  filter_tags.call(rebuild, false).sort_by { |tag| Version.version_to_num(tag.first[1..]) }.each do |tag|
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
@@ -125,13 +125,13 @@ def drop_uninteresting_tags(tags)
   # highest-numbered point release for older versions
   ret = []
   tags.reverse_each do |tag|
-    numeric = Version.version_to_num(tag.first[1..-1])
+    numeric = Version.version_to_num(tag.first[1..])
     # drop anything older than v2.0
     next if numeric < 2_000_000
 
     # older than v2.17, take only the highest release
     if numeric < 2_170_000 and !ret.empty?
-      old = Version.version_to_num(ret[0].first[1..-1])
+      old = Version.version_to_num(ret[0].first[1..])
       next if old.to_i.div(10_000) == numeric.to_i.div(10_000)
     end
     # keep everything else
@@ -145,7 +145,7 @@ def index_doc(filter_tags, doc_list, get_content)
   rebuild = ENV["REBUILD_DOC"]
   rerun = ENV["RERUN"] || rebuild || false
 
-  tags = filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..-1]) }
+  tags = filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..]) }
   drop_uninteresting_tags(tags).each do |tag|
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
