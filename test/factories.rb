@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 FactoryBot.define do
-
   sequence :number do |n|
     n
   end
@@ -57,5 +56,4 @@ FactoryBot.define do
     number { FactoryBot.generate(:number) }
     title { FactoryBot.generate(:title) }
   end
-
 end

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class SiteController < ApplicationController
-
   def index
     expires_in 10.minutes, public: true
 
@@ -65,5 +64,4 @@ class SiteController < ApplicationController
       redirect_to "https://git-scm.com#{current_uri}"
     end
   end
-
 end

@@ -3,7 +3,6 @@
 require "test_helper"
 
 class SiteControllerTest < ActionController::TestCase
-
   test "should get index" do
     get :index
     assert_response :success
@@ -34,5 +33,4 @@ class SiteControllerTest < ActionController::TestCase
     get :search_results, params: { search: "git-rebase" }
     assert_response :success
   end
-
 end

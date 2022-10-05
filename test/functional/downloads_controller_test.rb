@@ -3,7 +3,6 @@
 require "test_helper"
 
 class DownloadsControllerTest < ActionController::TestCase
-
   test "should get index page" do
     get :index
     assert_response :success
@@ -33,5 +32,4 @@ class DownloadsControllerTest < ActionController::TestCase
     get :download, params: { platform: "test" }
     assert_redirected_to downloads_path
   end
-
 end

@@ -7,7 +7,7 @@ class Book < ApplicationRecord
   has_many :sections, through: :chapters
   has_many :xrefs, dependent: :delete_all
 
-  @@all_books={
+  @@all_books = {
     "az" => "progit2-aze/progit2",
     "be" => "progit/progit2-be",
     "bg" => "progit/progit2-bg",

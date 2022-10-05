@@ -10,6 +10,7 @@ class BooksController < ApplicationController
     else
       @book = Book.where(code: lang).order("percent_complete DESC, edition DESC").first
       raise PageNotFound unless @book
+
       redirect_to "/book/#{lang}/v#{@book.edition}"
     end
     raise PageNotFound unless @book
@@ -19,6 +20,7 @@ class BooksController < ApplicationController
     link = params[:link]
     @book = Book.where(code: params[:lang], edition: params[:edition]).first
     raise PageNotFound unless @book
+
     xref = @book.xrefs.where(name: link).first
     raise PageNotFound unless xref
     return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{ERB::Util.url_encode(xref.section.slug)}##{xref.name}" unless @content
@@ -50,6 +52,7 @@ class BooksController < ApplicationController
     chapter = @book.chapters.where(number: chapter).first
     @content = chapter.sections.where(number: section).first
     raise PageNotFound unless @content
+
     return redirect_to "/book/#{lang}/v2/#{@content.slug}"
   end
 
@@ -61,7 +64,7 @@ class BooksController < ApplicationController
       @book ||= Book.where(code: (params[:lang] || "en")).order("percent_complete DESC, edition DESC").first
     end
     raise PageNotFound unless @book
+
     @book
   end
-
 end

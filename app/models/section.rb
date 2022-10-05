@@ -11,7 +11,6 @@ require "searchable"
 # t.belongs_to  :chapter
 # t.timestamps
 class Section < ApplicationRecord
-
   include Searchable
 
   default_scope { order(:number) }
@@ -45,6 +44,7 @@ class Section < ApplicationRecord
         end
       end
     end
+
     "/book"
   end
 
@@ -61,6 +61,7 @@ class Section < ApplicationRecord
       end
       # find next chapter
     end
+
     "/book/#{lang}/v#{self.book.edition}"
   end
 
@@ -81,15 +82,14 @@ class Section < ApplicationRecord
                    type: "book",
                    id: "#{code}---#{self.slug}",
                    body: {
-                       chapter: self.chapter.title,
-                       section: self.title,
-                       number: self.cs_number,
-                       lang: code,
-                       html: self.html
+                     chapter: self.chapter.title,
+                     section: self.title,
+                     number: self.cs_number,
+                     lang: code,
+                     html: self.html
                    }
     rescue StandardError
       nil
     end
   end
-
 end

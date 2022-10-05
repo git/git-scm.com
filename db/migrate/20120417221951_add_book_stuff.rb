@@ -3,7 +3,7 @@
 class AddBookStuff < ActiveRecord::Migration[4.2]
   def up
     create_table :books do |t|
-      t.string      :code
+      t.string :code
       t.timestamps
     end
     add_index :books, [:code]

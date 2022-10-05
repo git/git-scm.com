@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe DocVersion, type: :model do
-
   it { should belong_to :doc }
   it { should belong_to :version }
   it { should belong_to :doc_file }

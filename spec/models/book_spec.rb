@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe Book, type: :model do
-
   let(:book) { Fabricate(:book) }
 
   it { should have_many :chapters }
@@ -18,5 +17,4 @@ RSpec.describe Book, type: :model do
     chapter = Fabricate(:chapter, book: book)
     expect(book.chapters.count).to eql(4)
   end
-
 end

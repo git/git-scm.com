@@ -3,7 +3,6 @@
 require "test_helper"
 
 class VersionTest < ActiveSupport::TestCase
-
   should have_many :doc_versions
   should have_many(:docs).through(:doc_versions)
   should have_many :downloads
@@ -17,5 +16,4 @@ class VersionTest < ActiveSupport::TestCase
     assert (v1 < v2)
     assert (v2 < v3)
   end
-
 end

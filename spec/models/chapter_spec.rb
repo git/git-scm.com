@@ -3,13 +3,11 @@
 require "rails_helper"
 
 RSpec.describe Chapter, type: :model do
-
   let(:book) { Fabricate(:book) }
   let(:chapter) { Fabricate(:chapter, book: book) }
 
   it { should belong_to :book }
   it { should have_many :sections }
-
 
   it "should have title" do
     expect(chapter.title).to eql("Git")
@@ -25,5 +23,4 @@ RSpec.describe Chapter, type: :model do
     expect(sections.any?).to be_truthy
     expect(sections.count).to eql(3)
   end
-
 end

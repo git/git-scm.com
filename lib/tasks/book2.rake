@@ -6,7 +6,7 @@ require "pathname"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |line|
-    if File.dirname(path)=="."
+    if File.dirname(path) == "."
       new_fname = $1
     else
       new_fname = (Pathname.new(path).dirname + Pathname.new($1)).cleanpath.to_s
@@ -23,10 +23,10 @@ end
 
 desc "Reset book html to trigger re-build"
 task reset_book2: :environment do
-    Book.where(edition: 2).each do |book|
-        book.ebook_html = "0000000000000000000000000000000000000000"
-        book.save
-    end
+  Book.where(edition: 2).each do |book|
+    book.ebook_html = "0000000000000000000000000000000000000000"
+    book.save
+  end
 end
 
 def genbook(code, &get_content)
@@ -80,7 +80,7 @@ def genbook(code, &get_content)
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content, attributes: { "lang" => code})
+  asciidoc = Asciidoctor::Document.new(content, attributes: { "lang" => code })
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
@@ -123,7 +123,6 @@ def genbook(code, &get_content)
 
     section = 1
     chapter.search("div[@class=sect2]").each do |sec|
-
       id_xref = sec.at("h3").attribute("id").to_s
 
       section_title = sec.at("h3").content
@@ -222,7 +221,7 @@ task remote_genbook2: :environment do
 
         begin
           rel = @octokit.latest_release(repo)
-          get_url =   -> (name_re) do
+          get_url = ->(name_re) do
             asset = rel.assets.find { |asset| name_re.match(asset.name) }
             if asset
               asset.browser_download_url
@@ -232,11 +231,11 @@ task remote_genbook2: :environment do
           end
           book.ebook_pdf  = get_url.call(/\.pdf$/)
           book.ebook_epub = get_url.call(/\.epub$/)
-          book.ebook_mobi  = get_url.call(/\.mobi$/)
+          book.ebook_mobi = get_url.call(/\.mobi$/)
         rescue Octokit::NotFound
           book.ebook_pdf  = nil
           book.ebook_epub = nil
-          book.ebook_mobi  = nil
+          book.ebook_mobi = nil
         end
 
         book.save

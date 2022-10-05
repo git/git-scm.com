@@ -32,5 +32,4 @@ class Version < ApplicationRecord
     end
     version_int
   end
-
 end

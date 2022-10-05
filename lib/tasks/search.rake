@@ -9,7 +9,6 @@ task search_clear: :environment do
   end
 
   client.indices.create index: ELASTIC_SEARCH_INDEX
-
 end
 
 task search_index: :environment do

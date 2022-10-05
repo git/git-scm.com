@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class GuiPresenter
-
   def read_gui_yaml
     yaml = YAML.load_file("resources/guis.yml")
     return yaml["guis"]

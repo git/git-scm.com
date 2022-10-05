@@ -34,11 +34,11 @@ class DownloadService
 
         if version
           find_or_create_download(
-              filename: name,
-              platform: "windows#{bitness}#{portable}",
-              release_date: date,
-              version: version,
-              url: url
+            filename: name,
+            platform: "windows#{bitness}#{portable}",
+            release_date: date,
+            version: version,
+            url: url
           )
         else
           Rails.logger.info("Could not find version #{version_name}")
@@ -60,11 +60,11 @@ class DownloadService
 
         if version
           find_or_create_download(
-              filename: name,
-              platform: "mac",
-              release_date: Time.parse(date.iso8601),
-              version: version,
-              url: url
+            filename: name,
+            platform: "mac",
+            release_date: Time.parse(date.iso8601),
+            version: version,
+            url: url
           )
         else
           Rails.logger.info("Could not find version #{name}")
@@ -80,16 +80,16 @@ class DownloadService
       releases  = @octokit.releases(repository)
 
       releases
-          .reject { |release| release.prerelease || release.draft }
-          .each do |release|
-            release.assets.each do |asset|
-              downloads << [
-                asset.name,
-                asset.updated_at,
-                asset.browser_download_url
-              ]
-            end
-          end
+        .reject { |release| release.prerelease || release.draft }
+        .each do |release|
+        release.assets.each do |asset|
+          downloads << [
+            asset.name,
+            asset.updated_at,
+            asset.browser_download_url
+          ]
+        end
+      end
 
       downloads
     end
@@ -108,11 +108,11 @@ class DownloadService
 
     def find_or_create_download(filename:, platform:, release_date:, version:, url:)
       options = {
-        filename:     filename,
-        platform:     platform,
+        filename: filename,
+        platform: platform,
         release_date: release_date,
-        version:      version,
-        url:          url
+        version: version,
+        url: url
       }
 
       if (download = Download.find_by(options))

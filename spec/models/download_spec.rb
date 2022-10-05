@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe Download, type: :model do
-
   let(:version) { Fabricate(:version) }
   let(:download) { Fabricate(:download, version: version) }
 
@@ -16,5 +15,4 @@ RSpec.describe Download, type: :model do
   it "should have version" do
     expect(download.version).to eql(version)
   end
-
 end

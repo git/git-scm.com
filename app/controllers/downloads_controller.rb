@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 class DownloadsController < ApplicationController
-
   def index
   end
 
@@ -13,7 +12,7 @@ class DownloadsController < ApplicationController
   def guis
     guis_info = GuiPresenter.instance.guis_info
 
-    render "downloads/guis/index", locals: {guis_info: guis_info}
+    render "downloads/guis/index", locals: { guis_info: guis_info }
   end
 
   def logos
@@ -26,7 +25,7 @@ class DownloadsController < ApplicationController
 
     guis_info = GuiPresenter.instance.guis_info
 
-    render "downloads/guis/index", locals: {guis_info: guis_info}
+    render "downloads/guis/index", locals: { guis_info: guis_info }
   end
 
   def download

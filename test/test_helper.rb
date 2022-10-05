@@ -25,7 +25,7 @@ Faraday.new(url: "http://0.0.0.0:9200") do |builder|
   builder.request :json
   builder.adapter :test do |stub|
     resp = {
-      "hits" => {"hits" => []}
+      "hits" => { "hits" => [] }
     }
     stub.get("/gitscm/doc/_search") { [200, {}, JSON.dump(resp)] }
     stub.get("/gitscm/book/_search") { [200, {}, JSON.dump(resp)] }

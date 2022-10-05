@@ -3,7 +3,6 @@
 require File.expand_path("../../test_helper", __FILE__)
 
 class DocControllerTest < ActionController::TestCase
-
   test "should get index" do
     book = FactoryBot.create(:book, code: "en")
     get :index

@@ -12,15 +12,19 @@ class Chapter < ApplicationRecord
 
   def prev
     return false unless self.number
+
     num = self.number - 1
     return self.chapters.find_by(number: num) if num > 0
+
     false
   end
 
   def next
     return false unless self.number
+
     num = self.number + 1
     return self.chapters.find_by(number: num) if num > 0
+
     false
   end
 

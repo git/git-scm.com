@@ -3,14 +3,11 @@
 require "iso8601"
 
 module ApplicationHelper
-
   def sidebar_link_options(section)
-    if %w( about documentation downloads community
-         ).include?(@section) && @section == section ||
+    if %w(about documentation downloads community).include?(@section) && @section == section ||
        %w( reference book videos external-links
-           guis logos
-         ).include?(@subsection) && @subsection == section
-      {class: "active"}
+           guis logos).include?(@subsection) && @subsection == section
+      { class: "active" }
     else
       {}
     end
@@ -18,8 +15,8 @@ module ApplicationHelper
 
   def latest_version
     begin
-    @version ||= Version.latest_version
-    @version.name
+      @version ||= Version.latest_version
+      @version.name
     rescue
       ""
     end
@@ -37,8 +34,8 @@ module ApplicationHelper
 
   def latest_release_date
     begin
-    @version ||= Version.latest_version
-    "(" + @version.committed.strftime("%Y-%m-%d") + ")"
+      @version ||= Version.latest_version
+      "(" + @version.committed.strftime("%Y-%m-%d") + ")"
     rescue
       ""
     end
@@ -62,6 +59,7 @@ module ApplicationHelper
 
   def banner_duration(duration)
     return "" if duration.blank?
+
     ISO8601::Duration.new(duration).to_seconds.round * 1000
   end
 end
