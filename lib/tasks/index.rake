@@ -208,9 +208,15 @@ def index_doc(filter_tags, doc_list, get_content)
     generated = {}
     cmd = tag_files.detect { |f| f.first =~ /command-list\.txt/ }
     if cmd
-      cmd_list = get_content.call(cmd.second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject do |l|
-                   l =~ /^#/
-                 end.each_with_object({}) do |cmd, list|
+      raw_list =
+        get_content
+        .call(cmd.second)
+        .match(/(### command list.*|# command name.*)/m)[0]
+        .split("\n")
+        .reject do |l|
+          l =~ /^#/
+        end
+      cmd_list = raw_list.each_with_object({}) do |cmd, list|
         name, kind, attr = cmd.split(/\s+/)
         list[kind] ||= []
         list[kind] << [name, attr]
