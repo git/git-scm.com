@@ -48,14 +48,14 @@ def genbook(code, &get_content)
     # select the chapter files
     if /(book\/[01].*\/1-[^\/]*\.asc|ch[0-9]{2}-.*\.asc)/.match?(filename)
       chnumber += 1
-      chapters ["ch#{secnumber}"] = ["chapter", chnumber, filename]
+      chapters["ch#{secnumber}"] = ["chapter", chnumber, filename]
       secnumber += 1
     end
     # detect the appendices
     next unless filename =~ /(book\/[ABC].*\.asc|[ABC].*\.asc)/
 
     appnumber += 1
-    chapters ["ch#{secnumber}"] = ["appendix", appnumber, filename]
+    chapters["ch#{secnumber}"] = ["appendix", appnumber, filename]
     secnumber += 1
   end
 
@@ -93,7 +93,7 @@ def genbook(code, &get_content)
       puts "not including #{chapter_title}\n"
       break
     end
-    chapter_type, chapter_number = chapters ["ch#{index}"]
+    chapter_type, chapter_number = chapters["ch#{index}"]
     chapter = entry
 
     next if !chapter_title
@@ -196,7 +196,7 @@ end
 
 desc "Generate book html directly from git repo"
 task remote_genbook2: :environment do
-  @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
+  @octokit = Octokit::Client.new(access_token: ENV.fetch("GITHUB_API_TOKEN", nil))
 
   if ENV["GENLANG"]
     books = Book.all_books.select { |code, _repo| code == ENV["GENLANG"] }

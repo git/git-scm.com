@@ -35,7 +35,7 @@ end
 
 def index_l10n_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
-  rebuild = ENV["REBUILD_DOC"]
+  rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
   filter_tags.call(rebuild, false).sort_by { |tag| Version.version_to_num(tag.first[1..]) }.each do |tag|
@@ -161,7 +161,7 @@ end
 
 def index_doc(filter_tags, doc_list, get_content)
   ActiveRecord::Base.logger.level = Logger::WARN
-  rebuild = ENV["REBUILD_DOC"]
+  rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
   tags = filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..]) }
@@ -202,7 +202,7 @@ def index_doc(filter_tags, doc_list, get_content)
     end
 
     puts "Found #{doc_files.size} entries"
-    doc_limit = ENV["ONLY_BUILD_DOC"]
+    doc_limit = ENV.fetch("ONLY_BUILD_DOC", nil)
 
     # generate command-list content
     generated = {}
@@ -304,7 +304,7 @@ end
 
 def github_index_doc(index_fun, repo)
   Octokit.auto_paginate = true
-  @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
+  @octokit = Octokit::Client.new(access_token: ENV.fetch("GITHUB_API_TOKEN", nil))
 
   repo = ENV["GIT_REPO"] || repo
 
@@ -345,7 +345,7 @@ def github_index_doc(index_fun, repo)
 end
 
 def local_index_doc(index_fun)
-  dir = ENV["GIT_REPO"]
+  dir = ENV.fetch("GIT_REPO", nil)
   Dir.chdir(dir) do
     tag_filter = lambda do |tagname, gettags = true|
       if gettags
