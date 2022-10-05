@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
 class DownloadsController < ApplicationController
-  def index
-  end
+  def index; end
 
   def latest
     latest = Version.latest_version.name

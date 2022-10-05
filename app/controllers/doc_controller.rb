@@ -10,8 +10,7 @@ class DocController < ApplicationController
     @videos = Gitscm::VIDEOS
   end
 
-  def ref
-  end
+  def ref; end
 
   def man
     return redirect_to docs_path unless @doc_file
@@ -41,8 +40,7 @@ class DocController < ApplicationController
     end
   end
 
-  def ext
-  end
+  def ext; end
 
   private
 
