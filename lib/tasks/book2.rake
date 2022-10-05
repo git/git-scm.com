@@ -38,7 +38,6 @@ def genbook(code, &get_content)
   appnumber = 0
   chnumber = 0
   secnumber = 0
-  ids = {}
 
   # The chapter files are historically located in book/<chapter_name>/1-<chapter_name>.asc
   # The new localisation of these files are at the root of the project
