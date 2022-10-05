@@ -6,9 +6,9 @@ ruby "3.1.2"
 gem "rails", "~> 6.0"
 
 # hacks for rails6 + ruby 3.1
-gem 'net-smtp', require: false
 gem 'net-imap', require: false
 gem 'net-pop', require: false
+gem 'net-smtp', require: false
 
 gem "asciidoctor", "~> 2.0.0"
 gem "elasticsearch", "2.0.2"

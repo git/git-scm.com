@@ -228,7 +228,7 @@ def index_doc(filter_tags, doc_list, get_content)
           section = content.match(/^[a-z0-9-]+\(([1-9])\)/)[1]
           match = content.match(/NAME\n----\n\S+ - (.*)$/)
           if match
-              "linkgit:#{cmd}[#{section}]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
+            "linkgit:#{cmd}[#{section}]::\n\t#{attr == 'deprecated' ? '(deprecated) ' : ''}#{match[1]}\n"
           end
         end
         list.merge!("Documentation/cmds-#{category}.txt" => links.compact.join("\n"))
