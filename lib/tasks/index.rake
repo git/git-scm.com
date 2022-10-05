@@ -247,6 +247,7 @@ def index_doc(filter_tags, doc_list, get_content)
               puts "#{new_fname} could not be resolved for expansion"
             end
           end
+          new_content
         end
       end
 
