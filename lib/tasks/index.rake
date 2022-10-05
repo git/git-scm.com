@@ -44,7 +44,6 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
     end
 
     puts "Found #{doc_files.size} entries"
-    doc_limit = ENV["ONLY_BUILD_DOC"]
 
     get_content_f = proc do |source, target|
       name = File.join(File.dirname(source), target)
@@ -79,7 +78,6 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       ids = Set.new([])
       lang = File.dirname(full_path)
       path = File.basename(full_path, ".txt")
-      # next if doc_limit && path !~ /#{doc_limit}/
 
       file = DocFile.where(name: path).first_or_create
 
