@@ -311,7 +311,7 @@ def github_index_doc(index_fun, repo)
     blobs[sha] = content.force_encoding("UTF-8")
   end
 
-  tag_filter = ->(tagname, gettags = true) do
+  tag_filter = lambda do |tagname, gettags = true|
     # find all tags
     if gettags
       tags = @octokit.tags(repo).select { |tag| !tag.nil? && tag.name =~ /v\d([\.\d])+$/ } # just get release tags
@@ -334,7 +334,7 @@ def github_index_doc(index_fun, repo)
 
   get_content =   ->(sha) do blob_content[sha] end
 
-  get_file_list = ->(tree_sha) do
+  get_file_list = lambda do |tree_sha|
     tree_info = @octokit.tree(repo, tree_sha, recursive: true)
     tree_info.tree.collect { |ent| [ent.path, ent.sha] }
   end
@@ -345,7 +345,7 @@ end
 def local_index_doc(index_fun)
   dir = ENV["GIT_REPO"]
   Dir.chdir(dir) do
-    tag_filter = ->(tagname, gettags = true) do
+    tag_filter = lambda do |tagname, gettags = true|
       if gettags
         # find all tags
         tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
@@ -370,7 +370,7 @@ def local_index_doc(index_fun)
 
     get_content =   ->(sha) do `git cat-file blob #{sha}` end
 
-    get_file_list = ->(tree_sha) do
+    get_file_list = lambda do |tree_sha|
       entries = `git ls-tree -r #{tree_sha}`.strip.split("\n")
       tree = entries.map do |e|
         mode, type, sha, path = e.split(" ")

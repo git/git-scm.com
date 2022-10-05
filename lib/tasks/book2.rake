@@ -221,7 +221,7 @@ task remote_genbook2: :environment do
 
         begin
           rel = @octokit.latest_release(repo)
-          get_url = ->(name_re) do
+          get_url = lambda do |name_re|
             asset = rel.assets.find { |asset| name_re.match(asset.name) }
             if asset
               asset.browser_download_url
