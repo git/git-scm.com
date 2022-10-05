@@ -202,6 +202,7 @@ def index_doc(filter_tags, doc_list, get_content)
       generated = cmd_list.keys.inject({}) do |list, category|
         links = cmd_list[category].map do |cmd, attr|
           next unless cmd_file = tag_files.detect { |ent| ent.first == "Documentation/#{cmd}.txt" }
+
           content = get_content.call(cmd_file.second)
           section = content.match(/^git.*\(([1-9])\)/)[1]
           if match = content.match(/NAME\n----\n\S+ - (.*)$/)

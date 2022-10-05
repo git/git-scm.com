@@ -54,6 +54,7 @@ def genbook(code, &get_content)
     end
     # detect the appendices
     next unless filename =~ /(book\/[ABC].*\.asc|[ABC].*\.asc)/
+
     appnumber += 1
     chapters ["ch#{secnumber}"] = ["appendix", appnumber, filename]
     secnumber += 1
