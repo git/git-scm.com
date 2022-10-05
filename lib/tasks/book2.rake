@@ -13,7 +13,7 @@ def expand(content, path, &get_content)
     end
     new_content = get_content.call(new_fname)
     if new_content
-      expand(new_content.gsub("\xEF\xBB\xBF".force_encoding("UTF-8"), ""), new_fname) { |c| get_content.call (c) }
+      expand(new_content.gsub("\xEF\xBB\xBF".force_encoding("UTF-8"), ""), new_fname) { |c| get_content.call(c) }
     else
       puts "#{new_fname} could not be resolved for expansion"
       ""

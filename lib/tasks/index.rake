@@ -50,7 +50,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       name = File.join(File.dirname(source), target)
       content_file = tag_files.detect { |ent| ent.first == name }
       if content_file
-        new_content = get_content.call (content_file.second)
+        new_content = get_content.call(content_file.second)
       else
         puts "Included file #{name} was not translated. Processing anyway\n"
       end
@@ -227,7 +227,7 @@ def index_doc(filter_tags, doc_list, get_content)
       get_content_f = Proc.new do |name|
         content_file = tag_files.detect { |ent| ent.first == name }
         if content_file
-          new_content = get_content.call (content_file.second)
+          new_content = get_content.call(content_file.second)
         end
         new_content
       end
