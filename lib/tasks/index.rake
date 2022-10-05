@@ -356,7 +356,7 @@ def local_index_doc(index_fun)
         commit_sha = `git rev-parse #{tag}`.chomp
         tree_sha = `git rev-parse #{tag}^{tree}`.chomp
         tagger = `git cat-file commit #{tag} | grep committer`.chomp.split(" ")
-        tz = tagger.pop
+        _tz = tagger.pop
         ts = tagger.pop
         ts = Time.at(ts.to_i)
         [tag, commit_sha, tree_sha, ts]
@@ -368,7 +368,7 @@ def local_index_doc(index_fun)
     get_file_list = lambda do |tree_sha|
       entries = `git ls-tree -r #{tree_sha}`.strip.split("\n")
       tree = entries.map do |e|
-        mode, type, sha, path = e.split(" ")
+        _mode, _type, sha, path = e.split(" ")
         [path, sha]
       end
     end
