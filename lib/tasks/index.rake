@@ -314,7 +314,7 @@ def github_index_doc(index_fun, repo)
   tag_filter = lambda do |tagname, gettags = true|
     # find all tags
     if gettags
-      tags = @octokit.tags(repo).select { |tag| !tag.nil? && tag.name =~ /v\d([\.\d])+$/ } # just get release tags
+      tags = @octokit.tags(repo).select { |tag| !tag.nil? && tag.name =~ /v\d([.\d])+$/ } # just get release tags
       if tagname
         tags = tags.select { |t| t.name == tagname }
       end
@@ -349,7 +349,7 @@ def local_index_doc(index_fun)
       if gettags
         # find all tags
         tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
-        tags = tags.select { |tag| tag =~ /v\d([\.\d])+$/ } # just get release tags
+        tags = tags.select { |tag| tag =~ /v\d([.\d])+$/ } # just get release tags
         if tagname
           tags = tags.select { |t| t == tagname }
         end

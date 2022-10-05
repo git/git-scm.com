@@ -31,7 +31,7 @@ module Searchable
       lang_options = { "must" => [{ "term" => { "lang" => options[:lang] } }] }
       query_options["query"]["bool"].merge!(lang_options) if options[:lang].present?
 
-      keywords.split(/\s|\-/).each do |keyword|
+      keywords.split(/\s|-/).each do |keyword|
         query_options["query"]["bool"]["should"] << { "prefix" => { type_name => { "value" => keyword,
                                                                                    "boost" => 12.0 } } }
         query_options["query"]["bool"]["should"] << { "term" => { format => keyword } }

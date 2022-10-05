@@ -26,8 +26,8 @@ Rails.application.routes.draw do
       "https://github.com/git/git/blob/master/Documentation/howto/#{path_params[:file]}.txt"
     }
 
-    get "/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-\.]+/
-    get "/:file"      => "doc#man", :as => :doc_file,      :file => /[\w\-\.]+/
+    get "/:file.html" => "doc#man", :as => :doc_file_html, :file => /[\w\-.]+/
+    get "/:file"      => "doc#man", :as => :doc_file,      :file => /[\w\-.]+/
 
     get "/:file/:version" => "doc#man", :version => /[^\/]+/
   end

@@ -136,17 +136,17 @@ def genbook(code, &get_content)
       html.gsub!("<h5", "<h4")
       html.gsub!(/\/h5>/, "/h4>")
 
-      if xlink = html.scan(/href=\"1-.*?\.html\#(.*?)\"/)
+      if xlink = html.scan(/href="1-.*?\.html\#(.*?)"/)
         xlink.each do |link|
           xref = link.first
-          html.gsub!(/href=\"1-.*?\.html\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
+          html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"ch00/#{xref}\"") rescue nil
         end
       end
 
-      if xlink = html.scan(/href=\"\#(.*?)\"/)
+      if xlink = html.scan(/href="\#(.*?)"/)
         xlink.each do |link|
           xref = link.first
-          html.gsub!(/href=\"\##{xref}\"/, "href=\"ch00/#{xref}\"") rescue nil
+          html.gsub!(/href="\##{xref}"/, "href=\"ch00/#{xref}\"") rescue nil
         end
       end
 
