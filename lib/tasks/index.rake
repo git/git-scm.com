@@ -99,7 +99,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
           line = "<a href='/docs/#{x[1]}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
         end
         # HTML anchor on hdlist1 (i.e. command options)
-        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
+        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
           text = $1.tr("^A-Za-z0-9-", "")
           anchor = "#{path}-#{text}"
           # handle anchor collisions by appending -1
@@ -234,7 +234,7 @@ def index_doc(filter_tags, doc_list, get_content)
       end
 
       def expand_content(content, path, get_f_content, generated)
-        content.gsub(/include::(\S+)\.txt\[\]/) do |line|
+        content.gsub(/include::(\S+)\.txt\[\]/) do |_line|
           if File.dirname(path) == "."
             new_fname = "#{$1}.txt"
           else
@@ -275,7 +275,7 @@ def index_doc(filter_tags, doc_list, get_content)
             line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
           end
           # HTML anchor on hdlist1 (i.e. command options)
-          html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |m|
+          html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
             text = $1.tr("^A-Za-z0-9-", "")
             anchor = "#{path}-#{text}"
             # handle anchor collisions by appending -1

@@ -5,7 +5,7 @@ require "octokit"
 require "pathname"
 
 def expand(content, path, &get_content)
-  content.gsub(/include::(\S+)\[\]/) do |line|
+  content.gsub(/include::(\S+)\[\]/) do |_line|
     if File.dirname(path) == "."
       new_fname = $1
     else
@@ -45,7 +45,7 @@ def genbook(code, &get_content)
   chapter_files = /(book\/[01A-C].*\/1-[^\/]*?\.asc|(?:ch[0-9]{2}|[ABC])-[^\/]*?\.asc)/
   chaps = progit.scan(chapter_files).flatten
 
-  chaps.each_with_index do |filename, index|
+  chaps.each_with_index do |filename, _index|
     # select the chapter files
     if /(book\/[01].*\/1-[^\/]*\.asc|ch[0-9]{2}-.*\.asc)/.match?(filename)
       chnumber += 1
@@ -191,7 +191,7 @@ task remote_genbook2: :environment do
   @octokit = Octokit::Client.new(access_token: ENV["GITHUB_API_TOKEN"])
 
   if ENV["GENLANG"]
-    books = Book.all_books.select { |code, repo| code == ENV["GENLANG"] }
+    books = Book.all_books.select { |code, _repo| code == ENV["GENLANG"] }
   else
     books = Book.all_books.select do |code, repo|
       repo_head = @octokit.commit(repo, "HEAD").sha
