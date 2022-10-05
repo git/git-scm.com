@@ -44,6 +44,6 @@ class Book < ApplicationRecord
   end
 
   def has_edition(number)
-    Book.where(edition: number, code: self.code).count > 0
+    Book.where(edition: number, code: code).count > 0
   end
 end

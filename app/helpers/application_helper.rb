@@ -42,7 +42,7 @@ module ApplicationHelper
   end
 
   def latest_relnote_url
-    "https://raw.github.com/git/git/master/Documentation/RelNotes/#{self.latest_version}.txt"
+    "https://raw.github.com/git/git/master/Documentation/RelNotes/#{latest_version}.txt"
   end
 
   # Overriding this because we're not using asset pipeline for images,

@@ -15,7 +15,7 @@ class Version < ApplicationRecord
   before_save :save_version_order
 
   def save_version_order
-    self.vorder = Version.version_to_num(self.name)
+    self.vorder = Version.version_to_num(name)
   end
 
   def self.latest_version

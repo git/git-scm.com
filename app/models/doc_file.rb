@@ -39,7 +39,7 @@ class DocFile < ApplicationRecord
   end
 
   def languages
-    self.doc_versions.select(:language).distinct.collect do |v|
+    doc_versions.select(:language).distinct.collect do |v|
       [v[:language], @@true_lang[v[:language]] || v[:language]]
     end
   end

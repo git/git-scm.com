@@ -23,24 +23,24 @@ class Section < ApplicationRecord
   has_many :xrefs, dependent: :delete_all
 
   def set_slug
-    if self.title
-      title = (self.chapter.title + "-" + self.title)
-      title = self.chapter.title if self.title.empty?
+    if title
+      title = (chapter.title + "-" + self.title)
+      title = chapter.title if self.title.empty?
       title = title.gsub(/\(|\)|\./, "").gsub(/\s+/, "-").gsub("&#39;", "-")
       self.slug = title
     end
   end
 
   def prev_slug
-    lang = self.book.code
-    prev_number = self.number - 1
-    if section = self.sections.find_by(number: prev_number)
-      return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
+    lang = book.code
+    prev_number = number - 1
+    if section = sections.find_by(number: prev_number)
+      return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
     else
       # find previous chapter
-      if ch = self.chapter.prev
+      if ch = chapter.prev
         if section = ch.last_section
-          return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
+          return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
         end
       end
     end
@@ -49,44 +49,44 @@ class Section < ApplicationRecord
   end
 
   def next_slug
-    lang = self.book.code
-    next_number = self.number + 1
-    if section = self.sections.find_by(number: next_number)
-      return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
+    lang = book.code
+    next_number = number + 1
+    if section = sections.find_by(number: next_number)
+      return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
     else
-      if ch = self.chapter.next
+      if ch = chapter.next
         if section = ch.first_section
-          return "/book/#{lang}/v#{self.book.edition}/#{ERB::Util.url_encode(section.slug)}"
+          return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
         end
       end
       # find next chapter
     end
 
-    "/book/#{lang}/v#{self.book.edition}"
+    "/book/#{lang}/v#{book.edition}"
   end
 
   def cs_number
-    if self.chapter.chapter_type == "appendix"
-      "A" + self.chapter.chapter_number.to_s + "." + self.number.to_s
+    if chapter.chapter_type == "appendix"
+      "A" + chapter.chapter_number.to_s + "." + number.to_s
     else
-      self.chapter.chapter_number.to_s + "." + self.number.to_s
+      chapter.chapter_number.to_s + "." + number.to_s
     end
   end
 
   def index
     client = ElasticClient.instance
 
-    code = self.book.code
+    code = book.code
     begin
       client.index index: ELASTIC_SEARCH_INDEX,
                    type: "book",
-                   id: "#{code}---#{self.slug}",
+                   id: "#{code}---#{slug}",
                    body: {
-                     chapter: self.chapter.title,
-                     section: self.title,
-                     number: self.cs_number,
+                     chapter: chapter.title,
+                     section: title,
+                     number: cs_number,
                      lang: code,
-                     html: self.html
+                     html: html
                    }
     rescue StandardError
       nil

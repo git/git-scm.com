@@ -11,36 +11,36 @@ class Chapter < ApplicationRecord
   has_many :chapters, through: :book
 
   def prev
-    return false unless self.number
+    return false unless number
 
-    num = self.number - 1
-    return self.chapters.find_by(number: num) if num > 0
+    num = number - 1
+    return chapters.find_by(number: num) if num > 0
 
     false
   end
 
   def next
-    return false unless self.number
+    return false unless number
 
-    num = self.number + 1
-    return self.chapters.find_by(number: num) if num > 0
+    num = number + 1
+    return chapters.find_by(number: num) if num > 0
 
     false
   end
 
   def last_section
-    self.sections.reorder("number DESC").first
+    sections.reorder("number DESC").first
   end
 
   def first_section
-    self.sections.first
+    sections.first
   end
 
   def cs_number
-    if self.chapter_type == "appendix"
-      "A" + self.chapter_number
+    if chapter_type == "appendix"
+      "A" + chapter_number
     else
-      self.chapter_number
+      chapter_number
     end
   end
 end

@@ -8,7 +8,7 @@ module Searchable
       # TODO find more OOP solution
       # we should never look to search_type variable again here
       # nor when adding to index
-      class_name    = self.name.to_s.downcase
+      class_name    = name.to_s.downcase
       search_type   = (class_name == "section" ? "book" : "man_doc")
 
       type_name     = (search_type == "book" ? "section" : "name")
