@@ -249,8 +249,8 @@ task remote_genbook2: :environment do
 
       book.save
     end
-  rescue StandardError => err
-    puts err.message
+  rescue StandardError => e
+    puts e.message
   end
 end
 
