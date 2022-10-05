@@ -213,8 +213,8 @@ def index_doc(filter_tags, doc_list, get_content)
         path, sha = entry
         tool = File.basename path
         content = get_content.call sha
-        merge = (content.include? "can_merge") ? "" : " * #{tool}\n"
-        diff = (content.include? "can_diff") ? "" : " * #{tool}\n"
+        merge = content.include?("can_merge") ? "" : " * #{tool}\n"
+        diff = content.include?("can_diff") ? "" : " * #{tool}\n"
         [merge, diff]
       end
 
