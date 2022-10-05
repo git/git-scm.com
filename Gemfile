@@ -31,6 +31,7 @@ group :development, :test do
   gem "listen"
   gem "pry-byebug"
   gem "rubocop"
+  gem "rubocop-discourse"
   gem "rubocop-performance"
   gem "rubocop-rails"
   gem "rubocop-rspec"
