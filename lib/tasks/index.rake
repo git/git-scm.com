@@ -123,7 +123,7 @@ end
 def drop_uninteresting_tags(tags)
   # proceed in reverse-chronological order, as we'll pick only the
   # highest-numbered point release for older versions
-  ret = Array.new
+  ret = []
   tags.reverse_each do |tag|
     numeric = Version.version_to_num(tag.first[1..-1])
     # drop anything older than v2.0
