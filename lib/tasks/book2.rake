@@ -234,9 +234,7 @@ task remote_genbook2: :environment do
         rel = @octokit.latest_release(repo)
         get_url = lambda do |name_re|
           asset = rel.assets.find { |asset| name_re.match(asset.name) }
-          if asset
-            asset.browser_download_url
-          end
+          asset&.browser_download_url
         end
         book.ebook_pdf  = get_url.call(/\.pdf$/)
         book.ebook_epub = get_url.call(/\.epub$/)
