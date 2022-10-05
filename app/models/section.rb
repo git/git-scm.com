@@ -40,7 +40,7 @@ class Section < ApplicationRecord
       # find previous chapter
       if section = ch.last_section
         return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
-        end
+      end
     end
 
     "/book"
@@ -54,7 +54,7 @@ class Section < ApplicationRecord
     elsif ch = chapter.next
       if section = ch.first_section
         return "/book/#{lang}/v#{book.edition}/#{ERB::Util.url_encode(section.slug)}"
-        end
+      end
       # find next chapter
     end
 
