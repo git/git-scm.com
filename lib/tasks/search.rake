@@ -1,4 +1,4 @@
-# rubocop:disable Style/FrozenStringLiteralComment
+# frozen_string_literal: true
 
 task search_clear: :environment do
   # BONSAI.clear
