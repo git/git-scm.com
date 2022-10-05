@@ -13,6 +13,7 @@ gem "puma"
 
 gem "diffy"
 gem "nokogiri"
+gem "rss"
 
 # Assets
 gem "sass-rails"
