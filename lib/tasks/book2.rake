@@ -139,21 +139,33 @@ def genbook(code, &get_content)
       if xlink = html.scan(/href="1-.*?\.html\#(.*?)"/)
         xlink.each do |link|
           xref = link.first
-          html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"ch00/#{xref}\"") rescue nil
+          begin
+            html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"ch00/#{xref}\"")
+          rescue StandardError
+            nil
+          end
         end
       end
 
       if xlink = html.scan(/href="\#(.*?)"/)
         xlink.each do |link|
           xref = link.first
-          html.gsub!(/href="\##{xref}"/, "href=\"ch00/#{xref}\"") rescue nil
+          begin
+            html.gsub!(/href="\##{xref}"/, "href=\"ch00/#{xref}\"")
+          rescue StandardError
+            nil
+          end
         end
       end
 
       if subsec = html.scan(/<img src="(.*?)"/)
         subsec.each do |sub|
           sub = sub.first
-          html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"") rescue nil
+          begin
+            html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"")
+          rescue StandardError
+            nil
+          end
         end
       end
 

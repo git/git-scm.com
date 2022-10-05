@@ -38,19 +38,35 @@ module Searchable
       end
 
       client = ElasticClient.instance
-      search = client.search index: ELASTIC_SEARCH_INDEX, body: query_options rescue nil
+      search = begin
+        client.search index: ELASTIC_SEARCH_INDEX, body: query_options
+      rescue StandardError
+        nil
+      end
 
       if search
         ref_hits = []
-        results = search["hits"]["hits"] rescue []
+        results = begin
+          search["hits"]["hits"]
+        rescue StandardError
+          []
+        end
         results.each do |result|
           source = result["_source"]
           name = source["section"] || source["chapter"] || source["name"]
           slug = result["_id"].gsub("---", "/")
           highlight = if search_type == "book"
-                        result["highlight"]["html"].first rescue nil
+                        begin
+                          result["highlight"]["html"].first
+                        rescue StandardError
+                          nil
+                        end
                       else
-                        result["highlight"]["text"].first rescue nil
+                        begin
+                          result["highlight"]["text"].first
+                        rescue StandardError
+                          nil
+                        end
                       end
           hit = {
             name: name,
