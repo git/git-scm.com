@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-PageNotFound = Class.new(Exception)
+PageNotFound = Class.new(StandardError)
 
 class ApplicationController < ActionController::Base
   protect_from_forgery
