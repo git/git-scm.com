@@ -236,8 +236,6 @@ task remote_genbook2: :environment do
           asset = rel.assets.find { |asset| name_re.match(asset.name) }
           if asset
             asset.browser_download_url
-          else
-            nil
           end
         end
         book.ebook_pdf  = get_url.call(/\.pdf$/)
