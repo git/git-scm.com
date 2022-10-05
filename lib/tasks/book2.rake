@@ -256,7 +256,7 @@ end
 
 desc "Generate book html directly from git repo"
 task local_genbook2: :environment do
-  if (ENV["GENLANG"] && ENV["GENPATH"])
+  if ENV["GENLANG"] && ENV["GENPATH"]
     genbook(ENV["GENLANG"]) do |filename|
       File.open(File.join(ENV["GENPATH"], filename), "r") { |infile| File.read(infile) }
     end
