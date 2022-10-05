@@ -202,46 +202,46 @@ task remote_genbook2: :environment do
 
   books.each do |code, repo|
 
-      blob_content = Hash.new do |blobs, sha|
-        content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
-        blobs[sha] = content.force_encoding("UTF-8")
+    blob_content = Hash.new do |blobs, sha|
+      content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
+      blobs[sha] = content.force_encoding("UTF-8")
+    end
+    repo_head = @octokit.commit(repo, "HEAD")
+    repo_tree = @octokit.tree(repo, repo_head.commit.tree.sha, recursive: true)
+    Book.transaction do
+      genbook(code) do |filename|
+        file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
+        if file_handle
+          blob_content[file_handle[:sha]]
+        end
       end
-      repo_head = @octokit.commit(repo, "HEAD")
-      repo_tree = @octokit.tree(repo, repo_head.commit.tree.sha, recursive: true)
-      Book.transaction do
-        genbook(code) do |filename|
-          file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
-          if file_handle
-            blob_content[file_handle[:sha]]
+
+      book = Book.where(edition: 2, code: code).first_or_create
+      book.ebook_html = repo_head.sha
+
+      begin
+        rel = @octokit.latest_release(repo)
+        get_url = lambda do |name_re|
+          asset = rel.assets.find { |asset| name_re.match(asset.name) }
+          if asset
+            asset.browser_download_url
+          else
+            nil
           end
         end
-
-        book = Book.where(edition: 2, code: code).first_or_create
-        book.ebook_html = repo_head.sha
-
-        begin
-          rel = @octokit.latest_release(repo)
-          get_url = lambda do |name_re|
-            asset = rel.assets.find { |asset| name_re.match(asset.name) }
-            if asset
-              asset.browser_download_url
-            else
-              nil
-            end
-          end
-          book.ebook_pdf  = get_url.call(/\.pdf$/)
-          book.ebook_epub = get_url.call(/\.epub$/)
-          book.ebook_mobi = get_url.call(/\.mobi$/)
-        rescue Octokit::NotFound
-          book.ebook_pdf  = nil
-          book.ebook_epub = nil
-          book.ebook_mobi = nil
-        end
-
-        book.save
+        book.ebook_pdf  = get_url.call(/\.pdf$/)
+        book.ebook_epub = get_url.call(/\.epub$/)
+        book.ebook_mobi = get_url.call(/\.mobi$/)
+      rescue Octokit::NotFound
+        book.ebook_pdf  = nil
+        book.ebook_epub = nil
+        book.ebook_mobi = nil
       end
-    rescue StandardError => err
-      puts err.message
+
+      book.save
+    end
+  rescue StandardError => err
+    puts err.message
 
   end
 end
