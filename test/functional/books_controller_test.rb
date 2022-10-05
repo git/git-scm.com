@@ -9,7 +9,7 @@ class BooksControllerTest < ActionController::TestCase
   end
 
   test "gets the book page" do
-    book = FactoryBot.create(:book, code: "en")
+    _book = FactoryBot.create(:book, code: "en")
     get :show, params: { lang: "en" }
     assert_response :success
   end

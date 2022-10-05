@@ -12,7 +12,7 @@ class DocVersionTest < ActiveSupport::TestCase
     file = FactoryBot.create(:doc_file, name: "test-command")
     docs = range.map { |i| FactoryBot.create(:doc, plain: "Doc #{i}") }
     vers = range.map { |i| FactoryBot.create(:version, name: "#{i}.0", vorder: Version.version_to_num("#{i}.0")) }
-    dver = range.map { |i| FactoryBot.create(:doc_version, doc_file: file, version: vers[i], doc: docs[i]) }
+    _dver = range.map { |i| FactoryBot.create(:doc_version, doc_file: file, version: vers[i], doc: docs[i]) }
 
     dv = DocVersion.latest_for("test-command")
     assert_equal docs[3], dv.doc
@@ -23,7 +23,7 @@ class DocVersionTest < ActiveSupport::TestCase
     file = FactoryBot.create(:doc_file, name: "test-command")
     docs = range.map { |i| FactoryBot.create(:doc, plain: "Doc #{i}") }
     vers = range.map { |i| FactoryBot.create(:version, name: "v#{i}.0") }
-    dver = range.map { |i| FactoryBot.create(:doc_version, doc_file: file, version: vers[i], doc: docs[i]) }
+    _dver = range.map { |i| FactoryBot.create(:doc_version, doc_file: file, version: vers[i], doc: docs[i]) }
 
     dv = DocVersion.for_version("test-command", "v2.0")
     assert_equal docs[2], dv.doc
