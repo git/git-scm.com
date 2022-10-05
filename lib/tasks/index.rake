@@ -243,7 +243,7 @@ def index_doc(filter_tags, doc_list, get_content)
         [merge, diff]
       end
 
-      can_merge, can_diff = tools.transpose.map { |strs| strs.join "" }
+      can_merge, can_diff = tools.transpose.map(&:join)
       generated["Documentation/mergetools-diff.txt"] = can_diff
       generated["Documentation/mergetools-merge.txt"] = can_merge
 
@@ -349,7 +349,7 @@ def local_index_doc(index_fun)
       if gettags
         # find all tags
         tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
-        tags = tags.select { |tag| tag =~ /v\d([.\d])+$/ } # just get release tags
+        tags = tags.grep(/v\d([.\d])+$/) # just get release tags
         if tagname
           tags = tags.select { |t| t == tagname }
         end
@@ -360,7 +360,7 @@ def local_index_doc(index_fun)
         # extract metadata
         commit_sha = `git rev-parse #{tag}`.chomp
         tree_sha = `git rev-parse #{tag}^{tree}`.chomp
-        tagger = `git cat-file commit #{tag} | grep committer`.chomp.split(" ")
+        tagger = `git cat-file commit #{tag} | grep committer`.chomp.split
         _tz = tagger.pop
         ts = tagger.pop
         ts = Time.at(ts.to_i)
@@ -373,7 +373,7 @@ def local_index_doc(index_fun)
     get_file_list = lambda do |tree_sha|
       entries = `git ls-tree -r #{tree_sha}`.strip.split("\n")
       entries.map do |e|
-        _mode, _type, sha, path = e.split(" ")
+        _mode, _type, sha, path = e.split
         [path, sha]
       end
     end
