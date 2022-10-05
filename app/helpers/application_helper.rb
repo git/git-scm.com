@@ -48,7 +48,7 @@ module ApplicationHelper
   def image_tag(image, options = {})
     options = options.symbolize_keys
 
-    src = options[:src] = "/images/#{image}"
+    options[:src] = "/images/#{image}"
 
     tag("img", options)
   end
