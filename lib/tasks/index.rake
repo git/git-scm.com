@@ -94,7 +94,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         html = asciidoc.render
         html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
           x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
-          line = "<a href='/docs/#{x[1]}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
+          "<a href='/docs/#{x[1]}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
         end
         # HTML anchor on hdlist1 (i.e. command options)
         html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
@@ -269,7 +269,7 @@ def index_doc(filter_tags, doc_list, get_content)
           html = asciidoc.render
           html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
             x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
-            line = "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
+            "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
           end
           # HTML anchor on hdlist1 (i.e. command options)
           html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
@@ -367,7 +367,7 @@ def local_index_doc(index_fun)
 
     get_file_list = lambda do |tree_sha|
       entries = `git ls-tree -r #{tree_sha}`.strip.split("\n")
-      tree = entries.map do |e|
+      entries.map do |e|
         _mode, _type, sha, path = e.split(" ")
         [path, sha]
       end
