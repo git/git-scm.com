@@ -43,7 +43,7 @@ class Book < ApplicationRecord
     @@all_books
   end
 
-  def has_edition(number)
+  def edition?(number)
     Book.where(edition: number, code: code).count > 0
   end
 end
