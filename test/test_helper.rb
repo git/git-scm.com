@@ -11,7 +11,8 @@ Shoulda::Matchers.configure do |config|
   end
 end
 
-class ActiveSupport::TestCase
+module ActiveSupport
+  class TestCase
   # Setup all fixtures in test/fixtures/*.(yml|csv) for all tests in alphabetical order.
   #
   # Note: You'll currently still have to declare fixtures explicitly in integration tests
@@ -19,6 +20,7 @@ class ActiveSupport::TestCase
   fixtures :all
 
   # Add more helper methods to be used by all tests here...
+  end
 end
 
 Faraday.new(url: "http://0.0.0.0:9200") do |builder|
