@@ -41,11 +41,11 @@ class SiteController < ApplicationController
       results: []
     }
 
-    if results = Doc.search(sname)
+    if (results = Doc.search(sname))
       data[:results] << results
     end
 
-    if results = Section.search(sname, lang: "en")
+    if (results = Section.search(sname, lang: "en"))
       data[:results] << results
     end
 

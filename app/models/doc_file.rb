@@ -48,7 +48,8 @@ class DocFile < ApplicationRecord
     changes = []
     doc_versions = self.doc_versions.includes(:version).version_changes.limit(limit_size).to_a
     doc_versions.each_with_index do |doc_version, i|
-      next unless previous_doc_version = doc_versions[i + 1]
+      previous_doc_version = doc_versions[i + 1]
+      next unless previous_doc_version
 
       sha2 = doc_version.doc.blob_sha
       sha1 = previous_doc_version.doc.blob_sha

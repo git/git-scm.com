@@ -5,7 +5,8 @@ class BooksController < ApplicationController
 
   def show
     lang = params[:lang] || "en"
-    if edition = params[:edition]
+    edition = params[:edition]
+    if edition
       @book = Book.where(code: lang, edition: edition).first
     else
       @book = Book.where(code: lang).order("percent_complete DESC, edition DESC").first
@@ -30,7 +31,8 @@ class BooksController < ApplicationController
     @content = @book.sections.where(slug: params[:slug]).first
     if !@content
       @book = Book.where(code: @book.code, edition: 2).first
-      if @content = @book.sections.where(slug: params[:slug]).first
+      @content = @book.sections.where(slug: params[:slug]).first
+      if @content
         return redirect_to "/book/#{@book.code}/v#{@book.edition}/#{params[:slug]}"
       else
         return redirect_to "/book/#{@book.code}"
@@ -57,7 +59,8 @@ class BooksController < ApplicationController
   end
 
   def book_resource
-    if edition = params[:edition]
+    edition = params[:edition]
+    if edition
       @book ||= Book.where(code: (params[:lang] || "en"), edition: edition).first
     else
       @no_edition = true

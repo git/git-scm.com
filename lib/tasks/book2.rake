@@ -136,7 +136,8 @@ def genbook(code, &get_content)
       html.gsub!("<h5", "<h4")
       html.gsub!(/\/h5>/, "/h4>")
 
-      if xlink = html.scan(/href="1-.*?\.html\#(.*?)"/)
+      xlink = html.scan(/href="1-.*?\.html\#(.*?)"/)
+      if xlink
         xlink.each do |link|
           xref = link.first
           begin
@@ -147,7 +148,8 @@ def genbook(code, &get_content)
         end
       end
 
-      if xlink = html.scan(/href="\#(.*?)"/)
+      xlink = html.scan(/href="\#(.*?)"/)
+      if xlink
         xlink.each do |link|
           xref = link.first
           begin
@@ -158,7 +160,8 @@ def genbook(code, &get_content)
         end
       end
 
-      if subsec = html.scan(/<img src="(.*?)"/)
+      subsec = html.scan(/<img src="(.*?)"/)
+      if subsec
         subsec.each do |sub|
           sub = sub.first
           begin
