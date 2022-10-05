@@ -5,12 +5,12 @@ task downloads: %i[windows_downloads mac_downloads]
 
 desc "find latest windows version"
 task windows_downloads: :environment do
-  Rails.logger = Logger.new(STDOUT)
+  Rails.logger = Logger.new($stdout)
   DownloadService.download_windows_versions
 end
 
 desc "find latest mac version"
 task mac_downloads: :environment do
-  Rails.logger = Logger.new(STDOUT)
+  Rails.logger = Logger.new($stdout)
   DownloadService.download_mac_versions
 end
