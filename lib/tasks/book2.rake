@@ -53,11 +53,10 @@ def genbook(code, &get_content)
       secnumber += 1
     end
     # detect the appendices
-    if filename =~ /(book\/[ABC].*\.asc|[ABC].*\.asc)/
-      appnumber += 1
-      chapters ["ch#{secnumber}"] = ["appendix", appnumber, filename]
-      secnumber += 1
-    end
+    next unless filename =~ /(book\/[ABC].*\.asc|[ABC].*\.asc)/
+    appnumber += 1
+    chapters ["ch#{secnumber}"] = ["appendix", appnumber, filename]
+    secnumber += 1
   end
 
   # we strip the includes that don't match the chapters we want to include
