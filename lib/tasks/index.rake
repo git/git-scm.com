@@ -129,12 +129,12 @@ def drop_uninteresting_tags(tags)
   tags.reverse_each do |tag|
     numeric = Version.version_to_num(tag.first[1..-1])
     # drop anything older than v2.0
-    next if numeric < 2000000
+    next if numeric < 2_000_000
 
     # older than v2.17, take only the highest release
-    if numeric < 2170000 and !ret.empty?
+    if numeric < 2_170_000 and !ret.empty?
       old = Version.version_to_num(ret[0].first[1..-1])
-      next if old.to_i.div(10000) == numeric.to_i.div(10000)
+      next if old.to_i.div(10_000) == numeric.to_i.div(10_000)
     end
     # keep everything else
     ret.unshift(tag)
