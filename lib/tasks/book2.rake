@@ -137,38 +137,32 @@ def genbook(code, &get_content)
       html.gsub!(/\/h5>/, "/h4>")
 
       xlink = html.scan(/href="1-.*?\.html\#(.*?)"/)
-      if xlink
-        xlink.each do |link|
-          xref = link.first
-          begin
-            html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"ch00/#{xref}\"")
-          rescue StandardError
-            nil
-          end
+      xlink&.each do |link|
+        xref = link.first
+        begin
+          html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"ch00/#{xref}\"")
+        rescue StandardError
+          nil
         end
       end
 
       xlink = html.scan(/href="\#(.*?)"/)
-      if xlink
-        xlink.each do |link|
-          xref = link.first
-          begin
-            html.gsub!(/href="\##{xref}"/, "href=\"ch00/#{xref}\"")
-          rescue StandardError
-            nil
-          end
+      xlink&.each do |link|
+        xref = link.first
+        begin
+          html.gsub!(/href="\##{xref}"/, "href=\"ch00/#{xref}\"")
+        rescue StandardError
+          nil
         end
       end
 
       subsec = html.scan(/<img src="(.*?)"/)
-      if subsec
-        subsec.each do |sub|
-          sub = sub.first
-          begin
-            html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"")
-          rescue StandardError
-            nil
-          end
+      subsec&.each do |sub|
+        sub = sub.first
+        begin
+          html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"")
+        rescue StandardError
+          nil
         end
       end
 
