@@ -191,11 +191,10 @@ def index_doc(filter_tags, doc_list, get_content)
     if cmd
       cmd_list = get_content.call(cmd.second).match(/(### command list.*|# command name.*)/m)[0].split("\n").reject do |l|
                    l =~ /^#/
-                 end.inject({}) do |list, cmd|
+                 end.each_with_object({}) do |cmd, list|
         name, kind, attr = cmd.split(/\s+/)
         list[kind] ||= []
         list[kind] << [name, attr]
-        list
       end
       generated = cmd_list.keys.inject({}) do |list, category|
         links = cmd_list[category].map do |cmd, attr|
