@@ -18,7 +18,7 @@ class SiteController < ApplicationController
   # called when you submit your search
   def search_results
     @term = sname = request.query_parameters["search"].to_s.downcase
-    data = search_term(sname, true)
+    data = search_term(sname)
     @top = []
     @rest = []
     data[:results].each do |type|
@@ -35,7 +35,7 @@ class SiteController < ApplicationController
     render "site/results"
   end
 
-  def search_term(sname, highlight = false)
+  def search_term(sname)
     data = {
       term: sname,
       results: []
