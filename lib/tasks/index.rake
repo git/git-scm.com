@@ -150,10 +150,10 @@ def index_doc(filter_tags, doc_list, get_content)
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
-    stag = Version.where(name: name.gsub("v", "")).first
+    stag = Version.where(name: name.delete("v")).first
     next if stag && !rerun
 
-    stag = Version.where(name: name.gsub("v", "")).first_or_create
+    stag = Version.where(name: name.delete("v")).first_or_create
 
     stag.commit_sha = commit_sha
     stag.tree_sha = tree_sha
