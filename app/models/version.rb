@@ -28,7 +28,7 @@ class Version < ApplicationRecord
     numbers = version.to_s.split(".")
     numbers.each do |x|
       version_int += x.to_f * mult
-      mult = mult / 100.0
+      mult /= 100.0
     end
     version_int
   end
