@@ -30,7 +30,9 @@ group :development, :test do
   gem "dotenv-rails"
   gem "listen"
   gem "pry-byebug"
-  gem "rubocop-github"
+  gem "rubocop"
+  gem "rubocop-performance"
+  gem "rubocop-rails"
   gem "ruby-prof"
   gem "sqlite3"
 end
