@@ -33,8 +33,8 @@ Rails.application.routes.draw do
   end
 
   %w[man ref git].each do |path|
-    get "/#{path}/:file" => redirect("/docs/%{file}")
-    get "/#{path}/:file/:version" => redirect("/docs/%{file}/%{version}"), :version => /[^\/]+/
+    get "/#{path}/:file" => redirect("/docs/%<file>s")
+    get "/#{path}/:file/:version" => redirect("/docs/%<file>s/%<version>s"), :version => /[^\/]+/
   end
 
   resource :book do
@@ -46,9 +46,9 @@ Rails.application.routes.draw do
 
     nested do
       scope ":lang" do
-        get "/v1"                => redirect("/book/%{lang}/v2")
-        get "/v1/:slug"          => redirect("/book/%{lang}/v2/%{slug}")
-        get "/v1/:chapter/:link" => redirect("/book/%{lang}/v2/%{chapter}/%{link}")
+        get "/v1"                => redirect("/book/%<lang>s/v2")
+        get "/v1/:slug"          => redirect("/book/%<lang>s/v2/%<slug>s")
+        get "/v1/:chapter/:link" => redirect("/book/%<lang>s/v2/%<chapter>s/%<link>s")
 
         get "/v:edition"                => "books#show"
         get "/v:edition/:slug"          => "books#section"
