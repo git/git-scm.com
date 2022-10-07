@@ -150,7 +150,8 @@ def expand_content(content, path, get_f_content, generated)
     else
       new_content = get_f_content.call(new_fname)
       if new_content
-        expand_content(new_content.force_encoding("UTF-8"), new_fname, get_f_content, generated)
+        new_content = expand_content(new_content.force_encoding("UTF-8"),
+                                     new_fname, get_f_content, generated)
       else
         puts "#{new_fname} could not be resolved for expansion"
       end
