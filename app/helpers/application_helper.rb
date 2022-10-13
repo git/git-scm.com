@@ -50,7 +50,7 @@ module ApplicationHelper
 
     options[:src] = "/images/#{image}"
 
-    tag.img(options)
+    tag("img", options)
   end
 
   def banner_duration(duration)
