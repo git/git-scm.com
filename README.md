@@ -1,12 +1,15 @@
-# Git Homepage [![CI](https://github.com/git/git-scm.com/actions/workflows/ci.yml/badge.svg)](https://github.com/git/git-scm.com/actions/workflows/ci.yml) [![Help Contribute to Open Source](https://www.codetriage.com/git/git-scm.com/badges/users.svg)](https://www.codetriage.com/git/git-scm.com)
+# Git Homepage [![CI](https://github.com/git/git-scm.com/actions/workflows/ci.yml/badge.svg)](https://github.com/git/git-scm.com/actions/workflows/ci.yml) [![Help Contribute to Open Source](https://www.codetriage.com/git/git-scm.com/badges/users.svg)](https://www.codetriage.com/git/git-scm.com) 
+
+![Github Repo Size](https://img.shields.io/github/repo-size/git/git-scm.com?style=for-the-badge&color=aqua)
+
 
 This is the web application for the [git-scm.com](https://git-scm.com) site.  It is meant to be the
 first place a person new to Git will land and download or learn about the
 Git SCM system.
 
-This app is written in Ruby on Rails and deployed on Heroku.
+This app is written in **Ruby on Rails** and deployed on Heroku.
 
-## Setup
+<details><summary><h2> Setup </h2></summary>
 
 You'll need a Ruby environment to run Rails.  First do:
 
@@ -72,6 +75,7 @@ Now you can run the Rails site to take a look.
 
 The site should be running on http://localhost:5000
 
+</details><br>
 
 ## Testing
 
@@ -83,7 +87,7 @@ To run the website for testing purposes, run:
 
     $ ./script/server
 
-## Contributing
+<details><summary><h2> Contributing </h2></summary>
 
 If you wish to contribute to this website, please [fork it on GitHub](https://github.com/git/git-scm.com), push your
 change to a named branch, then send a pull request. If it is a big feature,
@@ -94,7 +98,7 @@ be accepted. If it involves code, please also write tests for it.
 
 The [list of GUI clients](https://git-scm.com/downloads/guis) has been constructed by the community for a long time. If you want to add another tool you'll need to follow a few steps:
 
-1. Add the GUI client details at the YAML file: https://github.com/git/git-scm.com/blob/main/resources/guis.yml
+1. Add the GUI client details at the [YAML file](https://github.com/git/git-scm.com/blob/main/resources/guis.yml)
     1. The fields `name`, `url`, `price`, `license` should be very straightforward to fill.
     2. The field `image_tag` corresponds to the filename of the image of the tool (without path, just the filename).
     3. `platforms` is a list of at least 1 platform in which the tool is supported. The possibilities are: `Windows`, `Mac`, `Linux`, `Android`, and `iOS`
@@ -114,6 +118,8 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
       1. If you have more than 1 tool with the same name, a warning will appear: `======= WARNING: THERE ARE DUPLICATED GUIS =======`
       2. If you are using the same `order` value for more than 1 tool, a warning will appear: `======= WARNING: THERE ARE DUPLICATED ORDERS (value: <VALUE>) =======`
 
+</details><br>
+
 ## License
 
 The source code for the site is licensed under the MIT license, which you can find in
@@ -121,3 +127,11 @@ the MIT-LICENSE.txt file.
 
 All graphical assets are licensed under the
 [Creative Commons Attribution 3.0 Unported License](https://creativecommons.org/licenses/by/3.0/).
+
+<br>
+
+## Contributors
+
+<a href="https://github.com/git/git-scm.com/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=git/git-scm.com" />
+</a>
