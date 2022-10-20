@@ -248,6 +248,7 @@ var Downloads = {
     Downloads.observeGUIOSFilter();
     Downloads.observePopState();
     Downloads.filterGUIS();
+    Downloads.postProcessDownloadPage();
   },
 
   getOSFromQueryString: function() {
@@ -314,7 +315,35 @@ var Downloads = {
     onPopState(function() {
       Downloads.filterGUIS();
     });
-  }
+  },
+
+  // say how many days ago this version was released
+  postProcessReleaseDate: function(index, releaseDateString) {
+    const daysAgo = Math.floor((Date.now() - Date.parse($('#auto-download-date').html())) / 86400000);
+    if (daysAgo < 0) return releaseDateString; // leave unparseable content alone
+
+    const rest = (count, unit) => `${count} ${unit}${count > 1 ? "s" : ""} ago`;
+    let ago = rest(daysAgo, "day");
+
+    const handwave = (exact, unit) => {
+      const roundedDown = Math.floor(exact);
+      const fract = exact - roundedDown;
+      if (fract < 0.25) return `about ${rest(roundedDown, unit)}`;
+      if (fract < 0.75) return `over ${rest(roundedDown, unit)}`;
+      return `almost ${rest(roundedDown + 1, unit)}`;
+    }
+
+    if (daysAgo == 0) ago = "today";
+    else if (daysAgo == 1) ago = "yesterday";
+    // from here on out, we keep it only approximately exact
+    else if (daysAgo > 365 * 0.75) ago = handwave(daysAgo / 365.25, "year");
+    else if (daysAgo > 45) ago = handwave(daysAgo / 30.4, "month");
+    return `<strong>${ago}</strong>, `;
+  },
+
+  postProcessDownloadPage: function() {
+    $('#relative-release-date').html(Downloads.postProcessReleaseDate);
+  },
 }
 
 // Scroll to Top
