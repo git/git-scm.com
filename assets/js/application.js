@@ -341,7 +341,26 @@ var Downloads = {
     return `<strong>${ago}</strong>, `;
   },
 
+  adjustFor32BitWindows: function() {
+    // adjust the auto-link for Windows 32-bit setups
+    const is32BitWindows = window.session.browser.os === 'Windows'
+      && !navigator.userAgent.match(/WOW64|Win64|x64|x86_64/)
+    if (!is32BitWindows) return;
+
+    const link = $('#auto-download-link');
+    const version = $('#auto-download-version');
+    const bitness = $('#auto-download-bitness');
+    const date = $('#auto-download-date');
+    if (link.length && version.length && bitness.length && date.length) {
+      bitness.html('32-bit');
+      link.attr('href', '{{ .Site.Params.windows_installer.installer32.url }}');
+      version.html('{{ .Site.Params.windows_installer.installer32.version }}');
+      date.html('{{ .Site.Params.windows_installer.installer32.release_date }}');
+    }
+  },
+
   postProcessDownloadPage: function() {
+    Downloads.adjustFor32BitWindows();
     $('#relative-release-date').html(Downloads.postProcessReleaseDate);
   },
 }
