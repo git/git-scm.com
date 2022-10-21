@@ -1,10 +1,32 @@
-# frozen_string_literal: true
+#!/usr/bin/env ruby
 
 require "asciidoctor"
 require "octokit"
 require "time"
 require "digest/sha1"
 require "set"
+require 'fileutils'
+require 'yaml'
+require_relative "version"
+
+SITE_ROOT = File.join(File.expand_path(File.dirname(__FILE__)), '../')
+DATA_FILE = "#{SITE_ROOT}data/docs.yml"
+
+def read_data
+  if File.exists?(DATA_FILE)
+    # `permitted_classes` required to allow running with Ruby v3.1
+    data = YAML.load_file(DATA_FILE, permitted_classes: [Time])
+  else
+    FileUtils.mkdir_p(File.dirname(DATA_FILE))
+    data = {}
+  end
+
+  data["versions"] = {} unless data["versions"]
+  data["pages"] = {} if !data["pages"]
+  data["sha-map"] = {} if !data["sha-map"]
+
+  data
+end
 
 def make_asciidoc(content)
   Asciidoctor::Document.new(content,
@@ -34,7 +56,6 @@ def expand_l10n(path, content, get_f_content, categories)
 end
 
 def index_l10n_doc(filter_tags, doc_list, get_content)
-  ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
@@ -67,7 +88,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       name = File.join(File.dirname(source), target)
       content_file = tag_files.detect { |ent| ent.first == name }
       if content_file
-        new_content = get_content.call(content_file.second)
+        new_content = get_content.call(content_file[1])
       else
         puts "Included file #{name} was not translated. Processing anyway\n"
       end
@@ -162,24 +183,23 @@ def expand_content(content, path, get_f_content, generated)
 end
 
 def index_doc(filter_tags, doc_list, get_content)
-  ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
+  data = read_data
+
   tags = filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..]) }
   drop_uninteresting_tags(tags).each do |tag|
-    name, commit_sha, tree_sha, ts = tag
-    puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
+    tagname, commit_sha, tree_sha, ts = tag
+    puts "#{tagname}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
-    stag = Version.where(name: name.delete("v")).first
-    next if stag && !rerun
+    next if data["versions"][tagname] && !rerun
 
-    stag = Version.where(name: name.delete("v")).first_or_create
+    data["versions"][tagname] = stag = {}
 
-    stag.commit_sha = commit_sha
-    stag.tree_sha = tree_sha
-    stag.committed = ts
-    stag.save
+    stag["commit_sha"] = commit_sha
+    stag["tree_sha"] = tree_sha
+    stag["committed"] = ts
 
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select do |ent|
@@ -201,7 +221,7 @@ def index_doc(filter_tags, doc_list, get_content)
             pull.* |
             scalar |
             technical\/.*
-        )\.txt)/x
+        )\.txt)$/x
     end
 
     puts "Found #{doc_files.size} entries"
@@ -213,7 +233,7 @@ def index_doc(filter_tags, doc_list, get_content)
     if cmd
       cmd_list =
         get_content
-        .call(cmd.second)
+        .call(cmd[1])
         .match(/(### command list.*|# command name.*)/m)[0]
         .split("\n")
         .grep_v(/^#/)
@@ -227,7 +247,7 @@ def index_doc(filter_tags, doc_list, get_content)
           cmd_file = tag_files.detect { |ent| ent.first == "Documentation/#{cmd}.txt" }
           next unless cmd_file
 
-          content = get_content.call(cmd_file.second)
+          content = get_content.call(cmd_file[1])
           section = content.match(/^[a-z0-9-]+\(([1-9])\)/)[1]
           match = content.match(/NAME\n----\n\S+ - (.*)$/)
           if match
@@ -253,7 +273,7 @@ def index_doc(filter_tags, doc_list, get_content)
       get_content_f = proc do |name|
         content_file = tag_files.detect { |ent| ent.first == name }
         if content_file
-          new_content = get_content.call(content_file.second)
+          new_content = get_content.call(content_file[1])
         end
         new_content
       end
@@ -266,7 +286,7 @@ def index_doc(filter_tags, doc_list, get_content)
         next if path == "Documentation/technical/scalar.txt"
         next if doc_limit && path !~ /#{doc_limit}/
 
-        file = DocFile.where(name: docname).first_or_create
+        doc_path = "#{SITE_ROOT}content/docs/#{docname}"
 
         puts "   build: #{docname}"
 
@@ -274,12 +294,13 @@ def index_doc(filter_tags, doc_list, get_content)
         content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
         asciidoc = make_asciidoc(content)
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
-        doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
-        if rerun || !doc.plain || !doc.html
+
+        doc = data["sha-map"][asciidoc_sha]
+        if rerun || !doc
           html = asciidoc.render
           html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
             x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
-            "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
+            "<a href='{{< relurl \"docs/#{x[1]}\" >}}'>#{x[1]}[#{x[2]}]</a>"
           end
           # HTML anchor on hdlist1 (i.e. command options)
           html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
@@ -290,18 +311,50 @@ def index_doc(filter_tags, doc_list, get_content)
             ids.add(anchor)
             "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
           end
-          doc.plain = asciidoc.source
-          doc.html  = html
-          doc.save
         end
-        dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id, language: "en").first_or_create
-        dv.doc_id = doc.id
-        dv.language = "en"
-        dv.save
-      end
+        # Make links relative
+        html.gsub!(/(<a href=['"])\/([^'"]*)/, '\1{{< relurl "\2" >}}')
 
+        if !doc
+          doc = data["sha-map"][asciidoc_sha] = {
+            "docname" => docname,
+            "versions" => [tagname]
+          }
+          data["pages"][docname] = {} if !data["pages"][docname]
+          data["pages"][docname]['latest-changes'] = tagname
+        else
+          raise "docname recorded for #{asciidoc_sha} is #{doc["docname"]}, but version #{tagname} has it as #{docname}" if doc["docname"] != docname
+          doc["versions"] = [] if !doc["versions"]
+          doc["versions"].push(tagname) if !doc["versions"].include?(tagname)
+        end
+
+        front_matter = {
+          "category" => "manual",
+          "section" => "documentation",
+          "subsection" => "manual",
+          "title" => "Git - #{docname} Documentation"
+        }
+
+        FileUtils.mkdir_p(doc_path)
+        File.open("#{doc_path}/#{tagname}.html", "w") do |out|
+          out.write("#{front_matter.to_yaml}\n---\n", out)
+          out.write(html, out)
+        end
+
+        if data["pages"][docname]['latest-changes'] == tagname
+          FileUtils.mkdir_p(File.dirname(doc_path))
+          File.open("#{doc_path}.html", "w") do |out|
+            front_matter["aliases"] = ["/docs/#{docname}/index.html"]
+            out.write("#{front_matter.to_yaml}\n---\n")
+            out.write(html)
+          end
+        end
+      end
     end
-    Rails.cache.write("latest-version", Version.latest_version.name)
+    data["latest-version"] = tagname
+  end
+  File.open(DATA_FILE, "w") do |out|
+    YAML.dump(data, out)
   end
 end
 
@@ -353,7 +406,7 @@ def local_index_doc(index_fun)
     tag_filter = lambda do |tagname, gettags = true|
       if gettags
         # find all tags
-        tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
+        tags = `git tag -l --sort=version:refname 'v[12]*'`.strip.split("\n")
         tags = tags.grep(/v\d([.\d])+$/) # just get release tags
         if tagname
           tags = tags.select { |t| t == tagname }
@@ -387,18 +440,21 @@ def local_index_doc(index_fun)
   end
 end
 
-task local_index: :environment do
-  local_index_doc(:index_doc)
-end
-
-task local_index_l10n: :environment do
-  local_index_doc(:index_l10n_doc)
-end
-
-task preindex: :environment do
-  github_index_doc(:index_doc, "gitster/git")
-end
-
-task preindex_l10n: :environment do
-  github_index_doc(:index_l10n_doc, "jnavila/git-html-l10n")
+if ARGV.length == 2
+  if ARGV[0] != "remote"
+    ENV["GIT_REPO"] = ARGV[0]
+    if ARGV[1] != "l10n"
+      local_index_doc(:index_doc)
+    else
+      local_index_doc(:index_l10n_doc)
+    end
+  else
+    if ARGV[1] != "l10n"
+      github_index_doc(:index_doc, "gitster/git")
+    else
+      github_index_doc(:index_l10n_doc, "jnavila/git-html-l10n")
+    end
+  end
+else
+  abort("Need two arguments: (<path-to-repo> | remote) (en | l10n)!")
 end
