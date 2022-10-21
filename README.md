@@ -25,21 +25,23 @@ Note that this will take about 7 times as long, and the site will not be re-rend
 
 ## Update manual pages
 
-(TODO!)
-You can do so using a local Git source clone like this:
+First, install the Ruby prerequisites:
 
-    $ GIT_REPO=../git/.git rake local_index
+	$ bundler install
 
-This will populate the man pages for all Git versions. You can also populate them only for a specific Git version (faster):
+Then, you can build the manual pages using a local Git source clone like this:
+
+    $ ruby ./script/update-docs.rb /path/to/git/.git en
+
+This will populate the manual pages for all Git versions. You can also populate them only for a specific Git version (faster):
 
     $ version=v2.23.0
-    $ GIT_REPO=../git/.git REBUILD_DOC=$version rake local_index
+    $ REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git/.git en
 
 Or you can populate the man pages from GitHub (much slower) like this:
 
     $ export GITHUB_API_TOKEN=github_personal_auth_token
-    $ rake preindex  # all versions
-    $ REBUILD_DOC=$version rake preindex  # specific version
+    $ REBUILD_DOC=$version ruby ./script/update-docs.rb remote en  # specific version
 
 Similarly, you can also populate the localized man pages. From a local clone of https://github.com/jnavila/git-html-l10n :
 
