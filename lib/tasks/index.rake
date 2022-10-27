@@ -56,7 +56,8 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       ent.first =~
         /^([-_\w]+)\/(
           (
-            git.*
+            git.* |
+            scalar
         )\.txt)/x
     end
 
@@ -198,6 +199,7 @@ def index_doc(filter_tags, doc_list, get_content)
             rev.* |
             pretty.* |
             pull.* |
+            scalar |
             technical\/.*
         )\.txt)/x
     end
