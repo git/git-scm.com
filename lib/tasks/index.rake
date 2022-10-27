@@ -262,6 +262,8 @@ def index_doc(filter_tags, doc_list, get_content)
         path, sha = entry
         ids = Set.new([])
         docname = File.basename(path, ".txt")
+        # TEMPORARY: skip the scalar technical doc until it has a non-overlapping name
+        next if path == "Documentation/technical/scalar.txt"
         next if doc_limit && path !~ /#{doc_limit}/
 
         file = DocFile.where(name: docname).first_or_create
