@@ -114,6 +114,15 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
       1. If you have more than 1 tool with the same name, a warning will appear: `======= WARNING: THERE ARE DUPLICATED GUIS =======`
       2. If you are using the same `order` value for more than 1 tool, a warning will appear: `======= WARNING: THERE ARE DUPLICATED ORDERS (value: <VALUE>) =======`
 
+## FAQ
+
+While setting the repo if you find any error, check if it's a known issue and the corresponding solution bellow.
+
+### An error occurred while installing pg (1.2.3), and Bundler cannot continue.
+
+If you got this error when running `bundle install`, then you need to install postgresql on your OS. Check [this stackoverflow topic](https://stackoverflow.com/questions/52339221/rails-gem-error-while-installing-pg-1-1-3-and-bundler-cannot-continue) for more details.
+
+
 ## License
 
 The source code for the site is licensed under the MIT license, which you can find in
