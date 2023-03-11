@@ -59,7 +59,7 @@ Rails.application.configure do
 
   # Use a different cache store in production.
   # config.cache_store = :mem_cache_store
-  config.cache_store = :redis_store, ENV["REDIS_URL"]
+  config.cache_store = :redis_store, ENV.fetch("REDIS_URL")
 
   # Use a real queuing backend for Active Job (and separate queues per environment).
   # config.active_job.queue_adapter     = :resque
