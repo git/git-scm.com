@@ -51,6 +51,19 @@ Side note: What _are_ "ugly URLs"? Hugo, by default, generates "pretty" URLs lik
 
 Pro-Tip: Do this in a sparse checkout that excludes large parts of `content/`, to speed up the rendering time.
 
+To test the site locally _with_ the search enabled, run this instead:
+
+    $ hugo
+    $ npx -y pagefind --site public
+    $ node script/serve-public.js
+
+You can also use Pagefind's built-in server (which will be running on http://127.0.0.1:1414), but again, you have to turn off "ugly URLs":
+
+    $ HUGO_UGLYURLS=false hugo
+    $ npx -y pagefind --site public --serve
+
+Note that running Pagefind will make the process about 7 times slower, and the site will not be re-rendered and live-reloaded in the browser when you change files in `content/` (unlike with `hugo serve -w`).
+
 ## Update manual pages
 
 (TODO!)
@@ -133,6 +146,10 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
 
 * https://gohugo.io/
 * https://gohugo.io/content-management/shortcodes/
+
+### Pagefind (client-side search)
+
+* https://pagefind.app/
 
 ## License
 
