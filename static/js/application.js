@@ -98,6 +98,7 @@ var Search = {
   selectedIndex: 0,
 
   init: function() {
+    Search.displayFullSearchResults();
     Search.observeFocus();
     Search.observeTextEntry();
     Search.observeResultsClicks();
@@ -197,6 +198,77 @@ var Search = {
     $('form#search').switchClass("focus", "", 200);
     $('#search-results').fadeOut(0.2);
     Search.selectedIndex = 0;
+  },
+
+  getQueryValue: function(key) {
+    const query = window.location.search.substring(1);
+    const needle = `${key}=`;
+    return query
+      .split('&')
+      .filter(e => e.startsWith(needle))
+      .map(e => decodeURIComponent(e.substring(needle.length).replace(/\+/g, '%20')))
+      .pop();
+  },
+
+  initializeSearchIndex: function(callback) {
+    if (Search.searchIndex) {
+      callback();
+      return;
+    }
+    $.getJSON('/search/search-data.json', data => {
+      Search.store = data;
+
+      // Initialize lunr with the fields it will be searching on. Titles get
+      // a boost of 10 to indicate matches on this field are more important.
+      Search.searchIndex = lunr(function () {
+        this.ref('id');
+        this.field('title', { boost: 10 });
+        this.field('category');
+        this.field('content');
+
+        for (var key in Search.store) {
+          this.add({
+            'id': key,
+            'title': Search.store[key].title,
+            'category': Search.store[key].category,
+            'content': Search.store[key].content
+          });
+        }
+      })
+      callback();
+    })
+  },
+
+  displayFullSearchResults: function() {
+    const searchResultsElements = document.getElementsByClassName('full-search-results');
+    if (!searchResultsElements || searchResultsElements.length !== 1) return;
+
+    const searchTerm = this.getQueryValue('search');
+    if (!searchTerm) return;
+
+    const searchTermElement = document.getElementById('search-term');
+    if (searchTermElement) searchTermElement.innerHTML = searchTerm;
+
+    const searchTextElement = document.getElementById('search-text');
+    if (searchTextElement) searchTextElement.value = searchTerm;
+
+    searchResultsElements[0].innerHTML = 'Searching&hellip;';
+
+    this.initializeSearchIndex(async () => {
+      const results = await Search.pagefind.search(searchTerm);
+      if (!results || !results.results || !results.results.length) return;
+
+      const list = (await Promise.all(results.results.map(async e => {
+        const result = await e.data();
+        const href = result.url;
+        return `
+          <li><h3><a href="${href}">${result.meta.title}</a></h3>
+          <a class="url" href="${href}">${href}</a>
+          <p>${result.excerpt}</p></li>`;
+      }))).join('');
+
+      searchResultsElements[0].innerHTML = list || '<li>No results found</li>';
+    })
   }
 }
 
