@@ -158,10 +158,42 @@ var Search = {
 
       if(term != Search.currentSearch) {
         Search.currentSearch = term;
-        $.get("/search", {search: term}, function(results) {
-          $("#search-results").html(results);
+        $("#search-results").text(`Searching for ${term}`);
+        this.initializeSearchIndex(async () => {
+          const results = await Search.pagefind.debouncedSearch(term);
+          if (results === null) return;
+          $("#search-results").html(`
+            <header> Search Results </header>
+            <table>
+              <tbody>
+                <tr class="show-all">
+                 <td class="category"> &nbsp; </td>
+                  <td class="matches">
+                    <ul>
+                      <li>
+                        <a class="highlight">Show all results...</a>
+                      </li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="category"> &nbsp; </td>
+                  <td class="matches">
+                    <ul>
+                    ${(await Promise.all(results.results.map(async e => {
+                      const result = await e.data();
+                      return `
+                        <li><a href="${result.url}">${result.meta.title}</a></li>
+                      `
+                    }))).join('')}
+                    </ul>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          `);
           Search.searching = false;
-        }, 'html');
+        });
       };
     }
     else {
@@ -211,32 +243,15 @@ var Search = {
   },
 
   initializeSearchIndex: function(callback) {
-    if (Search.searchIndex) {
-      callback();
+    if (Search.pagefind) {
+      callback().catch(console.log);
       return;
     }
-    $.getJSON('/search/search-data.json', data => {
-      Search.store = data;
-
-      // Initialize lunr with the fields it will be searching on. Titles get
-      // a boost of 10 to indicate matches on this field are more important.
-      Search.searchIndex = lunr(function () {
-        this.ref('id');
-        this.field('title', { boost: 10 });
-        this.field('category');
-        this.field('content');
-
-        for (var key in Search.store) {
-          this.add({
-            'id': key,
-            'title': Search.store[key].title,
-            'category': Search.store[key].category,
-            'content': Search.store[key].content
-          });
-        }
-      })
-      callback();
-    })
+    (async () => {
+      Search.pagefind = await import(`${baseURLPrefix}pagefind/pagefind.js`);
+      Search.pagefind.init();
+      await callback();
+    })().catch(console.log);
   },
 
   displayFullSearchResults: function() {
