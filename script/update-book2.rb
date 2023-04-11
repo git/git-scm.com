@@ -269,6 +269,7 @@ def local_genbook2(language_code, worktree_path)
       puts "::error::#{filename} is missing!"
       "**ERROR**: _#{filename} is missing_"
     end
+    book.sha = `git -C "#{worktree_path}" rev-parse HEAD`.chomp
     if language_code == 'en'
       latest_tag = `git -C "#{worktree_path}" for-each-ref --format '%(refname:short)' --sort=-committerdate --count=1 refs/tags/`.chomp
       if latest_tag.empty?
