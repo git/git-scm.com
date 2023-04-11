@@ -96,6 +96,16 @@ class Book
         "sections" => sections
       })
     end
+    data = {
+      "language_code" => @language_code,
+      "chapters" => chapters
+    }
+    path = File.join(File.dirname(__FILE__), "..", "data", "book-#{@language_code}.yml")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.open(path, 'w') do |file|
+      file.write(data.to_yaml.strip)
+    end
+
     front_matter = self.front_matter
     front_matter["page_title"] = "Git - Book"
     front_matter["url"] = "/book/#{@language_code}/v#{@edition}.html"
@@ -103,7 +113,6 @@ class Book
     front_matter["book"]["front_page"] = true
     front_matter["book"]["repository_url"] = "https://github.com/#{@@all_books[@language_code]}"
     front_matter["book"]["sha"] = self.sha
-    front_matter["book"]["chapters"] = chapters
     if self.ebook_pdf
       front_matter["book"]["ebook_pdf"] = self.ebook_pdf
     end
