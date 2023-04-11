@@ -66,6 +66,10 @@ class Book
     File.absolute_path(File.join(File.dirname(__FILE__), "..", "content", "book", @language_code, "v#{@edition}", path))
   end
 
+  def relative_url(path)
+    return "book/#{@language_code}/v#{@edition}#{path.nil? || path.empty? || path == "." ? "" : "/#{path}"}"
+  end
+
   def removeAllFiles
     FileUtils.rm_rf(absolute_path("."))
   end
@@ -75,6 +79,10 @@ class Chapter
   def initialize(book)
     @book = book
     @sections = []
+    @previous_chapter = @book.chapters[-1]
+    if not @previous_chapter.nil?
+      @previous_chapter.next_chapter = self
+    end
   end
 
   def front_matter
@@ -92,8 +100,24 @@ class Chapter
   attr_accessor :sha
   attr_accessor :sections
 
+  def next_chapter=(chapter)
+    @next_chapter = chapter
+  end
+
   def absolute_path(path)
     return @book.absolute_path(path)
+  end
+
+  def relative_url(path)
+    return @book.relative_url(path)
+  end
+
+  def previous_chapter
+    return @previous_chapter
+  end
+
+  def next_chapter
+    return @next_chapter
   end
 
   def save
@@ -102,8 +126,19 @@ class Chapter
 end
 
 class Section
-  def initialize(chapter)
+  def initialize(chapter, section_number)
     @chapter = chapter
+    @section_number = section_number
+    @previous_section = @chapter.sections[-1]
+    if @previous_section.nil?
+      previous_chapter = chapter.previous_chapter
+      if not previous_chapter.nil?
+        @previous_section = previous_chapter.sections[-1]
+      end
+    end
+    if not @previous_section.nil?
+      @previous_section.next_section = self
+    end
   end
 
   def front_matter
@@ -111,7 +146,9 @@ class Section
     front_matter["title"] = "Git - #{self.title}"
     front_matter["book"]["section"] = {
       "title" => self.title,
-      "number" => @section_number
+      "number" => @section_number,
+      "previous" => self.previous_section_url,
+      "next" => self.next_section_url
     }
     return front_matter
   end
@@ -120,17 +157,40 @@ class Section
   attr_accessor :html
   attr_accessor :slug
 
-  def set_slug
+  def next_section=(section)
+    @next_section = section
+  end
+
+  def slug
+    return @slug if not @slug.nil?
     if self.title.empty?
       title = @chapter.title
     else
       title = (@chapter.title + "-" + self.title)
     end
-    self.slug = title.gsub(/\(|\)|\./, "").gsub(/\s+/, "-").gsub("&#39;", "-")
+    @slug = title.gsub(/\(|\)|\./, "").gsub(/\s+/, "-").gsub("&#39;", "-")
   end
 
   def absolute_path(path)
     return @chapter.absolute_path(path)
+  end
+
+  def relative_url(path)
+    return @chapter.relative_url(path)
+  end
+
+  def previous_section_url
+    if @previous_section.nil?
+      return self.relative_url(nil)
+    end
+    return self.relative_url(@previous_section.slug)
+  end
+
+  def next_section_url
+    if @next_section.nil?
+      return self.relative_url(nil)
+    end
+    return self.relative_url(@next_section.slug)
   end
 
   def save
