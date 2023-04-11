@@ -85,6 +85,10 @@ class Chapter
     end
   end
 
+  def cs_number
+    "#{self.chapter_type == "appendix" ? "A" : ""}#{self.chapter_number}"
+  end
+
   def front_matter
     front_matter = @book.front_matter
     front_matter["book"]["chapter"] = {
@@ -142,12 +146,17 @@ class Section
     end
   end
 
+  def cs_number
+    "#{@chapter.cs_number}.#{@section_number}"
+  end
+
   def front_matter
     front_matter = @chapter.front_matter
     front_matter["title"] = "Git - #{self.title}"
     front_matter["book"]["section"] = {
       "title" => self.title,
       "number" => @section_number,
+      "cs_number" => self.cs_number,
       "previous" => self.previous_section_url,
       "next" => self.next_section_url
     }
