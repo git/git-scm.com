@@ -263,9 +263,10 @@ end
 # Generate book html directly from local git repo"
 def local_genbook2(language_code, worktree_path)
   if language_code && worktree_path
-    genbook(language_code) do |filename|
+    book = genbook(language_code) do |filename|
       File.open(File.join(worktree_path, filename), "r") { |infile| File.read(infile) }
     end
+    book.save
   end
 end
 

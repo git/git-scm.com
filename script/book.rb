@@ -42,6 +42,9 @@ class Book
   end
 
   attr_accessor :chapters
+  attr_accessor :ebook_pdf
+  attr_accessor :ebook_epub
+  attr_accessor :ebook_mobi
   attr_accessor :sha
 
   def initialize(edition, language_code)
@@ -80,6 +83,61 @@ class Book
 
   def removeAllFiles
     FileUtils.rm_rf(absolute_path("."))
+  end
+
+  def save
+    chapters = []
+    @chapters.each do |chapter|
+      next if chapter.nil?
+      sections = []
+      chapter.sections.each do |section|
+        next if section.nil?
+        sections.append({
+          "cs_number" => section.cs_number,
+          "title" => section.title,
+          "url" => section.relative_url(nil)
+        })
+      end
+      chapters.append({
+        "cs_number" => chapter.cs_number,
+        "title" => chapter.title,
+        "sections" => sections
+      })
+    end
+    front_matter = self.front_matter
+    front_matter["page_title"] = "Git - Book"
+    front_matter["url"] = "/book/#{@language_code}/v#{@edition}.html"
+    front_matter["aliases"] = [ "/book/#{@language_code}/v#{@edition}/index.html" ]
+    front_matter["book"]["front_page"] = true
+    front_matter["book"]["repository_url"] = "https://github.com/#{@@all_books[@language_code]}"
+    front_matter["book"]["sha"] = self.sha
+    front_matter["book"]["chapters"] = chapters
+    if self.ebook_pdf
+      front_matter["book"]["ebook_pdf"] = self.ebook_pdf
+    end
+    if self.ebook_epub
+      front_matter["book"]["ebook_epub"] = self.ebook_epub
+    end
+    if self.ebook_mobi
+      front_matter["book"]["ebook_mobi"] = self.ebook_mobi
+    end
+
+    path = self.absolute_path("_index.html")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.open(path, 'w') do |file|
+      file.write(self.wrap_front_matter(front_matter))
+    end
+
+    front_matter = { "redirect_to" => "book/#{@language_code}/v#{@edition}" }
+    File.open(self.absolute_path("../_index.html"), 'w') do |file|
+      file.write(self.wrap_front_matter(front_matter))
+    end
+
+    if @language_code == "en"
+      File.open(self.absolute_path("../../_index.html"), 'w') do |file|
+        file.write(self.wrap_front_matter(front_matter))
+      end
+    end
   end
 end
 
@@ -198,6 +256,9 @@ class Section
   end
 
   def relative_url(path)
+    if path.nil? || path.empty?
+      path = self.slug
+    end
     return @chapter.relative_url(path)
   end
 
