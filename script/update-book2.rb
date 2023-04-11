@@ -24,7 +24,7 @@ def expand(content, path, &get_content)
 end
 
 def genbook(language_code, &get_content)
-  nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
+  nav = '<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>'
 
   progit = get_content.call("progit.asc")
 
@@ -112,7 +112,7 @@ def genbook(language_code, &get_content)
     schapter.save
 
     # create xref
-    csection = schapter.sections[1]
+    # csection = schapter.sections[1]
     # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
     # xref.section = csection
     # xref.save
@@ -166,11 +166,10 @@ def genbook(language_code, &get_content)
 
       csection = schapter.sections[section]
       if csection.nil?
-        schapter.sections[section] = csection = Section.new(schapter)
+        schapter.sections[section] = csection = Section.new(schapter, section)
       end
       csection.title = section_title.to_s
       csection.html = pretext + html
-      csection.save
 
       # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
       # xref.section = csection
