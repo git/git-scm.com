@@ -78,7 +78,8 @@ def genbook(language_code, &get_content)
   alldoc = Nokogiri::HTML(html)
   number = 1
 
-  book = Book.new(2, language_code)
+  edition = 2
+  book = Book.new(edition, language_code)
   book.removeAllFiles()
 
   alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index|
@@ -117,6 +118,8 @@ def genbook(language_code, &get_content)
     # xref.section = csection
     # xref.save
 
+    book_prefix = "book/#{language_code}/v#{edition}/"
+
     section = 1
     chapter.search("div[@class=sect2]").each do |sec|
       id_xref = sec.at("h3").attribute("id").to_s
@@ -152,11 +155,13 @@ def genbook(language_code, &get_content)
         end
       end
 
+      images = []
       subsec = html.scan(/<img src="(.*?)"/)
       subsec&.each do |sub|
         sub = sub.first
         begin
-          html.gsub!(/<img src="#{sub}"/, "<img src=\"/book/en/v2/#{sub}\"")
+          html.gsub!(/<img src="#{sub}"/, "<img src=\"{{< relurl \"#{book_prefix}#{sub}\" >}}\"")
+          images.append(sub)
         rescue StandardError
           nil
         end
@@ -170,6 +175,13 @@ def genbook(language_code, &get_content)
       end
       csection.title = section_title.to_s
       csection.html = pretext + html
+
+      images.each do |path|
+        content = get_content.call(path)
+        csection.saveImage(path, content)
+      rescue Errno::ENOENT
+        puts "::error::referenced image #{path} does not exit!"
+      end
 
       # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
       # xref.section = csection
