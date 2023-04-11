@@ -62,8 +62,8 @@ class Book
     }
   end
 
-  def absolute_path(path)
-    File.absolute_path(File.join(File.dirname(__FILE__), "..", "content", "book", @language_code, "v#{@edition}", path))
+  def absolute_path(path, top_level = "content")
+    File.absolute_path(File.join(File.dirname(__FILE__), "..", top_level, "book", @language_code, "v#{@edition}", path))
   end
 
   def relative_url(path)
@@ -99,6 +99,7 @@ class Chapter
   attr_accessor :chapter_number
   attr_accessor :sha
   attr_accessor :sections
+  attr_accessor :book
 
   def next_chapter=(chapter)
     @next_chapter = chapter
@@ -203,6 +204,14 @@ class Section
     File.open("#{path}.html", 'w') do |file|
       file.write(front_matter)
       file.write(self.html.strip)
+    end
+  end
+
+  def saveImage(path, content)
+    path = @chapter.book.absolute_path(path, "static")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.open(path, 'w') do |file|
+      file.write(content)
     end
   end
 end
