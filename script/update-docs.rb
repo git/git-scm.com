@@ -7,6 +7,7 @@ require "digest/sha1"
 require "set"
 require 'fileutils'
 require 'yaml'
+require 'diffy'
 require_relative "version"
 
 SITE_ROOT = File.join(File.expand_path(File.dirname(__FILE__)), '../')
@@ -23,7 +24,6 @@ def read_data
 
   data["versions"] = {} unless data["versions"]
   data["pages"] = {} if !data["pages"]
-  data["sha-map"] = {} if !data["sha-map"]
 
   data
 end
@@ -182,6 +182,27 @@ def expand_content(content, path, get_f_content, generated)
   end
 end
 
+# returns an array of the differences with 3 entries
+# 0: additions
+# 1: subtractions
+# 2: 8 - (add + sub)
+def diff(pre, post)
+  diff_out = Diffy::Diff.new(pre, post)
+  first_chars = diff_out.to_s.gsub(/(.)[^\n]*\n/, '\1')
+  adds = first_chars.count("+")
+  mins = first_chars.count("-")
+  total = mins + adds
+  if total > 8
+    min = (8.0 / total)
+    adds = (adds * min).round
+    mins = (mins * min).round
+    total = 8
+  end
+  [adds, mins, 8 - total]
+rescue StandardError
+  [0, 0, 8]
+end
+
 def index_doc(filter_tags, doc_list, get_content)
   rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
@@ -193,13 +214,15 @@ def index_doc(filter_tags, doc_list, get_content)
     tagname, commit_sha, tree_sha, ts = tag
     puts "#{tagname}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
-    next if data["versions"][tagname] && !rerun
+    version = tagname.tr("v", "")
+    next if data["versions"][version] && !rerun
 
-    data["versions"][tagname] = stag = {}
+    data["versions"][version] = version_data = {}
 
-    stag["commit_sha"] = commit_sha
-    stag["tree_sha"] = tree_sha
-    stag["committed"] = ts
+    version_data["commit_sha"] = commit_sha
+    version_data["tree_sha"] = tree_sha
+    version_data["committed"] = ts
+    version_data["date"] = ts.strftime("%m/%d/%y")
 
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select do |ent|
@@ -290,50 +313,72 @@ def index_doc(filter_tags, doc_list, get_content)
 
         puts "   build: #{docname}"
 
+        data["pages"][docname] = {
+          "version-map" => {}
+        } unless data["pages"][docname]
+        page_data = data["pages"][docname]
+
         content = expand_content((get_content.call sha).force_encoding("UTF-8"), path, get_content_f, generated)
         content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
+
         asciidoc = make_asciidoc(content)
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
+        if !File.exists?("#{SITE_ROOT}_generated-asciidoc/#{asciidoc_sha}")
+          FileUtils.mkdir_p("#{SITE_ROOT}_generated-asciidoc")
+          File.open("#{SITE_ROOT}_generated-asciidoc/#{asciidoc_sha}", "w") do |out|
+            out.write(content)
+          end
+        end
 
-        doc = data["sha-map"][asciidoc_sha]
-        if rerun || !doc
-          html = asciidoc.render
-          html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
-            x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
-            "<a href='{{< relurl \"docs/#{x[1]}\" >}}'>#{x[1]}[#{x[2]}]</a>"
-          end
-          # HTML anchor on hdlist1 (i.e. command options)
-          html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
-            text = $1.tr("^A-Za-z0-9-", "")
-            anchor = "#{path}-#{text}"
-            # handle anchor collisions by appending -1
-            anchor += "-1" while ids.include?(anchor)
-            ids.add(anchor)
-            "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
-          end
+        version_map = page_data["version-map"]
+        next if !rerun && version_map[version] == asciidoc_sha
+
+        version_map[version] = asciidoc_sha
+
+        # Generate HTML
+        html = asciidoc.render
+        html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
+          x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
+          "<a href='{{< relurl \"docs/#{x[1]}\" >}}'>#{x[1]}[#{x[2]}]</a>"
+        end
+        # HTML anchor on hdlist1 (i.e. command options)
+        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
+          text = $1.tr("^A-Za-z0-9-", "")
+          anchor = "#{path}-#{text}"
+          # handle anchor collisions by appending -1
+          anchor += "-1" while ids.include?(anchor)
+          ids.add(anchor)
+          "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
         end
         # Make links relative
         html.gsub!(/(<a href=['"])\/([^'"]*)/, '\1{{< relurl "\2" >}}')
 
-        if !doc
-          doc = data["sha-map"][asciidoc_sha] = {
-            "docname" => docname,
-            "versions" => [tagname]
-          }
-          data["pages"][docname] = {} if !data["pages"][docname]
-          data["pages"][docname]['latest-changes'] = tagname
-        else
-          raise "docname recorded for #{asciidoc_sha} is #{doc["docname"]}, but version #{tagname} has it as #{docname}" if doc["docname"] != docname
-          doc["versions"] = [] if !doc["versions"]
-          doc["versions"].push(tagname) if !doc["versions"].include?(tagname)
+        doc_versions = version_map.keys.sort{|a, b| Version.version_to_num(a) <=> Version.version_to_num(b)}
+        doc_version_index = doc_versions.index(version)
+
+        changed_in = doc_version_index
+        changed_in = changed_in - 1 while version_map[doc_versions[changed_in - 1]] == asciidoc_sha
+        unchanged_until = doc_version_index
+        unchanged_until = unchanged_until + 1 while version_map[doc_versions[unchanged_until + 1]] == asciidoc_sha
+
+        if !page_data["latest-changes"] || Version.version_to_num(page_data["latest-changes"]) <= Version.version_to_num(version)
+          page_data["latest-changes"] = doc_versions[changed_in]
         end
 
+        # Write <docname>/<version>.html
         front_matter = {
           "category" => "manual",
           "section" => "documentation",
           "subsection" => "manual",
-          "title" => "Git - #{docname} Documentation"
+          "title" => "Git - #{docname} Documentation",
+          "docname" => docname,
+          "version" => doc_versions[changed_in],
         }
+
+        if changed_in != doc_version_index && File.exists?("#{doc_path}/#{version}.html")
+          # remove obsolete file
+          File.delete("#{doc_path}/#{version}.html")
+        end
 
         FileUtils.mkdir_p(doc_path)
         front_matter_with_redirects = front_matter.clone
@@ -346,7 +391,8 @@ def index_doc(filter_tags, doc_list, get_content)
           out.write(html)
         end
 
-        if data["pages"][docname]['latest-changes'] == tagname
+        # Write <docname>.html
+        if page_data["latest-changes"] == version
           FileUtils.mkdir_p(File.dirname(doc_path))
           File.open("#{doc_path}.html", "w") do |out|
             front_matter["aliases"] = ["/docs/#{docname}/index.html"]
@@ -354,9 +400,46 @@ def index_doc(filter_tags, doc_list, get_content)
             out.write(html)
           end
         end
+
+        # Regenerate `page-versions` info
+        page_data["page-versions"] = page_versions = [{
+          "name" => doc_versions[0],
+          "added" => 8,
+          "removed" => 0
+        }]
+        i = 1
+        while i < doc_versions.length do
+          pre_version = doc_versions[i - 1]
+          post_version = doc_versions[i]
+          pre_sha = version_map[pre_version]
+          post_sha = version_map[post_version]
+          if pre_sha == post_sha
+            # unchanged
+            j = i
+            j = j + 1 while post_sha == version_map[doc_versions[j + 1]]
+            page_versions.unshift({
+              "name" => i == j ? post_version : "#{post_version} &rarr; #{doc_versions[j]}"
+            })
+            i = j + 1
+          else
+            page_data["diff-cache"] = {} if !page_data["diff-cache"]
+            cached_diff = page_data["diff-cache"]["#{pre_sha}..#{post_sha}"]
+            if !cached_diff
+              pre_content = File.read("#{SITE_ROOT}_generated-asciidoc/#{pre_sha}")
+              post_content = File.read("#{SITE_ROOT}_generated-asciidoc/#{post_sha}")
+              cached_diff = page_data["diff-cache"]["#{pre_sha}..#{post_sha}"] = diff(pre_content, post_content)
+            end
+            page_versions.unshift({
+              "name" => doc_versions[i],
+              "added" => cached_diff[0],
+              "removed" => cached_diff[1]
+            })
+            i = i + 1
+          end
+        end
       end
     end
-    data["latest-version"] = tagname
+    data["latest-version"] = version if !data["latest-version"] || Version.version_to_num(data["latest-version"]) < Version.version_to_num(version)
   end
   File.open(DATA_FILE, "w") do |out|
     YAML.dump(data, out)
