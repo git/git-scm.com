@@ -336,9 +336,14 @@ def index_doc(filter_tags, doc_list, get_content)
         }
 
         FileUtils.mkdir_p(doc_path)
-        File.open("#{doc_path}/#{tagname}.html", "w") do |out|
-          out.write("#{front_matter.to_yaml}\n---\n", out)
-          out.write(html, out)
+        front_matter_with_redirects = front_matter.clone
+        front_matter_with_redirects["aliases"] =
+          doc_versions[changed_in..unchanged_until].flat_map do |v|
+            ["/docs/#{docname}/#{v}/index.html"]
+          end
+        File.open("#{doc_path}/#{doc_versions[changed_in]}.html", "w") do |out|
+          out.write("#{front_matter_with_redirects.to_yaml}\n---\n")
+          out.write(html)
         end
 
         if data["pages"][docname]['latest-changes'] == tagname
