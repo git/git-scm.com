@@ -1,0 +1,62 @@
+name: 'Run Hugo/Pagefind and deploy to GitHub Pages'
+description: 'Runs Hugo and Pagefind and then deploys the result to GitHub Pages.'
+# This composite Action requires the following things in the calling workflow:
+#
+# permissions:
+#   contents: write # to push changes (if any)
+#   pages: write # to deploy to GitHub Pages
+#   id-token: write # to verify that the deployment source is legit
+# environment:
+#   name: github-pages
+#   url: ${{ steps.<id-of-deployment-step>.outputs.url }}
+outputs:
+  url:
+    description: The URL to which the site was deployed
+    value: ${{ steps.deploy.outputs.page_url }}
+runs:
+  using: "composite"
+  steps:
+    - name: push changes
+      shell: bash
+      run: git push origin HEAD
+
+    - name: un-sparse worktree to prepare for deployment
+      shell: bash
+      run: git sparse-checkout disable
+
+    - name: setup GitHub Pages
+      id: pages
+      uses: actions/configure-pages@v5
+
+    - name: configure Hugo and Pagefind version
+      shell: bash
+      run: |
+        set -x &&
+        echo "HUGO_VERSION=$(sed -n 's/^ *hugo_version: *//p' <hugo.yml)" >>$GITHUB_ENV
+        echo "PAGEFIND_VERSION=$(sed -n 's/^ *pagefind_version: *//p' <hugo.yml)" >>$GITHUB_ENV
+
+    - name: install Hugo ${{ env.HUGO_VERSION }}
+      shell: bash
+      run: |
+        set -x &&
+        curl -Lo /tmp/hugo.deb https://github.com/gohugoio/hugo/releases/download/v$HUGO_VERSION/hugo_extended_${HUGO_VERSION}_linux-amd64.deb &&
+        sudo dpkg -i /tmp/hugo.deb
+
+    - name: run Hugo to build the pages
+      env:
+        HUGO_RELATIVEURLS: false
+      shell: bash
+      run: hugo config && hugo --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+    - name: run Pagefind ${{ env.PAGEFIND_VERSION }} to build the search index
+      shell: bash
+      run: npx -y pagefind@${{ env.PAGEFIND_VERSION }} --site public
+
+    - name: upload GitHub Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./public
+
+    - name: deploy
+      id: deploy
+      uses: actions/deploy-pages@v4

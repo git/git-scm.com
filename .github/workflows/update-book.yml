@@ -1,0 +1,128 @@
+name: Update Progit Book
+
+on:
+  workflow_dispatch:
+  schedule:
+    # check daily for updates
+    - cron: '29 4 * * *'
+
+jobs:
+  check-for-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            external/book/sync
+            script
+      - uses: actions/github-script@v7
+        id: get-pending
+        with:
+          script: |
+            const { getPendingBookUpdates } = require('./script/ci-helper.js')
+
+            const pending = await getPendingBookUpdates(github)
+            // an empty matrix is invalid and makes the workflow run fail, unfortunately
+            return pending.length ? pending : ['']
+      - name: ruby setup
+        # Technically, we do not need Ruby in this job. But we do want to cache
+        # Ruby & The Gems for use in the matrix in the next job.
+        if: steps.get-pending.outputs.result != '[""]'
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+    outputs:
+      matrix: ${{ steps.get-pending.outputs.result }}
+  update-book:
+    needs: check-for-updates
+    if: needs.check-for-updates.outputs.matrix != '[""]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: ${{ fromJson(needs.check-for-updates.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            script
+            external/book/sync
+            external/book/data
+            external/book/content/book/${{ matrix.language.lang }}
+            external/book/static/book/${{ matrix.language.lang }}
+      - name: clone ${{ matrix.language.repository }}
+        run: |
+          printf '%s\n' /progit-clone/ /vendor >>.git/info/exclude &&
+
+          # Clone the book's sources
+          git clone --depth 1 --single-branch \
+            https://github.com/${{ matrix.language.repository }} progit-clone
+      - name: ruby setup
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: update book/${{ matrix.language.lang }}
+        run: |
+          # this seems to be needed to let `bundle exec` see `vendor/bundle/`
+          { bundle check || bundle install --frozen; } &&
+
+          # generate the HTML
+          bundle exec ruby ./script/update-book2.rb ${{ matrix.language.lang }} progit-clone
+      - name: commit changes
+        run: |
+          # record the commit hash
+          mkdir -p external/book/sync &&
+          git -C progit-clone rev-parse HEAD >external/book/sync/book-${{ matrix.language.lang }}.sha &&
+
+          # commit it all
+          git add -A external/book &&
+          git -c user.name=${{ github.actor }} \
+            -c user.email=${{ github.actor }}@noreply.github.com \
+            commit -m 'book: update ${{ matrix.language.lang }}' \
+              -m 'Updated via the `update-book.yml` GitHub workflow.'
+      - name: verify that there are no uncommitted changes
+        run: |
+          git update-index --refresh &&
+          if test -n "$(git diff HEAD)$(git ls-files --exclude-standard --other)"
+          then
+            echo '::error::there are uncommitted changes!' >&2
+            git status >&2
+            exit 1
+          fi
+      - name: generate the bundle
+        run: |
+          git branch -m book-${{ matrix.language.lang }}
+          git bundle create ${{ matrix.language.lang }}.bundle refs/remotes/origin/${{ github.ref_name }}..book-${{ matrix.language.lang }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.language.lang }}
+          path: ${{ matrix.language.lang }}.bundle
+  push-updates:
+    needs: [check-for-updates, update-book]
+    if: needs.check-for-updates.outputs.matrix != '[""]'
+    permissions:
+      contents: write # to push changes (if any)
+      pages: write # to deploy to GitHub Pages
+      id-token: write # to verify that the deployment source is legit
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - name: apply updates
+        id: apply
+        run: |
+          for lang in $(echo '${{ needs.check-for-updates.outputs.matrix }}' |
+            sed -n 's/\[\?{[^}]*"lang":"\([^"]*\)[^}]*},\?\]\?/\1 /gp')
+          do
+            git -c core.editor=: \
+              -c user.name=${{ github.actor }} \
+              -c user.email=${{ github.actor }}@noreply.github.com \
+              pull --no-rebase bundle-$lang/$lang.bundle book-$lang ||
+            exit 1
+          done
+      - name: deploy to GitHub Pages
+        id: deploy
+        uses: ./.github/actions/deploy-to-github-pages
