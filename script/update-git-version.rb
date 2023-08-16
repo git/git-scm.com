@@ -7,10 +7,13 @@ require "yaml"
 require_relative "version"
 
 octokit = Octokit::Client.new(access_token: ENV.fetch("GITHUB_API_TOKEN", nil))
-tags = octokit.tags("git/git").sort_by { |tag| -Version.version_to_num(tag.first[1..]) }
-version = tags[0].name.gsub(/^v/, "")
+tags = octokit.tags("git/git")
+    .map { |item| item.first[1] }
+    .select { |tag| tag =~ /^v\d+(\.\d+){2,3}$/ } # filter out e.g. -rc versions
+    .sort_by { |tag| -Version.version_to_num(tag) }
+version = tags[0].gsub(/^v/, "")
 
-ref = octokit.ref("git/git", "tags/#{tags[0].name}")
+ref = octokit.ref("git/git", "tags/#{tags[0]}")
 tag = octokit.tag("git/git", ref.object.sha)
 date = tag.tagger.date
 
