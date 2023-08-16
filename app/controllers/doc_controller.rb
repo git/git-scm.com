@@ -42,6 +42,8 @@ class DocController < ApplicationController
 
   def ext; end
 
+  def credential_helpers; end
+
   private
 
   def set_caching

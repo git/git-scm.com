@@ -15,6 +15,7 @@ Rails.application.routes.draw do
   scope :doc, as: :doc do
     get "/"    => "doc#index"
     get "/ext" => "doc#ext"
+    get "/credential-helpers" => "doc#credential_helpers"
   end
 
   scope :docs, as: :docs do
