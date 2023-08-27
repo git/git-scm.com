@@ -45,10 +45,9 @@ Or you can do it from GitHub (much slower) like this:
 
 ## Update the `Downloads` pages
 
-(TODO!)
 Now you need to get the latest downloads for the downloads pages:
 
-    $ rake downloads
+    $ ruby ./script/update-download-data.rb
 
 ## Update the ProGit book
 
