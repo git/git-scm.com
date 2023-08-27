@@ -1,22 +1,31 @@
 name: CI
-on: pull_request
+on: [pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - name: ruby setup
-      uses: ruby/setup-ruby@v1
+    - name: configure Hugo version
+      run: |
+        set -x &&
+        echo "HUGO_VERSION=$(sed -n 's/^ *hugo_version: *//p' <hugo.yml)" >>$GITHUB_ENV
+
+    - name: install Hugo ${{ env.HUGO_VERSION }}
+      run: |
+        set -x &&
+        curl -Lo /tmp/hugo.deb https://github.com/gohugoio/hugo/releases/download/v$HUGO_VERSION/hugo_extended_${HUGO_VERSION}_linux-amd64.deb &&
+        sudo dpkg -i /tmp/hugo.deb
+
+    - name: run Hugo to build the pages
+      run: hugo
+
+    - name: build tar archive
+      run: cd public && tar czvf ../pages.tar.gz *
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
       with:
-        bundler-cache: true
-
-    - name: rails setup
-      run: bundle exec rake db:create db:schema:load
-
-    - name: rubocop
-      run: bundle exec rubocop -P
-
-    - name: rspec
-      run: bundle exec rspec
+        name: pages
+        path: pages.tar.gz
