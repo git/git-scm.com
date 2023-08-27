@@ -189,7 +189,19 @@ var Search = {
                   </ul>
                 </td>
               </tr>
-              <tr>
+              <tr style="display:none">
+                <td class="category">Reference</td>
+                <td class="matches">
+                  <ul id="ul-reference"></ul>
+                </td>
+              </tr>
+              <tr style="display:none">
+                <td class="category">Book</td>
+                <td class="matches">
+                  <ul id="ul-book"></ul>
+                </td>
+              </tr>
+              <tr id="row-any">
                 <td class="category"> &nbsp; </td>
                 <td class="matches">
                   <ul>
@@ -217,22 +229,46 @@ var Search = {
           }`);
           loadButton.loading = false;
 
+          const ulReference = $("#ul-reference")
+          const ulBook = $("#ul-book")
+
           const chunkLength = 10;
           let displayCount = 0;
+
+          const categorizeResult = (i) => {
+            while (i < displayCount && typeof results.results[i].data === 'object') {
+              const result = results.results[i++];
+              if (result.data.meta.category === 'Reference') {
+                if (ulReference.children().length === 0) ulReference.parent().parent().css("display", "table-row")
+                ulReference.append(result.li)
+              } else if (result.data.meta.category === 'Book') {
+                if (ulBook.children().length === 0) ulBook.parent().parent().css("display", "table-row")
+                ulBook.append(result.li)
+              }
+            }
+          };
+
           const loadResultsChunk = () => {
             if (loadButton.loading || displayCount >= results.results.length) return;
 
             loadButton.loading = true;
             const n = displayCount + chunkLength;
             while (displayCount < n) {
-              const li = $("<li><a>&hellip;</a></li>");
-              li.insertBefore(loadButton);
+              const result = results.results[displayCount]
+              result.li = $("<li><a>&hellip;</a></li>");
+              result.li.insertBefore(loadButton);
 
               // load the result lazily
-              (async () => {
-                const result = await results.results[displayCount].data();
-                li.html(`<a href = "${result.url}">${result.meta.title}</a>`);
-              })().catch(console.log);
+              (async (i) => {
+                result.data = await results.results[displayCount].data();
+                if (!i || typeof results.results[i - 1].data === 'object') categorizeResult(i);
+                result.data.meta.title = result.data.meta.title.replace(/^Git - (.*) Documentation$/, "$1")
+                result.data.url = result.data.url.replace(/\.html$/, '')
+                result.li.html(`<a href = "${result.data.url}">${result.data.meta.title}</a>`);
+              })(displayCount).catch((err) => {
+                console.log(err);
+                result.li.html(`<i>Error loading result</i>`);
+              });
 
               if (++displayCount >= results.results.length) {
                 loadButton.remove();
@@ -303,7 +339,14 @@ var Search = {
     }
     (async () => {
       Search.pagefind = await import(`${baseURLPrefix}pagefind/pagefind.js`);
-      const options = {}
+      const options = {
+        ranking: {
+          pageLength: 0.1, // boost longer pages
+          termFrequency: 0.1, // do not favor short pages
+          termSaturation: 2, // look for pages with more matches
+          termSimilarity: 9, // prefer exact matches
+        }
+      }
       const language = this.getQueryValue('language');
       if (language) options.language = language;
       await Search.pagefind.options(options);
@@ -322,9 +365,15 @@ var Search = {
       showSubResults: true,
       showImages: false,
       language,
+      ranking: {
+        pageLength: 0.1, // boost longer pages
+        termFrequency: 0.1, // do not favor short pages
+        termSaturation: 2, // look for pages with more matches
+        termSimilarity: 9, // prefer exact matches
+      },
       processResult: function (result) {
         result.url = result.url.replace(/\.html$/, "")
-	return result
+        return result
       },
     });
 

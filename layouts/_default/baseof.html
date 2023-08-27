@@ -1,17 +1,21 @@
 <!DOCTYPE html>
 {{ if isset .Params "redirect_to" }}
+{{ $redirect_to := .Params.redirect_to }}
+{{ if not (hasPrefix $redirect_to "https://") }}
+{{ $redirect_to = relURL $redirect_to }}
+{{ end }}
 <html lang="en">
  <head>
   <meta charset="utf-8">
   <title>Redirecting&hellip;</title>
-  <link rel="canonical" href="{{ relURL .Params.redirect_to }}">
-  <meta http-equiv="refresh" content="0; url={{ relURL .Params.redirect_to }}">
+  <link rel="canonical" href="{{ $redirect_to }}">
+  <meta http-equiv="refresh" content="0; url={{ $redirect_to }}">
   <meta name="robots" content="noindex">
  </head>
  <body>
   <script>location="{{ relURL .Params.redirect_to }}"</script>
   <h1>Redirecting&hellip;</h1>
-  <a href="{{ relURL .Params.redirect_to }}">Click here if you are not redirected.</a>
+  <a href="{{ $redirect_to }}">Click here if you are not redirected.</a>
  </body>
 </html>
 {{ else }}
@@ -88,7 +92,7 @@
               2nd Edition
             </span>
           </div>
-          <div id="main" data-pagefind-filter="category:book" data-pagefind-body class="book edition2">
+          <div id="main" data-pagefind-filter="category:book" data-pagefind-meta="category:Book" data-pagefind-weight="0.05" data-pagefind-body class="book edition2">
             <h1>{{ .Params.book.section.cs_number }} {{ .Params.book.chapter.title }} - {{ .Params.book.section.title }}</h1>
             <div>
               {{ .Content }}
@@ -99,11 +103,36 @@
       </div>
       {{ partial "footer.html" . }}
     </div>
+  {{ else if (isset .Params "docname") }}
+    <div class="inner">
+      <div id="content-wrapper">
+        {{ partial "sidebar.html" . }}
+        <div id="content">
+          <div id='reference-version'>
+            {{ partial "ref/versions.html" . }}
+          </div>
+
+          <!-- older manual page versions are less interesting and need to be excluded from the search -->
+          {{ $include_in_search := (or (not (isset .Params "docname")) (isset .Params "latest-changes") (isset .Params "lang")) }}
+          <div id="main"{{ if $include_in_search }} data-pagefind-filter="category:reference" data-pagefind-meta="category:Reference" data-pagefind-weight="0.05" data-pagefind-body{{ end }}>
+            {{ .Content }}
+            {{ $match := findRESubmatch "(?s)>NAME</h2>.*?<p[^>]*>(git-)?([^ ]+)" .Content 1 }}
+            {{ if (eq ($match | len) 1) }}
+              {{ $command_name := (index (index $match 0) 2) }}
+              {{ $weight := cond (strings.Contains $command_name "-") 7 10 }}
+              <!-- boost the command name in the search -->
+              <h3 hidden="true" data-pagefind-weight="{{ $weight }}">{{ $command_name }}</h3>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+      {{ partial "footer.html" . }}
+    </div>
   {{ else }}
     <div class="inner">
       <div id="content-wrapper">
         {{ partial "sidebar.html" . }}
-        <div id="content" data-pagefind-body>
+        <div id="content" data-pagefind-filter="category:{{ $section }}" data-pagefind-weight="0.05" data-pagefind-body>
           {{ if (eq .Page.Path "/docs") }}
             {{ partial "ref/index.html" . }}
           {{ else if isset .Params "video_title" }}
