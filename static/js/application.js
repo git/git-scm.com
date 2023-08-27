@@ -179,7 +179,19 @@ var Search = {
                   </ul>
                 </td>
               </tr>
-              <tr>
+              <tr style="display:none">
+                <td class="category">Reference</td>
+                <td class="matches">
+                  <ul id="ul-reference"></ul>
+                </td>
+              </tr>
+              <tr style="display:none">
+                <td class="category">Book</td>
+                <td class="matches">
+                  <ul id="ul-book"></ul>
+                </td>
+              </tr>
+              <tr id="row-any">
                 <td class="category"> &nbsp; </td>
                 <td class="matches">
                   <ul>
@@ -207,6 +219,9 @@ var Search = {
           }`);
           loadButton.loading = false;
 
+          const ulReference = $("#ul-reference")
+          const ulBook = $("#ul-book")
+
           const chunkLength = 10;
           let displayCount = 0;
           const loadResultsChunk = () => {
@@ -221,6 +236,14 @@ var Search = {
               // load the result lazily
               (async () => {
                 const result = await results.results[displayCount].data();
+                if (result.meta.category === 'Reference') {
+                  if (ulReference.children().length === 0) ulReference.parent().parent().css("display", "table-row")
+                  ulReference.append(li)
+                  result.meta.title = result.meta.title.replace(/^Git - (.*) Documentation$/, "$1")
+                } else if (result.meta.category === 'Book') {
+                  if (ulBook.children().length === 0) ulBook.parent().parent().css("display", "table-row")
+                  ulBook.append(li)
+                }
                 li.html(`<a href = "${result.url}">${result.meta.title}</a>`);
               })().catch(console.log);
 
@@ -293,7 +316,12 @@ var Search = {
     }
     (async () => {
       Search.pagefind = await import(`${baseURLPrefix}pagefind/pagefind.js`);
-      const options = {}
+      const options = {
+        ranking: {
+          // do not favor short pages
+          termFrequency: 0,
+        }
+      }
       const language = this.getQueryValue('language');
       if (language) options.language = language;
       await Search.pagefind.options(options);
@@ -310,7 +338,11 @@ var Search = {
     new PagefindUI({
       element: "#search-div",
       showSubResults: true,
-      language
+      language,
+      ranking: {
+        // do not favor short pages
+        termFrequency: 0,
+      }
     });
 
     const searchTerm = this.getQueryValue('search');
