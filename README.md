@@ -14,6 +14,15 @@ You'll need the extended version of [Hugo](https://gohugo.io/). On Windows, we r
 
 The site should be running on http://127.0.0.1:1313. Note that it may be advisable to do this in a sparse checkout that excludes large parts of `content/`, to speed up the rendering time.
 
+To test the site locally _with_ the search enabled, run this instead:
+
+    $ hugo
+    $ npx -y pagefind --site public --serve
+
+That site should be running on http://127.0.0.1:1414
+
+Note that this will take about 7 times as long, and the site will not be re-rendered and live-reloaded in the browser (unlike with `hugo serve -w`).
+
 ## Update manual pages
 
 (TODO!)
@@ -89,10 +98,11 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
 
 2. Add the image to `static/images/guis/<GUI_CLIENT_NAME>@2x.png` and `static/images/guis/<GUI_CLIENT_NAME>.png` making sure the aspect ratio matches a 588:332 image.
 
-## Useful link regarding working with Hugo
+## Useful links regarding working with Hugo and Pagefind
 
 * https://gohugo.io/
 * https://gohugo.io/content-management/shortcodes/
+* https://pagefind.app/
 
 ## License
 
