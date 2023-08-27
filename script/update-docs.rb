@@ -1,10 +1,32 @@
-# frozen_string_literal: true
+#!/usr/bin/env ruby
 
 require "asciidoctor"
 require "octokit"
 require "time"
 require "digest/sha1"
 require "set"
+require 'fileutils'
+require 'yaml'
+require 'diffy'
+require_relative "version"
+
+SITE_ROOT = File.join(File.expand_path(File.dirname(__FILE__)), '../')
+DATA_FILE = "#{SITE_ROOT}data/docs.yml"
+
+def read_data
+  if File.exists?(DATA_FILE)
+    # `permitted_classes` required to allow running with Ruby v3.1
+    data = YAML.load_file(DATA_FILE, permitted_classes: [Time])
+  else
+    FileUtils.mkdir_p(File.dirname(DATA_FILE))
+    data = {}
+  end
+
+  data["versions"] = {} unless data["versions"]
+  data["pages"] = {} if !data["pages"]
+
+  data
+end
 
 def make_asciidoc(content)
   Asciidoctor::Document.new(content,
@@ -34,7 +56,6 @@ def expand_l10n(path, content, get_f_content, categories)
 end
 
 def index_l10n_doc(filter_tags, doc_list, get_content)
-  ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
@@ -67,7 +88,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       name = File.join(File.dirname(source), target)
       content_file = tag_files.detect { |ent| ent.first == name }
       if content_file
-        new_content = get_content.call(content_file.second)
+        new_content = get_content.call(content_file[1])
       else
         puts "Included file #{name} was not translated. Processing anyway\n"
       end
@@ -93,9 +114,9 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
       if rerun || !doc.plain || !doc.html
         html = asciidoc.render
-        html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
-          x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
-          "<a href='/docs/#{x[1]}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
+        html.gsub!(/linkgit:(\S+?)\[(\d+)\]/) do |line|
+          x = /^linkgit:(\S+?)\[(\d+)\]/.match(line)
+          "<a href='/docs/#{x[1].gsub(/&#x2d;/, '-')}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
         end
         # HTML anchor on hdlist1 (i.e. command options)
         html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
@@ -161,25 +182,47 @@ def expand_content(content, path, get_f_content, generated)
   end
 end
 
+# returns an array of the differences with 3 entries
+# 0: additions
+# 1: subtractions
+# 2: 8 - (add + sub)
+def diff(pre, post)
+  diff_out = Diffy::Diff.new(pre, post)
+  first_chars = diff_out.to_s.gsub(/(.)[^\n]*\n/, '\1')
+  adds = first_chars.count("+")
+  mins = first_chars.count("-")
+  total = mins + adds
+  if total > 8
+    min = (8.0 / total)
+    adds = (adds * min).round
+    mins = (mins * min).round
+    total = 8
+  end
+  [adds, mins, 8 - total]
+rescue StandardError
+  [0, 0, 8]
+end
+
 def index_doc(filter_tags, doc_list, get_content)
-  ActiveRecord::Base.logger.level = Logger::WARN
   rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
+  data = read_data
+
   tags = filter_tags.call(rebuild).sort_by { |tag| Version.version_to_num(tag.first[1..]) }
   drop_uninteresting_tags(tags).each do |tag|
-    name, commit_sha, tree_sha, ts = tag
-    puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
+    tagname, commit_sha, tree_sha, ts = tag
+    puts "#{tagname}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
-    stag = Version.where(name: name.delete("v")).first
-    next if stag && !rerun
+    version = tagname.tr("v", "")
+    next if data["versions"][version] && !rerun
 
-    stag = Version.where(name: name.delete("v")).first_or_create
+    data["versions"][version] = version_data = {}
 
-    stag.commit_sha = commit_sha
-    stag.tree_sha = tree_sha
-    stag.committed = ts
-    stag.save
+    version_data["commit_sha"] = commit_sha
+    version_data["tree_sha"] = tree_sha
+    version_data["committed"] = ts
+    version_data["date"] = ts.strftime("%m/%d/%y")
 
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select do |ent|
@@ -201,7 +244,7 @@ def index_doc(filter_tags, doc_list, get_content)
             pull.* |
             scalar |
             technical\/.*
-        )\.txt)/x
+        )\.txt)$/x
     end
 
     puts "Found #{doc_files.size} entries"
@@ -213,7 +256,7 @@ def index_doc(filter_tags, doc_list, get_content)
     if cmd
       cmd_list =
         get_content
-        .call(cmd.second)
+        .call(cmd[1])
         .match(/(### command list.*|# command name.*)/m)[0]
         .split("\n")
         .grep_v(/^#/)
@@ -227,7 +270,7 @@ def index_doc(filter_tags, doc_list, get_content)
           cmd_file = tag_files.detect { |ent| ent.first == "Documentation/#{cmd}.txt" }
           next unless cmd_file
 
-          content = get_content.call(cmd_file.second)
+          content = get_content.call(cmd_file[1])
           section = content.match(/^[a-z0-9-]+\(([1-9])\)/)[1]
           match = content.match(/NAME\n----\n\S+ - (.*)$/)
           if match
@@ -253,10 +296,12 @@ def index_doc(filter_tags, doc_list, get_content)
       get_content_f = proc do |name|
         content_file = tag_files.detect { |ent| ent.first == name }
         if content_file
-          new_content = get_content.call(content_file.second)
+          new_content = get_content.call(content_file[1])
         end
         new_content
       end
+
+      check_paths = Set.new([])
 
       doc_files.each do |entry|
         path, sha = entry
@@ -266,42 +311,186 @@ def index_doc(filter_tags, doc_list, get_content)
         next if path == "Documentation/technical/scalar.txt"
         next if doc_limit && path !~ /#{doc_limit}/
 
-        file = DocFile.where(name: docname).first_or_create
+        doc_path = "#{SITE_ROOT}content/docs/#{docname}"
 
         puts "   build: #{docname}"
 
+        data["pages"][docname] = {
+          "version-map" => {}
+        } unless data["pages"][docname]
+        page_data = data["pages"][docname]
+
         content = expand_content((get_content.call sha).force_encoding("UTF-8"), path, get_content_f, generated)
+        # Handle `gitlink:` mistakes (the last of which was fixed in
+        # dbf47215e32b (rebase docs: fix "gitlink" typo, 2019-02-27))
+        content.gsub!(/gitlink:/, "linkgit:")
+        # Handle erroneous `link:api-trace2.txt`, see 4945f046c7f5 (api docs:
+        # link to html version of api-trace2, 2022-09-16)
+        content.gsub!(/link:api-trace2.txt/, 'link:api-trace2.html')
         content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
+
         asciidoc = make_asciidoc(content)
         asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
-        doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
-        if rerun || !doc.plain || !doc.html
-          html = asciidoc.render
-          html.gsub!(/linkgit:(\S+)\[(\d+)\]/) do |line|
-            x = /^linkgit:(\S+)\[(\d+)\]/.match(line)
-            "<a href='/docs/#{x[1]}'>#{x[1]}[#{x[2]}]</a>"
+        if !File.exists?("#{SITE_ROOT}_generated-asciidoc/#{asciidoc_sha}")
+          FileUtils.mkdir_p("#{SITE_ROOT}_generated-asciidoc")
+          File.open("#{SITE_ROOT}_generated-asciidoc/#{asciidoc_sha}", "w") do |out|
+            out.write(content)
           end
-          # HTML anchor on hdlist1 (i.e. command options)
-          html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
-            text = $1.tr("^A-Za-z0-9-", "")
-            anchor = "#{path}-#{text}"
-            # handle anchor collisions by appending -1
-            anchor += "-1" while ids.include?(anchor)
-            ids.add(anchor)
-            "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
-          end
-          doc.plain = asciidoc.source
-          doc.html  = html
-          doc.save
         end
-        dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id, language: "en").first_or_create
-        dv.doc_id = doc.id
-        dv.language = "en"
-        dv.save
+
+        version_map = page_data["version-map"]
+        next if !rerun && version_map[version] == asciidoc_sha
+
+        version_map[version] = asciidoc_sha
+
+        # Generate HTML
+        html = asciidoc.render
+        html.gsub!(/linkgit:+(\S+?)\[(\d+)\]/) do |line|
+          x = /^linkgit:+(\S+?)\[(\d+)\]/.match(line)
+          if x[1] == "curl"
+            "<a href='https://curl.se/docs/manpage.html'>curl</a>"
+          else
+            relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}"
+            check_paths.add(relurl)
+            "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
+          end
+        end
+        # HTML anchor on hdlist1 (i.e. command options)
+        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
+          text = $1.tr("^A-Za-z0-9-", "")
+          anchor = "#{path}-#{text}"
+          # handle anchor collisions by appending -1
+          anchor += "-1" while ids.include?(anchor)
+          ids.add(anchor)
+          "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
+        end
+        # Make links relative
+        html.gsub!(/(<a href=['"])\/([^'"]*)/) do |relurl|
+          before = $1
+          after = $2
+          after.sub!(/^docs\/\.\.\//, 'docs/')
+          after = 'pack-format' if after == 'technical/pack-format'
+          check_paths.add(after.sub(/#.*/, ''))
+          "#{before}{{< relurl \"#{after}\" >}}"
+        end
+
+        doc_versions = version_map.keys.sort{|a, b| Version.version_to_num(a) <=> Version.version_to_num(b)}
+        doc_version_index = doc_versions.index(version)
+
+        changed_in = doc_version_index
+        changed_in = changed_in - 1 while version_map[doc_versions[changed_in - 1]] == asciidoc_sha
+        unchanged_until = doc_version_index
+        unchanged_until = unchanged_until + 1 while version_map[doc_versions[unchanged_until + 1]] == asciidoc_sha
+
+        if !page_data["latest-changes"] || Version.version_to_num(page_data["latest-changes"]) <= Version.version_to_num(version)
+          page_data["latest-changes"] = doc_versions[changed_in]
+        end
+
+        # Write <docname>/<version>.html
+        front_matter = {
+          "category" => "manual",
+          "section" => "documentation",
+          "subsection" => "manual",
+          "title" => "Git - #{docname} Documentation",
+          "docname" => docname,
+          "version" => doc_versions[changed_in],
+        }
+
+        if changed_in != doc_version_index && File.exists?("#{doc_path}/#{version}.html")
+          # remove obsolete file
+          File.delete("#{doc_path}/#{version}.html")
+        end
+
+        FileUtils.mkdir_p(doc_path)
+        front_matter_with_redirects = front_matter.clone
+        front_matter_with_redirects["aliases"] =
+          doc_versions[changed_in..unchanged_until].flat_map do |v|
+            ["/docs/#{docname}/#{v}/index.html"]
+          end
+        File.open("#{doc_path}/#{doc_versions[changed_in]}.html", "w") do |out|
+          out.write("#{front_matter_with_redirects.to_yaml}\n---\n")
+          out.write(html)
+        end
+
+        # Write <docname>.html
+        if page_data["latest-changes"] == version
+          FileUtils.mkdir_p(File.dirname(doc_path))
+          File.open("#{doc_path}.html", "w") do |out|
+            front_matter["latest-changes"] = version
+            front_matter["aliases"] = ["/docs/#{docname}/index.html"]
+            out.write("#{front_matter.to_yaml}\n---\n")
+            out.write(html)
+          end
+        end
+
+        # Regenerate `page-versions` info
+        page_data["page-versions"] = page_versions = [{
+          "name" => doc_versions[0],
+          "added" => 8,
+          "removed" => 0
+        }]
+        i = 1
+        while i < doc_versions.length do
+          pre_version = doc_versions[i - 1]
+          post_version = doc_versions[i]
+          pre_sha = version_map[pre_version]
+          post_sha = version_map[post_version]
+          if pre_sha == post_sha
+            # unchanged
+            j = i
+            j = j + 1 while post_sha == version_map[doc_versions[j + 1]]
+            page_versions.unshift({
+              "name" => i == j ? post_version : "#{post_version} &rarr; #{doc_versions[j]}"
+            })
+            i = j + 1
+          else
+            page_data["diff-cache"] = {} if !page_data["diff-cache"]
+            cached_diff = page_data["diff-cache"]["#{pre_sha}..#{post_sha}"]
+            if !cached_diff
+              pre_content = File.read("#{SITE_ROOT}_generated-asciidoc/#{pre_sha}")
+              post_content = File.read("#{SITE_ROOT}_generated-asciidoc/#{post_sha}")
+              cached_diff = page_data["diff-cache"]["#{pre_sha}..#{post_sha}"] = diff(pre_content, post_content)
+            end
+            page_versions.unshift({
+              "name" => doc_versions[i],
+              "added" => cached_diff[0],
+              "removed" => cached_diff[1]
+            })
+            i = i + 1
+          end
+        end
       end
 
+      # In some cases, documents are skipped from git-scm.com, e.g. the
+      # `howto/` files. As a consequence, some links may point to locations
+      # that are not populated. Let's redirect to the source files in the
+      # git/git repository.
+      check_paths.each do |path|
+        doc_path = "#{SITE_ROOT}content/#{path}.html"
+        if !File.exists?(doc_path)
+          type = 'blob'
+          target = path.sub(/^docs\//, '')
+          if target == 'api-index'
+            type = 'tree'
+            target = 'technical'
+          elsif target == 'howto-index'
+            type = 'tree'
+            target = 'howto'
+          else
+            target += '.txt'
+          end
+          front_matter = { "redirect_to" => "https://github.com/git/git/#{type}/HEAD/Documentation/#{target}" } # ltrim `docs/`
+          FileUtils.mkdir_p(File.dirname(doc_path))
+          File.open(doc_path, "w") do |out|
+            out.write("#{front_matter.to_yaml}\n---\n")
+          end
+        end
+      end
     end
-    Rails.cache.write("latest-version", Version.latest_version.name)
+    data["latest-version"] = version if !data["latest-version"] || Version.version_to_num(data["latest-version"]) < Version.version_to_num(version)
+  end
+  File.open(DATA_FILE, "w") do |out|
+    YAML.dump(data, out)
   end
 end
 
@@ -353,7 +542,7 @@ def local_index_doc(index_fun)
     tag_filter = lambda do |tagname, gettags = true|
       if gettags
         # find all tags
-        tags = `git tag | egrep 'v1|v2'`.strip.split("\n")
+        tags = `git tag -l --sort=version:refname 'v[12]*'`.strip.split("\n")
         tags = tags.grep(/v\d([.\d])+$/) # just get release tags
         if tagname
           tags = tags.select { |t| t == tagname }
@@ -387,18 +576,21 @@ def local_index_doc(index_fun)
   end
 end
 
-task local_index: :environment do
-  local_index_doc(:index_doc)
-end
-
-task local_index_l10n: :environment do
-  local_index_doc(:index_l10n_doc)
-end
-
-task preindex: :environment do
-  github_index_doc(:index_doc, "gitster/git")
-end
-
-task preindex_l10n: :environment do
-  github_index_doc(:index_l10n_doc, "jnavila/git-html-l10n")
+if ARGV.length == 2
+  if ARGV[0] != "remote"
+    ENV["GIT_REPO"] = ARGV[0]
+    if ARGV[1] != "l10n"
+      local_index_doc(:index_doc)
+    else
+      local_index_doc(:index_l10n_doc)
+    end
+  else
+    if ARGV[1] != "l10n"
+      github_index_doc(:index_doc, "gitster/git")
+    else
+      github_index_doc(:index_l10n_doc, "jnavila/git-html-l10n")
+    end
+  end
+else
+  abort("Need two arguments: (<path-to-repo> | remote) (en | l10n)!")
 end
