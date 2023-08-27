@@ -3,6 +3,7 @@
 require "asciidoctor"
 require "nokogiri"
 require "octokit"
+require "open-uri"
 require "pathname"
 require_relative "book"
 
@@ -63,8 +64,9 @@ def genbook(language_code, &get_content)
   end
 
   begin
-    l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{language_code}.adoc").read
-  rescue StandardError
+    l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/main/data/locale/attributes-#{language_code}.adoc").read
+  rescue StandardError => e
+    puts "::warning::could not read #{language_code} attributes: #{e}"
     l10n_file = ""
   end
   initial_content.gsub!("include::ch01", l10n_file + "\ninclude::ch01")
