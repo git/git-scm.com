@@ -209,10 +209,10 @@ var Dropdowns = {
     var eles = $('.dropdown-trigger');
     eles.click(function(e) {
       e.preventDefault();
-      
+
       $(this).toggleClass('active');
       $('#' + $(this).attr('data-panel-id')).toggle();
-      
+
       eles.each((_, ele)=>{
         if(ele === this) return
         $(ele).removeClass('active');
@@ -240,8 +240,18 @@ var Downloads = {
     Downloads.filterGUIS();
   },
 
-  getOSFilter: function() {
-    var os = location.href.substring(location.href.lastIndexOf("/") + 1);
+  getOSFromQueryString: function() {
+    const query = window.location.search.substring(1);
+    const needle = `os=`;
+    return query
+      .split('&')
+      .filter(e => e.startsWith(needle))
+      .map(e => decodeURIComponent(e.substring(needle.length).replace(/\+/g, '%20')))
+      .pop();
+  },
+
+  getOSFilter: function(os) {
+    os = os || Downloads.getOSFromQueryString();
     return os === 'linux' || os === 'mac' || os === 'windows' || os === 'android' || os === 'ios' ? os : '';
   },
 
@@ -250,8 +260,8 @@ var Downloads = {
     return platforms[os];
   },
 
-  filterGUIS: function() {
-    var osFilter = Downloads.getOSFilter();
+  filterGUIS: function(os) {
+    var osFilter = Downloads.getOSFilter(os);
     var capitalizedOS = Downloads.capitalizeOS(osFilter);
     $('a.gui-os-filter').not("[data-os='"+osFilter+"']").removeClass('selected');
     $('a.gui-os-filter').filter("[data-os='"+osFilter+"']").addClass('selected');
@@ -278,11 +288,15 @@ var Downloads = {
       if (window.history && window.history.pushState) {
         var url = os === ''
           ? '/downloads/guis/'
-          : '/download/gui/'+os;
-        history.pushState(null, $(this).html(), url);
+          : `/download/guis?os=${os}`;
+        try {
+          history.pushState(null, $(this).html(), url);
+        } catch (e) {
+          if (`${e}`.indexOf('The operation is insecure') < 0) console.log(e)
+        }
       }
 
-      Downloads.filterGUIS();
+      Downloads.filterGUIS(os);
     });
   },
 
