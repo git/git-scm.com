@@ -160,6 +160,10 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
 
 * https://pagefind.app/
 
+### Lychee (link checker)
+
+* https://lychee.cli.rs/
+
 ## License
 
 The source code for the site is licensed under the MIT license, which you can find in
