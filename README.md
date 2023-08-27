@@ -45,14 +45,13 @@ Or you can populate the man pages from GitHub (much slower) like this:
 
 Similarly, you can also populate the localized man pages. From a local clone of https://github.com/jnavila/git-html-l10n :
 
-    $ GIT_REPO=../git-html-l10n/.git rake local_index_l10n  # all versions
-    $ GIT_REPO=../git-html-l10n/.git REBUILD_DOC=$version rake local_index_l10n  # specific version
+    $ ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n  # all versions
+    $ REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n  # specific version
 
 Or you can do it from GitHub (much slower) like this:
 
     $ export GITHUB_API_TOKEN=github_personal_auth_token
-    $ rake preindex_l10n  # all versions
-    $ REBUILD_DOC=$version rake preindex_l10n  # specific version
+    $ REBUILD_DOC=$version ruby ./script/update-docs.rb remote l10n  # specific version
 
 ## Update the `Downloads` pages
 
