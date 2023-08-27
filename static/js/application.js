@@ -20,6 +20,13 @@
 popped = 'state' in window.history;
 initialURL = location.href;
 
+const baseURLPrefix = (() => {
+  const scripts = document.getElementsByTagName('script');
+  const index = scripts.length - 1;
+  const thisScript = scripts[index];
+  return thisScript.src.replace(/^.*:\/\/[^/]*(.*\/)js\/[^/]+.js(\?.*)?$/, '$1');
+})();
+
 $(document).ready(function() {
   BrowserFallbacks.init();
   Search.init();
@@ -49,27 +56,27 @@ var DownloadBox = {
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $(".monitor").addClass("mac");
-      $("#download-link").text("Download for Mac").attr("href", "/download/mac");
+      $("#download-link").text("Download for Mac").attr("href", `${baseURLPrefix}download/mac`);
       $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Mac GUIs").attr("href", "/download/gui/mac");
+      $("#gui-link").text("Mac GUIs").attr("href", `${baseURLPrefix}download/gui/mac`);
       $("#gui-os-filter").attr('data-os', 'mac');
       $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
       $(".monitor").addClass("windows");
-      $("#download-link").text("Download for Windows").attr("href", "/download/win");
+      $("#download-link").text("Download for Windows").attr("href", `${baseURLPrefix}download/win`);
       $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Windows GUIs").attr("href", "/download/gui/windows");
+      $("#gui-link").text("Windows GUIs").attr("href", `${baseURLPrefix}download/gui/windows`);
       $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
+      $("#alt-link").text("Mac Build").attr("href", `${baseURLPrefix}download/mac`);
       $("#gui-os-filter").attr('data-os', 'windows');
       $("#gui-os-filter").text("Only show GUIs for my OS (Windows)")
     } else if (os == "Linux") {
       $(".monitor").addClass("linux");
-      $("#download-link").text("Download for Linux").attr("href", "/download/linux");
+      $("#download-link").text("Download for Linux").attr("href", `${baseURLPrefix}download/linux`);
       $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Linux GUIs").attr("href", "/download/gui/linux");
+      $("#gui-link").text("Linux GUIs").attr("href", `${baseURLPrefix}download/gui/linux`);
       $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", "/download/mac");
+      $("#alt-link").text("Mac Build").attr("href", `${baseURLPrefix}download/mac`);
       $("#gui-os-filter").attr('data-os', 'linux');
       $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
     } else {
@@ -247,7 +254,7 @@ var Search = {
     if(!url) {
       const term = $('#search-text').val();
       const language = document.querySelector("html")?.getAttribute("lang");
-      url = `search/results?search=${term}${language && `&language=${language}`}`;
+      url = `${baseURLPrefix}search/results?search=${term}${language && `&language=${language}`}`;
     }
     window.location.href = url;
     selectedIndex = 0;
@@ -395,8 +402,8 @@ var Downloads = {
 
       if (window.history && window.history.pushState) {
         var url = os === ''
-          ? '/downloads/guis/'
-          : `/download/guis?os=${os}`;
+          ? `${baseURLPrefix}downloads/guis`
+          : `${baseURLPrefix}download/guis?os=${os}`;
         try {
           history.pushState(null, $(this).html(), url);
         } catch (e) {
