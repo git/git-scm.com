@@ -395,6 +395,7 @@ def index_doc(filter_tags, doc_list, get_content)
         if page_data["latest-changes"] == version
           FileUtils.mkdir_p(File.dirname(doc_path))
           File.open("#{doc_path}.html", "w") do |out|
+            front_matter["latest-changes"] = version
             front_matter["aliases"] = ["/docs/#{docname}/index.html"]
             out.write("#{front_matter.to_yaml}\n---\n")
             out.write(html)
