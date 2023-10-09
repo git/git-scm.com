@@ -158,40 +158,76 @@ var Search = {
 
       if(term != Search.currentSearch) {
         Search.currentSearch = term;
-        $("#search-results").text(`Searching for ${term}`);
+        $("#search-results").html(`
+          <header> Search Results </header>
+          <table>
+            <tbody>
+              <tr class="show-all">
+               <td class="category"> &nbsp; </td>
+                <td class="matches">
+                  <ul>
+                    <li>
+                      <a class="highlight" id="show-results-label">Searching for <span id="search-term">&nbsp;</span>...</a>
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <td class="category"> &nbsp; </td>
+                <td class="matches">
+                  <ul>
+                    <li><button id="load-more-results">Loading</button></li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        `);
+        $("#search-term").text(term);
         this.initializeSearchIndex(async () => {
           const results = await Search.pagefind.debouncedSearch(term);
           if (results === null) return;
-          $("#search-results").html(`
-            <header> Search Results </header>
-            <table>
-              <tbody>
-                <tr class="show-all">
-                 <td class="category"> &nbsp; </td>
-                  <td class="matches">
-                    <ul>
-                      <li>
-                        <a class="highlight">Show all results...</a>
-                      </li>
-                    </ul>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="category"> &nbsp; </td>
-                  <td class="matches">
-                    <ul>
-                    ${(await Promise.all(results.results.map(async e => {
-                      const result = await e.data();
-                      return `
-                        <li><a href="${result.url}">${result.meta.title}</a></li>
-                      `
-                    }))).join('')}
-                    </ul>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          `);
+          if (results.results.length === 0) {
+            $("#show-results-label").text("No matching pages found.");
+            return;
+          }
+          $("#show-results-label").text("Show all results...");
+          const loadButton = $("#load-more-results");
+          loadButton.text(`Loading ${
+            results.results.length < 2
+            ? "result"
+            : `${results.results.length} results`
+          }`);
+          loadButton.loading = false;
+
+          const chunkLength = 10;
+          let displayCount = 0;
+          const loadResultsChunk = () => {
+            if (loadButton.loading || displayCount >= results.results.length) return;
+
+            loadButton.loading = true;
+            const n = displayCount + chunkLength;
+            while (displayCount < n) {
+              const li = $("<li><a>&hellip;</a></li>");
+              li.insertBefore(loadButton);
+
+              // load the result lazily
+              (async () => {
+                const result = await results.results[displayCount].data();
+                li.html(`<a href = "${result.url}">${result.meta.title}</a>`);
+              })().catch(console.log);
+
+              if (++displayCount >= results.results.length) {
+                loadButton.remove();
+                return;
+              }
+            }
+            const remaining = results.results.length - displayCount;
+            loadButton.text(`Load ${remaining} more ${remaining < 2 ? "result" : "results"}`);
+            loadButton.loading = false;
+          };
+          loadResultsChunk();
+          loadButton.on("click", loadResultsChunk);
           Search.searching = false;
         });
       };
