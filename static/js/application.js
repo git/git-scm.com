@@ -245,8 +245,9 @@ var Search = {
     var link = $('#search-results a')[Search.selectedIndex];
     var url = $(link).attr('href');
     if(!url) {
-      var term = $('#search-text').val();
-      url = "/search/results?search=" + term;
+      const term = $('#search-text').val();
+      const language = document.querySelector("html")?.getAttribute("lang");
+      url = `search/results?search=${term}${language && `&language=${language}`}`;
     }
     window.location.href = url;
     selectedIndex = 0;
@@ -285,6 +286,8 @@ var Search = {
     }
     (async () => {
       Search.pagefind = await import(`${baseURLPrefix}pagefind/pagefind.js`);
+      const language = this.getQueryValue('language');
+      if (language) Search.pagefind.options({language});
       Search.pagefind.init();
       await callback();
     })().catch(console.log);
