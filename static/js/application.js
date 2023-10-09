@@ -294,35 +294,17 @@ var Search = {
   },
 
   displayFullSearchResults: function() {
-    const searchResultsElements = document.getElementsByClassName('full-search-results');
-    if (!searchResultsElements || searchResultsElements.length !== 1) return;
+    if (!$("#search-div").length) return;
+
+    const language = this.getQueryValue('language');
+
+    new PagefindUI({ element: "#search-div", showSubResults: true, language });
 
     const searchTerm = this.getQueryValue('search');
-    if (!searchTerm) return;
-
-    const searchTermElement = document.getElementById('search-term');
-    if (searchTermElement) searchTermElement.innerHTML = searchTerm;
-
-    const searchTextElement = document.getElementById('search-text');
-    if (searchTextElement) searchTextElement.value = searchTerm;
-
-    searchResultsElements[0].innerHTML = 'Searching&hellip;';
-
-    this.initializeSearchIndex(async () => {
-      const results = await Search.pagefind.search(searchTerm);
-      if (!results || !results.results || !results.results.length) return;
-
-      const list = (await Promise.all(results.results.map(async e => {
-        const result = await e.data();
-        const href = result.url;
-        return `
-          <li><h3><a href="${href}">${result.meta.title}</a></h3>
-          <a class="url" href="${href}">${href}</a>
-          <p>${result.excerpt}</p></li>`;
-      }))).join('');
-
-      searchResultsElements[0].innerHTML = list || '<li>No results found</li>';
-    })
+    if (searchTerm) {
+      // TODO: figure out how to use `trigger()` instead of `[0].dispatchEvent()`
+      $("#search-div input").val(searchTerm)[0].dispatchEvent(new Event("input"))
+    }
   }
 }
 
