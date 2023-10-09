@@ -1,0 +1,85 @@
+name: Synchronize with new Git version (if any)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # check daily for updates
+    - cron: '37 17 * * *'
+
+jobs:
+  update-git-version-and-manual-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push changes (if any)
+      pages: write # to deploy to GitHub Pages
+      id-token: write # to verify that the deployment source is legit
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+            script
+      - name: ruby setup
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: update recorded Git version
+        env:
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # this seems to be needed to let `bundle exec` see `vendor/bundle/`
+          { bundle check || bundle install --frozen; } &&
+
+          # update recorded Git version
+          bundle exec ruby script/update-git-version.rb
+      - name: commit changes (if any)
+        id: commit
+        run: |
+          # Exit early if there are no changes
+          git update-index --ignore-submodules --refresh &&
+          git diff-files --quiet --ignore-submodules -- hugo.yml &&
+          exit 0
+
+          version="$(git diff hugo.yml | sed -n '/^+ *latest_version: /{s/.*: //;p;q}')"
+          echo "result=$version" >>$GITHUB_OUTPUT
+
+          git \
+            -c user.name=${{ github.actor }} \
+            -c user.email=${{ github.actor }}@noreply.github.com \
+            commit -m "Update git-version ($version)" \
+              -m 'Updated via the `update-git-version-and-manual-pages.yml` GitHub workflow.' \
+              -- hugo.yml
+      - name: prepare worktree
+        if: steps.commit.outputs.result != ''
+        run: git sparse-checkout disable
+      - name: clone git.git
+        if: steps.commit.outputs.result != ''
+        run: git clone --bare https://github.com/git/git '${{ runner.temp }}/git'
+      - name: update manual pages
+        if: steps.commit.outputs.result != ''
+        run: bundle exec ruby script/update-docs.rb '${{ runner.temp }}/git' en
+      - name: commit manual pages
+        if: steps.commit.outputs.result != ''
+        run: |
+          git add -A external/docs &&
+          git \
+            -c user.name=${{ github.actor }} \
+            -c user.email=${{ github.actor }}@noreply.github.com \
+            commit -m "Update manual pages (${{ steps.commit.outputs.result }})" \
+              -m 'Updated via the `update-git-version-and-manual-pages.yml` GitHub workflow.'
+      - name: verify that there are no uncommitted changes
+        run: |
+          git update-index --refresh &&
+          if test -n "$(git diff HEAD)$(git ls-files --exclude-standard --other)"
+          then
+            echo '::error::there are uncommitted changes!' >&2
+            git status >&2
+            exit 1
+          fi
+      - name: deploy to GitHub Pages
+        if: steps.commit.outputs.result != ''
+        id: deploy
+        uses: ./.github/actions/deploy-to-github-pages
