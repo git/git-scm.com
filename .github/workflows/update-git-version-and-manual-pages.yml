@@ -2,6 +2,11 @@ name: Synchronize with new Git version (if any)
 
 on:
   workflow_dispatch:
+    inputs:
+      force-rebuild:
+        description: Force re-building all manual pages (e.g. after a script change)
+        type: boolean
+        default: false
   schedule:
     # check daily for updates
     - cron: '37 17 * * *'
@@ -53,23 +58,36 @@ jobs:
               -m 'Updated via the `update-git-version-and-manual-pages.yml` GitHub workflow.' \
               -- hugo.yml
       - name: prepare worktree
-        if: steps.commit.outputs.result != ''
+        if: steps.commit.outputs.result != '' || inputs.force-rebuild == true
         run: git sparse-checkout disable
       - name: clone git.git
-        if: steps.commit.outputs.result != ''
+        if: steps.commit.outputs.result != '' || inputs.force-rebuild == true
         run: git clone --bare https://github.com/git/git '${{ runner.temp }}/git'
       - name: update manual pages
-        if: steps.commit.outputs.result != ''
-        run: bundle exec ruby script/update-docs.rb '${{ runner.temp }}/git' en
+        if: steps.commit.outputs.result != '' || inputs.force-rebuild == true
+        run: |
+          if test true = '${{ inputs.force-rebuild }}'
+          then
+            export RERUN=true
+          fi
+          bundle exec ruby script/update-docs.rb '${{ runner.temp }}/git' en
       - name: commit manual pages
-        if: steps.commit.outputs.result != ''
+        id: manual-pages
+        if: steps.commit.outputs.result != '' || inputs.force-rebuild == true
         run: |
           git add -A external/docs &&
+          if test true = '${{ inputs.force-rebuild }}' && git diff-index --cached --quiet HEAD --
+          then
+            echo '::notice::A manual pages rebuild was requested but resulted in no changes' >&2
+            exit 0
+          fi &&
+          version='${{ steps.commit.outputs.result }}' &&
           git \
             -c user.name=${{ github.actor }} \
             -c user.email=${{ github.actor }}@noreply.github.com \
-            commit -m "Update manual pages (${{ steps.commit.outputs.result }})" \
-              -m 'Updated via the `update-git-version-and-manual-pages.yml` GitHub workflow.'
+            commit -m "Update manual pages (${version:-manually forced rebuild})" \
+              -m 'Updated via the `update-git-version-and-manual-pages.yml` GitHub workflow.' &&
+          echo "result=modified" >>$GITHUB_OUTPUT
       - name: verify that there are no uncommitted changes
         run: |
           git update-index --refresh &&
@@ -80,6 +98,6 @@ jobs:
             exit 1
           fi
       - name: deploy to GitHub Pages
-        if: steps.commit.outputs.result != ''
+        if: steps.commit.outputs.result != '' || steps.manual-pages.outputs.result != ''
         id: deploy
         uses: ./.github/actions/deploy-to-github-pages
