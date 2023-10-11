@@ -19,30 +19,32 @@ const getAllBooks = async () => {
   }, {})
 }
 
-const getPendingBookUpdates = async (octokit) => {
+const getPendingBookUpdates = async (octokit, forceRebuild) => {
   const books = await getAllBooks()
   const result = []
   for (const lang of Object.keys(books)) {
-    try {
-      const localSha = await getFileContents(`_sync_state/book-${lang}.sha`)
+    if (!forceRebuild) {
+      try {
+        const localSha = await getFileContents(`_sync_state/book-${lang}.sha`)
 
-      const [owner, repo] = books[lang].split('/')
-      const { data: { default_branch: remoteDefaultBranch } } =
-        await octokit.rest.repos.get({
-          owner,
-          repo
-        })
-      const { data: { object: { sha: remoteSha } } } =
-        await octokit.rest.git.getRef({
-          owner,
-          repo,
-          ref: `heads/${remoteDefaultBranch}`
-        })
+        const [owner, repo] = books[lang].split('/')
+        const { data: { default_branch: remoteDefaultBranch } } =
+          await octokit.rest.repos.get({
+            owner,
+            repo
+          })
+        const { data: { object: { sha: remoteSha } } } =
+          await octokit.rest.git.getRef({
+            owner,
+            repo,
+            ref: `heads/${remoteDefaultBranch}`
+          })
 
-      if (localSha === remoteSha) continue
-    } catch (e) {
-      // It's okay for the `.sha` file not to exist yet.`
-      if (e.code !== 'ENOENT') throw e
+        if (localSha === remoteSha) continue
+      } catch (e) {
+        // It's okay for the `.sha` file not to exist yet.`
+        if (e.code !== 'ENOENT') throw e
+      }
     }
     result.push({
       lang,
