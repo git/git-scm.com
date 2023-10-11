@@ -54,14 +54,40 @@ const getPendingBookUpdates = async (octokit, forceRebuild) => {
   return result
 }
 
+const areTranslatedManualPagesUpToDate = async (octokit) => {
+  try {
+    const localSha = await getFileContents(`_sync_state/git-html-l10n.sha`)
+
+    const [owner, repo] = 'jnavila/git-html-l10n'.split('/')
+    const { data: { default_branch: remoteDefaultBranch } } =
+    await octokit.rest.repos.get({
+      owner,
+      repo
+    })
+    const { data: { object: { sha: remoteSha } } } =
+      await octokit.rest.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${remoteDefaultBranch}`
+      })
+
+    if (localSha === remoteSha) return true
+  } catch (e) {
+    // It's okay for the `.sha` file not to exist yet.`
+    if (e.code !== 'ENOENT') throw e
+  }
+  return false
+}
+
 // for testing locally, needs `npm install @octokit/rest` to work
 if (require.main === module) {
   (async () => {
     const { Octokit } = require('@octokit/rest')
-    console.log(await getPendingBookUpdates(new Octokit()))
+    console.log(await areTranslatedManualPagesUpToDate(new Octokit()))
   })().catch(console.log)
 }
 
 module.exports = {
-  getPendingBookUpdates
+  getPendingBookUpdates,
+  areTranslatedManualPagesUpToDate
 }
