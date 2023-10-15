@@ -4,3 +4,5 @@ source "https://rubygems.org"
 
 gem "octokit"
 gem "rss"
+gem "asciidoctor", "~> 2.0.0"
+gem "nokogiri"

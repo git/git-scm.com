@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require "asciidoctor"
 require "nokogiri"
 require "octokit"
 require "pathname"
+require_relative "book"
 
 def expand(content, path, &get_content)
   content.gsub(/include::(\S+)\[\]/) do |_line|
@@ -21,15 +23,7 @@ def expand(content, path, &get_content)
   end
 end
 
-desc "Reset book html to trigger re-build"
-task reset_book2: :environment do
-  Book.where(edition: 2).each do |book|
-    book.ebook_html = "0000000000000000000000000000000000000000"
-    book.save
-  end
-end
-
-def genbook(code, &get_content)
+def genbook(language_code, &get_content)
   nav = '<div id="nav"><a href="[[nav-prev]]">prev</a> | <a href="[[nav-next]]">next</a></div>'
 
   progit = get_content.call("progit.asc")
@@ -69,7 +63,7 @@ def genbook(code, &get_content)
   end
 
   begin
-    l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{code}.adoc").read
+    l10n_file = URI.open("https://raw.githubusercontent.com/asciidoctor/asciidoctor/master/data/locale/attributes-#{language_code}.adoc").read
   rescue StandardError
     l10n_file = ""
   end
@@ -79,13 +73,13 @@ def genbook(code, &get_content)
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
 
-  asciidoc = Asciidoctor::Document.new(content, attributes: { "lang" => code })
+  asciidoc = Asciidoctor::Document.new(content, attributes: { "lang" => language_code })
   html = asciidoc.render
   alldoc = Nokogiri::HTML(html)
   number = 1
 
-  Book.where(edition: 2, code: code).destroy_all
-  book = Book.create(edition: 2, code: code)
+  book = Book.new(2, language_code)
+  book.removeAllFiles()
 
   alldoc.xpath("//div[@class='sect1']").each_with_index do |entry, index|
     chapter_title = entry.at("h2").content
@@ -107,18 +101,21 @@ def genbook(code, &get_content)
     pretext = entry.search("div[@class=sectionbody]/div/p").to_html
     id_xref = chapter.at("h2").attribute("id").to_s
 
-    schapter = book.chapters.where(number: number).first_or_create
+    schapter = book.chapters[number]
+    if schapter.nil?
+      book.chapters[number] = schapter = Chapter.new(book)
+    end
     schapter.title = chapter_title.to_s
     schapter.chapter_type = chapter_type
     schapter.chapter_number = chapter_number
-    schapter.sha = book.ebook_html
+    schapter.sha = book.sha
     schapter.save
 
     # create xref
-    csection = schapter.sections.where(number: 1).first_or_create
-    xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
-    xref.section = csection
-    xref.save
+    csection = schapter.sections[1]
+    # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
+    # xref.section = csection
+    # xref.save
 
     section = 1
     chapter.search("div[@class=sect2]").each do |sec|
@@ -167,92 +164,104 @@ def genbook(code, &get_content)
 
       puts "\t\t#{chapter_type} #{chapter_number}.#{section} : #{chapter_title} . #{section_title} - #{html.size}"
 
-      csection = schapter.sections.where(number: section).first_or_create
+      csection = schapter.sections[section]
+      if csection.nil?
+        schapter.sections[section] = csection = Section.new(schapter)
+      end
       csection.title = section_title.to_s
       csection.html = pretext + html
       csection.save
 
-      xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
-      xref.section = csection
-      xref.save
+      # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
+      # xref.section = csection
+      # xref.save
 
       # record all the xrefs
-      sec.search(".//*[@id]").each do |id|
-        id_xref = id.attribute("id").to_s
-        xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
-        xref.section = csection
-        xref.save
-      end
+      # sec.search(".//*[@id]").each do |id|
+      #   id_xref = id.attribute("id").to_s
+      #   xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
+      #   xref.section = csection
+      #   xref.save
+      # end
 
       section += 1
       pretext = ""
     end
   end
-  book.sections.each do |section|
-    section.set_slug
-    section.save
+  book.chapters.each do |chapter|
+    next if chapter.nil?
+    chapter.sections.each do |section|
+      next if section.nil?
+      section.save
+    end
   end
+  book
 end
 
-desc "Generate book html directly from git repo"
-task remote_genbook2: :environment do
+# Generate book html directly from remote git repo
+def remote_genbook2(language_code)
   @octokit = Octokit::Client.new(access_token: ENV.fetch("GITHUB_API_TOKEN", nil))
 
-  if ENV["GENLANG"]
-    books = Book.all_books.select { |code, _repo| code == ENV["GENLANG"] }
+  if language_code
+    books = Book.all_books.select { |code, _repo| code == language_code }
   else
-    books = Book.all_books.reject do |code, repo|
+    books = Book.all_books.reject do |language_code, repo|
       repo_head = @octokit.commit(repo, "HEAD").sha
-      book = Book.where(edition: 2, code: code).first_or_create
-      repo_head == book.ebook_html
+      book = Book.where(edition: 2, language_code: language_code).first_or_create
+      repo_head == book.sha
     end
   end
 
-  books.each do |code, repo|
+  books.each do |language_code, repo|
     blob_content = Hash.new do |blobs, sha|
       content = Base64.decode64(@octokit.blob(repo, sha, encoding: "base64").content)
       blobs[sha] = content.force_encoding("UTF-8")
     end
     repo_head = @octokit.commit(repo, "HEAD")
     repo_tree = @octokit.tree(repo, repo_head.commit.tree.sha, recursive: true)
-    Book.transaction do
-      genbook(code) do |filename|
-        file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
-        if file_handle
-          blob_content[file_handle[:sha]]
-        end
+    book = genbook(language_code) do |filename|
+      file_handle = repo_tree.tree.detect { |tree| tree[:path] == filename }
+      if file_handle
+        blob_content[file_handle[:sha]]
       end
-
-      book = Book.where(edition: 2, code: code).first_or_create
-      book.ebook_html = repo_head.sha
-
-      begin
-        rel = @octokit.latest_release(repo)
-        get_url = lambda do |name_re|
-          asset = rel.assets.find { |asset| name_re.match(asset.name) }
-          asset&.browser_download_url
-        end
-        book.ebook_pdf  = get_url.call(/\.pdf$/)
-        book.ebook_epub = get_url.call(/\.epub$/)
-        book.ebook_mobi = get_url.call(/\.mobi$/)
-      rescue Octokit::NotFound
-        book.ebook_pdf  = nil
-        book.ebook_epub = nil
-        book.ebook_mobi = nil
-      end
-
-      book.save
     end
+
+    book.sha = repo_head.sha
+
+    begin
+      rel = @octokit.latest_release(repo)
+      get_url = lambda do |name_re|
+        asset = rel.assets.find { |asset| name_re.match(asset.name) }
+        asset&.browser_download_url
+      end
+      book.ebook_pdf  = get_url.call(/\.pdf$/)
+      book.ebook_epub = get_url.call(/\.epub$/)
+      book.ebook_mobi = get_url.call(/\.mobi$/)
+    rescue Octokit::NotFound
+      book.ebook_pdf  = nil
+      book.ebook_epub = nil
+      book.ebook_mobi = nil
+    end
+
+    book.save
   rescue StandardError => e
     puts e.message
   end
 end
 
-desc "Generate book html directly from git repo"
-task local_genbook2: :environment do
-  if ENV["GENLANG"] && ENV["GENPATH"]
-    genbook(ENV["GENLANG"]) do |filename|
-      File.open(File.join(ENV["GENPATH"], filename), "r") { |infile| File.read(infile) }
+# Generate book html directly from local git repo"
+def local_genbook2(language_code, worktree_path)
+  if language_code && worktree_path
+    genbook(language_code) do |filename|
+      File.open(File.join(worktree_path, filename), "r") { |infile| File.read(infile) }
     end
   end
+end
+
+if ARGV.length == 2
+  local_genbook2(ARGV[0], ARGV[1])
+elsif ARGV.length == 1
+  remote_genbook2(ARGV[0])
+else
+  abort("Need one or two arguments!")
 end
