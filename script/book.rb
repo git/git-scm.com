@@ -1,12 +1,9 @@
 # frozen_string_literal: true
 
-# t.string      :code
-# t.timestamps
-class Book < ApplicationRecord
-  has_many :chapters, dependent: :delete_all
-  has_many :sections, through: :chapters
-  has_many :xrefs, dependent: :delete_all
+require 'fileutils'
+require 'yaml'
 
+class Book
   @@all_books = {
     "az" => "progit2-aze/progit2",
     "be" => "progit/progit2-be",
@@ -44,7 +41,108 @@ class Book < ApplicationRecord
     @@all_books
   end
 
-  def edition?(number)
-    Book.where(edition: number, code: code).count > 0
+  attr_accessor :chapters
+  attr_accessor :sha
+
+  def initialize(edition, language_code)
+    @edition = edition
+    @language_code = language_code
+    @chapters = []
+  end
+
+  def front_matter
+    front_matter = {
+      "category" => "book",
+      "section" => "documentation",
+      "subsection" => "book",
+      "sidebar" => "book",
+      "book" => {
+        "language_code" => @language_code
+      }
+    }
+  end
+
+  def absolute_path(path)
+    File.absolute_path(File.join(File.dirname(__FILE__), "..", "content", "book", @language_code, "v#{@edition}", path))
+  end
+
+  def removeAllFiles
+    FileUtils.rm_rf(absolute_path("."))
+  end
+end
+
+class Chapter
+  def initialize(book)
+    @book = book
+    @sections = []
+  end
+
+  def front_matter
+    front_matter = @book.front_matter
+    front_matter["book"]["chapter"] = {
+      "title" => self.title,
+      "number" => self.chapter_number
+    }
+    return front_matter
+  end
+
+  attr_accessor :title
+  attr_accessor :chapter_type
+  attr_accessor :chapter_number
+  attr_accessor :sha
+  attr_accessor :sections
+
+  def absolute_path(path)
+    return @book.absolute_path(path)
+  end
+
+  def save
+    # TODO
+  end
+end
+
+class Section
+  def initialize(chapter)
+    @chapter = chapter
+  end
+
+  def front_matter
+    front_matter = @chapter.front_matter
+    front_matter["title"] = "Git - #{self.title}"
+    front_matter["book"]["section"] = {
+      "title" => self.title,
+      "number" => @section_number
+    }
+    return front_matter
+  end
+
+  attr_accessor :title
+  attr_accessor :html
+  attr_accessor :slug
+
+  def set_slug
+    if self.title.empty?
+      title = @chapter.title
+    else
+      title = (@chapter.title + "-" + self.title)
+    end
+    self.slug = title.gsub(/\(|\)|\./, "").gsub(/\s+/, "-").gsub("&#39;", "-")
+  end
+
+  def absolute_path(path)
+    return @chapter.absolute_path(path)
+  end
+
+  def save
+    return if self.slug.nil?
+
+    front_matter = "#{self.front_matter.to_yaml}\n---\n"
+
+    path = self.absolute_path(self.slug)
+    FileUtils.mkdir_p(File.dirname(path))
+    File.open("#{path}.html", 'w') do |file|
+      file.write(front_matter)
+      file.write(self.html.strip)
+    end
   end
 end
