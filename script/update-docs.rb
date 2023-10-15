@@ -59,18 +59,19 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
   rebuild = ENV.fetch("REBUILD_DOC", nil)
   rerun = ENV["RERUN"] || rebuild || false
 
+  data = read_data
+  data["l10n"] = {} unless data["l10n"]
+  l10n = data["l10n"]
+
   filter_tags.call(rebuild, false).sort_by { |tag| Version.version_to_num(tag.first[1..]) }.each do |tag|
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}"
 
-    stag = Version.where(name: name.gsub("v", "l10n")).first_or_create
+    next if !rerun && l10n["committed"] and l10n["committed"] >= ts
 
-    next if (stag.commit_sha == commit_sha) && !rerun
-
-    stag.commit_sha = commit_sha
-    stag.tree_sha = tree_sha
-    stag.committed = ts
-    stag.save
+    l10n["commit_sha"] = commit_sha
+    l10n["tree_sha"] = tree_sha
+    l10n["committed"] = ts
 
     tag_files = doc_list.call(tree_sha)
     doc_files = tag_files.select do |ent|
@@ -101,9 +102,16 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       lang = File.dirname(full_path)
       path = File.basename(full_path, ".txt")
 
-      file = DocFile.where(name: path).first_or_create
+      doc_path = "#{SITE_ROOT}content/docs/#{path}"
 
       puts "   build: #{path} for #{lang}"
+
+      data["pages"][path] = {
+        "version-map" => {}
+      } unless data["pages"][path]
+      page_data = data["pages"][path]
+      page_data["languages"] = {} unless page_data["languages"]
+      lang_data = page_data["languages"]
 
       content = get_content.call sha
       categories = {}
@@ -111,32 +119,56 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1/#{lang}\\2[\\3]")
       asciidoc = make_asciidoc(content)
       asciidoc_sha = Digest::SHA1.hexdigest(asciidoc.source)
-      doc = Doc.where(blob_sha: asciidoc_sha).first_or_create
-      if rerun || !doc.plain || !doc.html
-        html = asciidoc.render
-        html.gsub!(/linkgit:(\S+?)\[(\d+)\]/) do |line|
-          x = /^linkgit:(\S+?)\[(\d+)\]/.match(line)
-          "<a href='/docs/#{x[1].gsub(/&#x2d;/, '-')}/#{lang}'>#{x[1]}[#{x[2]}]</a>"
+      if !File.exists?("#{SITE_ROOT}_generated-asciidoc/#{asciidoc_sha}")
+        FileUtils.mkdir_p("#{SITE_ROOT}_generated-asciidoc")
+        File.open("#{SITE_ROOT}_generated-asciidoc/#{asciidoc_sha}", "w") do |out|
+          out.write(content)
         end
-        # HTML anchor on hdlist1 (i.e. command options)
-        html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
-          text = $1.tr("^A-Za-z0-9-", "")
-          anchor = "#{path}-#{text}"
-          # handle anchor collisions by appending -1
-          anchor += "-1" while ids.include?(anchor)
-          ids.add(anchor)
-
-          "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
-        end
-        doc.plain = asciidoc.source
-        doc.html  = html
-        doc.save
       end
-      dv = DocVersion.where(version_id: stag.id, doc_file_id: file.id, language: lang).first_or_create
-      dv.doc_id = doc.id
-      dv.language = lang
-      dv.save
+
+      next if !rerun && lang_data[lang] == asciidoc_sha
+
+      html = asciidoc.render
+      html.gsub!(/linkgit:(\S+?)\[(\d+)\]/) do |line|
+        x = /^linkgit:(\S+?)\[(\d+)\]/.match(line)
+        relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}/#{lang}"
+        "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
+      end
+      # HTML anchor on hdlist1 (i.e. command options)
+      html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
+        text = $1.tr("^A-Za-z0-9-", "")
+        anchor = "#{path}-#{text}"
+        # handle anchor collisions by appending -1
+        anchor += "-1" while ids.include?(anchor)
+        ids.add(anchor)
+
+        "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
+      end
+      # Make links relative
+      html.gsub!(/(<a href=['"])\/([^'"]*)/, '\1{{< relurl "\2" >}}')
+
+      # Write <docname>/<lang>.html
+      front_matter = {
+        "category" => "manual",
+        "section" => "documentation",
+        "subsection" => "manual",
+        "title" => "Git - #{path} Documentation",
+        "docname" => path,
+        "lang" => lang,
+        "aliases" => ["/docs/#{path}/#{lang}/index.html"]
+      }
+
+      FileUtils.mkdir_p(doc_path)
+      File.open("#{doc_path}/#{lang}.html", "w") do |out|
+        out.write("#{front_matter.to_yaml}\n---\n")
+        out.write(html)
+      end
+
+      lang_data[lang] = asciidoc_sha
     end
+  end
+  File.open(DATA_FILE, "w") do |out|
+    YAML.dump(data, out)
   end
 end
 
