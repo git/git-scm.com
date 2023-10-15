@@ -60,22 +60,29 @@ Now you need to get the latest downloads for the downloads pages:
 
 ## Update the ProGit book
 
-(TODO!)
-Now you'll probably want some book data. You'll have
-to have access to the [Pro Git project on GitHub](https://github.com/progit/progit2) through the API.
+First, you will have to get the necessary prerequisites:
+
+    $ bundler install
+
+Now you'll probably want some book data.
+
+You'll have to get the book content from a repository on your computer by specifying the path:
+
+    $ git clone https://github.com/progit/progit2-fr ../progit2-fr
+    $ ruby ./script/update-book2.rb fr ../progit2-fr
+
+That will generate the book content from the Asciidoc files and write the files to the local tree, ready to be committed and served via Hugo.
+
+Alternatively, you need to have access to the [Pro Git project on GitHub](https://github.com/progit/progit2) through the API.
 
     $ export GITHUB_API_TOKEN=github_personal_auth_token
-    $ rake remote_genbook2
+    $ ruby ./script/update-book2.rb en
 
-If you have 2FA enabled, you'll need to create a [Personal Access Token](https://help.github.com/articles/creating-an-access-token-for-command-line-use/).    
+If you have 2FA enabled, you'll need to create a [Personal Access Token](https://help.github.com/articles/creating-an-access-token-for-command-line-use/).
 
-That will generate the book content from the Asciidoc files fetched from the online repository and post it to the Rails server database. You can select a specific language by indicating it in the `GENLANG` environment variable:
+If you want to build the book for all available languages, just skip the language code:
 
-    $ GENLANG=zh rake remote_genbook2
-
-Alternatively, you can get the book content from a repository on your computer by specifying the path in the `GENPATH` environment variable to the `local_genbook2` target:
-
-    $ GENLANG=fr GENPATH=../progit2-fr rake local_genbook2
+    $ ruby ./script/update-book2.rb
 
 ## Contributing
 
