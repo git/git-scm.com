@@ -52,10 +52,4 @@ module ApplicationHelper
 
     tag("img", options)
   end
-
-  def banner_duration(duration)
-    return "" if duration.blank?
-
-    ISO8601::Duration.new(duration).to_seconds.round * 1000
-  end
 end
