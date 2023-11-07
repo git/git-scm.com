@@ -189,7 +189,19 @@ var Search = {
                   </ul>
                 </td>
               </tr>
-              <tr>
+              <tr style="display:none">
+                <td class="category">Reference</td>
+                <td class="matches">
+                  <ul id="ul-reference"></ul>
+                </td>
+              </tr>
+              <tr style="display:none">
+                <td class="category">Book</td>
+                <td class="matches">
+                  <ul id="ul-book"></ul>
+                </td>
+              </tr>
+              <tr id="row-any">
                 <td class="category"> &nbsp; </td>
                 <td class="matches">
                   <ul>
@@ -217,22 +229,44 @@ var Search = {
           }`);
           loadButton.loading = false;
 
+          const ulReference = $("#ul-reference")
+          const ulBook = $("#ul-book")
+
           const chunkLength = 10;
           let displayCount = 0;
+
+          const categorizeResult = (i) => {
+            while (i < displayCount && typeof results.results[i].data === 'object') {
+              const result = results.results[i++];
+              if (result.data.meta.category === 'Reference') {
+                if (ulReference.children().length === 0) ulReference.parent().parent().css("display", "table-row")
+                ulReference.append(result.li)
+              } else if (result.data.meta.category === 'Book') {
+                if (ulBook.children().length === 0) ulBook.parent().parent().css("display", "table-row")
+                ulBook.append(result.li)
+              }
+            }
+          };
+
           const loadResultsChunk = () => {
             if (loadButton.loading || displayCount >= results.results.length) return;
 
             loadButton.loading = true;
             const n = displayCount + chunkLength;
             while (displayCount < n) {
-              const li = $("<li><a>&hellip;</a></li>");
-              li.insertBefore(loadButton);
+              const result = results.results[displayCount]
+              result.li = $("<li><a>&hellip;</a></li>");
+              result.li.insertBefore(loadButton);
 
               // load the result lazily
-              (async () => {
-                const result = await results.results[displayCount].data();
-                li.html(`<a href = "${result.url}">${result.meta.title}</a>`);
-              })().catch(console.log);
+              (async (i) => {
+                result.data = await results.results[displayCount].data();
+                if (!i || typeof results.results[i - 1].data === 'object') categorizeResult(i);
+                result.li.html(`<a href = "${result.data.url}">${result.data.meta.title}</a>`);
+              })(displayCount).catch((err) => {
+                console.log(err);
+                result.li.html(`<i>Error loading result</i>`);
+              });
 
               if (++displayCount >= results.results.length) {
                 loadButton.remove();
