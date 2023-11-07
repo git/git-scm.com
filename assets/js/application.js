@@ -262,6 +262,7 @@ var Search = {
               (async (i) => {
                 result.data = await results.results[displayCount].data();
                 if (!i || typeof results.results[i - 1].data === 'object') categorizeResult(i);
+                result.data.meta.title = result.data.meta.title.replace(/^Git - (.*) Documentation$/, "$1")
                 result.li.html(`<a href = "${result.data.url}">${result.data.meta.title}</a>`);
               })(displayCount).catch((err) => {
                 console.log(err);
