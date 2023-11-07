@@ -239,6 +239,7 @@ var Search = {
                 if (result.meta.category === 'Reference') {
                   if (ulReference.children().length === 0) ulReference.parent().parent().css("display", "table-row")
                   ulReference.append(li)
+		  result.meta.title = result.meta.title.replace(/^Git - (.*) Documentation$/, "$1")
                 } else if (result.meta.category === 'Book') {
                   if (ulBook.children().length === 0) ulBook.parent().parent().css("display", "table-row")
                   ulBook.append(li)
