@@ -111,6 +111,7 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
 
 * https://gohugo.io/
 * https://gohugo.io/content-management/shortcodes/
+* https://github.com/google/re2/wiki/Syntax/ (for Hugo's regular expression syntax)
 * https://pagefind.app/
 
 ## License
