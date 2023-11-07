@@ -293,7 +293,12 @@ var Search = {
     }
     (async () => {
       Search.pagefind = await import(`${baseURLPrefix}pagefind/pagefind.js`);
-      const options = {}
+      const options = {
+        ranking: {
+          // do not favor short pages
+          termFrequency: 0,
+        }
+      }
       const language = this.getQueryValue('language');
       if (language) options.language = language;
       await Search.pagefind.options(options);
@@ -310,7 +315,11 @@ var Search = {
     new PagefindUI({
       element: "#search-div",
       showSubResults: true,
-      language
+      language,
+      ranking: {
+        // do not favor short pages
+        termFrequency: 0,
+      }
     });
 
     const searchTerm = this.getQueryValue('search');
