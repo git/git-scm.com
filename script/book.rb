@@ -42,6 +42,7 @@ class Book
   end
 
   attr_accessor :chapters
+  attr_accessor :xrefs
   attr_accessor :ebook_pdf
   attr_accessor :ebook_epub
   attr_accessor :ebook_mobi
@@ -51,6 +52,7 @@ class Book
     @edition = edition
     @language_code = language_code
     @chapters = []
+    @xrefs = {}
   end
 
   def front_matter
@@ -137,6 +139,15 @@ class Book
     if @language_code == "en"
       File.open(self.absolute_path("../../_index.html"), 'w') do |file|
         file.write("---\nredirect_to: \"book/#{@language_code}/v#{@edition}\"\n---\n")
+      end
+    end
+
+    FileUtils.mkdir_p(self.absolute_path("ch00"))
+    @xrefs.each do |id_xref, section|
+      path = self.absolute_path("ch00/#{id_xref}.html")
+      relurl = "#{section.relative_url(nil)}##{id_xref}"
+      File.open(path, 'w') do |file|
+        file.write("---\nredirect_to: \"#{relurl}\"\n---\n")
       end
     end
   end
