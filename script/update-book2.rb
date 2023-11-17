@@ -102,7 +102,7 @@ def genbook(language_code, &get_content)
     end
 
     pretext = entry.search("div[@class=sectionbody]/div/p").to_html
-    id_xref = chapter.at("h2").attribute("id").to_s
+    id_xref_chapter = chapter.at("h2").attribute("id").to_s
 
     schapter = book.chapters[number]
     if schapter.nil?
@@ -113,12 +113,6 @@ def genbook(language_code, &get_content)
     schapter.chapter_number = chapter_number
     schapter.sha = book.sha
     schapter.save
-
-    # create xref
-    # csection = schapter.sections[1]
-    # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
-    # xref.section = csection
-    # xref.save
 
     book_prefix = "book/#{language_code}/v#{edition}/"
 
@@ -141,7 +135,7 @@ def genbook(language_code, &get_content)
       xlink&.each do |link|
         xref = link.first
         begin
-          html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"ch00/#{xref}\"")
+          html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"{{< relurl \"#{book_prefix}ch00/#{xref}\" >}}\"")
         rescue StandardError
           nil
         end
@@ -151,7 +145,7 @@ def genbook(language_code, &get_content)
       xlink&.each do |link|
         xref = link.first
         begin
-          html.gsub!(/href="\##{xref}"/, "href=\"ch00/#{xref}\"")
+          html.gsub!(/href="\##{xref}"/, "href=\"{{< relurl \"#{book_prefix}ch00/#{xref}\" >}}\"")
         rescue StandardError
           nil
         end
@@ -178,6 +172,11 @@ def genbook(language_code, &get_content)
       csection.title = section_title.to_s
       csection.html = pretext + html
 
+      # create xref
+      if section == 1
+        book.xrefs[id_xref_chapter] = csection
+      end
+
       images.each do |path|
         content = get_content.call(path)
         csection.saveImage(path, content)
@@ -185,17 +184,13 @@ def genbook(language_code, &get_content)
         puts "::error::referenced image #{path} does not exit!"
       end
 
-      # xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
-      # xref.section = csection
-      # xref.save
+      book.xrefs[id_xref] = csection
 
       # record all the xrefs
-      # sec.search(".//*[@id]").each do |id|
-      #   id_xref = id.attribute("id").to_s
-      #   xref = Xref.where(book_id: book.id, name: id_xref).first_or_create
-      #   xref.section = csection
-      #   xref.save
-      # end
+      sec.search(".//*[@id]").each do |id|
+        id_xref = id.attribute("id").to_s
+	book.xrefs[id_xref] = csection
+      end
 
       section += 1
       pretext = ""
