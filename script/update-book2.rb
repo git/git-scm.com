@@ -182,7 +182,18 @@ def genbook(language_code, &get_content)
         content = get_content.call(path)
         csection.saveImage(path, content)
       rescue Errno::ENOENT
-        puts "::error::referenced image #{path} does not exit!"
+        begin
+          # Try again with a path relative to the chapter's source file. This
+          # used to be common before progit2's d2152ec3 (New architecture of the
+          # repository for manual building of the book., 2017-08-28), and not all
+          # translations (ahem, `progit2-uz`) managed to merge that commit yet.
+          chapter_filename = chapters["ch#{index}"][2]
+          path2 = chapter_filename.sub(/[^\/]*$/, path)
+          content = get_content.call(path2)
+          csection.saveImage(path, content)
+        rescue Errno::ENOENT
+          puts "::error::referenced image #{path} does not exit!"
+        end
       end
 
       book.xrefs[id_xref] = csection
