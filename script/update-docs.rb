@@ -342,8 +342,12 @@ def index_doc(filter_tags, doc_list, get_content)
         html = asciidoc.render
         html.gsub!(/linkgit:+(\S+?)\[(\d+)\]/) do |line|
           x = /^linkgit:+(\S+?)\[(\d+)\]/.match(line)
-          relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}"
-          "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
+          if x[1] == "curl"
+            "<a href='https://curl.se/docs/manpage.html'>curl</a>"
+          else
+            relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}"
+            "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
+          end
         end
         # HTML anchor on hdlist1 (i.e. command options)
         html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
