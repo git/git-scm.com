@@ -134,6 +134,10 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}/#{lang}"
         "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
       end
+      # Handle Chinese "full stop" character
+      html.gsub!(/(<a href="[^"]*)。(")/, "\\1\\2")
+      html.gsub!(/( class="bare">[^<]*)(。)(<\/a>)/, "\\1\\3\\2")
+
       # HTML anchor on hdlist1 (i.e. command options)
       html.gsub!(/<dt class="hdlist1">(.*?)<\/dt>/) do |_m|
         text = $1.tr("^A-Za-z0-9-", "")
