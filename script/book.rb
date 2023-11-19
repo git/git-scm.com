@@ -75,6 +75,16 @@ class Book
     return "book/#{@language_code}/v#{@edition}#{path.nil? || path.empty? || path == "." ? "" : "/#{path}"}"
   end
 
+  def fixImagePath(path)
+    if path == "images/tagapangasiwa.png"
+      # In https://github.com/progit2-tl/progit2/pull/45 the
+      # reference was changed, but the file was not renamed
+      "images/collaborators.png"
+    else
+      path
+    end
+  end
+
   def removeAllFiles
     FileUtils.rm_rf(absolute_path("."))
   end
