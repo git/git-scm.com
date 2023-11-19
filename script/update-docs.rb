@@ -340,8 +340,8 @@ def index_doc(filter_tags, doc_list, get_content)
 
         # Generate HTML
         html = asciidoc.render
-        html.gsub!(/linkgit:(\S+?)\[(\d+)\]/) do |line|
-          x = /^linkgit:(\S+?)\[(\d+)\]/.match(line)
+        html.gsub!(/linkgit:+(\S+?)\[(\d+)\]/) do |line|
+          x = /^linkgit:+(\S+?)\[(\d+)\]/.match(line)
           relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}"
           "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
         end
