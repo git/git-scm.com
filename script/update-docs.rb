@@ -319,6 +319,9 @@ def index_doc(filter_tags, doc_list, get_content)
         page_data = data["pages"][docname]
 
         content = expand_content((get_content.call sha).force_encoding("UTF-8"), path, get_content_f, generated)
+        # Handle `gitlink:` mistakes (the last of which was fixed in
+        # dbf47215e32b (rebase docs: fix "gitlink" typo, 2019-02-27))
+        content.gsub!(/gitlink:/, "linkgit:")
         content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
 
         asciidoc = make_asciidoc(content)
