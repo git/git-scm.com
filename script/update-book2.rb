@@ -156,8 +156,9 @@ def genbook(language_code, &get_content)
       subsec&.each do |sub|
         sub = sub.first
         begin
-          html.gsub!(/<img src="#{sub}"/, "<img src=\"{{< relurl \"#{book_prefix}#{sub}\" >}}\"")
-          images.append(sub)
+          fixed = book.fixImagePath(sub)
+          html.gsub!(/<img src="#{sub}"/, "<img src=\"{{< relurl \"#{book_prefix}#{fixed}\" >}}\"")
+          images.append(fixed)
         rescue StandardError
           nil
         end
