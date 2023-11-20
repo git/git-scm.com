@@ -164,8 +164,12 @@ class Book
     FileUtils.mkdir_p(self.absolute_path("ch00"))
     @xrefs.each do |id_xref, section|
       path = self.absolute_path("ch00/#{id_xref}.html")
-      relurl = "#{section.relative_url(nil)}##{id_xref}"
-      front_matter = { "redirect_to" => relurl }
+      if section == 'redirect-to-en'
+        url = "book/en/v2/ch00/#{id_xref}"
+      else
+        url = "#{section.relative_url(nil)}##{id_xref}"
+      end
+      front_matter = { "redirect_to" => url }
       File.open(path, 'w') do |file|
         file.write(self.wrap_front_matter(front_matter))
       end
