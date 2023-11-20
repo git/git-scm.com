@@ -333,6 +333,12 @@ def index_doc(filter_tags, doc_list, get_content)
         # Handle `gitlink:` mistakes (the last of which was fixed in
         # dbf47215e32b (rebase docs: fix "gitlink" typo, 2019-02-27))
         content.gsub!(/gitlink:/, "linkgit:")
+        # Handle erroneous `link:api-trace2.txt`, see 4945f046c7f5 (api docs:
+        # link to html version of api-trace2, 2022-09-16)
+        content.gsub!(/link:api-trace2.txt/, 'link:api-trace2.html')
+	# Handle `linkgit:git-config.txt` mistake, fixed in ad52148a7d0
+	# (Documentation: fix broken linkgit to git-config, 2016-03-21)
+        content.gsub!(/linkgit:git-config.txt/, 'linkgit:git-config')
         content.gsub!(/link:(?:technical\/)?(\S*?)\.html(\#\S*?)?\[(.*?)\]/m, "link:/docs/\\1\\2[\\3]")
 
         asciidoc = make_asciidoc(content)
