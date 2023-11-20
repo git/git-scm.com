@@ -301,6 +301,8 @@ def index_doc(filter_tags, doc_list, get_content)
         new_content
       end
 
+      check_paths = Set.new([])
+
       doc_files.each do |entry|
         path, sha = entry
         ids = Set.new([])
@@ -346,6 +348,7 @@ def index_doc(filter_tags, doc_list, get_content)
             "<a href='https://curl.se/docs/manpage.html'>curl</a>"
           else
             relurl = "docs/#{x[1].gsub(/&#x2d;/, '-')}"
+            check_paths.add(relurl)
             "<a href='{{< relurl \"#{relurl}\" >}}'>#{x[1]}[#{x[2]}]</a>"
           end
         end
@@ -359,7 +362,14 @@ def index_doc(filter_tags, doc_list, get_content)
           "<dt class=\"hdlist1\" id=\"#{anchor}\"> <a class=\"anchor\" href=\"##{anchor}\"></a>#{$1} </dt>"
         end
         # Make links relative
-        html.gsub!(/(<a href=['"])\/([^'"]*)/, '\1{{< relurl "\2" >}}')
+        html.gsub!(/(<a href=['"])\/([^'"]*)/) do |relurl|
+          before = $1
+          after = $2
+          after.sub!(/^docs\/\.\.\//, 'docs/')
+          after = 'pack-format' if after == 'technical/pack-format'
+          check_paths.add(after.sub(/#.*/, ''))
+          "#{before}{{< relurl \"#{after}\" >}}"
+        end
 
         doc_versions = version_map.keys.sort{|a, b| Version.version_to_num(a) <=> Version.version_to_num(b)}
         doc_version_index = doc_versions.index(version)
@@ -444,6 +454,32 @@ def index_doc(filter_tags, doc_list, get_content)
               "removed" => cached_diff[1]
             })
             i = i + 1
+          end
+        end
+      end
+
+      # In some cases, documents are skipped from git-scm.com, e.g. the
+      # `howto/` files. As a consequence, some links may point to locations
+      # that are not populated. Let's redirect to the source files in the
+      # git/git repository.
+      check_paths.each do |path|
+        doc_path = "#{SITE_ROOT}content/#{path}.html"
+        if !File.exists?(doc_path)
+          type = 'blob'
+          target = path.sub(/^docs\//, '')
+          if target == 'api-index'
+            type = 'tree'
+            target = 'technical'
+          elsif target == 'howto-index'
+            type = 'tree'
+            target = 'howto'
+          else
+            target += '.txt'
+          end
+          front_matter = { "redirect_to" => "https://github.com/git/git/#{type}/HEAD/Documentation/#{target}" } # ltrim `docs/`
+          FileUtils.mkdir_p(File.dirname(doc_path))
+          File.open(doc_path, "w") do |out|
+            out.write("#{front_matter.to_yaml}\n---\n")
           end
         end
       end
