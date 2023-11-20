@@ -134,6 +134,7 @@ def genbook(language_code, &get_content)
       xlink = html.scan(/href="1-.*?\.html\#(.*?)"/)
       xlink&.each do |link|
         xref = link.first
+	book.xrefs[xref] = 'redirect-to-en' if !book.xrefs[xref]
         begin
           html.gsub!(/href="1-.*?\.html\##{xref}"/, "href=\"{{< relurl \"#{book_prefix}ch00/#{xref}\" >}}\"")
         rescue StandardError
@@ -144,6 +145,7 @@ def genbook(language_code, &get_content)
       xlink = html.scan(/href="\#(.*?)"/)
       xlink&.each do |link|
         xref = link.first
+	book.xrefs[xref] = 'redirect-to-en' if !book.xrefs[xref]
         begin
           html.gsub!(/href="\##{xref}"/, "href=\"{{< relurl \"#{book_prefix}ch00/#{xref}\" >}}\"")
         rescue StandardError
