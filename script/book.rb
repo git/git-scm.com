@@ -107,7 +107,7 @@ class Book
         sections.append({
           "cs_number" => section.cs_number,
           "title" => section.title,
-          "url" => section.relative_url(nil)
+          "url" => section.relative_url(nil).gsub(/%3F/, '?')
         })
       end
       chapters.append({
@@ -263,7 +263,13 @@ class Section
       "next" => self.next_section_url
     }
     if @slug =~ /:|[^-A-Za-z0-9_]/
-      front_matter["url"] = self.relative_url(@slug)
+      relative_url = self.relative_url(@slug)
+      front_matter["url"] = "/#{relative_url.gsub(/%3F/, '?')}.html"
+      if relative_url =~ /%3F/
+        front_matter["aliases"] = [
+	  "/#{relative_url.gsub(/%3F.*/, '')}.html"
+	]
+      end
     end
     return front_matter
   end
@@ -294,7 +300,7 @@ class Section
     if path.nil? || path.empty?
       path = self.slug
     end
-    return @chapter.relative_url(path)
+    return @chapter.relative_url(path.gsub(/\?/, '%3F'))
   end
 
   def previous_section_url
