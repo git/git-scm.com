@@ -156,7 +156,26 @@ class Book
     @xrefs.each do |id_xref, section|
       path = self.absolute_path("ch00/#{id_xref}.html")
       if section == 'redirect-to-en'
-        url = "book/en/v2/ch00/#{id_xref}"
+	if id_xref == 'ch01-introduction'
+	  id_xref = 'ch01-getting-started'
+        elsif id_xref == 'ch02-git-basics' || id_xref == '_bab_dasar-dasar_git'
+	  id_xref = 'ch02-git-basics-chapter'
+	elsif id_xref == '_percabangan_git'
+	  id_xref = 'ch03-git-branching'
+	elsif id_xref == 'r_git_on_the_server'
+	  id_xref = 'ch04-git-on-the-server'
+	elsif id_xref == '_getting_notes' || id_xref == '_sharing_notes'
+	  # Was removed in e2af0d7b (Remove dead notes content, 2014-11-09),
+	  # fall back to `git fetch`
+	  id_xref = '_git_fetch'
+	elsif id_xref == 'r_undoing' || id_xref == '_mengembalikan_ke_sebelumnya'
+	  id_xref = '_undoing'
+	end
+	if id_xref == '_git_notes'
+	  url = "docs/git-notes"
+	else
+          url = "book/en/v2/ch00/#{id_xref}"
+	end
       else
         url = "#{section.relative_url(nil)}##{id_xref}"
       end
