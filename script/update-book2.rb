@@ -122,7 +122,7 @@ def genbook(language_code, &get_content)
 
       section_title = sec.at("h3").content
 
-      html = sec.inner_html.to_s + nav
+      html = sec.inner_html.to_s
 
       html.gsub!("<h3", "<h2")
       html.gsub!(/\/h3>/, "/h2>")
@@ -142,15 +142,30 @@ def genbook(language_code, &get_content)
         end
       end
 
+      footnotes = Set.new([])
+
       xlink = html.scan(/href="\#(.*?)"/)
       xlink&.each do |link|
         xref = link.first
+        if xref.start_with?('_footnotedef_') || xref.start_with?('_footnoteref_')
+          footnotes.add(xref)
+          next
+        end
 	book.xrefs[xref] = 'redirect-to-en' if !book.xrefs[xref]
         begin
           html.gsub!(/href="\##{xref}"/, "href=\"{{< relurl \"#{book_prefix}ch00/#{xref}\" >}}\"")
         rescue StandardError
           nil
         end
+      end
+
+      if footnotes.empty?
+        footnotes = ''
+      else
+        @children = alldoc.xpath("//div[@id='footnotes']").children.select do |e|
+          e.name != 'div' || footnotes.include?(e.attributes['id'].to_s)
+        end
+        footnotes = "<div id='footnotes'>#{@children.map{|e| e.to_html}.join('').gsub(/\n\n*/, "\n")}</div>"
       end
 
       images = []
@@ -173,7 +188,7 @@ def genbook(language_code, &get_content)
         schapter.sections[section] = csection = Section.new(schapter, section)
       end
       csection.title = section_title.to_s
-      csection.html = pretext + html
+      csection.html = pretext + html + footnotes + nav
 
       # create xref
       if section == 1
@@ -203,7 +218,7 @@ def genbook(language_code, &get_content)
       # record all the xrefs
       sec.search(".//*[@id]").each do |id|
         id_xref = id.attribute("id").to_s
-	book.xrefs[id_xref] = csection
+	book.xrefs[id_xref] = csection if !id_xref.start_with?('_footnoteref_')
       end
 
       section += 1
