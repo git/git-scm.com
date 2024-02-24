@@ -1,0 +1,406 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: uz
+  chapter:
+    title: Customizing Git
+    number: 8
+  section:
+    title: Git Attributes
+    number: 2
+    cs_number: '8.2'
+    previous: book/uz/v2/Customizing-Git-Git-Configuration
+    next: book/uz/v2/Customizing-Git-Git-Hooks
+title: Git - Git Attributes
+
+---
+<h2 id="_git_attributes">Git Attributes</h2>
+<div class="paragraph">
+<p>
+Some of these settings can also be specified for a path, so that Git applies those settings only for a subdirectory or subset of files.
+These path-specific settings are called Git attributes and are set either in a <code>.gitattributes</code> file in one of your directories (normally the root of your project) or in the <code>.git/info/attributes</code> file if you don’t want the attributes file committed with your project.</p>
+</div>
+<div class="paragraph">
+<p>Using attributes, you can do things like specify separate merge strategies for individual files or directories in your project, tell Git how to diff non-text files, or have Git filter content before you check it into or out of Git.
+In this section, you’ll learn about some of the attributes you can set on your paths in your Git project and see a few examples of using this feature in practice.</p>
+</div>
+<div class="sect3">
+<h3 id="_binary_files">Binary Files</h3>
+<div class="paragraph">
+<p>
+One cool trick for which you can use Git attributes is telling Git which files are binary (in cases it otherwise may not be able to figure out) and giving Git special instructions about how to handle those files.
+For instance, some text files may be machine generated and not diffable, whereas some binary files can be diffed.
+You’ll see how to tell Git which is which.</p>
+</div>
+<div class="sect4">
+<h4 id="_identifying_binary_files">Identifying Binary Files</h4>
+<div class="paragraph">
+<p>Some files look like text files but for all intents and purposes are to be treated as binary data.
+For instance, Xcode projects on the Mac contain a file that ends in <code>.pbxproj</code>, which is basically a JSON (plain-text Javascript data format) dataset written out to disk by the IDE, which records your build settings and so on.
+Although it’s technically a text file (because it’s all UTF-8), you don’t want to treat it as such because it’s really a lightweight database – you can’t merge the contents if two people change it, and diffs generally aren’t helpful.
+The file is meant to be consumed by a machine.
+In essence, you want to treat it like a binary file.</p>
+</div>
+<div class="paragraph">
+<p>To tell Git to treat all <code>pbxproj</code> files as binary data, add the following line to your <code>.gitattributes</code> file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>*.pbxproj binary</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, Git won’t try to convert or fix CRLF issues; nor will it try to compute or print a diff for changes in this file when you run <code>git show</code> or <code>git diff</code> on your project.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_diffing_binary_files">Diffing Binary Files</h4>
+<div class="paragraph">
+<p>You can also use the Git attributes functionality to effectively diff binary files.
+You do this by telling Git how to convert your binary data to a text format that can be compared via the normal diff.</p>
+</div>
+<div class="paragraph">
+<p>First, you’ll use this technique to solve one of the most annoying problems known to humanity: version-controlling Microsoft Word documents.
+Everyone knows that Word is the most horrific editor around, but oddly, everyone still uses it.
+If you want to version-control Word documents, you can stick them in a Git repository and commit every once in a while; but what good does that do?
+If you run <code>git diff</code> normally, you only see something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --git a/chapter1.docx b/chapter1.docx
+index 88839c4..4afcb7c 100644
+Binary files a/chapter1.docx and b/chapter1.docx differ</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can’t directly compare two versions unless you check them out and scan them manually, right?
+It turns out you can do this fairly well using Git attributes.
+Put the following line in your <code>.gitattributes</code> file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>*.docx diff=word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This tells Git that any file that matches this pattern (<code>.docx</code>) should use the “word” filter when you try to view a diff that contains changes.
+What is the “word” filter?
+You have to set it up.
+Here you’ll configure Git to use the <code>docx2txt</code> program to convert Word documents into readable text files, which it will then diff properly.</p>
+</div>
+<div class="paragraph">
+<p>First, you’ll need to install <code>docx2txt</code>; you can download it from <a href="http://docx2txt.sourceforge.net" class="bare">http://docx2txt.sourceforge.net</a>. Follow the instructions in the <code>INSTALL</code> file to put it somewhere your shell can find it.
+Next, you’ll write a wrapper script to convert output to the format Git expects.
+Create a file that’s somewhere in your path called <code>docx2txt</code>, and add these contents:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">#!/bin/bash
+docx2txt.pl $1 -</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Don’t forget to <code>chmod a+x</code> that file.
+Finally, you can configure Git to use this script:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config diff.word.textconv docx2txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now Git knows that if it tries to do a diff between two snapshots, and any of the files end in <code>.docx</code>, it should run those files through the “word” filter, which is defined as the <code>docx2txt</code> program.
+This effectively makes nice text-based versions of your Word files before attempting to diff them.</p>
+</div>
+<div class="paragraph">
+<p>Here’s an example: Chapter 1 of this book was converted to Word format and committed in a Git repository.
+Then a new paragraph was added.
+Here’s what <code>git diff</code> shows:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --git a/chapter1.docx b/chapter1.docx
+index 0b013ca..ba25db5 100644
+--- a/chapter1.docx
++++ b/chapter1.docx
+@@ -2,6 +2,7 @@
+ This chapter will be about getting started with Git. We will begin at the beginning by explaining some background on version control tools, then move on to how to get Git running on your system and finally how to get it setup to start working with. At the end of this chapter you should understand why Git is around, why you should use it and you should be all setup to do so.
+ 1.1. About Version Control
+ What is "version control", and why should you care? Version control is a system that records changes to a file or set of files over time so that you can recall specific versions later. For the examples in this book you will use software source code as the files being version controlled, though in reality you can do this with nearly any type of file on a computer.
++Testing: 1, 2, 3.
+ If you are a graphic or web designer and want to keep every version of an image or layout (which you would most certainly want to), a Version Control System (VCS) is a very wise thing to use. It allows you to revert files back to a previous state, revert the entire project back to a previous state, compare changes over time, see who last modified something that might be causing a problem, who introduced an issue and when, and more. Using a VCS also generally means that if you screw things up or lose files, you can easily recover. In addition, you get all this for very little overhead.
+ 1.1.1. Local Version Control Systems
+ Many people's version-control method of choice is to copy files into another directory (perhaps a time-stamped directory, if they're clever). This approach is very common because it is so simple, but it is also incredibly error prone. It is easy to forget which directory you're in and accidentally write to the wrong file or copy over files you don't mean to.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git successfully and succinctly tells us that we added the string “Testing: 1, 2, 3.”, which is correct.
+It’s not perfect – formatting changes wouldn’t show up here – but it certainly works.</p>
+</div>
+<div class="paragraph">
+<p>Another interesting problem you can solve this way involves diffing image files.
+One way to do this is to run image files through a filter that extracts their EXIF information – metadata that is recorded with most image formats.
+If you download and install the <code>exiftool</code> program, you can use it to convert your images into text about the metadata, so at least the diff will show you a textual representation of any changes that happened:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '*.png diff=exif' &gt;&gt; .gitattributes
+$ git config diff.exif.textconv exiftool</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you replace an image in your project and run <code>git diff</code>, you see something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>diff --git a/image.png b/image.png
+index 88839c4..4afcb7c 100644
+--- a/image.png
++++ b/image.png
+@@ -1,12 +1,12 @@
+ ExifTool Version Number         : 7.74
+-File Size                       : 70 kB
+-File Modification Date/Time     : 2009:04:21 07:02:45-07:00
++File Size                       : 94 kB
++File Modification Date/Time     : 2009:04:21 07:02:43-07:00
+ File Type                       : PNG
+ MIME Type                       : image/png
+-Image Width                     : 1058
+-Image Height                    : 889
++Image Width                     : 1056
++Image Height                    : 827
+ Bit Depth                       : 8
+ Color Type                      : RGB with Alpha</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can easily see that the file size and image dimensions have both changed.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_keyword_expansion">Keyword Expansion</h3>
+<div class="paragraph">
+<p>
+SVN- or CVS-style keyword expansion is often requested by developers used to those systems.
+The main problem with this in Git is that you can’t modify a file with information about the commit after you’ve committed, because Git checksums the file first.
+However, you can inject text into a file when it’s checked out and remove it again before it’s added to a commit.
+Git attributes offers you two ways to do this.</p>
+</div>
+<div class="paragraph">
+<p>First, you can inject the SHA-1 checksum of a blob into an <code>$Id$</code> field in the file automatically.
+If you set this attribute on a file or set of files, then the next time you check out that branch, Git will replace that field with the SHA-1 of the blob.
+It’s important to notice that it isn’t the SHA-1 of the commit, but of the blob itself:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '*.txt ident' &gt;&gt; .gitattributes
+$ echo '$Id$' &gt; test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The next time you check out this file, Git injects the SHA-1 of the blob:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ rm test.txt
+$ git checkout -- test.txt
+$ cat test.txt
+$Id: 42812b7653c7b88933f8a9d6cad0ca16714b9bb3 $</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>However, that result is of limited use.
+If you’ve used keyword substitution in CVS or Subversion, you can include a datestamp – the SHA-1 isn’t all that helpful, because it’s fairly random and you can’t tell if one SHA-1 is older or newer than another just by looking at them.</p>
+</div>
+<div class="paragraph">
+<p>It turns out that you can write your own filters for doing substitutions in files on commit/checkout.
+These are called “clean” and “smudge” filters.
+In the <code>.gitattributes</code> file, you can set a filter for particular paths and then set up scripts that will process files just before they’re checked out (“smudge”, see <a href="{{< relurl "book/uz/v2/ch00/filters_a" >}}">The “smudge” filter is run on checkout.</a>) and just before they’re staged (“clean”, see <a href="{{< relurl "book/uz/v2/ch00/filters_b" >}}">The “clean” filter is run when files are staged.</a>).
+These filters can be set to do all sorts of fun things.</p>
+</div>
+<div id="filters_a" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/uz/v2/images/smudge.png" >}}" alt="The ``smudge'' filter is run on checkout.">
+</div>
+<div class="title">Figure 144. The “smudge” filter is run on checkout.</div>
+</div>
+<div id="filters_b" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/uz/v2/images/clean.png" >}}" alt="The ``clean'' filter is run when files are staged.">
+</div>
+<div class="title">Figure 145. The “clean” filter is run when files are staged.</div>
+</div>
+<div class="paragraph">
+<p>The original commit message for this feature gives a simple example of running all your C source code through the <code>indent</code> program before committing.
+You can set it up by setting the filter attribute in your <code>.gitattributes</code> file to filter <code>*.c</code> files with the “indent” filter:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>*.c filter=indent</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then, tell Git what the “indent” filter does on smudge and clean:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global filter.indent.clean indent
+$ git config --global filter.indent.smudge cat</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this case, when you commit files that match <code>*.c</code>, Git will run them through the indent program before it stages them and then run them through the <code>cat</code> program before it checks them back out onto disk.
+The <code>cat</code> program does essentially nothing: it spits out the same data that it comes in.
+This combination effectively filters all C source code files through <code>indent</code> before committing.</p>
+</div>
+<div class="paragraph">
+<p>Another interesting example gets <code>$Date$</code> keyword expansion, RCS style.
+To do this properly, you need a small script that takes a filename, figures out the last commit date for this project, and inserts the date into the file.
+Here is a small Ruby script that does that:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+data = STDIN.read
+last_date = `git log --pretty=format:"%ad" -1`
+puts data.gsub('$Date$', '$Date: ' + last_date.to_s + '$')</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>All the script does is get the latest commit date from the <code>git log</code> command, stick that into any <code>$Date$</code> strings it sees in stdin, and print the results – it should be simple to do in whatever language you’re most comfortable in.
+You can name this file <code>expand_date</code> and put it in your path.
+Now, you need to set up a filter in Git (call it <code>dater</code>) and tell it to use your <code>expand_date</code> filter to smudge the files on checkout.
+You’ll use a Perl expression to clean that up on commit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config filter.dater.smudge expand_date
+$ git config filter.dater.clean 'perl -pe "s/\\\$Date[^\\\$]*\\\$/\\\$Date\\\$/"'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This Perl snippet strips out anything it sees in a <code>$Date$</code> string, to get back to where you started.
+Now that your filter is ready, you can test it by setting up a file with your <code>$Date$</code> keyword and then setting up a Git attribute for that file that engages the new filter:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '# $Date$' &gt; date_test.txt
+$ echo 'date*.txt filter=dater' &gt;&gt; .gitattributes</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you commit those changes and check out the file again, you see the keyword properly substituted:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add date_test.txt .gitattributes
+$ git commit -m "Testing date expansion in Git"
+$ rm date_test.txt
+$ git checkout date_test.txt
+$ cat date_test.txt
+# $Date: Tue Apr 21 07:26:52 2009 -0700$</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can see how powerful this technique can be for customized applications.
+You have to be careful, though, because the <code>.gitattributes</code> file is committed and passed around with the project, but the driver (in this case, <code>dater</code>) isn’t, so it won’t work everywhere.
+When you design these filters, they should be able to fail gracefully and have the project still work properly.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_exporting_your_repository">Exporting Your Repository</h3>
+<div class="paragraph">
+<p>
+Git attribute data also allows you to do some interesting things when exporting an archive of your project.</p>
+</div>
+<div class="sect4">
+<h4 id="_export_ignore"><code>export-ignore</code></h4>
+<div class="paragraph">
+<p>You can tell Git not to export certain files or directories when generating an archive.
+If there is a subdirectory or file that you don’t want to include in your archive file but that you do want checked into your project, you can determine those files via the <code>export-ignore</code> attribute.</p>
+</div>
+<div class="paragraph">
+<p>For example, say you have some test files in a <code>test/</code> subdirectory, and it doesn’t make sense to include them in the tarball export of your project.
+You can add the following line to your Git attributes file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>test/ export-ignore</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, when you run git archive to create a tarball of your project, that directory won’t be included in the archive.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_export_subst"><code>export-subst</code></h4>
+<div class="paragraph">
+<p>Another thing you can do for your archives is some simple keyword substitution.
+Git lets you put the string <code>$Format:$</code> in any file with any of the <code>--pretty=format</code> formatting shortcodes, many of which you saw in Chapter 2.
+For instance, if you want to include a file named <code>LAST_COMMIT</code> in your project, and the last commit date was automatically injected into it when <code>git archive</code> ran, you can set up the file like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'Last commit date: $Format:%cd$' &gt; LAST_COMMIT
+$ echo "LAST_COMMIT export-subst" &gt;&gt; .gitattributes
+$ git add LAST_COMMIT .gitattributes
+$ git commit -am 'adding LAST_COMMIT file for archives'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When you run <code>git archive</code>, the contents of that file when people open the archive file will look like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat LAST_COMMIT
+Last commit date: $Format:Tue Apr 21 08:38:48 2009 -0700$</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_merge_strategies">Merge Strategies</h3>
+<div class="paragraph">
+<p>
+You can also use Git attributes to tell Git to use different merge strategies for specific files in your project.
+One very useful option is to tell Git to not try to merge specific files when they have conflicts, but rather to use your side of the merge over someone else’s.</p>
+</div>
+<div class="paragraph">
+<p>This is helpful if a branch in your project has diverged or is specialized, but you want to be able to merge changes back in from it, and you want to ignore certain files.
+Say you have a database settings file called <code>database.xml</code> that is different in two branches, and you want to merge in your other branch without messing up the database file.
+You can set up an attribute like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>database.xml merge=ours</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>And then define a dummy <code>ours</code> merge strategy with:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global merge.ours.driver true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you merge in the other branch, instead of having merge conflicts with the <code>database.xml</code> file, you see something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge topic
+Auto-merging database.xml
+Merge made by recursive.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this case, <code>database.xml</code> stays at whatever version you originally had.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
