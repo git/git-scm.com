@@ -1,0 +1,312 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - sparse-index Documentation
+docname: sparse-index
+version: 2.32.0
+latest-changes: 2.32.0
+aliases:
+- "/docs/sparse-index/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>The sparse-checkout feature allows users to focus a working directory on
+a subset of the files at HEAD. The cone mode patterns, enabled by
+<code>core.sparseCheckoutCone</code>, allow for very fast pattern matching to
+discover which files at HEAD belong in the sparse-checkout cone.</p>
+</div>
+<div class="paragraph">
+<p>Three important scale dimensions for a Git working directory are:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>HEAD</code>: How many files are present at <code>HEAD</code>?</p>
+</li>
+<li>
+<p>Populated: How many files are within the sparse-checkout cone.</p>
+</li>
+<li>
+<p>Modified: How many files has the user modified in the working directory?</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>We will use big-O notation&#8201;&#8212;&#8201;O(X)&#8201;&#8212;&#8201;to denote how expensive certain
+operations are in terms of these dimensions.</p>
+</div>
+<div class="paragraph">
+<p>These dimensions are ordered by their magnitude: users (typically) modify
+fewer files than are populated, and we can only populate files at <code>HEAD</code>.</p>
+</div>
+<div class="paragraph">
+<p>Problems occur if there is an extreme imbalance in these dimensions. For
+example, if <code>HEAD</code> contains millions of paths but the populated set has
+only tens of thousands, then commands like <code>git status</code> and <code>git add</code> can
+be dominated by operations that require O(<code>HEAD</code>) operations instead of
+O(Populated). Primarily, the cost is in parsing and rewriting the index,
+which is filled primarily with files at <code>HEAD</code> that are marked with the
+<code>SKIP_WORKTREE</code> bit.</p>
+</div>
+<div class="paragraph">
+<p>The sparse-index intends to take these commands that read and modify the
+index from O(<code>HEAD</code>) to O(Populated). To do this, we need to modify the
+index format in a significant way: add "sparse directory" entries.</p>
+</div>
+<div class="paragraph">
+<p>With cone mode patterns, it is possible to detect when an entire
+directory will have its contents outside of the sparse-checkout definition.
+Instead of listing all of the files it contains as individual entries, a
+sparse-index contains an entry with the directory name, referencing the
+object ID of the tree at <code>HEAD</code> and marked with the <code>SKIP_WORKTREE</code> bit.
+If we need to discover the details for paths within that directory, we
+can parse trees to find that list.</p>
+</div>
+<div class="paragraph">
+<p>At time of writing, sparse-directory entries violate expectations about the
+index format and its in-memory data structure. There are many consumers in
+the codebase that expect to iterate through all of the index entries and
+see only files. In fact, these loops expect to see a reference to every
+staged file. One way to handle this is to parse trees to replace a
+sparse-directory entry with all of the files within that tree as the index
+is loaded. However, parsing trees is slower than parsing the index format,
+so that is a slower operation than if we left the index alone. The plan is
+to make all of these integrations "sparse aware" so this expansion through
+tree parsing is unnecessary and they use fewer resources than when using a
+full index.</p>
+</div>
+<div class="paragraph">
+<p>The implementation plan below follows four phases to slowly integrate with
+the sparse-index. The intention is to incrementally update Git commands to
+interact safely with the sparse-index without significant slowdowns. This
+may not always be possible, but the hope is that the primary commands that
+users need in their daily work are dramatically improved.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_phase_i_format_and_initial_speedups"><a class="anchor" href="#_phase_i_format_and_initial_speedups"></a>Phase I: Format and initial speedups</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>During this phase, Git learns to enable the sparse-index and safely parse
+one. Protections are put in place so that every consumer of the in-memory
+data structure can operate with its current assumption of every file at
+<code>HEAD</code>.</p>
+</div>
+<div class="paragraph">
+<p>At first, every index parse will call a helper method,
+<code>ensure_full_index()</code>, which scans the index for sparse-directory entries
+(pointing to trees) and replaces them with the full list of paths (with
+blob contents) by parsing tree objects. This will be slower in all cases.
+The only noticeable change in behavior will be that the serialized index
+file contains sparse-directory entries.</p>
+</div>
+<div class="paragraph">
+<p>To start, we use a new required index extension, <code>sdir</code>, to allow
+inserting sparse-directory entries into indexes with file format
+versions 2, 3, and 4. This prevents Git versions that do not understand
+the sparse-index from operating on one, while allowing tools that do not
+understand the sparse-index to operate on repositories as long as they do
+not interact with the index. A new format, index v5, will be introduced
+that includes sparse-directory entries by default. It might also
+introduce other features that have been considered for improving the
+index, as well.</p>
+</div>
+<div class="paragraph">
+<p>Next, consumers of the index will be guarded against operating on a
+sparse-index by inserting calls to <code>ensure_full_index()</code> or
+<code>expand_index_to_path()</code>. If a specific path is requested, then those will
+be protected from within the <code>index_file_exists()</code> and <code>index_name_pos()</code>
+API calls: they will call <code>ensure_full_index()</code> if necessary. The
+intention here is to preserve existing behavior when interacting with a
+sparse-checkout. We don&#8217;t want a change to happen by accident, without
+tests. Many of these locations may not need any change before removing the
+guards, but we should not do so without tests to ensure the expected
+behavior happens.</p>
+</div>
+<div class="paragraph">
+<p>It may be desirable to <em>change</em> the behavior of some commands in the
+presence of a sparse index or more generally in any sparse-checkout
+scenario. In such cases, these should be carefully communicated and
+tested. No such behavior changes are intended during this phase.</p>
+</div>
+<div class="paragraph">
+<p>During a scan of the codebase, not every iteration of the cache entries
+needs an <code>ensure_full_index()</code> check. The basic reasons include:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>The loop is scanning for entries with non-zero stage. These entries
+are not collapsed into a sparse-directory entry.</p>
+</li>
+<li>
+<p>The loop is scanning for submodules. These entries are not collapsed
+into a sparse-directory entry.</p>
+</li>
+<li>
+<p>The loop is part of the index API, especially around reading or
+writing the format.</p>
+</li>
+<li>
+<p>The loop is checking for correct order of cache entries and that is
+correct if and only if the sparse-directory entries are in the correct
+location.</p>
+</li>
+<li>
+<p>The loop ignores entries with the <code>SKIP_WORKTREE</code> bit set, or is
+otherwise already aware of sparse directory entries.</p>
+</li>
+<li>
+<p>The sparse-index is disabled at this point when using the split-index
+feature, so no effort is made to protect the split-index API.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Even after inserting these guards, we will keep expanding sparse-indexes
+for most Git commands using the <code>command_requires_full_index</code> repository
+setting. This setting will be on by default and disabled one builtin at a
+time until we have sufficient confidence that all of the index operations
+are properly guarded.</p>
+</div>
+<div class="paragraph">
+<p>To complete this phase, the commands <code>git status</code> and <code>git add</code> will be
+integrated with the sparse-index so that they operate with O(Populated)
+performance. They will be carefully tested for operations within and
+outside the sparse-checkout definition.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_phase_ii_careful_integrations"><a class="anchor" href="#_phase_ii_careful_integrations"></a>Phase II: Careful integrations</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This phase focuses on ensuring that all index extensions and APIs work
+well with a sparse-index. This requires significant increases to our test
+coverage, especially for operations that interact with the working
+directory outside of the sparse-checkout definition. Some of these
+behaviors may not be the desirable ones, such as some tests already
+marked for failure in <code>t1092-sparse-checkout-compatibility.sh</code>.</p>
+</div>
+<div class="paragraph">
+<p>The index extensions that may require special integrations are:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>FS Monitor</p>
+</li>
+<li>
+<p>Untracked cache</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>While integrating with these features, we should look for patterns that
+might lead to better APIs for interacting with the index. Coalescing
+common usage patterns into an API call can reduce the number of places
+where sparse-directories need to be handled carefully.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_phase_iii_important_command_speedups"><a class="anchor" href="#_phase_iii_important_command_speedups"></a>Phase III: Important command speedups</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>At this point, the patterns for testing and implementing sparse-directory
+logic should be relatively stable. This phase focuses on updating some of
+the most common builtins that use the index to operate as O(Populated).
+Here is a potential list of commands that could be valuable to integrate
+at this point:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>git commit</code></p>
+</li>
+<li>
+<p><code>git checkout</code></p>
+</li>
+<li>
+<p><code>git merge</code></p>
+</li>
+<li>
+<p><code>git rebase</code></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Hopefully, commands such as <code>git merge</code> and <code>git rebase</code> can benefit
+instead from merge algorithms that do not use the index as a data
+structure, such as the merge-ORT strategy. As these topics mature, we
+may enable the ORT strategy by default for repositories using the
+sparse-index feature.</p>
+</div>
+<div class="paragraph">
+<p>Along with <code>git status</code> and <code>git add</code>, these commands cover the majority
+of users' interactions with the working directory. In addition, we can
+integrate with these commands:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>git grep</code></p>
+</li>
+<li>
+<p><code>git rm</code></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>These have been proposed as some whose behavior could change when in a
+repo with a sparse-checkout definition. It would be good to include this
+behavior automatically when using a sparse-index. Some clarity is needed
+to make the behavior switch clear to the user.</p>
+</div>
+<div class="paragraph">
+<p>This phase is the first where parallel work might be possible without too
+much conflicts between topics.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_phase_iv_the_long_tail"><a class="anchor" href="#_phase_iv_the_long_tail"></a>Phase IV: The long tail</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This last phase is less a "phase" and more "the new normal" after all of
+the previous work.</p>
+</div>
+<div class="paragraph">
+<p>To start, the <code>command_requires_full_index</code> option could be removed in
+favor of expanding only when hitting an API guard.</p>
+</div>
+<div class="paragraph">
+<p>There are many Git commands that could use special attention to operate as
+O(Populated), while some might be so rare that it is acceptable to leave
+them with additional overhead when a sparse-index is present.</p>
+</div>
+<div class="paragraph">
+<p>Here are some commands that might be useful to update:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>git sparse-checkout set</code></p>
+</li>
+<li>
+<p><code>git am</code></p>
+</li>
+<li>
+<p><code>git clean</code></p>
+</li>
+<li>
+<p><code>git stash</code></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
