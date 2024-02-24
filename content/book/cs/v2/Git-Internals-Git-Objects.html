@@ -1,0 +1,465 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: cs
+  chapter:
+    title: Git Internals
+    number: 10
+  section:
+    title: Git Objects
+    number: 2
+    cs_number: '10.2'
+    previous: book/cs/v2/Git-Internals-Plumbing-and-Porcelain
+    next: book/cs/v2/Git-Internals-Git-References
+title: Git - Git Objects
+
+---
+<h2 id="_objects">Git Objects</h2>
+<div class="paragraph">
+<p>Git je obsahově adresovatelný systém souborů.
+Výborně.
+A co to znamená?
+Znamená to, že v jádru systému Git se nachází jednoduché úložiště dat, ke kterému lze přistupovat pomocí klíčů.
+Můžete do něj vložit jakýkoli obsah a na oplátku dostanete klíč, který můžete kdykoli v budoucnu použít k vyzvednutí obsahu.
+Abychom to předvedli, můžete použít nízkoúrovňový příkaz <code>hash-object</code>, který vezme určitá data, uloží je v adresáři <code>.git</code> a vrátí vám klíč, pod nímž jsou tato data uložena.
+Vytvořme nejprve nový repozitář Git. Můžeme se přesvědčit, že je adresář <code>objects</code> prázdný:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init test
+Initialized empty Git repository in /tmp/test/.git/
+$ cd test
+$ find .git/objects
+.git/objects
+.git/objects/info
+.git/objects/pack
+$ find .git/objects -type f</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git inicializoval adresář <code>objects</code> a vytvořil v něm podadresáře <code>pack</code> a <code>info</code>, nenajdeme tu však žádné skutečné soubory.
+Nyní můžete uložit kousek textu do databáze Git:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'test content' | git hash-object -w --stdin
+d670460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Parametr <code>-w</code> sděluje příkazu <code>hash-object</code>, aby objekt uložil. Bez parametru by vám příkaz jen sdělil, jaký klíč by byl přidělen.
+<code>--stdin</code> tells the command to read the content from stdin; if you don’t specify this, <code>hash-object</code> expects a file path at the end.
+Výstupem příkazu je 40znakový otisk kontrolního součtu (checksum hash).
+This is the SHA-1 hash – a checksum of the content you’re storing plus a header, which you’ll learn about in a bit.
+Nyní se můžete podívat, jak Git vaše data uložil:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vidíte, že v adresáři <code>objects</code> přibyl nový soubor.
+This is how Git stores the content initially – as a single file per piece of content, named with the SHA-1 checksum of the content and its header.
+The subdirectory is named with the first 2 characters of the SHA-1, and the filename is the remaining 38 characters.</p>
+</div>
+<div class="paragraph">
+<p>Obsah můžete ze systému Git zase vytáhnout, k tomu slouží příkaz <code>cat-file</code>.
+Tento příkaz je něco jako švýcarský nůž k prohlížení objektů Git.
+Přidáte-li k příkazu <code>cat-file</code> parametr <code>-p</code>, říkáte mu, aby zjistil typ obsahu a přehledně vám ho zobrazil:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p d670460b4b4aece5915caf5c68d12f560a9fe3e4
+test content</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nyní tedy umíte vložit do systému Git určitý obsah a ten poté zase vytáhnout.
+Totéž můžete udělat také s obsahem v souborech.
+Na souboru můžete například provádět jednoduché verzování.
+Vytvořte nový soubor a uložte jeho obsah do své databáze:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'version 1' &gt; test.txt
+$ git hash-object -w test.txt
+83baae61804e65cc73a7201a7252750c76066a30</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Poté do souboru zapište nový obsah a znovu ho uložte:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'version 2' &gt; test.txt
+$ git hash-object -w test.txt
+1f7a7a472abf3dd9643fd615f6da379c4acb3e3a</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vaše databáze obsahuje dvě nové verze souboru a počáteční obsah, který jste do ní vložili:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Soubor nyní můžete vrátit do první verze:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 83baae61804e65cc73a7201a7252750c76066a30 &gt; test.txt
+$ cat test.txt
+version 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nebo do druhé verze:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a &gt; test.txt
+$ cat test.txt
+version 2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>But remembering the SHA-1 key for each version of your file isn’t practical; plus, you aren’t storing the filename in your system – just the content.
+Tento typ objektu se nazývá blob.
+Zadáte-li příkaz <code>cat-file -t</code> v kombinaci s klíčem SHA-1 objektu, Git vám sdělí jeho typ, ať se jedná o jakýkoli objekt Git.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -t 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+blob</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_tree_objects">Tree Objects</h3>
+<div class="paragraph">
+<p>The next type we’ll look at is the tree, which solves the problem of storing the filename and also allows you to store a group of files together.
+Git ukládá obsah podobným způsobem jako systém souborů UNIX, jen trochu jednodušeji.
+Veškerý obsah se ukládá v podobě objektů typu strom a blob. Stromy odpovídají položkám v adresáři UNIX a bloby víceméně odpovídají i-uzlům nebo obsahům souborů.
+Jeden objekt stromu obsahuje jednu nebo více položek stromu, z nichž každá obsahuje ukazatel SHA-1 na blob nebo podstrom s asociovaným režimem, typem a názvem souboru.
+For example, the most recent tree in a project may look something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob a906cb2a4a904a152e80877d4088654daad0c859      README
+100644 blob 8f94139338f9404f26296befa88755fc2598c289      Rakefile
+040000 tree 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0      lib</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Syntaxe <code>master^{tree}</code> určuje objekt stromu, na nějž ukazuje poslední revize větve <code>master</code>.
+Notice that the <code>lib</code> subdirectory isn’t a blob but a pointer to another tree:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0
+100644 blob 47c6340d6459e05787f644c2447d2595f5d3a54b      simplegit.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Conceptually, the data that Git is storing is something like this:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/cs/v2/images/data-model-1.png" >}}" alt="Simple version of the Git data model.">
+</div>
+<div class="title">Figure 149. Simple version of the Git data model.</div>
+</div>
+<div class="paragraph">
+<p>You can fairly easily create your own tree.
+Git normally creates a tree by taking the state of your staging area or index and writing a series of tree objects from it.
+Proto chcete-li vytvořit objekt stromu, musíte ze všeho nejdříve připravit soubory k zapsání, a vytvořit tak index.
+To create an index with a single entry – the first version of your <code>test.txt</code> file – you can use the plumbing command <code>update-index</code>.
+You use this command to artificially add the earlier version of the <code>test.txt</code> file to a new staging area.
+You must pass it the <code>--add</code> option because the file doesn’t yet exist in your staging area (you don’t even have a staging area set up yet) and <code>--cacheinfo</code> because the file you’re adding isn’t in your directory but is in your database.
+K tomu všemu přidáte režim, SHA-1 a název souboru:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git update-index --add --cacheinfo 100644 \
+  83baae61804e65cc73a7201a7252750c76066a30 test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this case, you’re specifying a mode of <code>100644</code>, which means it’s a normal file.
+Other options are <code>100755</code>, which means it’s an executable file; and <code>120000</code>, which specifies a symbolic link.
+The mode is taken from normal UNIX modes but is much less flexible – these three modes are the only ones that are valid for files (blobs) in Git (although other modes are used for directories and submodules).</p>
+</div>
+<div class="paragraph">
+<p>Nyní můžete použít příkaz <code>write-tree</code>, jímž zapíšete stav oblasti připravovaných změn neboli indexu do objektu stromu.
+No <code>-w</code> option is needed – calling <code>write-tree</code> automatically creates a tree object from the state of the index if that tree doesn’t yet exist:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git write-tree
+d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+$ git cat-file -p d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+100644 blob 83baae61804e65cc73a7201a7252750c76066a30      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Můžete si také ověřit, že jde skutečně o objekt stromu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -t d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+tree</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You’ll now create a new tree with the second version of <code>test.txt</code> and a new file as well:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'new file' &gt; new.txt
+$ git update-index test.txt
+$ git update-index --add new.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Your staging area now has the new version of <code>test.txt</code> as well as the new file <code>new.txt</code>.
+Uložte tento strom (zaznamenáním stavu oblasti připravených změn neboli indexu do objektu stromu) a prohlédněte si výsledek:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git write-tree
+0155eb4229851634a0f03eb265b69f5a2d56f341
+$ git cat-file -p 0155eb4229851634a0f03eb265b69f5a2d56f341
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Notice that this tree has both file entries and also that the <code>test.txt</code> SHA-1 is the “version 2” SHA-1 from earlier (<code>1f7a7a</code>).
+Just for fun, you’ll add the first tree as a subdirectory into this one.
+Stromy můžete do oblasti připravených změn načíst příkazem <code>read-tree</code>.
+V tomto případě můžete načíst existující strom jako podstrom do oblasti připravených změn pomocí parametru <code>--prefix</code>, který zadáte k příkazu <code>read-tree</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git read-tree --prefix=bak d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+$ git write-tree
+3c4e9cd789d88d8d89c1073707c3585e41b0e614
+$ git cat-file -p 3c4e9cd789d88d8d89c1073707c3585e41b0e614
+040000 tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579      bak
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you created a working directory from the new tree you just wrote, you would get the two files in the top level of the working directory and a subdirectory named <code>bak</code> that contained the first version of the <code>test.txt</code> file.
+You can think of the data that Git contains for these structures as being like this:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/cs/v2/images/data-model-2.png" >}}" alt="The content structure of your current Git data.">
+</div>
+<div class="title">Figure 150. The content structure of your current Git data.</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_commit_objects">Commit Objects</h3>
+<div class="paragraph">
+<p>Máte vytvořeny tři stromy označující různé snímky vašeho projektu, jež chcete sledovat. Původního problému jsme se však stále nezbavili: musíte si pamatovat všechny tři hodnoty SHA-1, abyste mohli snímky znovu vyvolat.
+You also don’t have any information about who saved the snapshots, when they were saved, or why they were saved.
+Toto jsou základní informace, které obsahuje objekt revize.</p>
+</div>
+<div class="paragraph">
+<p>Pro vytvoření objektu revize zavolejte příkaz <code>commit-tree</code> a zadejte jeden SHA-1 stromu a eventuální objekty revize, které mu bezprostředně předcházely.
+Začněte prvním stromem, který jste zapsali:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'first commit' | git commit-tree d8329f
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You will get a different hash value because of different creation time and author data.
+Replace commit and tag hashes with your own checksums further in this chapter.
+Nyní se můžete podívat na nově vytvořený objekt revize. Použijte příkaz <code>cat-file</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p fdf4fc3
+tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+author Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+
+first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The format for a commit object is simple: it specifies the top-level tree for the snapshot of the project at that point; the author/committer information (which uses your <code>user.name</code> and <code>user.email</code> configuration settings and a timestamp); a blank line, and then the commit message.</p>
+</div>
+<div class="paragraph">
+<p>Next, you’ll write the other two commit objects, each referencing the commit that came directly before it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'second commit' | git commit-tree 0155eb -p fdf4fc3
+cac0cab538b970a37ea1e769cbbde608743bc96d
+$ echo 'third commit'  | git commit-tree 3c4e9c -p cac0cab
+1a410efbd13591db07496601ebc7a059dd55cfe9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Všechny tři tyto objekty revizí ukazují na jeden ze tří stromů snímku, který jste vytvořili.
+Může se to zdát zvláštní, ale nyní máte vytvořenu skutečnou historii revizí Git, kterou lze zobrazit příkazem <code>git log</code> spuštěným pro hodnotu SHA-1 poslední revize:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --stat 1a410e
+commit 1a410efbd13591db07496601ebc7a059dd55cfe9
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:15:24 2009 -0700
+
+	third commit
+
+ bak/test.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit cac0cab538b970a37ea1e769cbbde608743bc96d
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:14:29 2009 -0700
+
+	second commit
+
+ new.txt  | 1 +
+ test.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+commit fdf4fc3344e67ab068f836878b6c4951e3b15f3d
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:09:34 2009 -0700
+
+    first commit
+
+ test.txt | 1 +
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Úžasné!
+You’ve just done the low-level operations to build up a Git history without using any of the front end commands.
+This is essentially what Git does when you run the <code>git add</code> and <code>git commit</code> commands – it stores blobs for the files that have changed, updates the index, writes out trees, and writes commit objects that reference the top-level trees and the commits that came immediately before them.
+These three main Git objects – the blob, the tree, and the commit – are initially stored as separate files in your <code>.git/objects</code> directory.
+Toto jsou všechny objekty v ukázkovém adresáři spolu s komentářem k tomu co obsahují:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/01/55eb4229851634a0f03eb265b69f5a2d56f341 # tree 2
+.git/objects/1a/410efbd13591db07496601ebc7a059dd55cfe9 # commit 3
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a # test.txt v2
+.git/objects/3c/4e9cd789d88d8d89c1073707c3585e41b0e614 # tree 3
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30 # test.txt v1
+.git/objects/ca/c0cab538b970a37ea1e769cbbde608743bc96d # commit 2
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4 # 'test content'
+.git/objects/d8/329fc1cc938780ffdd9f94e0d364e0ea74f579 # tree 1
+.git/objects/fa/49b077972391ad58037050f2a75f74e3671e92 # new.txt
+.git/objects/fd/f4fc3344e67ab068f836878b6c4951e3b15f3d # commit 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you follow all the internal pointers, you get an object graph something like this:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/cs/v2/images/data-model-3.png" >}}" alt="All the objects in your Git directory.">
+</div>
+<div class="title">Figure 151. All the objects in your Git directory.</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_ukládání_objektů">Ukládání objektů</h3>
+<div class="paragraph">
+<p>We mentioned earlier that a header is stored with the content.
+Let’s take a minute to look at how Git stores its objects.
+You’ll see how to store a blob object – in this case, the string “what is up, doc?” – interactively in the Ruby scripting language.</p>
+</div>
+<div class="paragraph">
+<p>Interaktivní režim Ruby spustíte příkazem <code>irb</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ irb
+&gt;&gt; content = "what is up, doc?"
+=&gt; "what is up, doc?"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git vytvoří záhlaví, které bude začínat typem objektu, jímž je v našem případě blob.
+Poté vloží mezeru, za níž bude následovat velikost obsahu a na konec nulový byte:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; header = "blob #{content.length}\0"
+=&gt; "blob 16\u0000"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git vytvoří řetězec ze záhlaví a původního obsahu a vypočítá kontrolní součet SHA-1 tohoto nového obsahu.
+V Ruby můžete hodnotu SHA-1 daného řetězce spočítat tak, že příkazem <code>require</code> připojíte knihovnu pro počítání SHA1 a zavoláte <code>Digest::SHA1.hexdigest()</code> s daným řetězcem:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; store = header + content
+=&gt; "blob 16\u0000what is up, doc?"
+&gt;&gt; require 'digest/sha1'
+=&gt; true
+&gt;&gt; sha1 = Digest::SHA1.hexdigest(store)
+=&gt; "bd9dbf5aae1a3862dd1526723246b20206e5fc37"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git zkomprimuje nový obsah metodou zlib, která je obsažena v knihovně zlib.
+Nejprve je třeba vyžádat si knihovnu a poté na obsah spustit příkaz <code>Zlib::Deflate.deflate()</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; require 'zlib'
+=&gt; true
+&gt;&gt; zlib_content = Zlib::Deflate.deflate(store)
+=&gt; "x\x9CK\xCA\xC9OR04c(\xCFH,Q\xC8,V(-\xD0QH\xC9O\xB6\a\x00_\x1C\a\x9D"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Finally, you’ll write your zlib-deflated content to an object on disk.
+You’ll determine the path of the object you want to write out (the first two characters of the SHA-1 value being the subdirectory name, and the last 38 characters being the filename within that directory).
+In Ruby, you can use the <code>FileUtils.mkdir_p()</code> function to create the subdirectory if it doesn’t exist.
+Poté zadejte <code>File.open()</code> pro otevření souboru a voláním <code>write()</code> na vzniklý identifikátor souboru zapište do souboru právě zkomprimovaný (zlib) obsah:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; path = '.git/objects/' + sha1[0,2] + '/' + sha1[2,38]
+=&gt; ".git/objects/bd/9dbf5aae1a3862dd1526723246b20206e5fc37"
+&gt;&gt; require 'fileutils'
+=&gt; true
+&gt;&gt; FileUtils.mkdir_p(File.dirname(path))
+=&gt; ".git/objects/bd"
+&gt;&gt; File.open(path, 'w') { |f| f.write zlib_content }
+=&gt; 32</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That’s it – you’ve created a valid Git blob object.
+All Git objects are stored the same way, just with different types – instead of the string blob, the header will begin with commit or tree.
+A navíc, zatímco obsahem blobu může být téměř cokoliv, obsah revize nebo stromu má velmi specifický formát.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
