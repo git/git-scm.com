@@ -1,0 +1,348 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: tr
+  chapter:
+    title: Git Branching
+    number: 3
+  section:
+    title: Rebasing
+    number: 6
+    cs_number: '3.6'
+    previous: book/tr/v2/Git-Branching-Remote-Branches
+    next: book/tr/v2/Git-Branching-Summary
+title: Git - Rebasing
+
+---
+<h2 id="_rebasing">Rebasing</h2>
+<div class="paragraph">
+<p>
+In Git, there are two main ways to integrate changes from one branch into another: the <code>merge</code> and the <code>rebase</code>.
+In this section you’ll learn what rebasing is, how to do it, why it’s a pretty amazing tool, and in what cases you won’t want to use it.</p>
+</div>
+<div class="sect3">
+<h3 id="_the_basic_rebase">The Basic Rebase</h3>
+<div class="paragraph">
+<p>If you go back to an earlier example from <a href="{{< relurl "book/tr/v2/ch00/_basic_merging" >}}">Basic Merging</a>, you can see that you diverged your work and made commits on two different branches.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/basic-rebase-1.png" >}}" alt="Simple divergent history.">
+</div>
+<div class="title">Görsel 35. Simple divergent history</div>
+</div>
+<div class="paragraph">
+<p>The easiest way to integrate the branches, as we’ve already covered, is the <code>merge</code> command.
+It performs a three-way merge between the two latest branch snapshots (<code>C3</code> and <code>C4</code>) and the most recent common ancestor of the two (<code>C2</code>), creating a new snapshot (and commit).</p>
+</div>
+<div id="rebasing-merging-example" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/basic-rebase-2.png" >}}" alt="Merging to integrate diverged work history.">
+</div>
+<div class="title">Görsel 36. Merging to integrate diverged work history</div>
+</div>
+<div class="paragraph">
+<p>However, there is another way: you can take the patch of the change that was introduced in <code>C4</code> and reapply it on top of <code>C3</code>.
+In Git, this is called <em>rebasing</em>.
+With the <code>rebase</code> command, you can take all the changes that were committed on one branch and replay them on a different branch.</p>
+</div>
+<div class="paragraph">
+<p>For this example, you would check out the <code>experiment</code> branch, and then rebase it onto the <code>master</code> branch as follows:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout experiment
+$ git rebase master
+First, rewinding head to replay your work on top of it...
+Applying: added staged command</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This operation works by going to the common ancestor of the two branches (the one you’re on and the one you’re rebasing onto), getting the diff introduced by each commit of the branch you’re on, saving those diffs to temporary files, resetting the current branch to the same commit as the branch you are rebasing onto, and finally applying each change in turn.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/basic-rebase-3.png" >}}" alt="Rebasing the change introduced in `C4` onto `C3`.">
+</div>
+<div class="title">Görsel 37. Rebasing the change introduced in <code>C4</code> onto <code>C3</code>
+</div>
+</div>
+<div class="paragraph">
+<p>At this point, you can go back to the <code>master</code> branch and do a fast-forward merge.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+$ git merge experiment</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/basic-rebase-4.png" >}}" alt="Fast-forwarding the master branch.">
+</div>
+<div class="title">Görsel 38. Fast-forwarding the master branch</div>
+</div>
+<div class="paragraph">
+<p>Now, the snapshot pointed to by <code>C4'</code> is exactly the same as the one that was pointed to by <code>C5</code> in <a href="{{< relurl "book/tr/v2/ch00/rebasing-merging-example" >}}">the merge example</a>.
+There is no difference in the end product of the integration, but rebasing makes for a cleaner history.
+If you examine the log of a rebased branch, it looks like a linear history: it appears that all the work happened in series, even when it originally happened in parallel.</p>
+</div>
+<div class="paragraph">
+<p>Often, you’ll do this to make sure your commits apply cleanly on a remote branch — perhaps in a project to which you’re trying to contribute but that you don’t maintain.
+In this case, you’d do your work in a branch and then rebase your work onto <code>origin/master</code> when you were ready to submit your patches to the main project.
+That way, the maintainer doesn’t have to do any integration work — just a fast-forward or a clean apply.</p>
+</div>
+<div class="paragraph">
+<p>Note that the snapshot pointed to by the final commit you end up with, whether it’s the last of the rebased commits for a rebase or the final merge commit after a merge, is the same snapshot — it’s only the history that is different.
+Rebasing replays changes from one line of work onto another in the order they were introduced, whereas merging takes the endpoints and merges them together.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_more_interesting_rebases">More Interesting Rebases</h3>
+<div class="paragraph">
+<p>You can also have your rebase replay on something other than the rebase target branch.
+Take a history like <a href="{{< relurl "book/tr/v2/ch00/rbdiag_e" >}}">A history with a topic branch off another topic branch</a>, for example.
+You branched a topic branch (<code>server</code>) to add some server-side functionality to your project, and made a commit.
+Then, you branched off that to make the client-side changes (<code>client</code>) and committed a few times.
+Finally, you went back to your server branch and did a few more commits.</p>
+</div>
+<div id="rbdiag_e" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/interesting-rebase-1.png" >}}" alt="A history with a topic branch off another topic branch.">
+</div>
+<div class="title">Görsel 39. A history with a topic branch off another topic branch</div>
+</div>
+<div class="paragraph">
+<p>Suppose you decide that you want to merge your client-side changes into your mainline for a release, but you want to hold off on the server-side changes until it’s tested further.
+You can take the changes on client that aren’t on server (<code>C8</code> and <code>C9</code>) and replay them on your <code>master</code> branch by using the <code>--onto</code> option of <code>git rebase</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rebase --onto master server client</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This basically says, “Take the <code>client</code> branch, figure out the patches since it diverged from the <code>server</code> branch, and replay these patches in the <code>client</code> branch as if it was based directly off the <code>master</code> branch instead.”
+It’s a bit complex, but the result is pretty cool.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/interesting-rebase-2.png" >}}" alt="Rebasing a topic branch off another topic branch.">
+</div>
+<div class="title">Görsel 40. Rebasing a topic branch off another topic branch</div>
+</div>
+<div class="paragraph">
+<p>Now you can fast-forward your <code>master</code> branch (see <a href="{{< relurl "book/tr/v2/ch00/rbdiag_g" >}}">Fast-forwarding your master branch to include the client branch changes</a>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+$ git merge client</code></pre>
+</div>
+</div>
+<div id="rbdiag_g" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/interesting-rebase-3.png" >}}" alt="Fast-forwarding your master branch to include the client branch changes.">
+</div>
+<div class="title">Görsel 41. Fast-forwarding your master branch to include the client branch changes</div>
+</div>
+<div class="paragraph">
+<p>Let’s say you decide to pull in your server branch as well.
+You can rebase the server branch onto the <code>master</code> branch without having to check it out first by running <code>git rebase &lt;basebranch&gt; &lt;topicbranch&gt;</code> — which checks out the topic branch (in this case, <code>server</code>) for you and replays it onto the base branch (<code>master</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rebase master server</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This replays your <code>server</code> work on top of your <code>master</code> work, as shown in <a href="{{< relurl "book/tr/v2/ch00/rbdiag_h" >}}">Rebasing your server branch on top of your master branch</a>.</p>
+</div>
+<div id="rbdiag_h" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/interesting-rebase-4.png" >}}" alt="Rebasing your server branch on top of your master branch.">
+</div>
+<div class="title">Görsel 42. Rebasing your server branch on top of your master branch</div>
+</div>
+<div class="paragraph">
+<p>Then, you can fast-forward the base branch (<code>master</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+$ git merge server</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can remove the <code>client</code> and <code>server</code> branches because all the work is integrated and you don’t need them anymore, leaving your history for this entire process looking like <a href="{{< relurl "book/tr/v2/ch00/rbdiag_i" >}}">Final commit history</a>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch -d client
+$ git branch -d server</code></pre>
+</div>
+</div>
+<div id="rbdiag_i" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/interesting-rebase-5.png" >}}" alt="Final commit history.">
+</div>
+<div class="title">Görsel 43. Final commit history</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_rebase_peril">The Perils of Rebasing</h3>
+<div class="paragraph">
+<p>
+Ahh, but the bliss of rebasing isn’t without its drawbacks, which can be summed up in a single line:</p>
+</div>
+<div class="paragraph">
+<p><strong>Do not rebase commits that exist outside your repository and people may have based work on them.</strong></p>
+</div>
+<div class="paragraph">
+<p>If you follow that guideline, you’ll be fine.
+If you don’t, people will hate you, and you’ll be scorned by friends and family.</p>
+</div>
+<div class="paragraph">
+<p>When you rebase stuff, you’re abandoning existing commits and creating new ones that are similar but different.
+If you push commits somewhere and others pull them down and base work on them, and then you rewrite those commits with <code>git rebase</code> and push them up again, your collaborators will have to re-merge their work and things will get messy when you try to pull their work back into yours.</p>
+</div>
+<div class="paragraph">
+<p>Let’s look at an example of how rebasing work that you’ve made public can cause problems.
+Suppose you clone from a central server and then do some work off that.
+Your commit history looks like this:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/perils-of-rebasing-1.png" >}}" alt="Clone a repository, and base some work on it.">
+</div>
+<div class="title">Görsel 44. Clone a repository, and base some work on it</div>
+</div>
+<div class="paragraph">
+<p>Now, someone else does more work that includes a merge, and pushes that work to the central server.
+You fetch it and merge the new remote branch into your work, making your history look something like this:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/perils-of-rebasing-2.png" >}}" alt="Fetch more commits, and merge them into your work.">
+</div>
+<div class="title">Görsel 45. Fetch more commits, and merge them into your work</div>
+</div>
+<div class="paragraph">
+<p>Next, the person who pushed the merged work decides to go back and rebase their work instead; they do a <code>git push --force</code> to overwrite the history on the server.
+You then fetch from that server, bringing down the new commits.</p>
+</div>
+<div id="_pre_merge_rebase_work" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/perils-of-rebasing-3.png" >}}" alt="Someone pushes rebased commits, abandoning commits you’ve based your work on.">
+</div>
+<div class="title">Görsel 46. Someone pushes rebased commits, abandoning commits you’ve based your work on</div>
+</div>
+<div class="paragraph">
+<p>Now you’re both in a pickle.
+If you do a <code>git pull</code>, you’ll create a merge commit which includes both lines of history, and your repository will look like this:</p>
+</div>
+<div id="_merge_rebase_work" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/perils-of-rebasing-4.png" >}}" alt="You merge in the same work again into a new merge commit.">
+</div>
+<div class="title">Görsel 47. You merge in the same work again into a new merge commit</div>
+</div>
+<div class="paragraph">
+<p>If you run a <code>git log</code> when your history looks like this, you’ll see two commits that have the same author, date, and message, which will be confusing.
+Furthermore, if you push this history back up to the server, you’ll reintroduce all those rebased commits to the central server, which can further confuse people.
+It’s pretty safe to assume that the other developer doesn’t want <code>C4</code> and <code>C6</code> to be in the history; that’s why they rebased in the first place.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_rebase_rebase">Rebase When You Rebase</h3>
+<div class="paragraph">
+<p>If you <strong>do</strong> find yourself in a situation like this, Git has some further magic that might help you out.
+If someone on your team force pushes changes that overwrite work that you’ve based work on, your challenge is to figure out what is yours and what they’ve rewritten.</p>
+</div>
+<div class="paragraph">
+<p>It turns out that in addition to the commit SHA-1 checksum, Git also calculates a checksum that is based just on the patch introduced with the commit.
+This is called a “patch-id”.</p>
+</div>
+<div class="paragraph">
+<p>If you pull down work that was rewritten and rebase it on top of the new commits from your partner, Git can often successfully figure out what is uniquely yours and apply them back on top of the new branch.</p>
+</div>
+<div class="paragraph">
+<p>For instance, in the previous scenario, if instead of doing a merge when we’re at <a href="{{< relurl "book/tr/v2/ch00/_pre_merge_rebase_work" >}}">Someone pushes rebased commits, abandoning commits you’ve based your work on</a> we run <code>git rebase teamone/master</code>, Git will:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Determine what work is unique to our branch (C2, C3, C4, C6, C7)</p>
+</li>
+<li>
+<p>Determine which are not merge commits (C2, C3, C4)</p>
+</li>
+<li>
+<p>Determine which have not been rewritten into the target branch (just C2 and C3, since C4 is the same patch as C4')</p>
+</li>
+<li>
+<p>Apply those commits to the top of <code>teamone/master</code></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>So instead of the result we see in <a href="{{< relurl "book/tr/v2/ch00/_merge_rebase_work" >}}">You merge in the same work again into a new merge commit</a>, we would end up with something more like <a href="{{< relurl "book/tr/v2/ch00/_rebase_rebase_work" >}}">Rebase on top of force-pushed rebase work.</a>.</p>
+</div>
+<div id="_rebase_rebase_work" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/tr/v2/images/perils-of-rebasing-5.png" >}}" alt="Rebase on top of force-pushed rebase work.">
+</div>
+<div class="title">Görsel 48. Rebase on top of force-pushed rebase work.</div>
+</div>
+<div class="paragraph">
+<p>This only works if C4 and C4' that your partner made are almost exactly the same patch.
+Otherwise the rebase won’t be able to tell that it’s a duplicate and will add another C4-like patch (which will probably fail to apply cleanly, since the changes would already be at least somewhat there).</p>
+</div>
+<div class="paragraph">
+<p>You can also simplify this by running a <code>git pull --rebase</code> instead of a normal <code>git pull</code>.
+Or you could do it manually with a <code>git fetch</code> followed by a <code>git rebase teamone/master</code> in this case.</p>
+</div>
+<div class="paragraph">
+<p>If you are using <code>git pull</code> and want to make <code>--rebase</code> the default, you can set the <code>pull.rebase</code> config value with something like <code>git config --global pull.rebase true</code>.</p>
+</div>
+<div class="paragraph">
+<p>If you only ever rebase commits that have never left your own computer, you’ll be just fine.
+If you rebase commits that have been pushed, but that no one else has based commits from, you’ll also be fine.
+If you rebase commits that have already been pushed publicly, and people may have based work on those commits, then you may be in for some frustrating trouble, and the scorn of your teammates.</p>
+</div>
+<div class="paragraph">
+<p>If you or a partner does find it necessary at some point, make sure everyone knows to run <code>git pull --rebase</code> to try to make the pain after it happens a little bit simpler.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_rebase_vs_merge">Rebase vs. Merge</h3>
+<div class="paragraph">
+<p>
+Now that you’ve seen rebasing and merging in action, you may be wondering which one is better.
+Before we can answer this, let’s step back a bit and talk about what history means.</p>
+</div>
+<div class="paragraph">
+<p>One point of view on this is that your repository’s commit history is a <strong>record of what actually happened.</strong>
+It’s a historical document, valuable in its own right, and shouldn’t be tampered with.
+From this angle, changing the commit history is almost blasphemous; you’re <em>lying</em> about what actually transpired.
+So what if there was a messy series of merge commits?
+That’s how it happened, and the repository should preserve that for posterity.</p>
+</div>
+<div class="paragraph">
+<p>The opposing point of view is that the commit history is the <strong>story of how your project was made.</strong>
+You wouldn’t publish the first draft of a book, and the manual for how to maintain your software deserves careful editing.
+This is the camp that uses tools like rebase and filter-branch to tell the story in the way that’s best for future readers.</p>
+</div>
+<div class="paragraph">
+<p>Now, to the question of whether merging or rebasing is better: hopefully you’ll see that it’s not that simple.
+Git is a powerful tool, and allows you to do many things to and with your history, but every team and every project is different.
+Now that you know how both of these things work, it’s up to you to decide which one is best for your particular situation.</p>
+</div>
+<div class="paragraph">
+<p>In general the way to get the best of both worlds is to rebase local changes you’ve made but haven’t shared yet before you push them in order to clean up your story, but never rebase anything you’ve pushed somewhere.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
