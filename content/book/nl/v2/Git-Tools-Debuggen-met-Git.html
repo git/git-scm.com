@@ -1,0 +1,183 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Debuggen met Git
+    number: 10
+    cs_number: '7.10'
+    previous: book/nl/v2/Git-Tools-Rerere
+    next: book/nl/v2/Git-Tools-Submodules
+title: Git - Debuggen met Git
+
+---
+<h2 id="_debuggen_met_git">Debuggen met Git</h2>
+<div class="paragraph">
+<p>Additioneel aan het feit dat het primair voor versiebeheer is, levert Git ook een aantal instrumenten om je te helpen met het debuggen van problemen in je projecten.
+Omdat Git is ontworpen om te werken met bijna alle soorten projecten, zijn deze instrumenten redelijk generiek, maar ze kunnen je vaak helpen om een fout op te sporen of een schuldige aan te wijzen als dingen fout gaan.</p>
+</div>
+<div class="sect3">
+<h3 id="_file_annotation">Bestands annotatie</h3>
+<div class="paragraph">
+<p>Als je op zoek bent naar een bug in je code en je wilt weten wanneer deze er in is geslopen en waarom, is bestands annotatie vaak het beste gereedschap.
+Het laat voor alle regels in alle bestanden zien welke de commit de laatste was die een wijziging aanbracht.
+Dus, als je ziet dat een methode in je code labiel is, kan je het bestand annoteren met <code>git blame</code> om te zien welke commit verantwoordelijk was voor de introductie van die regel.</p>
+</div>
+<div class="paragraph">
+<p>Het volgende voorbeeld gebruikt <code>git blame</code> om te bepalen welke commit en committer verantwoordelijk zijn voor regels in de top-level Linux kernel <code>Makefile</code> en, vervolgens, de <code>-L</code> optie om de uitvoer van de geannoteerde regels te beperken tot regels 69 tot en met 82 van dat bestand:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git blame -L 69,82 Makefile
+b8b0618cf6fab (Cheng Renquan  2009-05-26 16:03:07 +0800 69) ifeq ("$(origin V)", "command line")
+b8b0618cf6fab (Cheng Renquan  2009-05-26 16:03:07 +0800 70)   KBUILD_VERBOSE = $(V)
+^1da177e4c3f4 (Linus Torvalds 2005-04-16 15:20:36 -0700 71) endif
+^1da177e4c3f4 (Linus Torvalds 2005-04-16 15:20:36 -0700 72) ifndef KBUILD_VERBOSE
+^1da177e4c3f4 (Linus Torvalds 2005-04-16 15:20:36 -0700 73)   KBUILD_VERBOSE = 0
+^1da177e4c3f4 (Linus Torvalds 2005-04-16 15:20:36 -0700 74) endif
+^1da177e4c3f4 (Linus Torvalds 2005-04-16 15:20:36 -0700 75)
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 76) ifeq ($(KBUILD_VERBOSE),1)
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 77)   quiet =
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 78)   Q =
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 79) else
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 80)   quiet=quiet_
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 81)   Q = @
+066b7ed955808 (Michal Marek   2014-07-04 14:29:30 +0200 82) endif</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Merk op dat het eerste veld een deel is van de SHA-1 van de commit die het laatste die regel wijzigde.
+De volgende twee velden zijn waarden die uit die commit zijn gehaald — de naam van de auteur en de schrijfdatum van die commit — zodat je eenvoudig kunt zien wie de regel gewijzigd heeft en wanneer.
+Daarna volgt het regelnummer en de inhoud van het bestand.
+Merk ook de <code>^1da177e4c3f4</code> commit regels op, waar de <code>^</code> prefix de regels aangeeft dit in de initiele commit van de repository aan dit project zijn toegevoegd, en deze regels zijn sindsdien niet gewijzigd.
+Dit is een beetje verwarrend, omdat je nu op z’n minst drie verschillende manieren hebt gezien waarop Git het <code>^</code>-teken heeft gebruikt om een SHA-1 van een commit te duiden, maar dat is wat het hier betekent.</p>
+</div>
+<div class="paragraph">
+<p>Een ander gaaf iets van Git is dat het bestandsnaam wijzigingen niet expliciet bijhoudt.
+Het slaat de snapshots op en probeert dan impliciet uit te vinden dat het hernoemd is, nadat het gebeurd is.
+Een van de interessante toepassingen hiervan is dat je het ook kunt vragen allerhande code verplaatsingen uit te vinden.
+Als je <code>-C</code> aan <code>git blame</code> meegeeft, zal Git het bestand dat je annoteerd analiseren en probeert het uit te vinden waar delen van de code in dat bestand oorspronkelijk vandaan kwamen als ze van elders waren gekopieerd.
+Bijvoorbeeld, stel dat je een bestand genaamd <code>GITServerHandler.m</code> aan het herstructureren bent in meerdere bestanden, waarvan er een <code>GITPackUpload.m</code> heet.
+Door <code>GITPackUpload.m</code> te <em>blamen</em> met de <code>-C</code> optie, kan je zien waar delen van de code oorspronkelijk vandaan kwamen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git blame -C -L 141,153 GITPackUpload.m
+f344f58d GITServerHandler.m (Scott 2009-01-04 141)
+f344f58d GITServerHandler.m (Scott 2009-01-04 142) - (void) gatherObjectShasFromC
+f344f58d GITServerHandler.m (Scott 2009-01-04 143) {
+70befddd GITServerHandler.m (Scott 2009-03-22 144)         //NSLog(@"GATHER COMMI
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 145)
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 146)         NSString *parentSha;
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 147)         GITCommit *commit = [g
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 148)
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 149)         //NSLog(@"GATHER COMMI
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 150)
+56ef2caf GITServerHandler.m (Scott 2009-01-05 151)         if(commit) {
+56ef2caf GITServerHandler.m (Scott 2009-01-05 152)                 [refDict setOb
+56ef2caf GITServerHandler.m (Scott 2009-01-05 153)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit is erg nuttig.
+Normaalgesproken krijg je als de oorspronkelijke commit, de commit waar je de code naartoe hebt gekopieerd, omdat dat de eerste keer is dat je deze regels in dit bestand hebt aangeraakt.
+Git geeft je de oorspronkelijke commit waarin je deze regels hebt geschreven, zelfs als dat in een ander bestand was.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_binary_search">Binair zoeken</h3>
+<div class="paragraph">
+<p>Een bestand annoteren helpt je als je meteen al weet waar het probleem is.
+Als je niet weet wat er kapot gaat, en er zijn tientallen of honderden commits geweest sinds de laatste staat waarin je weet dat de code werkte, zal je waarschijnlijk <code>git bisect</code> inschakelen voor hulp.
+Het <code>bisect</code> commando voert een binair zoektocht uit door je commit historie om je te helpen zo snel als mogelijk de commit te vinden die een probleem heeft geïntroduceerd.</p>
+</div>
+<div class="paragraph">
+<p>Stel dat je zojuist een release van je code hebt ingevoerd in een productie omgeving, je krijgt fout rapporten over iets wat niet in je ontwikkelomgeving optrad, en je kunt je niet indenken waarom de code zich zo gedraagt.
+Je duikt in je code en het blijkt dat je het probleem kunt reproduceren, maar je kunt maar niet vinden waar het fout gaat.
+Je kunt de code <em>bisecten</em> om dit op te sporen.
+Eerst roep je <code>git bisect start</code> aan om het proces in gang te zetten, en dan gebruik je <code>git bisect bad</code> om het systeem te vertellen dat de huidige commit waar je op staat kapot is.
+Daarna moet je bisect vertellen waar de laatst bekende goede staat was, door `git bisect good &lt;goede_commit&gt; te gebruiken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect start
+$ git bisect bad
+$ git bisect good v1.0
+Bisecting: 6 revisions left to test after this
+[ecb6e1bc347ccecc5f9350d878ce677feb13d3b2] error handling on repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git kon opzoeken dat er ongeveer 12 commit zijn geweest tussen de commit die je als de laatst correcte hebt gemarkeerd (v1.0) en de huidige slechte versie, en dat het de middelste voor je heeft uitgecheckt.
+Op dit moment kan je je tests laten lopen om te zien of het probleem op deze commit voorkomt.
+Als dit het geval is, dan was het ergens voor deze middelste commit erin geslopen; als dat het niet het geval is, dan is het probleem na deze middelste commit geïntroduceerd.
+Het blijkt nu dat er hier geen probleem is, en je zegt Git dit door <code>git bisect good</code> in te typen en je zoektocht voort te zetten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect good
+Bisecting: 3 revisions left to test after this
+[b047b02ea83310a70fd603dc8cd7a6cd13d15c04] secure this thing</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu zit je op een andere commit, halverwege tussen de ene die je zojuist getest hebt, en je slechte commit.
+Je gaat weer testen en ziet nu dat deze commit kapot is, dus je zegt dit met <code>git bisect bad</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect bad
+Bisecting: 1 revisions left to test after this
+[f71ce38690acf49c1f3c9bea38e09d82a5ce6014] drop exceptions table</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Deze commit is prima, en nu heeft Git alle informatie die het nodig heeft om te bepalen waar het probleem is begonnen.
+Het geeft je de SHA-1 van de eerste slechte commit en laat je wat van de commit informatie zien en welke bestanden gewijzigd waren in die commit zodat je kunt uitzoeken wat er gebeurd is waardoor deze fout optreedt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect good
+b047b02ea83310a70fd603dc8cd7a6cd13d15c04 is first bad commit
+commit b047b02ea83310a70fd603dc8cd7a6cd13d15c04
+Author: PJ Hyett &lt;pjhyett@example.com&gt;
+Date:   Tue Jan 27 14:48:32 2009 -0800
+
+    secure this thing
+
+:040000 040000 40ee3e7821b895e52c1695092db9bdc4c61d1730
+f24d3c6ebcfc639b1a3814550e62d60b8e68a8e4 M  config</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je klaar bent, moet je <code>git bisect reset</code> aanroepen om je HEAD terug te zetten naar waar je was voordat je startte, of je verzandt in een hele vreemde status:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect reset</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit is een krachtig instrument dat je kan helpen met het in enkele minuten doorzoeken van honderden commits voor een opgetreden fout.
+Als je een script hebt dat met 0 eindigt als het project correct en niet-0 als het project fout is, kan je het <code>git bisect</code> proces zelfs volledig automatiseren.
+Allereerst vertel je het de reikwijdte van de bisect door de bekende goede en slechte commits door te geven.
+Je kunt dit doen door ze te tonen met de <code>bisect start</code> commando als je dit wilt, door de bekende slechte commit als eerste door te geven en de bekende goede commit als tweede:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect start HEAD v1.0
+$ git bisect run test-error.sh</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Op deze manier wordt <code>test-error.sh</code> automatisch aanroepen voor elke uitgecheckte commit totdat Git de eerste kapotte commit vindt.
+Je kunt ook zoiets als <code>make</code> of <code>make tests</code> aanroepen of wat je ook maar hebt dat geautomatiseerde tests voor je uitvoert.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

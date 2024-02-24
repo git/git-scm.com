@@ -1,0 +1,408 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Binnenwerk
+    number: 10
+  section:
+    title: Onderhoud en gegevensherstel
+    number: 7
+    cs_number: '10.7'
+    previous: book/nl/v2/Git-Binnenwerk-Uitwisseling-protocollen
+    next: book/nl/v2/Git-Binnenwerk-Omgevingsvariabelen
+title: Git - Onderhoud en gegevensherstel
+
+---
+<h2 id="_onderhoud_en_gegevensherstel">Onderhoud en gegevensherstel</h2>
+<div class="paragraph">
+<p>Bij tijd en wijle, moet je wat opschonen - een repository iets compacter maken, een geïmporteerde repository opschonen of verloren gegane werk herstellen.
+Deze paragraaf zal een aantal van deze scenarios behandelen.</p>
+</div>
+<div class="sect3">
+<h3 id="_git_gc">Onderhoud</h3>
+<div class="paragraph">
+<p>Op gezette tijden roept Git automatisch een commando genaamd “auto gc” aan.
+Meestal zal dit commando niets doen.
+Echter, als er teveel losse objecten zijn (objecten die niet in een packfile zitten) of teveel packfiles, roept Git een volwaardige <code>git gc</code> commando aan.
+Het “gc” staat voor vuil ophalen (garbage collect), en het commando voert een aantal dingen uit: het verzamelt alle losse objecten en zet ze in packfiles, het consolideert packfiles in een grote packfile, en het verwijdert objecten die onbereikbaar zijn vanaf enig commit en een aantal maanden oud zijn.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt auto gc ook handmatig aanroepen als volgt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc --auto</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nogmaals, over het algemeen doet dit niets.
+Je moet ongeveer 7.000 losse objecten hebben of meer dan 50 packfiles om Git een echte gc commando te laten aanroepen.
+Je kunt deze grenswaarden aanpassen met respectievelijk het <code>gc.auto</code> en <code>gc.autopacklimit</code> configuratie waarden.</p>
+</div>
+<div class="paragraph">
+<p>Het andere wat <code>gc</code> zal doen is je referenties in een enkel bestand stoppen.
+Stel dat je repository de volgende branches en tags bevat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/refs -type f
+.git/refs/heads/experiment
+.git/refs/heads/master
+.git/refs/tags/v1.0
+.git/refs/tags/v1.1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je <code>git gc</code> aanroept, zal je deze bestanden niet langer in de <code>refs</code> directory hebben staan.
+Git verplaatst ze allemaal in het kader van efficiëntie naar een bestand met de naam <code>.git/packed-refs</code> die er als volgt uit ziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .git/packed-refs
+# pack-refs with: peeled fully-peeled
+cac0cab538b970a37ea1e769cbbde608743bc96d refs/heads/experiment
+ab1afef80fac8e34258ff41fc1b867c702daa24b refs/heads/master
+cac0cab538b970a37ea1e769cbbde608743bc96d refs/tags/v1.0
+9585191f37f7b0fb9444f35a9bf50de191beadc2 refs/tags/v1.1
+^1a410efbd13591db07496601ebc7a059dd55cfe9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je een referentie bijwerkt, werkt Git dit bestand niet bij, maar schrijft in plaats daarvan een nieuw bestand naar <code>refs/heads</code>.
+Om de juiste SHA-1 voor een gegeven refentie te pakken te krijgen, zoekt Git de referentie eerst in de <code>refs</code> directory en daarna het <code>packed-refs</code> bestand als achtervang.
+Dus, als je een referentie niet kunt vinden in de <code>refs</code> directory, staat deze waarschijnlijk in je <code>packed-refs</code> bestand.</p>
+</div>
+<div class="paragraph">
+<p>Let even op de laatste regel van het bestand, die begint met een <code>^</code>.
+Dit geeft aan dat de tag directory erboven een geannoteerde tag is, en deze regel de commit is waar de geannoteerde tag naar verwijst.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_data_recovery">Gegevensherstel</h3>
+<div class="paragraph">
+<p>Op een bepaald punt in je Git-reis, kan je per ongeluk een commit kwijt raken.
+Meestal gebeurt dit omdat je een branch <em>force-delete</em> waar werk op zat, en je komt erachter dat je die branch toch nog nodig had; of je hebt een branch ge-<em>hard-reset</em>, en daarmee commits laat vallen waar je toch nog iets van wilde gebruiken.
+Aangenomen dat dit gebeurd is, hoe kan je die commits nog terughalen?</p>
+</div>
+<div class="paragraph">
+<p>Hier is een voorbeeld die de master branch hard-reset in je test repository naar een oudere commit en daarna de verloren commits herstelt.
+Laten we eerst eens zien hoe je repository er op dit moment uitziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --pretty=oneline
+ab1afef80fac8e34258ff41fc1b867c702daa24b modified repo a bit
+484a59275031909e19aadb7c92262719cfcdf19a added repo.rb
+1a410efbd13591db07496601ebc7a059dd55cfe9 third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu gaan we de <code>master</code>-branch terugzetten naar de middelste commit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard 1a410efbd13591db07496601ebc7a059dd55cfe9
+HEAD is now at 1a410ef third commit
+$ git log --pretty=oneline
+1a410efbd13591db07496601ebc7a059dd55cfe9 third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je bent effectief de bovenste twee commits kwijtgeraakt - je hebt geen branch waar deze commits vanaf bereikt kunnen worden.
+Je moet de SHA-1 van de laatste commit zien te vinden en dan een branch toevoegen die daarnaar wijst.
+De truuk is het vinden van de SHA-1 van die laatste commit - we mogen aannemen dat je deze niet uit je hoofd hebt geleerd, toch?</p>
+</div>
+<div class="paragraph">
+<p>Vaak is de snelste manier om een instrument genaamd <code>git reflog</code> te gebruiken.
+Als je aan het werk bent, houdt Git stilletjes bij wat je HEAD was elke keer als je het verandert.
+Elke keer als je commit, of branches wijzigt, wordt de reflog bijgewerkt.
+De reflog wordt ook bijgewerkt door het <code>git update-ref</code> commando, wat nog een reden is om dit te gebruiken in plaats van alleen de SHA-1 waarden naar je ref bestanden te schrijven, zoals we besproken hebben in <a href="{{< relurl "book/nl/v2/ch00/_git_refs" >}}">Git Referenties</a>.
+Je kunt zien waar je op enig moment geweest bent door <code>git reflog</code> aan te roepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reflog
+1a410ef HEAD@{0}: reset: moving to 1a410ef
+ab1afef HEAD@{1}: commit: modified repo.rb a bit
+484a592 HEAD@{2}: commit: added repo.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier kunnen we de twee commits zien die we uitgechecked hebben gehad, maar hier is ook niet veel informatie te zien.
+Om dezelfde informatie op een veel nuttiger manier te zien, kunnen we <code>git log -g</code> aanroepen, die je een normale log uitvoer voor je reflog laat zien.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -g
+commit 1a410efbd13591db07496601ebc7a059dd55cfe9
+Reflog: HEAD@{0} (Scott Chacon &lt;schacon@gmail.com&gt;)
+Reflog message: updating HEAD
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:22:37 2009 -0700
+
+		third commit
+
+commit ab1afef80fac8e34258ff41fc1b867c702daa24b
+Reflog: HEAD@{1} (Scott Chacon &lt;schacon@gmail.com&gt;)
+Reflog message: updating HEAD
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:15:24 2009 -0700
+
+       modified repo.rb a bit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het lijkt erop dat de laatste commit degene is die je kwijt was geraakt, dus je kunt deze terughalen door een nieuwe branch te maken op die commit.
+Bijvoorbeeld, je kunt een branch genaamd <code>recover-branch</code> beginnen op die commit (ab1afef):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch recover-branch ab1afef
+$ git log --pretty=oneline recover-branch
+ab1afef80fac8e34258ff41fc1b867c702daa24b modified repo a bit
+484a59275031909e19aadb7c92262719cfcdf19a added repo.rb
+1a410efbd13591db07496601ebc7a059dd55cfe9 third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Toppie - nu heb je een branch genaamd <code>recover-branch</code> die staat waar je <code>master</code>-branch heeft gestaan, en de eerste twee commits worden weer bereikbaar.
+Okay, nu stel dat je verlies om wat voor reden dan ook niet meer in de reflog zichtbaar is - je kunt dat naspelen door <code>recover-branch</code> weg te halen en de reflog weg te gooien.
+Nu kan je op geen enkele manier meer bij die eerste twee commits:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch -D recover-branch
+$ rm -Rf .git/logs/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Omdat de reflog gegevens worden bewaard in de <code>.git/logs/</code> directory, heb je effectief geen reflog.
+Hoe kan je nu die commit herstellen?
+Een manier is om het <code>git fsck</code> instrument te gebuiken die je database op integriteit controleert.
+Als je het aanroept met de <code>--full</code> optie, zal het je alle objecten laten zien waar geen enkele andere object naar verwijst:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git fsck --full
+Checking object directories: 100% (256/256), done.
+Checking objects: 100% (18/18), done.
+dangling blob d670460b4b4aece5915caf5c68d12f560a9fe3e4
+dangling commit ab1afef80fac8e34258ff41fc1b867c702daa24b
+dangling tree aea790b9a58f6cf6f2804eeac9f0abbe9631e4c9
+dangling blob 7108f7ecb345ee9d0084193f147cdad4d2998293</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In dit geval kan je de ontbrekende commit zien achter de tekst “dangling commit”.
+Je kunt het op dezelfde manier herstellen, door een branch toe te voegen die wijst naar die SHA-1.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_removing_objects">Objecten verwijderen</h3>
+<div class="paragraph">
+<p>Er zijn ontzettend veel goede dingen met Git, maar een eigenschap die problemen kan veroorzaken is het feit dat een <code>git clone</code> de hele geschiedenis van het project download, inclusief elke versie van elk bestand.
+Dit is prima als het hele spul broncode is, omdat Git optimaal is ingericht om die gegevens efficiënt te comprimeren.
+Echter, als iemand op enig moment in de geschiedenis van je project een enorm groot bestand heeft toegevoegd, zal elke kloon voor altijd gedwongen zijn om dat grote bestand te downloaden, zelfs als het in de volgende commit uit het project zou zijn verwijderd.
+Omdat het vanuit de historie bereikt kan worden, zal het altijd aanwezig zijn.</p>
+</div>
+<div class="paragraph">
+<p>Dit kan een groot probleem zijn als je Subversion of Perforce repositories naar Git aan het converteren bent.
+Omdat je in deze systemen niet de hele historie downloadt, heeft dit soort toevoegingen veel minder gevolgen.
+Als je een import vanuit een ander systeem gedaan hebt, of om een andere reden vindt dat je repository veel groter is dan het zou moeten zijn, volgt hier een manier om uit te vinden hoe je grote objecten kunt vinden en verwijderen.</p>
+</div>
+<div class="paragraph">
+<p><strong>Wees gewaarschuwd: deze techniek is destructief voor je commit historie.</strong>
+Het herschrijft elke commit object sinds de eerste boom die je moet wijzigen om een referentie van een groot bestand te verwijderen.
+Als je dit direct na een import doet, voordat iemand is begonnen om werk op de commit te baseren zit je nog goed - anders zal je alle bijdragers moeten vertellen dat ze hun werk moeten rebasen op je nieuwe commits.</p>
+</div>
+<div class="paragraph">
+<p>Om dit te demonstreren, ga je een groot bestand in je test repository toevoegen, deze in de volgende commit verwijderen, het opzoeken en het definitief uit de repository verwijderen.
+Eerst: voeg een groot object toe aan je historie:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ curl https://www.kernel.org/pub/software/scm/git/git-2.1.0.tar.gz &gt; git.tgz
+$ git add git.tgz
+$ git commit -m 'add git tarball'
+[master 7b30847] add git tarball
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 git.tgz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Oeps - je wilde niet een enorme tarball aan je project toevoegen.
+Laten we 'm maar snel weggooien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rm git.tgz
+rm 'git.tgz'
+$ git commit -m 'oops - removed large tarball'
+[master dadf725] oops - removed large tarball
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ delete mode 100644 git.tgz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu ga je <code>gc</code> aanroepen op je database en kijken hoeveel ruimte je nu gebruikt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc
+Counting objects: 17, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (13/13), done.
+Writing objects: 100% (17/17), done.
+Total 17 (delta 1), reused 10 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt het <code>count-objects</code> commando gebruiken om snel te zien hoeveel ruimte je gebruikt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git count-objects -v
+count: 7
+size: 32
+in-pack: 17
+packs: 1
+size-pack: 4868
+prune-packable: 0
+garbage: 0
+size-garbage: 0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>size-pack</code> regel is de grootte van je packfiles in kilobytes, dus je gebruikt bijna 5MB.
+Voor de laatste commit gebruikte je iets van 2K - het is duidelijk, het verwijderen van het bestand van de vorige commit heeft het niet uit je historie verwijderd.
+Elke keer als iemand deze repository kloont, zullen ze alle 5MB moeten klonen alleen om dit kleine project te pakken te krijgen, omdat je per ongeluk een groot bestand hebt toegevoegd.
+Laten we er vanaf komen.</p>
+</div>
+<div class="paragraph">
+<p>Eerst zal je het moeten vinden.
+In dit geval, weet je al welk bestand het is.
+Maar stel dat je het niet zou weten; hoe zou je uitvinden welk bestand of bestanden er zoveel ruimte in beslag nemen?
+Als je <code>git gc</code> aanroept, komen alle bestanden in een packfile terecht; je kunt de grote objecten vinden door een ander binnenwerk commando <code>git verify-pack</code> aan te roepen en de uitvoer te sorteren op het derde veld in de uitvoer, wat de bestandsgrootte is.
+Je kunt het ook door het <code>tail</code> commando pipen, omdat je alleen geinteresseerd bent in de laatste paar grootste bestanden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git verify-pack -v .git/objects/pack/pack-29...69.idx \
+  | sort -k 3 -n \
+  | tail -3
+dadf7258d699da2c8d89b09ef6670edb7d5f91b4 commit 229 159 12
+033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5 blob   22044 5792 4977696
+82c99a3e86bb1267b236a4b6eff7868d97489af1 blob   4975916 4976258 1438</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het grote object staat onderaan: 5MB.
+Om uit te vinden welk bestand dit is, ga je het <code>rev-list</code> commando gebruiken, die je al eventjes gebruikt hebt in <a href="{{< relurl "book/nl/v2/ch00/_enforcing_commit_message_format" >}}">Een specifiek commit-bericht formaat afdwingen</a>.
+Als je <code>--objects</code> doorgeeft aan <code>rev-list</code>, laat het alle SHA-1s zien van commits en ook de blob SHA-1s met het bestandspad die ermee verbonden is.
+Je kunt dit gebruiken om de naam van jouw blob te vinden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rev-list --objects --all | grep 82c99a3
+82c99a3e86bb1267b236a4b6eff7868d97489af1 git.tgz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu moet je dit bestand uit alle bomen in je verleden verwijderen.
+Je kunt eenvoudig zien welke commits dit bestand hebben gewijzigd:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --branches -- git.tgz
+dadf725 oops - removed large tarball
+7b30847 add git tarball</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je moet alle commits herschrijven die stroomafwaarts van <code>7b30847</code> liggen om dit bestand volledig uit je Git historie te verwijderen.
+Om dit te doen, gebruik je <code>filter-branch</code>, die je gebruikt hebt in <a href="{{< relurl "book/nl/v2/ch00/_rewriting_history" >}}">Geschiedenis herschrijven</a>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git filter-branch --index-filter \
+  'git rm --ignore-unmatch --cached git.tgz' -- 7b30847^..
+Rewrite 7b30847d080183a1ab7d18fb202473b3096e9f34 (1/2)rm 'git.tgz'
+Rewrite dadf7258d699da2c8d89b09ef6670edb7d5f91b4 (2/2)
+Ref 'refs/heads/master' was rewritten</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>--index-filter</code> optie is gelijk aan de <code>--tree-filter</code> optie zoals gebruikt in <a href="{{< relurl "book/nl/v2/ch00/_rewriting_history" >}}">Geschiedenis herschrijven</a>, behalve dat in plaats van een commando door te geven die bestanden wijzigt die op schijf zijn uitgecheckt, je elke keer het staging gebied of index wijzigt.</p>
+</div>
+<div class="paragraph">
+<p>In plaats van een specifiek bestand te verwijderen met iets als <code>rm file</code>, moet je het verwijderen met <code>git rm --cached</code> - je moet het van de index verwijderen, niet van schijf.
+De reden hierachter is snelheid - omdat Git niet elke revisie hoeft uit te checken naar schijf voordat het je filter aanroept kan het proces veel, veel sneller werken.
+Je kunt dezelfde resultaat met <code>--tree-filter</code> bereiken als je wilt.
+De <code>--ignore-unmatch</code> optie bij <code>git rm</code> vertelt het geen fout te genereren als het patroon die je probeert te vinden niet aanwezig is.
+Als laatste, vraag je <code>filter-branch</code> om je historie te alleen herschrijven vanaf de <code>7b30847</code> en later, omdat je weet dat dit de plaats is waar het probleem begon.
+Anders zou het vanaf het begin starten en onnodig langer zou duren.</p>
+</div>
+<div class="paragraph">
+<p>Je historie bevat niet langer meer een referentie naar dat bestand.
+Echter, je reflog en een nieuwe set van refs die Git toegevoegd heeft toen je het <code>filter-branch</code> gebruikte bestaan nog steeds onder <code>.git/refs/original</code> nog steeds wel, dus je zult deze moeten verwijderen en dan de database opnieuw inpakken.
+Je moet afraken van alles wat maar een verwijzing heeft naar die oude commits voordat je opnieuw inpakt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ rm -Rf .git/refs/original
+$ rm -Rf .git/logs/
+$ git gc
+Counting objects: 15, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (11/11), done.
+Writing objects: 100% (15/15), done.
+Total 15 (delta 1), reused 12 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Laten we eens kijken hoeveel ruimte je gewonnen hebt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git count-objects -v
+count: 11
+size: 4904
+in-pack: 15
+packs: 1
+size-pack: 8
+prune-packable: 0
+garbage: 0
+size-garbage: 0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De grootte van de ingepakte repository is gekrompen naar 8K, wat veel beter is dan 5MB.
+Je kunt aan de waarde van de grootte zien dat het grote object nog steeds in je losse objecten zit, dus het is nog niet weg; maar het wordt niet meer uitgewisseld met een push of een toekomstige kloon, en daar gaat het uiteindelijk om.
+Als je het echt wilt, zou je het object volledig kunnen verwijderen door <code>git prune</code> aan te roepen met de <code>--expire</code> optie:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git prune --expire now
+$ git count-objects -v
+count: 0
+size: 0
+in-pack: 15
+packs: 1
+size-pack: 8
+prune-packable: 0
+garbage: 0
+size-garbage: 0</code></pre>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

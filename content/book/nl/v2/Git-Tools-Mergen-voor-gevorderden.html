@@ -1,0 +1,927 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Mergen voor gevorderden
+    number: 8
+    cs_number: '7.8'
+    previous: book/nl/v2/Git-Tools-Reset-ontrafeld
+    next: book/nl/v2/Git-Tools-Rerere
+title: Git - Mergen voor gevorderden
+
+---
+<h2 id="_advanced_merging">Mergen voor gevorderden</h2>
+<div class="paragraph">
+<p>Mergen met Git is normaalgesproken redelijk eenvoudig.
+Omdat Git het je gemakkelijk maakt om meerdere malen de ene branch met de andere te mergen, betekent dit dat je branches met een lange levensduur kunt hebben maar dat je het gaandeweg up to date kunt houden, vaak kleine conflicten oplossend, in plaats van verrast te worden door een enorme conflict aan het eind van de reeks.</p>
+</div>
+<div class="paragraph">
+<p>Echter, soms zullen lastige conflicten optreden.
+In tegenstelling tot andere versie beheer systemen probeert Git niet al te slim te zijn bij het oplossen van merge conflicten.
+De filosfie van Git is om slim te zijn over het bepalen wanneer een merge oplossing eenduidig is, maar als er een conflict is probeert het niet slim te zijn en het automatisch op te lossen.
+Dit is de reden dat als je te lang wacht met het meren van twee branches die snel uiteenlopen, dat je tegen een aantal situaties zult aanlopen.</p>
+</div>
+<div class="paragraph">
+<p>In dit hoofdstuk zullen we van een aantal van die situaties laten zien wat de oorzaak kan zijn en welke instrumenten Git je geeft om je te helpen deze meer lastige situaties op te lossen.
+We zullen ook een aantal van de afwijkende, niet standaard type merges behandelen die je kunt uitvoeren, zowel als aangeven hoe je merges die je hebt uitgevoerd weer kunt terugdraaien.</p>
+</div>
+<div class="sect3">
+<h3 id="_merge_conflicten">Merge conflicten</h3>
+<div class="paragraph">
+<p>We hebben een aantal beginselen van het oplossen van merge conflicten in <a href="{{< relurl "book/nl/v2/ch00/_basic_merge_conflicts" >}}">Eenvoudige merge conflicten</a> behandeld, voor meer complexe conflicten geeft Git je een aantal instrumenten om uit te vinden wat er aan de hand is en hoe beter met het conflict om te gaan.</p>
+</div>
+<div class="paragraph">
+<p>Als eerste, als het enigszins mogelijk is, probeer je werk directory op te schonen voor je een merge uitvoert die conflicten zou kunnen bevatten.
+Als je onderhanden werk hebt, commit dit naar een tijdelijke branch of stash het.
+Dit zorgt ervoor dat je <strong>alles</strong> kunt terugdraaien wat je hier probeert.
+Als je niet bewaarde wijzigingen in je werk-directory hebt als je een merge probeert, kunnen een aantal tips die we geven ervoor zorgen dat je dit verliest.</p>
+</div>
+<div class="paragraph">
+<p>Laten we een erg eenvoudig voorbeeld doorlopen.
+We hebben een super simpel Ruby bestand dat <em>hello world</em> afdrukt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hello world'
+end
+
+hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In onze repository maken we een nieuwe branch genaamd <code>whitespace</code> en vervolgen we door alle Unix regel-einden te vervangen met DOS regel-einden, eigenlijk gewoon elke regel van het bestand wijzigend, maar alleen met witruimte.
+Dan wijzigen we de regel “hello world” in “hello mundo”.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -b whitespace
+Switched to a new branch 'whitespace'
+
+$ unix2dos hello.rb
+unix2dos: converting file hello.rb to DOS format ...
+$ git commit -am 'converted hello.rb to DOS'
+[whitespace 3270f76] converted hello.rb to DOS
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+$ vim hello.rb
+$ git diff -b
+diff --git a/hello.rb b/hello.rb
+index ac51efd..e85207e 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,7 +1,7 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-  puts 'hello world'
++  puts 'hello mundo'^M
+ end
+
+ hello()
+
+$ git commit -am 'hello mundo change'
+[whitespace 6d338d2] hello mundo change
+ 1 file changed, 1 insertion(+), 1 deletion(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu switchen we terug naar onze <code>master</code>-branch en voegen wat documentatie aan de functie toe.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+Switched to branch 'master'
+
+$ vim hello.rb
+$ git diff
+diff --git a/hello.rb b/hello.rb
+index ac51efd..36c06c8 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,5 +1,6 @@
+ #! /usr/bin/env ruby
+
++# prints out a greeting
+ def hello
+   puts 'hello world'
+ end
+
+$ git commit -am 'document the function'
+[master bec6336] document the function
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu gaan we proberen onze <code>whitespace</code>-branch te mergen en we zullen conflicten krijgen vanwege de witruimte wijzigingen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge whitespace
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_abort_merge">Een merge afbreken</h4>
+<div class="paragraph">
+<p>We kunnen nu kiezen.
+Als eerste, laten we bekijken hoe we uit deze situatie kunnen komen.
+Als je geen conflicten had verwacht en je wilt nu nog even niet met deze situatie te maken hebben, kan je eenvoudig de merge terugdraaien met <code>git merge --abort</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status -sb
+## master
+UU hello.rb
+
+$ git merge --abort
+
+$ git status -sb
+## master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>git merge --abort</code> optie probeert de status terug te halen van voor je probeerde de merge te draaien.
+De enige gevallen waar dit misschien niet helemaal mogelijk is zou zijn als je ge-unstashde, ongecommitte wijzigingen in je werk-directory zou hebben staan toen je het aanriep, in alle andere gevallen zou het prima moeten werken.</p>
+</div>
+<div class="paragraph">
+<p>Als je voor wat voor reden ook jezelf in een enorme bende weet te krijgen en je wilt gewoon opnieuw beginnen, kan je ook <code>git reset --hard HEAD</code> aanroepen of waar je ook naartoe wilt terugkeren.
+Onthoud: al het niet gecommitte werk gaat verloren, dus verzeker je ervan dat je hier geen onderhanden werk wilt hebben.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_witruimtes_negeren">Witruimtes negeren</h4>
+<div class="paragraph">
+<p>In dit specifieke geval hebben de conflicten met witruimtes te maken.
+We weten dit omdat dit geval eenvoudig is, maar het is ook redelijk eenvoudig te achterhalen in praktijksituaties als je naar een conflict kijkt, omdat elke regel is verwijderd aan de ene kant en weer aan de andere kant wordt toegevoegd.
+Standaard ziet Git al deze regels als gewijzigd en kan het dus de bestanden niet mergen.</p>
+</div>
+<div class="paragraph">
+<p>De standaard merge strategie kan echter argumenten meekrijgen, en een aantal van deze gaan over het op een nette manier negeren van witruimte wijzigingen.
+Als je ziet dat je een groot aantal witruimte issues hebt in een merge, kan je deze eenvoudigweg afbreken en nogmaals uitvoeren, deze keer met <code>-Xignore-all-space</code> of <code>-Xignore-space-change</code>.
+De eerste optie negeert alle witruimte <strong>volledig</strong> bij het vergelijken van de regels, en de tweede beschouwt volgorderlijke witruimte karakters als gelijk.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge -Xignore-space-change whitespace
+Auto-merging hello.rb
+Merge made by the 'recursive' strategy.
+ hello.rb | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Omdat in dit geval de eigenlijke bestandswijzigingen niet conflicteren, zal het negeren van de witruimte wijzigingen leiden tot een geslaagde merge.</p>
+</div>
+<div class="paragraph">
+<p>Dit bespaart je veel werk als je iemand in je team hebt die regelmatig graag alles herformateert van spaties naar tabs of omgekeerd.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_manual_remerge">Handmatig bestanden opnieuw mergen</h4>
+<div class="paragraph">
+<p>Hoewel Git het voorbewerken van witruimtes redelijk goed doet, zijn er andere soorten van wijzigingen waar Git misschien niet automatisch mee om kan gaan, maar zijn er oplossingen die met scripts gevonden kunnen worden.
+Als voorbeeld, stel dat Git de witruimte wijziging niet had kunnen verwerken en we hadden dit met de hand moeten doen.</p>
+</div>
+<div class="paragraph">
+<p>Wat we echt zouden moeten doen is het bestand dat we proberen te mergen met een <code>dos2unix</code> programma bewerken voordat we de echte bestandsmerge uitvoeren.
+Dus, hoe zouden we dat doen?</p>
+</div>
+<div class="paragraph">
+<p>Allereerst moeten we in de situatie van de merge conflict geraken.
+Dan willen we kopieën maken van mijn versie van het bestand, hun versie van het bestand (van de branch die we proberen te mergen) en de gezamelijke versie (van waar beide branches zijn afgesplitst).
+Daarna willen we een van de twee kanten verbeteren (die van hun of van ons) en dan de merge opnieuw proberen maar dan voor alleen deze ene bestand.</p>
+</div>
+<div class="paragraph">
+<p>Het krijgen van de drie bestandversies is eigenlijk vrij makkelijk.
+Git bewaart al deze versies in de index onder “stages” die elk met getallen zijn geassocieerd.
+Stage 1 is de gezamelijke voorouder, stage 2 is jouw versie en stage 3 is van de <code>MERGE_HEAD</code>, de versie die je probeert te mergen (“theirs”).</p>
+</div>
+<div class="paragraph">
+<p>Je kunt een kopie van elk van deze versie van het conflicterende bestand met het <code>git show</code> commando gecombineerd met een speciale syntax verkrijgen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git show :1:hello.rb &gt; hello.common.rb
+$ git show :2:hello.rb &gt; hello.ours.rb
+$ git show :3:hello.rb &gt; hello.theirs.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je iets dichter <em>op het ijzer</em> wilt werken, kan je ook het <code>ls-files -u</code> binnenwerk commando gebruiken om de echte SHA-1 nummers op te zoeken van de Git blobs voor elk van deze bestanden.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -u
+100755 ac51efdc3df4f4fd328d1a02ad05331d8e2c9111 1	hello.rb
+100755 36c06c8752c78d2aff89571132f3bf7841a7b5c3 2	hello.rb
+100755 e85207e04dfdd5eb0a1e9febbc67fd837c44a1cd 3	hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het <code>:1:hello.rb</code> is gewoon een verkorte manier om de SHA-1 van de blob op te zoeken.</p>
+</div>
+<div class="paragraph">
+<p>Nu we de inhoud van de drie stages in onze werk directory hebben, kunnen we handmatig die van hun opknappen om het witruimte probleem op te lossen en de bestanden opnieuw te mergen met het vrij onbekende <code>git merge-file</code> commando die precies dat doet.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ dos2unix hello.theirs.rb
+dos2unix: converting file hello.theirs.rb to Unix format ...
+
+$ git merge-file -p \
+    hello.ours.rb hello.common.rb hello.theirs.rb &gt; hello.rb
+
+$ git diff -b
+diff --cc hello.rb
+index 36c06c8,e85207e..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,8 -1,7 +1,8 @@@
+  #! /usr/bin/env ruby
+
+ +# prints out a greeting
+  def hello
+-   puts 'hello world'
++   puts 'hello mundo'
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We hebben op dit moment het bestand fijn gemerged.
+Sterker nog, dit werkt eigenlijk beter dan de <code>ignore-space-change</code> optie omdat dit echt de witruimte wijzigingen verbetert voor we mergen inplaats van ze gewoon te negeren.
+In de <code>ignore-space-change</code> merge, eindigen we uiteindelijk met een paar regels met DOS regel-einden, waardoor we dingen vermengen.</p>
+</div>
+<div class="paragraph">
+<p>Als je voordat de commit wordt beeindigd een indruk wilt krijgen van wat daadwerkelijk gewijzigd is tussen de ene en de andere kant, kan je <code>git diff</code> vragen om wat in je werk directory zit te vergelijken met wat je van plan bent te committen als resultaat van de merge met elk van deze stages.
+Laten we ze eens allemaal bekijken.</p>
+</div>
+<div class="paragraph">
+<p>Om het resultaat te vergelijken met wat je in je branch had voor de merge, met andere woorden om te zien wat de merge geïntroduceerd heeft, kan je <code>git diff --ours</code> aanroepen</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --ours
+* Unmerged path hello.rb
+diff --git a/hello.rb b/hello.rb
+index 36c06c8..44d0a25 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -2,7 +2,7 @@
+
+ # prints out a greeting
+ def hello
+-  puts 'hello world'
++  puts 'hello mundo'
+ end
+
+ hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dus hier kunnen we makkelijk zien wat er in onze branch gebeurd is, wat we daadwerkelijk in dit bestand introduceren met deze merge is de wijziging in die ene regel.</p>
+</div>
+<div class="paragraph">
+<p>Als we willen zien hoe het resultaat van de merge verschilt met wat er op hun kant stond, kan je <code>git diff --theirs</code> aanroepen.
+In deze en het volgende voorbeeld, moeten we <code>-b</code> gebruiken om de witruimtes te verwijderen omdat we het vergelijken met wat er in Git staat, niet onze opgeschoonde <code>hello.their.rb</code> bestand.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --theirs -b
+* Unmerged path hello.rb
+diff --git a/hello.rb b/hello.rb
+index e85207e..44d0a25 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,5 +1,6 @@
+ #! /usr/bin/env ruby
+
++# prints out a greeting
+ def hello
+   puts 'hello mundo'
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als laatste kan je zien hoe het bestand is veranderd ten opzichte van beide kanten met <code>git diff --base</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --base -b
+* Unmerged path hello.rb
+diff --git a/hello.rb b/hello.rb
+index ac51efd..44d0a25 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,7 +1,8 @@
+ #! /usr/bin/env ruby
+
++# prints out a greeting
+ def hello
+-  puts 'hello world'
++  puts 'hello mundo'
+ end
+
+ hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Op dit moment kunnen we het <code>git clean</code> commando gebruiken om de extra bestanden te verwijderen die we hebben gemaakt om de handmatige merge uit te voeren maar die we niet langer meer nodig hebben.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clean -f
+Removing hello.common.rb
+Removing hello.ours.rb
+Removing hello.theirs.rb</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_checking_out_conflicts">Conflicten beter bekijken</h4>
+<div class="paragraph">
+<p>Misschien zijn we om de een of andere reden niet tevreden met de huidige oplossing, of misschien werkt het handmatig wijzigen van een of beide kanten nog steeds niet goed en moeten we meer van de omstandigheden te weten komen.</p>
+</div>
+<div class="paragraph">
+<p>Laten we het voorbeeld een beetje veranderen.
+In dit voorbeeld hebben we twee langer doorlopende branches die elk een aantal commits hebben maar die, wanneer ze worden gemerged, een echt conflict op inhoud opleveren.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --graph --oneline --decorate --all
+* f1270f7 (HEAD, master) update README
+* 9af9d3b add a README
+* 694971d update phrase to hola world
+| * e3eb223 (mundo) add more tests
+| * 7cff591 add testing script
+| * c3ffff1 changed text to hello mundo
+|/
+* b7dcc89 initial hello world code</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We hebben nu drie unieke commits die alleen in de <code>master</code>-branch aanwezig zijn en drie andere die op de <code>mundo</code>-branch zitten.
+Als we de <code>mundo</code>-branch willen mergen krijgen we een conflict.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge mundo
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We zouden willen zien wat de merge conflict is.
+Als we het bestand openen, zie we iets als dit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+  puts 'hola world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; mundo
+end
+
+hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beide kanten van de merge hebben inhoud aan dit bestand toegevoegd, maar een aantal van de commits hebben het bestand op dezelfde plaats gewijzigd waardoor dit conflict optreedt.</p>
+</div>
+<div class="paragraph">
+<p>Laten we een aantal instrumenten verkennen die je tot je beschikking hebt om te bepalen hoe dit conflict tot stand is gekomen.
+Misschien is het niet duidelijk hoe je dit conflict precies moet oplossen.
+Je hebt meer kennis van de context nodig.</p>
+</div>
+<div class="paragraph">
+<p>Een handig instrument is <code>git checkout</code> met de <code>--conflict</code> optie.
+Dit zal het bestand opnieuw uitchecken en de merge conflict markeringen vervangen.
+Dit kan nuttig zijn als je de markeringen wilt verwijderen en de conflicten opnieuw wilt oplossen.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt aan <code>--conflict</code> of <code>diff3</code> of <code>merge</code> doorgeven (de laatste is de standaard).
+Als je het <code>diff3</code> doorgeeft zal Git iets andere soorten conflict markeringen gebruiken, waarbij je niet alleen de “ours” en “theirs” versies krijgt, maar ook de “base” versie <em>inline</em> waardoor je meer context krijgt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout --conflict=diff3 hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als we dat nu aanroepen, zal het bestand er nu zo uit zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours
+  puts 'hola world'
+||||||| base
+  puts 'hello world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs
+end
+
+hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als dit formaat je bevalt, kan je dit als standaard instellen voor toekomstige merge conflicten door de <code>merge.conflictstyle</code> instelling op <code>diff3</code> te zetten.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global merge.conflictstyle diff3</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het <code>git checkout</code> commando kan ook de opties <code>--ours</code> en <code>--theirs</code> verwerken, wat een ontzettend snelle manier kan zijn om gewoon een van de twee kanten te kiezen waarbij er gewoon niet gemerged zal worden.</p>
+</div>
+<div class="paragraph">
+<p>Dit is in het bijzonder handig voor conflicten tussen binaire bestanden waar je gewoon een kant kiest, of waar je alleen bepaalde bestanden wilt mergen van een andere branch - je kunt de merge uitvoeren en dan bepaalde bestanden bekijken dan een of de andere kant voordat je commit.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_merge_log">Merge log</h4>
+<div class="paragraph">
+<p>Een ander nuttig instrument bij het oplossen van merge conflicten is <code>git log</code>.
+Dit kan je helpen bij het verkrijgen van inzicht in wat kan hebben bijgedragen tot het conflict.
+Een stukje historie nakijken om boven water te krijgen waarom twee ontwikkelingen dezelfde gebieden raakten kan soms erg behulpzaam zijn.</p>
+</div>
+<div class="paragraph">
+<p>Om een complete lijst te krijgen van alle unieke commits die in elk van beide branches zitten en die betrokken zijn bij deze merge, kunnen we de “drievoudige punt” syntax gebruiken die we geleerd hebben in <a href="{{< relurl "book/nl/v2/ch00/_triple_dot" >}}">Drievoudige punt</a>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --left-right HEAD...MERGE_HEAD
+&lt; f1270f7 update README
+&lt; 9af9d3b add a README
+&lt; 694971d update phrase to hola world
+&gt; e3eb223 add more tests
+&gt; 7cff591 add testing script
+&gt; c3ffff1 changed text to hello mundo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dat is een mooie lijst van de in totaal zes betrokken commits, zowel als bij welke ontwikkellijn elke commit gedaan is.</p>
+</div>
+<div class="paragraph">
+<p>We kunnen dit echter verder vereenvoudigen om ons een meer specifieke context te geven.
+Als we de <code>--merge</code> optie gebruiken bij <code>git log</code>, zal het alleen de commits tonen van beide kanten van de merge die een bestand raken dat op dit moment in een conflict betrokken is.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --left-right --merge
+&lt; 694971d update phrase to hola world
+&gt; c3ffff1 changed text to hello mundo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je het daarentegen met de <code>-p</code> optie aanroept, krijg je alleen de diffs met het bestand dat in een conflict betrokken is geraakt.
+Dit kan <strong>heel</strong> handig zijn bij het snel verkrijgen vn de context die je nodig hebt om te begrijpen waarom iets conflicteerd en hoe het beter overwogen op te lossen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_gecombineerde_diff_formaat">Gecombineerde diff formaat</h4>
+<div class="paragraph">
+<p>Omdat Git alle merge resultaten die succesvol zijn staget, zal het aanroepen van <code>git diff</code> terwijl je in een conflicterende merge status zit, je alleen laten zien wat op dit moment zich nog steeds in een conflicterende status bevindt.
+Dit kan heel handig zijn om te zien wat je nog steeds moet oplossen.</p>
+</div>
+<div class="paragraph">
+<p>Als je <code>git diff</code> direct aanroept na een merge conflict, zal het je informatie geven in een nogal unieke diff uitvoer formaat.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc hello.rb
+index 0399cd5,59727f0..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,11 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+++&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+ +  puts 'hola world'
+++=======
++   puts 'hello mundo'
+++&gt;&gt;&gt;&gt;&gt;&gt;&gt; mundo
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit formaat heet “Gecombineerde Diff” (Combined Diff) en geeft je twee kolommen met gegevens naast elke regel.
+De eerste kolom laat je zien dat die regel anders is (toegevoegd of verwijderd) tuseen de “ours” branch en het bestand in je werk directory en de tweede kolom doet hetzelfde tussen de “theirs” branch en de kopie in je werk directory.</p>
+</div>
+<div class="paragraph">
+<p>Dus in het voorbeeld kan je zien dat de <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> en <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> regels in de werk kopie zitten maar in geen van beide kanten van de merge.
+Dit is logisch omdat de merge tool ze daar in heeft gezet voor onze context, maar het wordt van ons verwacht dat we ze weghalen.</p>
+</div>
+<div class="paragraph">
+<p>Als we het conflict oplossen en <code>git diff</code> nogmaals aanroepen, zien we hetzelfde, maar het is iets bruikbaarder.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ vim hello.rb
+$ git diff
+diff --cc hello.rb
+index 0399cd5,59727f0..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het laat ons zien dat “hola world” aan onze kant zat maar niet in de werk kopie, dat “hello mundo” aan hun kant stond maar niet in de werk kopie en uiteindelijk dat “hola mundo” in geen van beide kanten zat maar nu in de werk kopie staat.
+Dit kan nuttig zijn om na te kijken voordat de oplossing wordt gecommit.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt dit ook krijgen van de <code>git log</code> voor elke merge nadat deze is gedaan om achteraf te zien hoe iets was opgelost.
+Git zal deze uitvoer-vorm kiezen als je <code>git show</code> aanroept op een merge commit, of als je de <code>--cc</code> optie gebruikt bij een <code>git log -p</code> (die standaard alleen patces voor non-merge commits laat zien).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --cc -p -1
+commit 14f41939956d80b9e17bb8721354c33f8d5b5a79
+Merge: f1270f7 e3eb223
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri Sep 19 18:14:49 2014 +0200
+
+    Merge branch 'mundo'
+
+    Conflicts:
+        hello.rb
+
+diff --cc hello.rb
+index 0399cd5,59727f0..e1d0799
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_undoing_merges">Merges ongedaan maken</h3>
+<div class="paragraph">
+<p>Nu je weet hoe merge commits te maken, zal je waarschijnlijk er een aantal per ongeluk maken.
+Een van de mooie dingen van het werken met Git is dat het niet erg is om vergissingen te begaan, omdat het mogelijk is (en in veel gevallen makkelijk) om ze te herstellen.</p>
+</div>
+<div class="paragraph">
+<p>Merge commits zijn niet anders.
+Stel dat je bent begonnen met werken op een topic branch, deze abusiefelijk in <code>master</code> heb gemerged, en nu zie je commit historie er zo uit:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/undomerge-start.png" >}}" alt="Abusievelijke merge commit.">
+</div>
+<div class="title">Figuur 138. Abusievelijke merge commit</div>
+</div>
+<div class="paragraph">
+<p>Er zijn twee manieren om dit probleem te benaeren, afhankelijk van wat de gewenste uitkomst is.</p>
+</div>
+<div class="sect4">
+<h4 id="_de_referenties_herstellen">De referenties herstellen</h4>
+<div class="paragraph">
+<p>Als de ongewilde merge commit alleen bestaat in je lokale repository, is de eenvoudigste en beste oplossing om de branches dusdanig te verplaatsten dat ze wijzen naar waar je wilt hebben.
+In de meeste gevallen, als je de foutieve <code>git merge</code> opvolgt met <code>git reset --hard HEAD~</code>, zal dit de branch verwijzingen herstellen zodat ze er zo uit zien:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/undomerge-reset.png" >}}" alt="Historie na `git reset --hard HEAD~`.">
+</div>
+<div class="title">Figuur 139. Historie na <code>git reset --hard HEAD~</code>
+</div>
+</div>
+<div class="paragraph">
+<p>We hebben <code>reset</code> in <a href="{{< relurl "book/nl/v2/ch00/_git_reset" >}}">Reset ontrafeld</a> behandeld, dus het zou niet al te moeilijk uit te vinden wat hier gebeurt.
+Hier is een snelle opfrisser: <code>reset --hard</code> volgt normaalgesproken de volgende drie stappen:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Verplaats de branch waar HEAD naar wijst
+In dit geval willen we <code>master</code> verplaatsen naar waar het was voor de merge commit (<code>C6</code>).</p>
+</li>
+<li>
+<p>Laat de index eruit zien als HEAD.</p>
+</li>
+<li>
+<p>Laat de werk directory eruit zien als de index.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Het nadeel van deze aanpak is dat het de historie herschrijft, wat problematisch kan zijn met een gedeelde repository.
+Bestudeer <a href="{{< relurl "book/nl/v2/ch00/_rebase_peril" >}}">De gevaren van rebasen</a>&gt; om te zien wat er dan gebeuren kan; in het kort houdt het in dat als andere mensen de commits hebben die jij aan het herschrijven bent, je <code>reset</code> eigenlijk wilt vermijden.
+Deze aanpak zal ook niet werken als er andere commits gemaakt zijn sinds de merge; het verplaatsen van de referenties doet deze wijzigingen ook teniet.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_reverse_commit">De commit terugdraaien</h4>
+<div class="paragraph">
+<p>Als het verplaatsen van de branch verwijzingen niet gaat werken voor je, geeft Git je de optie van het maken van een nieuwe commit die alle wijzigingen van een bestaande terugdraait.
+Git noemt deze operatie een “revert”, en in dit specifieke scenario zou je het als volgt aanroepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git revert -m 1 HEAD
+[master b1d8379] Revert "Merge branch 'topic'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>-m 1</code> vlag geeft aan welke ouder de “hoofdlijn” (mainline) is en behouden moet blijven.
+Als je een merge naar <code>HEAD</code> begint (<code>git merge topic</code>), heeft de nieuwe commit twee ouders: de eerste is <code>HEAD</code> (<code>C6</code>), en de tweede is de punt van de branch die erin wordt gemerged (<code>C4</code>).
+In dit geval, willen we alle wijzigingen die zijn geïntroduceerd door het mergen van ouder #2 (<code>C4</code>) terugdraaien, terwijl we de alle inhoud van ouder #1 (<code>C6</code>) behouden.</p>
+</div>
+<div class="paragraph">
+<p>De historie met de terugdraaiende commit ziet er zo uit:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/undomerge-revert.png" >}}" alt="Historie na `git revert -m 1`.">
+</div>
+<div class="title">Figuur 140. Historie na <code>git revert -m 1</code>
+</div>
+</div>
+<div class="paragraph">
+<p>De nieuwe commit <code>^M</code> heeft precies dezelfde inhoud als <code>C6</code>, dus beginnende vanaf hier is het alsof de merge nooit heeft plaatsgevonden, behalve dat de commits die zijn ge-unmerged nog steeds in de geschiedenis van <code>HEAD</code> aanwezig zijn.
+Git zal in de war raken als je probeert <code>topic</code> weer in <code>master</code> te mergen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge topic
+Already up-to-date.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Er is niets in <code>topic</code> wat niet al bereikbaar is vanaf <code>master</code>.
+Wat erger is, als je werk toevoegt aan <code>topic</code> en weer merged, zal Git alleen de wijzigingen meenemen <em>sinds</em> de teruggedraaide merge:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/undomerge-revert2.png" >}}" alt="Historie met een slechte merge.">
+</div>
+<div class="title">Figuur 141. Historie met een slechte merge</div>
+</div>
+<div class="paragraph">
+<p>De beste manier om hiermee om te gaan is om de originele merge te ont-terugdraaien, omdat je nu de wijzigingen wilt doorvoeren die eruit waren verwijderd door ze terug te draaien, en <strong>dan</strong> een nieuwe merge commit te maken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git revert ^M
+[master 09f0126] Revert "Revert "Merge branch 'topic'""
+$ git merge topic</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/undomerge-revert3.png" >}}" alt="Historie na het opnieuw mergen van een teruggedraaide merge.">
+</div>
+<div class="title">Figuur 142. Historie na het opnieuw mergen van een teruggedraaide merge</div>
+</div>
+<div class="paragraph">
+<p>In dit voorbeeld, neutraliseren <code>M</code> en <code>^M</code> elkaar.
+<code>^^M</code> merget effectief de wijzigingen van <code>C3</code> en <code>C4</code>, en <code>C8</code> merged de wijzigingen van <code>C7</code>, dus nu is <code>topic</code> volledig gemerged.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_andere_soorten_merges">Andere soorten merges</h3>
+<div class="paragraph">
+<p>Tot zover hebben we de reguliere merge van twee branches behandeld, normaalgesproken afgehandeld met wat de “recursive” merge strategie wordt genoemd.
+Er zijn echter andere manieren om branches samen te voegen.
+Laten we een aantal van deze snel bespreken.</p>
+</div>
+<div class="sect4">
+<h4 id="_voorkeur_voor_de_onze_of_de_hunne">Voorkeur voor de onze of de hunne</h4>
+<div class="paragraph">
+<p>Allereerst, is er een ander nuttig iets wat we met de normale “recursive” merge wijze kunnen doen.
+We hebben de <code>ignore-all-space</code> en <code>ignore-space-change</code> opties gezien die met een <code>-X</code> worden doorgegeven, maar we kunnen Git ook vertellen om de ene of de andere kant de voorkeur te geven als het een conflict bespeurt.</p>
+</div>
+<div class="paragraph">
+<p>Standaard als Git een conflict ziet tussen twee branche die worden gemerged, zal het merge conflict markeringen in je code toevoegen en het bestand als <em>conflicted</em> bestempelen en je het laten oplossen.
+Als je de voorkeur hebt dat Git eenvoudigweg een bepaalde kant kiest en de andere kant negeert in plaats van je handmatig het conflict te laten oplossen kan je het <code>merge</code> commando een <code>-Xours</code> of <code>-Xtheirs</code> doorgeven.</p>
+</div>
+<div class="paragraph">
+<p>Als Git dit ziet, zal het geen conflict markeringen invoegen.
+Alle verschillen die merge-baar zijn zal het mergen.
+Bij alle verschillen die conflicteren zal het simpelweg in het geheel de kant kiezen doe je opgeeft, ook bij binaire bestanden.</p>
+</div>
+<div class="paragraph">
+<p>Als we terugkijken naar het “hello world” voorbeeld die we hiervoor gaven, kunnen we zien dat mergen in onze branch conflicten gaf.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge mundo
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Resolved 'hello.rb' using previous resolution.
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Echter als we het gebruiken met <code>-Xours</code> of <code>-Xtheirs</code> gebeurt dit niet.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge -Xours mundo
+Auto-merging hello.rb
+Merge made by the 'recursive' strategy.
+ hello.rb | 2 +-
+ test.sh  | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+ create mode 100644 test.sh</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In dat geval, in plaats van conflict markeringen te krijgen in het bestand met “hello mundo” aan de ene en “hola world” aan de andere kant, zal het simpelweg “hola world” kiezen.
+Echter alle andere niet conflicterende wijzigingen in die branch zijn succesvol samengevoegd.</p>
+</div>
+<div class="paragraph">
+<p>Deze optie kan ook aan het <code>git merge-file</code> commando die we eerder zagen worden doorgegeven door iets als <code>git merge-file --ours</code> aan te roepen voor individuele file merges.</p>
+</div>
+<div class="paragraph">
+<p>Als je iets als die wilt doen maar Git niet eens wilt laten proberen wijzigingen van de andere kant te laten samenvoegen, is er een meer draconische optie, en dat is de “ours” merge <em>strategie</em>.
+Dit verschilt met de “ours” recursieve merge <em>optie</em>.</p>
+</div>
+<div class="paragraph">
+<p>Dit zal feitelijk een nep merge uitvoeren.
+Het zal een nieuwe merge commit vastleggen met beide branches als ouders, maar het zal niet eens kijken naar de branch die je merget.
+Het zal eenvoudigweg de exacte code in je huidige branch vastleggen als het resultaat van de merge.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge -s ours mundo
+Merge made by the 'ours' strategy.
+$ git diff HEAD HEAD~
+$</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt zien dat er geen verschil is tussen de branch waar we op zaten en het resultaat van de merge.</p>
+</div>
+<div class="paragraph">
+<p>Dit kan vaak handig zijn als je Git wilt laten denken dat een branch al ingemerget is wanneer je later een merge aan het doen bent.
+Bijvoorbeeld, stel dat je een “release” gemaakt hebt en daar wat werk aan gedaan hebt dat je later zeker naar je <code>master</code>-branche wilt mergen.
+In de tussentijd moet er een of andere bugfix op <code>master</code> moet teruggebracht (backported) worden naar je <code>release</code>-branch.
+Je kunt de bugfix branch in de <code>release</code>-branch mergen en dezelfde branch ook met <code>merge -s ours</code> in je <code>master</code>-branch mergen (zelfs als de fix daar al aanwezig is) zodat later als je de <code>release</code>-branch weer merget, er geen conflicten met de bugfix zijn.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_subtree_merge">Het mergen van subtrees</h4>
+<div class="paragraph">
+<p>Het idee achter de subtree merge is dat je twee projecten hebt, en een van de projecten verwijst naar een subdirectory van de ander en vice versa.
+Als je een subtree merge specificeert, is Git vaak slim genoeg om uit te vinden dat de ene een subtree van de ander en zal daarvoor passend mergen.</p>
+</div>
+<div class="paragraph">
+<p>We zullen een voorbeeld doornemen van het toevoegen van een separaat project in een bestaand project en dan de code mergen van de tweede naar een subdirectory van de eerste.</p>
+</div>
+<div class="paragraph">
+<p>Eerst zullen we de Rack applicatie aan ons project toevoegen.
+We gaan het Rack project als een remote referentie in ons project toevoegen en deze dan uitchecken in zijn eigen branch:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add rack_remote https://github.com/rack/rack
+$ git fetch rack_remote --no-tags
+warning: no common commits
+remote: Counting objects: 3184, done.
+remote: Compressing objects: 100% (1465/1465), done.
+remote: Total 3184 (delta 1952), reused 2770 (delta 1675)
+Receiving objects: 100% (3184/3184), 677.42 KiB | 4 KiB/s, done.
+Resolving deltas: 100% (1952/1952), done.
+From https://github.com/rack/rack
+ * [new branch]      build      -&gt; rack_remote/build
+ * [new branch]      master     -&gt; rack_remote/master
+ * [new branch]      rack-0.4   -&gt; rack_remote/rack-0.4
+ * [new branch]      rack-0.9   -&gt; rack_remote/rack-0.9
+$ git checkout -b rack_branch rack_remote/master
+Branch rack_branch set up to track remote branch refs/remotes/rack_remote/master.
+Switched to a new branch "rack_branch"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu hebben we de root van het Rack project in onze <code>rack_branch</code>-branch en ons eigen project in de <code>master</code>-branch.
+Als je eerst de ene en dan de andere uitcheckt, kan je zien dat ze verschillende project roots hebben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ls
+AUTHORS         KNOWN-ISSUES   Rakefile      contrib         lib
+COPYING         README         bin           example         test
+$ git checkout master
+Switched to branch "master"
+$ ls
+README</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit is een beetje een raar concept.
+Het is niet verplicht dat alle branches in je repository branches van hetzelfde project zijn.
+Het is niet iets wat vaak voorkomt, omdat het zelden behulpzaam is, maar het is relatief eenvoudig om branches te hebben die volledig verschillende histories hebben.</p>
+</div>
+<div class="paragraph">
+<p>In dit geval willen we het Rack project in onze <code>master</code>-project binnenhalen (pull) als een subdirectory.
+We kunnen dat in Git doen met <code>git read-tree</code>.
+Je zult meer over <code>read-tree</code> en zijn vriendjes leren in <a href="{{< relurl "book/nl/v2/ch00/ch10-git-internals" >}}">Git Binnenwerk</a>, maar neem voor nu aan dat het de root tree van een branch naar je huidige staging area en werk dirctory inleest.
+We zijn zojuist teruggeschakeld naar de <code>master</code>-branch, en we pullen de <code>rack_branch</code>-branch in de <code>rack</code> subdirectory van de <code>master</code>-branch van ons hoofdproject:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git read-tree --prefix=rack/ -u rack_branch</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als we committen, zal het lijken alsof we alle Rack bestanden onder die subdirectory hebben - alsof we ze vanuit een tarball gekopieerd hebben.
+Wat dit interessant maakt, is dat we relatief eenvoudig wijzigingen van de ene branch naar de andere kunnen mergen.
+Dus, als het Rack project wijzigt, kunnen we upstream wijzigingen binnenhalen door naar die branch over te schakelen en te pullen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout rack_branch
+$ git pull</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Daarna kunnen we die wijzigingen in onze <code>master</code>-branch mergen.
+Om de wijzigingen binnen te halen en de commit message alvast in te vullen, gebruik je de <code>--squash</code> optie zowel als de <code>-Xsubtree</code> optie van de recursieve merge strategy.
+(De recursieve strategie is hier de standaard, maar we voegen het voor de duidelijkheid toe).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+$ git merge --squash -s recursive -Xsubtree=rack rack_branch
+Squash commit -- not updating HEAD
+Automatic merge went well; stopped before committing as requested</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>All de wijzigingen van het Rack project zijn gemerged en klaar om lokaal te worden gecommit.
+Je kunt ook het tegenovergestelde doen - de wijzigingen in de <code>rack</code> subdirectory van je master branch maken en ze dan later naar je <code>rack_branch</code>-branch mergen om ze dan in te dienen bij de beheerders of ze stroomopwaarts te pushen.</p>
+</div>
+<div class="paragraph">
+<p>Dit is een manier om een workflow te krijgen die lijkt op de submodule workflow zonder submodules te gebruiken (wat we in <a href="{{< relurl "book/nl/v2/ch00/_git_submodules" >}}">Submodules</a> zullen behandelen).
+We kunnen in onze repository branches aanmaken met andere gerelateerde projecten en ze bij tijd en wijle subtree mergen in ons project.
+Dit is in sommige opzichten handig, bijvoorbeeld omdat alle code op een enkele plaats wordt gecommit.
+Het heeft echter ook nadelen in de zin dat het iets complexer is en gevoeliger voor fouten in het herintegreren van wijzigingen of abusievelijk een branch te pushen naar een niet gerelateerde repository.</p>
+</div>
+<div class="paragraph">
+<p>Een ander gek iets is dat om een diff te krijgen tussen wat je in je <code>rack</code> subdirectory hebt en de code in je <code>rack_branch</code>-branch - om te zien of je ze moet mergen - kan je niet het normale <code>diff</code> commando gebruiken.
+In plaats daarvan moet je <code>git diff-tree</code> aanroepen met de branch waar het je mee wilt vergelijken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff-tree -p rack_branch</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Of, om wat in je <code>rack</code> subdirectory zit te vergelijken met wat de <code>master</code>-branch op de server was de laatste keer dat je gefetcht hebt kan je dit aanroepen</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff-tree -p rack_remote/master</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
