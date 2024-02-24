@@ -1,0 +1,1110 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git en andere systemen
+    number: 9
+  section:
+    title: Migreren naar Git
+    number: 2
+    cs_number: '9.2'
+    previous: book/nl/v2/Git-en-andere-systemen-Git-als-een-client
+    next: book/nl/v2/Git-en-andere-systemen-Samenvatting
+title: Git - Migreren naar Git
+
+---
+<h2 id="_migrating">Migreren naar Git</h2>
+<div class="paragraph">
+<p>
+Als je een bestaande codebase in een andere VCS hebt, en je hebt besloten om Git te gaan gebruiken, moet je je project op de een of andere manier migreren.
+Deze paragraaf behandelt een aantal importeerders voor veelgebruikte systemen, en laat je daarna zien hoe je je eigen importeur kunt ontwikkelen.
+Je zult kunnen lezen hoe gegevens uit een aantal van de grote professioneel gebruikte SCM systemen te importeren, omdat zij het leeuwendeel van de gebruikers vormen die overgaan, en omdat het eenvoudig is om instrumenten van hoge kwaliteit te pakken te krijgen.</p>
+</div>
+<div class="sect3">
+<h3 id="_subversion">Subversion</h3>
+<div class="paragraph">
+<p>
+
+Als je de vorige paragraaf leest over het gebruik van`git svn`, kan je eenvoudigweg deze instructies gebruiken om met <code>git svn clone</code> een repository te maken en daarna te stoppen met de Subversion server, naar een nieuwe Git server te pushen en die beginnen te gebruiken.
+Als je de historie wilt, kan je dat zo snel voor elkaar krijgen als je de gegevens uit de Subversion server kunt krijgen (en dat kan even duren).</p>
+</div>
+<div class="paragraph">
+<p>Deze import is echter niet perfect, en omdat het zo lang duurt, kan je eigenlijk ook meteen maar goed doen.
+Het eerste probleem is de auteur-informatie.
+In Subversion, heeft elke persoon die commit heeft gedaan een gebruikersnaam op het systeem die wordt opgenomen in de commit-informatie.
+De voorbeelden in de vorige paragraaf tonen <code>schacon</code> in bepaalde plaatsen, zoals de <code>blame</code> uitvoer en de <code>git svn log</code>.
+Als je dit beter op Git auteur-gegevens wilt mappen, moet je een relatie leggen van de Subversion gebruikers naar de Git auteurs.
+Maak een bestand genaamd <code>users.txt</code> die deze mapping-informatie heeft in een formaat als deze:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>schacon = Scott Chacon &lt;schacon@geemail.com&gt;
+selse = Someo Nelse &lt;selse@geemail.com&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Om een lijst van auteur-namen te krijgen die SVN gebruikt, kan je dit aanroepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ svn log --xml --quiet | grep author | sort -u | \
+  perl -pe 's/.*&gt;(.*?)&lt;.*/$1 = /'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dat maakt de loguitvoer in XML formaat aan, en behoudt vervolgens alleen de regels met auteur-informatie, verwijdert duplicaten en haalt de XML tags weg.
+(Dit werkt duidelijk alleen op een machine met <code>grep</code>, <code>sort</code>, en <code>perl</code> erop geïnstalleerd).
+Stuur daarna de uitvoer naar je users.txt bestand zodat je de overeenkomstige Git gebruiker gegevens naast elke regel kunt zetten.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt dit bestand aan <code>git svn</code> geven om het te helpen de auteur gegevens beter te mappen.
+Je kunt <code>git svn</code> ook vertellen de meta-data die Subversion normaalgesproken importeert niet mee te nemen, door <code>--no-metadata</code> mee te geven aan de <code>clone</code> of <code>init</code> commando’s.
+Hierdoor ziet je <code>import</code> commando er ongeveer zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn clone http://my-project.googlecode.com/svn/ \
+      --authors-file=users.txt --no-metadata --prefix "" -s my_project
+$ cd my_project</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu zou je een mooiere Subversion import moeten hebben in je <code>my_project</code> directory.
+In plaats van commits die er uit zien als dit</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>commit 37efa680e8473b615de980fa935944215428a35a
+Author: schacon &lt;schacon@4c93b258-373f-11de-be05-5f7a86268029&gt;
+Date:   Sun May 3 00:12:22 2009 +0000
+
+    fixed install - go to trunk
+
+    git-svn-id: https://my-project.googlecode.com/svn/trunk@94 4c93b258-373f-11de-
+    be05-5f7a86268029</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>zien ze er zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>commit 03a8785f44c8ea5cdb0e8834b7c8e6c469be2ff2
+Author: Scott Chacon &lt;schacon@geemail.com&gt;
+Date:   Sun May 3 00:12:22 2009 +0000
+
+    fixed install - go to trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Niet alleen ziet het Author veld er veel beter uit, maar de <code>git-svn-id</code> is er ook niet meer.</p>
+</div>
+<div class="paragraph">
+<p>Je moet ook nog wat opschonen na de import.
+Onder andere moet je de vreemde referenties opschonen die <code>git svn</code> heeft gemaakt.
+Allereerst ga je de tags verplaatsen zodat ze echte tags zijn, in plaats van vreemde remote branches, en daarna verplaats je de overige branches zodat ze lokaal zijn.</p>
+</div>
+<div class="paragraph">
+<p>Om de tags te verplaatsen zodat ze echte Git tags worden, roep je dit aan</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ for t in $(git for-each-ref --format='%(refname:short)' refs/remotes/tags); do git tag ${t/tags\//} $t &amp;&amp; git branch -D -r $t; done</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit neemt de referenties die remote branches waren en begonnen met <code>refs/remotes/tags/</code> en maakt er echte (lichtgewicht) tags van.</p>
+</div>
+<div class="paragraph">
+<p>Daarna verplaatsen we de overige referenties onder <code>refs/remotes</code> om er lokale branches van te maken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ for b in $(git for-each-ref --format='%(refname:short)' refs/remotes); do git branch $b refs/remotes/$b &amp;&amp; git branch -D -r $b; done</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het kan gebeuren dat je een aantal extra branches ziet die vooraf worden gegaan door <code>@xxx</code> (waar xxx een getal is), terwijl je in Subversion aleen maar een branch ziet.
+Dit is eigenlijk een Subversion kenmerk genaamd “peg-revisions”, wat iets is waar Git gewoonweg geen syntactische tegenhanger voor heeft.
+Vandaar dat <code>git svn</code> eenvoudigweg het svn versienummer aan de branchnaam toevoegt op dezelfde manier als jij dit zou hebben gedaan in svn om het peg-revisie van die branch te adresseren.
+Als je niet meer om de peg-revisies geeft, kan je ze simpelweg verwijderen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ for p in $(git for-each-ref --format='%(refname:short)' | grep @); do git branch -D $p; done</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu zijn alle oude branches echte Git branches en alle oude tags echte Git tags.</p>
+</div>
+<div class="paragraph">
+<p>Er is nog een laatste ding om op te schonen:
+Helaas maakt <code>git svn</code> een extra branch aan met de naam <code>trunk</code>, wat overeenkomt met de standaard branch in Subversion, maar de <code>trunk</code>-referentie wijst naar dezelfde plek als <code>master</code>.
+Omdat <code>master</code> idiomatisch meer Git is, is hier de manier om die extra branch te verwijderen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch -d trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het laatste om te doen is om je nieuwe Git server als een remote toe te voegen en er naar te pushen.
+Hier is een voorbeeld van een server als een remote toe te voegen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add origin git@my-git-server:myrepository.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Omdat al je branches en tags ernaar wilt sturen, kan je nu dit aanroepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git push origin --all
+$ git push origin --tags</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Al je branches en tags zouden nu op je nieuwe Git server moeten staan in een mooie, schone import.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_mercurial">Mercurial</h3>
+<div class="paragraph">
+<p>
+Omdat Mercurial and Git een redelijk overeenkomend model hebben om versies te representeren en omdat Git iets flexibeler is, is het converteren van een repository uit Mercurial naar Git minder omslachtig, gebruik makend van een instrument dat "hg-fast-export" heet, waar je een kopie van nodig gaat hebben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://github.com/frej/fast-export.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De eerste stap in de conversie is om een volledige kloon van de Mercurial repository die je wilt converteren te maken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg clone &lt;remote repo URL&gt; /tmp/hg-repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De volgende stap is om een auteur-mapping bestand te maken.
+Mercurial is wat minder streng dan Git voor wat het in het auteur veld zet voor changesets, dus dit is een goed moment om schoon schip te maken.
+Het aanmaken hiervan is een enkele commando regel in een <code>bash</code> shell:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd /tmp/hg-repo
+$ hg log | grep user: | sort | uniq | sed 's/user: *//' &gt; ../authors</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit duurt een paar tellen, afhankelijk van de lengte van de geschiedenis van je project, en nadien ziet het <code>/tmp/authors</code> bestand er ongeveer zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>bob
+bob@localhost
+bob &lt;bob@company.com&gt;
+bob jones &lt;bob &lt;AT&gt; company &lt;DOT&gt; com&gt;
+Bob Jones &lt;bob@company.com&gt;
+Joe Smith &lt;joe@company.com&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In dit voorbeeld, heeft dezelfde persoon (Bob) changesets aangemaakt onder vier verschillende namen, waarvan er één er wel correct uitziet, en één ervan zou voor een Git commit helemaal niet geldig zijn.
+Hg-fast-export laat ons dit corrigeren door elke regel in een instructie te veranderen: <code>"&lt;invoer&gt;"="&lt;uitvoer&gt;"</code>, waarbij <code>&lt;invoer&gt;</code> in een <code>&lt;uitvoer&gt;</code> wordt gewijzigd.
+Binnen de <code>&lt;invoer&gt;</code> en <code>&lt;uitvoer&gt;</code> tekenreeksen, worden alle <em>escaped</em> reeksen die door de python <code>string_escape</code> encoding worden begrepen ondersteund.
+Als het auteur mapping-bestand geen passende <code>&lt;invoer&gt;</code> regel heeft, wordt deze ongewijzigd doorgestuurd naar Git.
+Als alle gebruikersnamen er goed uitzien, hebben we dit bestand helemaal niet nodig.
+In ons voorbeeld, willen we dat ons bestand er zo uit ziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>"bob"="Bob Jones &lt;bob@company.com&gt;"
+"bob@localhost"="Bob Jones &lt;bob@company.com&gt;"
+"bob &lt;bob@company.com&gt;"="Bob Jones &lt;bob@company.com&gt;"
+"bob jones &lt;bob &lt;AT&gt; company &lt;DOT&gt; com&gt;"="Bob Jones &lt;bob@company.com&gt;"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hetzelfde soort mapping bestand kan worden gebruikt om branches en tags te hernoemen als de Mercurial naam niet wordt toegestaan door Git.</p>
+</div>
+<div class="paragraph">
+<p>De volgende stap is om onze nieuwe Git repository aan te maken en het volgende export script aan te roepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init /tmp/converted
+$ cd /tmp/converted
+$ /tmp/fast-export/hg-fast-export.sh -r /tmp/hg-repo -A /tmp/authors</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>-r</code> vlag vertelt hg-fast-export waar het de Mercurial repository kan vinden die we willen converteren, en de <code>-A</code> vlag vertelt het waar het auteur-mapping bestand te vinden is.
+Het script verwerkt Mercurial changesets en converteert ze in een script voor de "fast-import" functie (die we iets later zullen bespreken).
+Dit duurt even (al is het <em>veel</em> sneller dan het via het netwerk zou zijn), en de uitvoer is nogal breedsprakig:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ /tmp/fast-export/hg-fast-export.sh -r /tmp/hg-repo -A /tmp/authors
+Loaded 4 authors
+master: Exporting full revision 1/22208 with 13/0/0 added/changed/removed files
+master: Exporting simple delta revision 2/22208 with 1/1/0 added/changed/removed files
+master: Exporting simple delta revision 3/22208 with 0/1/0 added/changed/removed files
+[…]
+master: Exporting simple delta revision 22206/22208 with 0/4/0 added/changed/removed files
+master: Exporting simple delta revision 22207/22208 with 0/2/0 added/changed/removed files
+master: Exporting thorough delta revision 22208/22208 with 3/213/0 added/changed/removed files
+Exporting tag [0.4c] at [hg r9] [git :10]
+Exporting tag [0.4d] at [hg r16] [git :17]
+[…]
+Exporting tag [3.1-rc] at [hg r21926] [git :21927]
+Exporting tag [3.1] at [hg r21973] [git :21974]
+Issued 22315 commands
+git-fast-import statistics:
+---------------------------------------------------------------------
+Alloc'd objects:     120000
+Total objects:       115032 (    208171 duplicates                  )
+      blobs  :        40504 (    205320 duplicates      26117 deltas of      39602 attempts)
+      trees  :        52320 (      2851 duplicates      47467 deltas of      47599 attempts)
+      commits:        22208 (         0 duplicates          0 deltas of          0 attempts)
+      tags   :            0 (         0 duplicates          0 deltas of          0 attempts)
+Total branches:         109 (         2 loads     )
+      marks:        1048576 (     22208 unique    )
+      atoms:           1952
+Memory total:          7860 KiB
+       pools:          2235 KiB
+     objects:          5625 KiB
+---------------------------------------------------------------------
+pack_report: getpagesize()            =       4096
+pack_report: core.packedGitWindowSize = 1073741824
+pack_report: core.packedGitLimit      = 8589934592
+pack_report: pack_used_ctr            =      90430
+pack_report: pack_mmap_calls          =      46771
+pack_report: pack_open_windows        =          1 /          1
+pack_report: pack_mapped              =  340852700 /  340852700
+---------------------------------------------------------------------
+
+$ git shortlog -sn
+   369  Bob Jones
+   365  Joe Smith</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Meer valt er eigenlijk niet over te vertellen.
+Alle Mercurial tags zijn geconverteerd naar Git tags, en Mercurial branches en boekleggers (bookmarks) zijn geconverteerd naar Git branches.
+Nu ben je klaar om de repository naar zijn nieuwe server-thuis te sturen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add origin git@my-git-server:myrepository.git
+$ git push origin --all</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_bazaar">Bazaar</h3>
+<div class="paragraph">
+<p></p>
+</div>
+<div class="paragraph">
+<p>Bazaar is een DVCS tool die veel op Git lijkt, en als gevolg is het redelijk probleemloos om een Bazaar repository in een van Git te converteren.
+Om dit voor elkaar te krijgen, moet je de <code>bzr-fastimport</code>-plugin importeren.</p>
+</div>
+<div class="sect4">
+<h4 id="_de_bzr_fastimport_plugin_verkrijgen">De bzr-fastimport plugin verkrijgen</h4>
+<div class="paragraph">
+<p>De procedure om de fastimport plugin te installeren verschilt op een UNIX-achtige besturingssysteem en op Windows.
+In het eerste geval, is het het eenvoudigste om het <code>bzr-fastimport</code>-pakket te installeren, en dat zal alle benodigde afhankelijkheden installeren.</p>
+</div>
+<div class="paragraph">
+<p>Bijvoorbeeld, met Debian en afgeleiden, zou je het volgende doen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo apt-get install bzr-fastimport</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Met RHEL, zou je het volgende doen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo yum install bzr-fastimport</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Met Fedora, vanaf release 22, is dnf de nieuwe package manager:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo dnf install bzr-fastimport</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als het pakket niet beschikbaar is, kan je het als een plugin installeren:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ mkdir --parents ~/.bazaar/plugins     # maakt de benodigde folders voor de plugins
+$ cd ~/.bazaar/plugins
+$ bzr branch lp:bzr-fastimport fastimport   # iumporteert de fastimport plugin
+$ cd fastimport
+$ sudo python setup.py install --record=files.txt   # installeert de plugin</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Om deze plugin te laten werken, heb je ook de <code>fastimport</code> Python module nodig.
+Je kunt controleren of deze aanwezig is of niet en het installeren met de volgende commando’s:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ python -c "import fastimport"
+Traceback (most recent call last):
+  File "&lt;string&gt;", line 1, in &lt;module&gt;
+ImportError: No module named fastimport
+$ pip install fastimport</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als het niet beschikbaar is, kan je hte downloaden van het adres <a href="https://pypi.python.org/pypi/fastimport/" class="bare">https://pypi.python.org/pypi/fastimport/</a>.</p>
+</div>
+<div class="paragraph">
+<p>In het tweede geval (op Windows), wordt <code>bzr-fastimport</code> automatisch geinstalleerd met de standalone versie en de standaard installatie (laat alle checkboxen aangevinkt).
+Dus in dit geval hoef je niets te doen.</p>
+</div>
+<div class="paragraph">
+<p>Vanaf dat moment, is de manier waarop je een Bazaar repository afhankelijk van of je een enkele branch hebt, of dat je op een repository werkt die meerdere branches heeft.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_project_met_een_enkele_branch">Project met een enkele branch</h4>
+<div class="paragraph">
+<p>Ga met <code>cd</code> in de directory die jouw Bazaar repository bevat en initialiseer de Git repository:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd /path/to/the/bzr/repository
+$ git init</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu kan je eenvoudigweg je Bazaar repository exporteren en converteren in een Git repository met het volgende commando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ bzr fast-export --plain . | git fast-import</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Afhankelijk van de grootte van het project, wordt jouw Git repository gebouwd in een periode varierend van een paar seconden tot een paar minuten.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_het_geval_van_een_project_met_een_hoofd_branch_en_een_werk_branch">Het geval van een project met een hoofd-branch en een werk-branch</h4>
+<div class="paragraph">
+<p>Je kunt ook een Bazaar repository importeren dat branches bevat.
+Laten we aannemen dat je twee branches hebt: een vertegenwoordigt de hoofd-branch (myProject.trunk), de andere is de werk-branch (myProject.work).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ls
+myProject.trunk myProject.work</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Maak de Git repository en ga er met <code>cd</code> erheen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init git-repo
+$ cd git-repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Pull de master-branch in git:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ bzr fast-export --export-marks=../marks.bzr ../myProject.trunk | \
+git fast-import --export-marks=../marks.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Pull de werk-branch in Git:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ bzr fast-export --marks=../marks.bzr --git-branch=work ../myProject.work | \
+git fast-import --import-marks=../marks.git --export-marks=../marks.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><code>git branch</code> zal je nu de <code>master</code>-branch alsook de <code>work</code>-branch laten zien.
+Controleer de logs om je ervan te vergewissen dat ze volledig zijn en verwijder de <code>marks.bzr</code> en de <code>marks.git</code> bestanden.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_de_staging_area_synchroniseren">De staging area synchroniseren</h4>
+<div class="paragraph">
+<p>Onafhankelijk van het aantal branches die je had en de import-methode die je gebruikt hebt, is je staging area niet gesynchroniseerd met <code>HEAD</code>, en met het importeren van verschillende branches, is je werk-directory ook niet gesynchroniseerd.
+Deze situatie is eenvoudig op te lossen met het volgende commando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard HEAD</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_het_negeren_van_de_bestanden_die_met_bzrignore_werden_genegeerd">Het negeren van de bestanden die met .bzrignore werden genegeerd</h4>
+<div class="paragraph">
+<p>Laten we nu eens kijken naar de te negeren bestanden.
+Het eerste wat we moeten doen is <code>.bzrignore</code> naar <code>.gitignore</code> hernoemen.
+Als het <code>.bzrignore</code> bestand een of meerdere regels bevat die beginnen met "!!" of "RE:", zal je deze moetten wijzigen en misschien verscheidene <code>.gitignore</code>-bestanden maken om precies dezelfde bestanden te negerern die Bazaar ook negeerde.</p>
+</div>
+<div class="paragraph">
+<p>Uiteindelijk zal je een commit moeten maken die deze wijziging voor de migratie bevat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git mv .bzrignore .gitignore
+$ # modify .gitignore if needed
+$ git commit -am 'Migration from Bazaar to Git'</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_jouw_repository_naar_de_server_sturen">Jouw repository naar de server sturen</h4>
+<div class="paragraph">
+<p>We zijn er!
+Je kunt nu de repository naar zijn nieuwe thuis-server pushen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add origin git@my-git-server:mygitrepository.git
+$ git push origin --all
+$ git push origin --tags</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je Git repository is klaar voor gebruik.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_perforce_import">Perforce</h3>
+<div class="paragraph">
+<p>
+Het volgende systeem waar we naar gaan kijken is het importeren uit Perforce.
+Zoals hierboven besproken, zijn er twee manieren om Git en Perforce met elkaar te laten praten: git-p4 en Perforce Git Fusion.</p>
+</div>
+<div class="sect4">
+<h4 id="_perforce_git_fusion">Perforce Git Fusion</h4>
+<div class="paragraph">
+<p>Met Git Fusion verloopt dit proces vrijwel pijnloos.
+Configureer alleen je project settings, user mappings en branches met behulp van een configuratie bestand (zoals behandeld in <a href="{{< relurl "book/nl/v2/ch00/_p4_git_fusion" >}}">Git Fusion</a>), en clone de repository.
+Git Fusion geeft je iets wat eruit ziet als een echte Git repository, die dan klaar is om naar een reguliere Git host te pushen als je dat wilt.
+Je kunt zelfs Perforce als je Git host gebruiken als je dat wilt.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_git_p4">Git-p4</h4>
+<div class="paragraph">
+<p>Git-p4 kan ook als een importeer gereedschap werken.
+Als voorbeeld zullen we het Jam project importeren van de Perforce Public Depot.
+Om je werkstation in te richten, moet je de P4PORT omgevingsvariabele exporteren zodat deze wijst naar het Perforce depot:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ export P4PORT=public.perforce.com:1666</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Om dit mee te kunnen doen, moet je een Perforce depot hebben om mee te verbinden.
+Wij zullen het publieke depot op public.perforce.com gebruiken in onze voorbeelden, maar je kunt elk depot waar jetoegang toe hebt gebruiken.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>
+Roep het <code>git p4 clone</code> commando aan om het Jam project van de Perforce server te importeren, waarbij je het pad van het depot en het project en het pad waar je het project in wilt importeren meegeeft:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git-p4 clone //guest/perforce_software/jam@all p4import
+Importing from //guest/perforce_software/jam@all into p4import
+Initialized empty Git repository in /private/tmp/p4import/.git/
+Import destination: refs/remotes/p4/master
+Importing revision 9957 (100%)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit specifieke project heeft maar een branch, maar als je branches hebt die geconfigureerd zijn met branch views (of alleen een set directories), kan je de <code>--detect-branches</code> vlag gebruiken bij <code>git p4 clone</code> om alle branches van het project ook te importeren.
+Zie <a href="{{< relurl "book/nl/v2/ch00/_git_p4_branches" >}}">Branchen</a> voor wat meer diepgang op dit onderwerp.</p>
+</div>
+<div class="paragraph">
+<p>Op dit punt ben je bijna klaar.
+Als je naar de <code>p4import</code> directory gaat en <code>git log</code> aanroept, kan je je geïmporteerde werk zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -2
+commit e5da1c909e5db3036475419f6379f2c73710c4e6
+Author: giles &lt;giles@giles@perforce.com&gt;
+Date:   Wed Feb 8 03:13:27 2012 -0800
+
+    Correction to line 355; change &lt;/UL&gt; to &lt;/OL&gt;.
+
+    [git-p4: depot-paths = "//public/jam/src/": change = 8068]
+
+commit aa21359a0a135dda85c50a7f7cf249e4f7b8fd98
+Author: kwirth &lt;kwirth@perforce.com&gt;
+Date:   Tue Jul 7 01:35:51 2009 -0800
+
+    Fix spelling error on Jam doc page (cummulative -&gt; cumulative).
+
+    [git-p4: depot-paths = "//public/jam/src/": change = 7304]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt zien dat <code>git-p4</code> een identificerend element heeft achtergelaten in elk commit-bericht.
+Je kunt dit element prima daar laten, in het geval dat je in de toekomst naar het Perforce change nummer moet refereren.
+Echter, als je dit element wilt weghalen, is dit het moment om het te doen - voordat je begint te werken met de nieuwe repository.
+
+Je kunt <code>git filter-branch</code> gebruiken om de element-tekenreeksen en masse te verwijderen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git filter-branch --msg-filter 'sed -e "/^\[git-p4:/d"'
+Rewrite e5da1c909e5db3036475419f6379f2c73710c4e6 (125/125)
+Ref 'refs/heads/master' was rewritten</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je <code>git log</code> aanroept, kan je zien dat alle SHA-1 checksums voor de commits zijn gewijzigd, maar de <code>git-p4</code> tekenreeksen staan niet meer in de commit-berichten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -2
+commit b17341801ed838d97f7800a54a6f9b95750839b7
+Author: giles &lt;giles@giles@perforce.com&gt;
+Date:   Wed Feb 8 03:13:27 2012 -0800
+
+    Correction to line 355; change &lt;/UL&gt; to &lt;/OL&gt;.
+
+commit 3e68c2e26cd89cb983eb52c024ecdfba1d6b3fff
+Author: kwirth &lt;kwirth@perforce.com&gt;
+Date:   Tue Jul 7 01:35:51 2009 -0800
+
+    Fix spelling error on Jam doc page (cummulative -&gt; cumulative).</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je import is klaar om te worden gepusht naar je nieuwe Git server.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_tfs">TFS</h3>
+<div class="paragraph">
+<p>
+Als je team haar versiebeheer uit TFVC naar Git gaat converteren, wil je de hoogst-betrouwbare conversie gebruiken die je maar kunt krijgen.
+Dit houdt in dat, hoewel we zowel git-tfs als git-tf in de samenwerkings-paragraaf hebben behandeld, zullen we hier alleen git-tfs behandelen, omdat git-tfs branches ondersteunt, en deze beperking het vrijwel onmogelijk maakt om git-tf hiervoor te gebruiken.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Dit is een eenrichtings conversie.
+De Git repository die hier wordt aangemaakt kan geen verbinding meer leggen met het oorspronkelijk TFVC project.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Het eerste om te doen is gebruikersnamen mappen.
+TFVC is nogal ruimdenkend met wat er in het auteur veld gaat voor changesets, maar Git wil een voor de mens leesbare naam en email adres hebben.
+Je kunt deze informatie als volgt van het <code>tf</code> commando-regel client krijgen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-powershell" data-lang="powershell">PS&gt; tf history $/myproject -recursive &gt; AUTHORS_TMP</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit pakt alle changesets in de geschiedenis van het project en zet dit in het AUTHORS_TMP bestand die we verder gaan verwerken om de gegevens uit het <em>User</em> kolom (de tweede) te halen.
+Open het bestand en bekijk op welke karakter de kolom begint en eindigt en vervang, in de volgende commando-regel, de parameters <code>11-20</code> van het <code>cut</code> commando met de waarden die jij gevonden hebt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-powershell" data-lang="powershell">PS&gt; cat AUTHORS_TMP | cut -b 11-20 | tail -n+3 | sort | uniq &gt; AUTHORS</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het <code>cut</code> commando behoudt alleen de karakters tussen 11 en 20 van elke regel.
+Het <code>tail</code> commando slaat de eerste twee regels over, die kolom-koppen en ASCII-art onderstrepingen zijn.
+Het resultaat van dit alles wordt aan <code>sort</code> en <code>uniq</code> doorgegeven om duplicaten te verwijderen en bewaard in een bestand genaamd <code>AUTHORS</code>.
+De volgende stap is handmatig; om git-tfs van dit bestand gebruik te laten maken, moet elke regel in dit formaat staan:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-text" data-lang="text">DOMAIN\username = User Name &lt;email@address.com&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het gedeelte links is het “User” veld van TFVC, en het gedeelte rechts van het gelijk-teken is de gebruikersnaam die voor Git commits gaat worden gebruikt.</p>
+</div>
+<div class="paragraph">
+<p>Als je dit bestand eenmaal hebt, is de volgende stap om te nemen een volledige kloon van het TFVC project waar je in bent geïnteresseerd te maken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-powershell" data-lang="powershell">PS&gt; git tfs clone --with-branches --authors=AUTHORS https://username.visualstudio.com/DefaultCollection $/project/Trunk project_git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vervolgens wil je de <code>git-tfs-id</code> gedeeltes aan het eind van de commit-berichten opschonen.
+Het volgende commando gaat dit doen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-powershell" data-lang="powershell">PS&gt; git filter-branch -f --msg-filter 'sed "s/^git-tfs-id:.*$//g"' '--' --all</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit gebruikt het <code>sed</code> commando van de Git-bash omgeving om elke regel die begint met “git-tfs-id:” met leegte te vervangen, dit Git vervolgens dan zal negeren.</p>
+</div>
+<div class="paragraph">
+<p>Als dit eenmaal gedaan is, ben je klaar om een nieuwe remote toe te voegen, al je branches te pushen, en je team is klaar om met Git te gaan werken.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_custom_importer">Importeren op maat</h3>
+<div class="paragraph">
+<p>
+
+Als jouw systeem niet een van de bovenstaande is, moet je op het internet gaan zoeken naar een importeerder - goede importeerders zijn beschikbaar voor vele andere systemen, inclusief CVS, Clear Case, Visual Source Safe en zelfs een directory met archieven.
+Als geen van die tools voor jou geschikt zijn, je hebt een heel obscure tool, of je hebt om een andere reden een meer aangepaste importeer proces nodig, dan moet je <code>git fast-import</code> gebruiken.
+Dit commando leest eenvoudige instructies van stdin om specifieke Git gegevens te schrijven.
+Het is veel eenvoudiger om op deze manier Git objecten aan te maken dan de rauwe Git commando’s te gebruiken of om zelf de rauwe objecten te schrijven (zie <a href="{{< relurl "book/nl/v2/ch00/ch10-git-internals" >}}">Git Binnenwerk</a> voor meer informatie).
+Op deze manier kan je een import script schrijven die de benodigde informatie uit het te importeren systeem leest en op stdout eenvoudige instructies afdrukt.
+Je kunt dit programma dan aanroepen en de uitvoer doorgeven aan <code>git fast-import</code> met een pipe-instructie.</p>
+</div>
+<div class="paragraph">
+<p>Om een snelle demonstratie te geven, ga je een eenvoudige importeerder schrijven.
+Stel dat je in <code>current</code> aan het werk bent, je maakt op gezette tijden een backup van je project door de directory naar een andere te kopieren met een datum-tijd indicatie genaamd <code>back_YYYY_MM_DD</code>, en je wilt dit importeren in Git.
+Je directory-structuur ziet er zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ls /opt/import_from
+back_2014_01_02
+back_2014_01_04
+back_2014_01_14
+back_2014_02_03
+current</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Om een Git directory te importeren, moet je weten hoe Git haar gegevens opslaat.
+Zoals je je zult herinneren, is Git in de basis een geschakelde lijst van commit objecten die verwijzen naar een snapshot van de inhoud.
+Alles wat je hoeft te doen is <code>fast-import</code> te vertellen wat de snapshots van de inhoud zijn, welke commit-gegevens hiernaar verwijzen en de volgorde waarin ze staan.
+Je strategie zal zijn om een voor een door de snapshots te gaan en commits te maken met de inhoud van elke directory, en elke commit terug te laten verwijzen naar de vorige.</p>
+</div>
+<div class="paragraph">
+<p>Zoals we in <a href="{{< relurl "book/nl/v2/ch00/_an_example_git_enforced_policy" >}}">Een voorbeeld van Git-afgedwongen beleid</a> gedaan hebben, schrijven we dit in Ruby, omdat dit is waar we gewoonlijk mee werken en het redelijk eenvoudig te lezen is.
+Je kunt dit voorbeeld redelijk eenvoudig in iets schrijven waar je bekend mee bent - het moet gewoon de juiste informatie naar <code>stdout</code> uitvoeren.
+En als je op Windows draait, betekent dit dat je ervoor moet zorgen dat je geen carriage returns aan het eind van je regels gebruikt - git fast-import is erg secuur in het alleen accepteren van line feeds (LF) niet de carriage return line feeds (CFLF) die door Windows wordt gebruikt.</p>
+</div>
+<div class="paragraph">
+<p>Om te beginnen, spring je in de doel directory en identificeert elke subdirectory, die elk een snapshot is van wat je wilt importeren als een commit.
+Je springt in elke subdirectory en drukt de commando’s af die nodig zijn om het te exporteren.
+Je hoofdlus ziet er zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">last_mark = nil
+
+# loop through the directories
+Dir.chdir(ARGV[0]) do
+  Dir.glob("*").each do |dir|
+    next if File.file?(dir)
+
+    # move into the target directory
+    Dir.chdir(dir) do
+      last_mark = print_export(dir, last_mark)
+    end
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je roept <code>print_export</code> in elke directory aan, die de inhoud en kenmerk (mark) van de vorige snapshot neemt en je de inhoud en kenmerk van deze teruggeeft; op die manier kan je ze goed koppelen.</p>
+</div>
+<div class="paragraph">
+<p>“Mark” is de term die <code>fast-import</code> gebruikt voor een identificatie die je aan een commit geeft; tijdens het aanmaken van commit geef je elk een kenmerk die je kunt gebruiken om als koppeling vanaf andere commits.
+Dus, het eerste wat je moet doen in je <code>print_export</code> methode is een kenmerk genereren van de naam van de directory:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">mark = convert_dir_to_mark(dir)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je doet dit door een reeks (array) directories te maken en de indexwaarde als het kenmerk te gebruiken, omdat een kenmerk een integer dient te zijn.
+Je methode ziet er zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">$marks = []
+def convert_dir_to_mark(dir)
+  if !$marks.include?(dir)
+    $marks &lt;&lt; dir
+  end
+  ($marks.index(dir) + 1).to_s
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu je een integer representatie hebt van je commit, heb je een datum nodig voor de commit metadata.
+Omdat de datum in de naam van de directory zit, ga je het eruit halen.
+De volgende regel in je <code>print_export</code> bestand is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">date = convert_dir_to_date(dir)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>where <code>convert_dir_to_date</code> is defined as:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">def convert_dir_to_date(dir)
+  if dir == 'current'
+    return Time.now().to_i
+  else
+    dir = dir.gsub('back_', '')
+    (year, month, day) = dir.split('_')
+    return Time.local(year, month, day).to_i
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dat retourneert een integerwaarde voor de datum van elke directory.
+Het laatste stukje meta-informatie dat je nodig hebt voor elke commit zijn de gegevens van de committer, die je hardgecodeerd hebt in een globale variabele:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">$author = 'John Doe &lt;john@example.com&gt;'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu ben je klaar om de commit data af te drukken voor je importeerder.
+De initiële informatie geeft aan dat je een commit object definieert en op welke branch deze staat, gevolgd door het kenmerk die je hebt gegenereert, de informatie van de committer en het commit bericht, en dan de vorige commit als die er is.
+De code ziet er zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby"># print the import information
+puts 'commit refs/heads/master'
+puts 'mark :' + mark
+puts "committer #{$author} #{date} -0700"
+export_data('imported from ' + dir)
+puts 'from :' + last_mark if last_mark</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je geeft de tijdzone (-0700) hardgecodeerd, omdat dit nu eenmaal makkelijk is.
+Als je vanuit een ander systeem importeert, moet je de tijdzone als een relatieve verschuiving (offset) weergeven.
+Het commit bericht moet worden uitgedrukt in een speciaal formaat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>data (size)\n(contents)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het formaat bestaat uit het woord data, de grootte van de te lezen gegevens, een nieuwe regel en tot slot de gegevens.
+Omdat je hetzelfde formaat later nodig hebt om de bestandsinhoud te specificeren, maak je een hulpmethode, <code>export_data</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">def export_data(string)
+  print "data #{string.size}\n#{string}"
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wat er nu nog overblijft is het specifieren van de bestandsinhoud voor elk snapshot.
+Dit is makkelijk, omdat je elk van deze in een directory hebt - je kunt het <code>deleteall</code> commando afdrukken gevolgd door de inhoud van elk bestand in de directory.
+Git zal dan elke snapshot op de juiste manier opslaan:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">puts 'deleteall'
+Dir.glob("**/*").each do |file|
+  next if !File.file?(file)
+  inline_data(file)
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let op:  Omdat veel systemen hun revisies zien als wijzigingen van de ene commit naar de ander, kan fast-import ook commando’s accepteren waar bij elke commit kan worden aangegeven welke bestanden er zijn toegevoegd, verwijderd of gewijzigd en welke nieuwe elementen erbij zijn gekomen.
+Je kunt de verschillen tussen de snapshots berekenen en alleen deze gegevens meegeven, maar het is veel ingewikkelder om dit te doen - je kunt net zo makkelijk Git alle gegevens meegeven en het hem laten uitzoeken.
+Als dit beter past bij jouw gegevens, neem dan de <code>fast-import</code> man page door voor de details hoe je deze gegevens moet doorgeven in dat geval.</p>
+</div>
+<div class="paragraph">
+<p>Het formaat om de nieuwe bestandsinhoud weer te geven of om een gewijzigd bestand te specificeren met de nieuwe inhoud is als volgt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>M 644 inline path/to/file
+data (size)
+(file contents)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier is 644 de mode (als je aanroepbare bestanden hebt, moet je dit detecteren en in plaats daarvan 755 opgeven), en in de code (inline) geef je de inhoud direct achter deze regel weer.
+Je <code>inline_data</code> methode ziet er zo uit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">def inline_data(file, code = 'M', mode = '644')
+  content = File.read(file)
+  puts "#{code} #{mode} inline #{file}"
+  export_data(content)
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je hergebruikt de <code>export_data</code> methode die je eerder hebt gedefinieerd, omdat dit formaat hetzelfde is als waarmee je de commit bericht gegevens specificeert.</p>
+</div>
+<div class="paragraph">
+<p>Het laatste wat je nog moet doen is om het huidige kenmerk te retourneren, zodat het kan worden doorgegeven in de volgende iteratie:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">return mark</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Als je op Windows draait moet je je ervan verzekeren dat je een extra stap toevoegt.
+Zoals eerder opgemerkt, gebruikt Windows CRLF voor nieuwe regel tekens waar <code>git fast-import</code> alleen LF verwacht.
+Om dit probleem te verhelpen en <code>git fast-import</code> blij te maken, moet je ruby vertellen om LF te gebruiken in plaats van CRLF:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">$stdout.binmode</code></pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Dat is 't.
+Hier is het script in zijn totaliteit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+$stdout.binmode
+$author = "John Doe &lt;john@example.com&gt;"
+
+$marks = []
+def convert_dir_to_mark(dir)
+    if !$marks.include?(dir)
+        $marks &lt;&lt; dir
+    end
+    ($marks.index(dir)+1).to_s
+end
+
+def convert_dir_to_date(dir)
+    if dir == 'current'
+        return Time.now().to_i
+    else
+        dir = dir.gsub('back_', '')
+        (year, month, day) = dir.split('_')
+        return Time.local(year, month, day).to_i
+    end
+end
+
+def export_data(string)
+    print "data #{string.size}\n#{string}"
+end
+
+def inline_data(file, code='M', mode='644')
+    content = File.read(file)
+    puts "#{code} #{mode} inline #{file}"
+    export_data(content)
+end
+
+def print_export(dir, last_mark)
+    date = convert_dir_to_date(dir)
+    mark = convert_dir_to_mark(dir)
+
+    puts 'commit refs/heads/master'
+    puts "mark :#{mark}"
+    puts "committer #{$author} #{date} -0700"
+    export_data("imported from #{dir}")
+    puts "from :#{last_mark}" if last_mark
+
+    puts 'deleteall'
+    Dir.glob("**/*").each do |file|
+        next if !File.file?(file)
+        inline_data(file)
+    end
+    mark
+end
+
+# Loop through the directories
+last_mark = nil
+Dir.chdir(ARGV[0]) do
+    Dir.glob("*").each do |dir|
+        next if File.file?(dir)
+
+        # move into the target directory
+        Dir.chdir(dir) do
+            last_mark = print_export(dir, last_mark)
+        end
+    end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je dit script aanroept, krijg je inhoud dat er ongeveer zo uit ziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ruby import.rb /opt/import_from
+commit refs/heads/master
+mark :1
+committer John Doe &lt;john@example.com&gt; 1388649600 -0700
+data 29
+imported from back_2014_01_02deleteall
+M 644 inline README.md
+data 28
+# Hello
+
+This is my readme.
+commit refs/heads/master
+mark :2
+committer John Doe &lt;john@example.com&gt; 1388822400 -0700
+data 29
+imported from back_2014_01_04from :1
+deleteall
+M 644 inline main.rb
+data 34
+#!/bin/env ruby
+
+puts "Hey there"
+M 644 inline README.md
+(...)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Om de importeerder te laten draaien, geeft je de uitvoer met een pipe door aan <code>git fast-import</code> terwjil je in de Git directory staat waar je naartoe wilt importeren.
+Je kunt een nieuwe directory aanmaken en daarna <code>git init</code> daarin aanroepen als een begin, en daarna je script aanroepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init
+Initialized empty Git repository in /opt/import_to/.git/
+$ ruby import.rb /opt/import_from | git fast-import
+git-fast-import statistics:
+---------------------------------------------------------------------
+Alloc'd objects:       5000
+Total objects:           13 (         6 duplicates                  )
+      blobs  :            5 (         4 duplicates          3 deltas of          5 attempts)
+      trees  :            4 (         1 duplicates          0 deltas of          4 attempts)
+      commits:            4 (         1 duplicates          0 deltas of          0 attempts)
+      tags   :            0 (         0 duplicates          0 deltas of          0 attempts)
+Total branches:           1 (         1 loads     )
+      marks:           1024 (         5 unique    )
+      atoms:              2
+Memory total:          2344 KiB
+       pools:          2110 KiB
+     objects:           234 KiB
+---------------------------------------------------------------------
+pack_report: getpagesize()            =       4096
+pack_report: core.packedGitWindowSize = 1073741824
+pack_report: core.packedGitLimit      = 8589934592
+pack_report: pack_used_ctr            =         10
+pack_report: pack_mmap_calls          =          5
+pack_report: pack_open_windows        =          2 /          2
+pack_report: pack_mapped              =       1457 /       1457
+---------------------------------------------------------------------</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zoals je kunt zien, als het succesvol eindigt, geeft het je een bergje statistieken wat het allemaal heeft bereikt.
+In dit geval, heb je in totaal 13 objecten geïmporteerd voor 4 commits in 1 branch.
+Je kunt nu <code>git log</code> aanroepen om je nieuwe historie te bekijken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -2
+commit 3caa046d4aac682a55867132ccdfbe0d3fdee498
+Author: John Doe &lt;john@example.com&gt;
+Date:   Tue Jul 29 19:39:04 2014 -0700
+
+    imported from current
+
+commit 4afc2b945d0d3c8cd00556fbe2e8224569dc9def
+Author: John Doe &lt;john@example.com&gt;
+Date:   Mon Feb 3 01:00:00 2014 -0700
+
+    imported from back_2014_02_03</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Kijk eens aan - een mooie, schone Git repository.
+Het is belangrijk om op te merken dat er niets is uitgecheckt - je hebt initieel nog geen enkel bestand in je werk directory.
+Om deze te krijgen, moet je je branch resetten tot waar <code>master</code> nu is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ls
+$ git reset --hard master
+HEAD is now at 3caa046 imported from current
+$ ls
+README.md main.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt nog veel meer doen met het <code>fast-import</code> gereedschap - verschillende modes behandelen, binaire gegevens, meerdere branches en mergen, tags, voortgangs-indicators en meer.
+Een aantal voorbeelden van meer ingewikkelde scenarios zijn beschikbaar in de <code>contrib/fast-import</code> directory van de Git broncode.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

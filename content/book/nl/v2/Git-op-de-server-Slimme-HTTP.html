@@ -1,0 +1,110 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git op de server
+    number: 4
+  section:
+    title: Slimme HTTP
+    number: 6
+    cs_number: '4.6'
+    previous: book/nl/v2/Git-op-de-server-Git-Daemon
+    next: book/nl/v2/Git-op-de-server-GitWeb
+title: Git - Slimme HTTP
+
+---
+<h2 id="_slimme_http_2">Slimme HTTP</h2>
+<div class="paragraph">
+<p>
+We hebben nu geauthenticeerde toegang via SSH en ongeauthenticeerde toegang met <code>git://</code>, maar er is een protocol die tot beide in staat is.
+Slimme HTTP opzetten is eigenlijk gewoon op de server een CGI script <code>git-http-backend</code> geheten activeren die met Git wordt geleverd.
+Deze CGI leest het pad en de headers die door een <code>git fetch</code> of een <code>git push</code> worden gestuurd aan een HTTP URL en bepaalt of de client via HTTP kan communiceren (wat elke client sinds versie 1.6.6 kan).
+Als de CGI ziet dat de client "slim" is, zal het op de slimme manier met deze communiceren, anders zal het terugvallen op het domme gedrag (dus het is "backward compatible" met lees acties van oudere clients).</p>
+</div>
+<div class="paragraph">
+<p>Laten we een heel eenvoudige opzet doornemen. We zullen het gaan opzetten met Apache als de CGI server.
+Als je geen Apache hebt geïnstalleerd, kan je dit op een Linux machine doen met iets wat lijkt op:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo apt-get install apache2 apache2-utils
+$ a2enmod cgi alias env</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit zet <code>mod_cgi</code>, <code>mod_alias</code> en <code>mod_env</code> modules aan, die alle nodig zijn om dit goed te laten werken.</p>
+</div>
+<div class="paragraph">
+<p>Je zult ook nog de Unix user groep van de <code>/srv/git</code> directories naar <code>www-data</code> te zetten zodat je webserver lees- en schrijfrechten heeft op de repositories, omdat de Apache instantie die de CGI script draait (standaard) draait onder die user:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ chgrp -R www-data /srv/git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vervolgens moeten we een aantal dingen aan de Apache configuratie toevoegen om <code>git-http-backend</code> als afhandelaar te identificeren voor alles wat in het <code>/git</code> pad van je web server binnenkomt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">SetEnv GIT_PROJECT_ROOT /opt/git
+SetEnv GIT_HTTP_EXPORT_ALL
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je de <code>GIT_HTTP_EXPORT_ALL</code> uit je omgevingsvariabele laat, zal Git alleen de repositories met het <code>git-daemon-export-ok</code> bestand erin verspreiden, net zoals de Git daemon deed.</p>
+</div>
+<div class="paragraph">
+<p>Als laatste moet je Apache vertellen om verzoeken naar paden toe te staan die er zo uit zien, optioneel met een Auth block zoals hier:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&lt;Files "git-http-backend"&gt;
+    AuthType Basic
+    AuthName "Git Access"
+    AuthUserFile /srv/git/.htpasswd
+    Require expr !(%{QUERY_STRING} -strmatch '*service=git-receive-pack*' || %{REQUEST_URI} =~ m#/git-receive-pack$#)
+    Require valid-user
+&lt;/Files&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dat verplicht je een <code>.htaccess</code> bestand aan te maken met daarin de wachtwoorden van al de geldige gebruikers.
+Hier is een voorbeeld van hoe een “schacon” gebruiker toe te voegen aan het bestand:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ htpasswd -c /srv/git/.htpasswd schacon</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Er zijn tig manieren om geauthenticeerde gebruikers in Apache aan te geven, je zult een keuze moeten maken en een van deze implementeren.
+Dit is gewoon een van de eenvoudigste voorbeelden die we konden verzinnen.
+Je zult dit waarschijnlijk ook over SSL willen opzetten, zodat alle gegevens zijn versleuteld.</p>
+</div>
+<div class="paragraph">
+<p>We willen ons niet te veel bochten wringen om de specifieke zaken van Apache configuraties uit de doeken te doen, je gebruikt misschien een andere server of andere authenticatie behoeften hebben.
+De clou is dat Git met een CGI geleverd wordt die <code>git-http-backend</code> heet die, wanneer geactiveerd, alle onderhandelingen doet teneinde bestanden te sturen en te ontvangen over HTTP.
+Deze implementeert het authenticeren zelf niet, maar dat kan eenvoudig worden beheerd op het niveau van de server die dit aanroept.
+Je kunt dit met vrijwel elke web server met CGI capaciteiten, dus pas het vooral toe op hetgeen waar je het meest bekend mee bent.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Voor meer informatie over het configureren van authenticatie in Apache, verwijzen we je naar de volgende Apache documentatie: <a href="https://httpd.apache.org/docs/current/howto/auth.html" class="bare">https://httpd.apache.org/docs/current/howto/auth.html</a></p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

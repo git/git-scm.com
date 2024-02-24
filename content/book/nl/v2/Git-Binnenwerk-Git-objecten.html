@@ -1,0 +1,518 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Binnenwerk
+    number: 10
+  section:
+    title: Git objecten
+    number: 2
+    cs_number: '10.2'
+    previous: book/nl/v2/Git-Binnenwerk-Binnenwerk-en-koetswerk-plumbing-and-porcelain
+    next: book/nl/v2/Git-Binnenwerk-Git-Referenties
+title: Git - Git objecten
+
+---
+<h2 id="_objects">Git objecten</h2>
+<div class="paragraph">
+<p>Git is een op inhoud-adresseerbaar bestandssysteem.
+Mooi.
+Wat betekent dat nu eigenlijk?
+Het betekent dat in het hart van Git een eenvoudig sleutel-waarde gegevens opslag zit.
+Je kunt elke vorm van inhoud erin stoppen, en het zal je een sleutel teruggeven die je kunt gebruiken om de inhoud op elk gewenst moment weer op te halen.</p>
+</div>
+<div class="paragraph">
+<p>Om dit te laten zien, zal je het plumbing commando <code>hash-object</code> gebruiken, die gegevens aanneemt, dit opslaat in je <code>.git</code> directory en je de sleutel teruggeeft waarmee de gegevens zijn opgeslagen.</p>
+</div>
+<div class="paragraph">
+<p>Eerst, moet je een nieuwe Git repository initialiseren en vaststellen dat er niets in de <code>objects</code> directory zit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init test
+Initialized empty Git repository in /tmp/test/.git/
+$ cd test
+$ find .git/objects
+.git/objects
+.git/objects/info
+.git/objects/pack
+$ find .git/objects -type f</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git heeft nu de <code>objects</code> directory geinitialiseerd en daarin <code>pack</code> en <code>info</code> subdirectories aangemaakt, maar er zijn geen reguliere bestanden.
+Nu sla je wat tekst op in je Git database:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'test content' | git hash-object -w --stdin
+d670460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In het eenvoudigste vorm neemt het <code>git hash-object</code> de inhoud die je hem hebt gegeven en alleen maar de unieke sleutel teruggeven die <em>zou worden</em> gebuikt als je het zou opslaan in de Git database.
+De <code>-w</code> vertelt <code>hash-object</code> om niet simpelweg de sleutel terug te geven maar om het object op te slaan in de database.
+Tot slot vertelt de <code>--stdin</code> optie het commando om de te verwerken inhoud van stdin te lezen; als je dit niet aangeeft, verwacht het commando een bestands-argument aan het eind van het commando met daarin de inhoud die moet worden verwerkt.</p>
+</div>
+<div class="paragraph">
+<p>De uitvoer van het commando is een 40-karakter checksum hash.
+Dit is de SHA-1 hash — een controlegetal van de inhoud die je opslaat plus een header, waar je iets later meer over gaat lezen.
+Nu kan je zien hoe Git je gegevens heeft opgeslagen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je weer je <code>objects</code> directoy gaat bekijken, kan je zien dat het nu een bestand bevat voor die nieuwe inhoud.
+Dit is hoe Git de inhoud initieel opslaat — als een enkel bestand per stuk inhoud, met het SHA-1 controlegetal als naam die is berekend over de inhoud en de header.
+De subdirectory heeft de eerste 2 karakters van de SHA-1 als naam, en de bestandsnaam is de overige 38 karakters.</p>
+</div>
+<div class="paragraph">
+<p>Als je inhoud in je object database hebt, kan je de inhoud bekijken met het <code>git cat-file</code> commando.
+Dit commando is een soort Zwitsers zakmes voor het inspecteren van Git objecten.
+Met het doorgeven van <code>-p</code> vertel je het <code>cat-file</code> commando om het type inhoud uit te zoeken en het netjes aan je te laten zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p d670460b4b4aece5915caf5c68d12f560a9fe3e4
+test content</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu ben je in staat om inhoud aan Git toe te voegen en om het er weer uit te halen.
+Je kunt dit ook met de inhoud van bestanden doen.
+Bijvoorbeeld, je kunt een eenvoudig versiebeheer op een bestand doen.
+Eerst, maak een nieuw bestand aan en bewaar de inhoud in je database:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'version 1' &gt; test.txt
+$ git hash-object -w test.txt
+83baae61804e65cc73a7201a7252750c76066a30</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Daarna schrijf je wat nieuwe inhoud naar het bestand, en bewaart het opnieuw:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'version 2' &gt; test.txt
+$ git hash-object -w test.txt
+1f7a7a472abf3dd9643fd615f6da379c4acb3e3a</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je object database bevat beide versies van dit nieuwe bestand (zowel als de eerste inhoud die je daar bewaard hebt):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Op dit moment kan je je lokale kopie van dat <code>test.txt</code> bestand verwijderen, en dan Git gebruiken om uit de object database de eerste versie die je bewaard hebt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 83baae61804e65cc73a7201a7252750c76066a30 &gt; test.txt
+$ cat test.txt
+version 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>of de tweede versie op te halen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a &gt; test.txt
+$ cat test.txt
+version 2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Maar de SHA-1 sleutel onthouden voor elke versie van je bestand is niet praktisch; plus je bewaart niet de bestandsnaam in je systeem — alleen de inhoud.
+Dit type object noemen we een <em>blob</em>.
+Je kunt Git je het objecttype laten vertellen van elk object in Git, gegeven de SHA-1 sleutel, met <code>git cat-file -t</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -t 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+blob</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_tree_objects">Boom objecten (tree objects)</h3>
+<div class="paragraph">
+<p>Het volgende type waar we naar gaan kijken is de tree, wat het probleem oplost van het opslaan van bestandsnamen en je ook in staat stelt om een groep van bestanden bij elkaar op te slaan.
+Git slaat de inhoud op een manier die vergelijkbaar is met een UNIX bestandssysteem, maar wat versimpeld.
+Alle inhoud wordt opgeslagen als tree en blob objecten, waarbij trees overeenkomen met UNIX directory entries en blobs min of meer overeenkomen met inodes of bestandsinhoud.
+Een enkele tree object bevat een of meer entries, elk daarvan is de SHA-1 hash van een blob of subtree met de bijbehorende mode, type en bestandsnaam.
+Bijvoorbeeld, de meest recente tree in een project kan er ongeveer zo uitzien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob a906cb2a4a904a152e80877d4088654daad0c859      README
+100644 blob 8f94139338f9404f26296befa88755fc2598c289      Rakefile
+040000 tree 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0      lib</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>master^{tree}</code> syntax geeft het tree object aan waarnaar wordt verwezen door de laatste commit op je <code>master</code>-branch.
+Merk op dat de <code>lib</code> subdirectory geen blob is, maar een verwijzing naar een andere tree:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0
+100644 blob 47c6340d6459e05787f644c2447d2595f5d3a54b      simplegit.rb</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Afhankelijk van de shell die je gebruikt, kan je fouten krijgen als je de <code>master^{tree}</code> syntax gebruikt.</p>
+</div>
+<div class="paragraph">
+<p>In CMD op Windows is het <code>^</code> karakter gebruikt voor escapen, dus je moet het verdubbelen om dit te voorkomen: <code>git cat-file -p master^^{tree}</code>.
+Als je PowerShell gebruikt, moeten parameters waarin de {} karakters worden gebruikt van quotes worden voorzien om te voorkomen dat ze verkeerd worden geinterpreteerd:  <code>git cat-file -p 'master^{tree}'</code>.</p>
+</div>
+<div class="paragraph">
+<p>Als je ZSH gebruikt, wordt het <code>^</code> karakter gebruikt voor globbing, dus je moet de hele expressie in quotes zetten: <code>git cat-file -p "master^{tree}"</code>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Conceptueel zijn de gegevens die Git opslaat ongeveer dit:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/data-model-1.png" >}}" alt="Eenvoudige versie van het Git datamodel.">
+</div>
+<div class="title">Figuur 149. Eenvoudige versie van het Git datamodel.</div>
+</div>
+<div class="paragraph">
+<p>Je kunt redelijk eenvoudig je eigen boom maken.
+Git maakt normaalgesproken een tree door de staat van je staging gebied of index te nemen en daarvan een reeks tree objects te maken.
+Dus, om een tree object te maken, moet je eerst een index opzetten door wat bestanden te stagen.
+Om een index te maken met een enkele ingang — de eerste versie van je <code>test.txt</code> bestand — kan je het plumbing commando <code>git update-index</code> gebruiken.
+Je gebruikt dit commando om kunstmatig de eerdere versie van het bestand <code>test.txt</code> aan een nieuwe staging gebied toe te voegen.
+Je moet het de optie <code>--add</code> doorgeven omdat het bestand nog niet bestaat in je staging gebied (je hebt nog niet eens een staging gebied ingericht) en <code>--cacheinfo</code> omdat het bestand dat je toevoegt in in je directory zit maar in je database.
+Daarna geef je de mode, SHA-1 en bestandsnaam op:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git update-index --add --cacheinfo 100644 \
+  83baae61804e65cc73a7201a7252750c76066a30 test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In dit geval geef je een mode <code>100644</code> op, wat aangeeft dat het een normaal bestand is.
+Andere opties zijn <code>100755</code>, wat aangeeft dat het een uitvoerbaar bestand is; en <code>120000</code>, wat een symbolische link aangeeft.
+De modus is afgeleid van normale UNIX modi maar het is minder flexibel — deze drie modi zijn de enige die geldig zijn voor bestanden (blobs) in Git (alhoewel andere modi worden gebruikt voor directories en submodules).</p>
+</div>
+<div class="paragraph">
+<p>Nu kan je het <code>git write-tree</code> commando gebruiken om het staging gebied te schrijven naar een tree object.
+Hier is geen <code>-w</code> optie nodig — het aanroepen van <code>write-tree</code> maakt automatisch een tree object aan van de staat van de index als die tree nog niet bestaat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git write-tree
+d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+$ git cat-file -p d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+100644 blob 83baae61804e65cc73a7201a7252750c76066a30      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt ook verifiëren dat dit een tree object is met hetzelfde <code>git cat-file</code> commando die je eerder gezien hebt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -t d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+tree</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je gaat nu een nieuwe tree maken met de tweede versie van <code>test.txt</code> en ook nog een nieuw bestand:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'new file' &gt; new.txt
+$ git update-index test.txt
+$ git update-index --add new.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je staging gebied heeft nu de nieuwe versie van <code>test.txt</code> alsook het nieuwe bestand <code>new.txt</code>.
+Schrijf dat deze tree weg (sla de staat van het staging gebied of index op in een tree object) en kijk hoe dit eruit ziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git write-tree
+0155eb4229851634a0f03eb265b69f5a2d56f341
+$ git cat-file -p 0155eb4229851634a0f03eb265b69f5a2d56f341
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Merk op dat deze tree beide bestands entries bevat en ook dat de <code>test.txt</code> SHA-1 gelijk aan de “versie 2” SHA-1 van eerder is (<code>1f7a7a</code>).
+Puur voor de lol, ga je de eerste tree als een subdirectory toevoegen in deze.
+Je kunt trees in je staging area lezen door <code>git read-tree</code> aan te roepen.
+In dit geval, kan je een bestaande tree als een subtree in je staging gebied lezen door de <code>--prefix</code> optie te gebruiken bij dit commando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git read-tree --prefix=bak d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+$ git write-tree
+3c4e9cd789d88d8d89c1073707c3585e41b0e614
+$ git cat-file -p 3c4e9cd789d88d8d89c1073707c3585e41b0e614
+040000 tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579      bak
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je een werk directory van de nieuwe tree maakt die je zojuist geschreven hebt, zou je de twee bestanden op het
+ hoogste niveau van de werk directory krijgen en een subdirectory met de naam <code>bak</code> die de eerste versie van het
+ test.txt bestand zou bevatten.
+Je kunt de gegevens die Git bevat voor deze structuren als volgt weergeven:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/data-model-2.png" >}}" alt="De inhoudsstructuur van je huidige Git gegevens.">
+</div>
+<div class="title">Figuur 150. De inhoudsstructuur van je huidige Git gegevens.</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_commit_objects">Commit objecten</h3>
+<div class="paragraph">
+<p>Je hebt drie trees die de verschillende snapshots weergeven van je project die je wilt volgen, maar het eerdere probleem blijft: je moet alle drie SHA-1 waarden onthouden om de snapshots te kunnen terughalen.
+Je hebt ook geen informatie over wie de snapshots heeft opgeslagen, wanneer ze zijn opgeslagen of waarom ze waren opgeslagen.
+Dit is de basis informatie die het commit object voor je opslaat.</p>
+</div>
+<div class="paragraph">
+<p>Om een commit object te maken, roep je <code>commit-tree</code> aan en geef je een de SHA-1 van een enkele tree op en welke commit objecten, indien van toepassing, er direct aan vooraf gaan.
+Begin met de eerste tree die je geschreven hebt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'first commit' | git commit-tree d8329f
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je zult verschillende hash-waarden krijgen omdat er verschillen zijn in aanmaak tijd en auteur-gegevens.
+Vervang de commit en tag-hashwaarden verderop in dit hoofdstuk met je eigen checksums.
+Nu kan je naar je nieuwe commit object kijken met <code>git cat-file</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p fdf4fc3
+tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+author Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+
+first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het formaat voor een commit object is eenvoudig: het geeft de tree op het hoogste niveau weer voor de snapshot van het project op dat punt; de commits van de ouder (het commit object beschreven hierboven heeft geen enkele ouder); de auteur/committer informatie (welke je <code>user.name</code> en <code>user.email</code> configuratie instellingen gebruikt en een timestamp); een blanko regel en dan het commit bericht.</p>
+</div>
+<div class="paragraph">
+<p>Vervolgens ga je de andere twee commit objects schrijven, die elk naar de commit refereren die er direct aan vooraf ging:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'second commit' | git commit-tree 0155eb -p fdf4fc3
+cac0cab538b970a37ea1e769cbbde608743bc96d
+$ echo 'third commit'  | git commit-tree 3c4e9c -p cac0cab
+1a410efbd13591db07496601ebc7a059dd55cfe9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Elk van de drie commit objecten verwijzen naar een van de drie snapshot trees die je gemaakt hebt.
+Gek genoeg, heb je nu een echte Git historie die je kunt bekijken met het <code>git log</code> commando, als je dit aanroept op de laatste SHA-1 commit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --stat 1a410e
+commit 1a410efbd13591db07496601ebc7a059dd55cfe9
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:15:24 2009 -0700
+
+	third commit
+
+ bak/test.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit cac0cab538b970a37ea1e769cbbde608743bc96d
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:14:29 2009 -0700
+
+	second commit
+
+ new.txt  | 1 +
+ test.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+commit fdf4fc3344e67ab068f836878b6c4951e3b15f3d
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:09:34 2009 -0700
+
+    first commit
+
+ test.txt | 1 +
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Verbluffend.
+Je hebt zojuist de diepere niveau operaties uitgevoerd die een Git historie hebben opgebouwd, zonder gebruik te maken van een van de hogere commando’s.
+In essentie is dit wat Git doet als je de <code>git add</code> en <code>git commit</code> commando’s gebuikt — het slaat blobs op voor de bestanden die zijn gewijzigd, werkt de index bij, schrijft de trees weg en schrijft commit objecten weg die verwijzen naar de trees op het hoogste niveau en de commits die er direct aan vooraf zijn gegaan.
+Deze drie hoofd Git objecten — de blob, de tree en de commit worden initieel opgeslagen als aparte bestanden in je <code>.git/objects</code> directory.
+Hier zijn alle huidige objecten in de voorbeeld directory, met als commentaar wat ze opslaan:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/01/55eb4229851634a0f03eb265b69f5a2d56f341 # tree 2
+.git/objects/1a/410efbd13591db07496601ebc7a059dd55cfe9 # commit 3
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a # test.txt v2
+.git/objects/3c/4e9cd789d88d8d89c1073707c3585e41b0e614 # tree 3
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30 # test.txt v1
+.git/objects/ca/c0cab538b970a37ea1e769cbbde608743bc96d # commit 2
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4 # 'test content'
+.git/objects/d8/329fc1cc938780ffdd9f94e0d364e0ea74f579 # tree 1
+.git/objects/fa/49b077972391ad58037050f2a75f74e3671e92 # new.txt
+.git/objects/fd/f4fc3344e67ab068f836878b6c4951e3b15f3d # commit 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je al de interne verwijzingen volgt, zal je een objectgraaf krijgen die er ongeveer zo uitziet:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/data-model-3.png" >}}" alt="Alle bereikbare objects in je Git directory.">
+</div>
+<div class="title">Figuur 151. Alle bereikbare objects in je Git directory.</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_object_opslag">Object opslag</h3>
+<div class="paragraph">
+<p>We hebben eerder gezegd dat er een header wordt opgeslagen bij de inhoud.
+Laten we nu de tijd nemen om een kijkje te nemen hoe Git haar objecten opslaat.
+Je gaat zien hoe een blob object interactief wordt opgeslagen — in dit geval, de zin “what is up, doc?” — in de Ruby scripttaal.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt de interactieve Ruby modus starten met het <code>irb</code> commando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ irb
+&gt;&gt; content = "what is up, doc?"
+=&gt; "what is up, doc?"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git stelt een header samen die begint met het type van het object, in dit geval een blob.
+Aan dat eerste gedeelte van de header voegt Git een spatie toe gevolgd door de lengte in bytes van de inhoud en tot slot een null byte:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; header = "blob #{content.length}\0"
+=&gt; "blob 16\u0000"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git plakt de header en de oorspronkelijke inhoud samen en berekent het SHA-1 controlegetal van die nieuwe inhoud.
+Je kunt de SHA-1 waarde van een tekenreeks in Ruby berekenen door de SHA1 digest library te includen met het <code>require</code> commando en daarna <code>Digest::SHA1.hexdigest()</code> aan te roepen met de tekenreeks:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; store = header + content
+=&gt; "blob 16\u0000what is up, doc?"
+&gt;&gt; require 'digest/sha1'
+=&gt; true
+&gt;&gt; sha1 = Digest::SHA1.hexdigest(store)
+=&gt; "bd9dbf5aae1a3862dd1526723246b20206e5fc37"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Laten we dit vergelijken met de uitvoer van <code>git hash-object</code>.
+Hier gebruiken we <code>echo -n</code> om te voorkomen dat er een newline aan de invoer wordt toegevoegd.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo -n "what is up, doc?" | git hash-object --stdin
+bd9dbf5aae1a3862dd1526723246b20206e5fc37</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git comprimeert de nieuwe inhoud met zlib, wat je in Ruby kunt doen met de zlib library.
+Eerst moet je de library <em>requiren</em> en daarna <code>Zlib::Deflate.deflate()</code> aanroepen op de inhoud:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; require 'zlib'
+=&gt; true
+&gt;&gt; zlib_content = Zlib::Deflate.deflate(store)
+=&gt; "x\x9CK\xCA\xC9OR04c(\xCFH,Q\xC8,V(-\xD0QH\xC9O\xB6\a\x00_\x1C\a\x9D"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als laatste schrijf je je zlib-deflated inhoud naar een object op schijf.
+Je bepaalt het pad van het object die je wilt schrijven (de eerste twee karakters van de SHA-1 waarde als de naam van de subdirectory, en de overige 38 karakters zijnde de bestandsnaam binnen die directory).
+In Ruby kan je de <code>FileUtils.mkdir_p()</code> functie gebruiken om de subdirectory aan te maken als die nog niet bestaat.
+Daarna open je het bestand met <code>File.open()</code> en schrijf je de eerder zlib-gecomprimeerde inhoud naar het bestand met een <code>write()</code> aanroep op de filehandle die je krijgt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; path = '.git/objects/' + sha1[0,2] + '/' + sha1[2,38]
+=&gt; ".git/objects/bd/9dbf5aae1a3862dd1526723246b20206e5fc37"
+&gt;&gt; require 'fileutils'
+=&gt; true
+&gt;&gt; FileUtils.mkdir_p(File.dirname(path))
+=&gt; ".git/objects/bd"
+&gt;&gt; File.open(path, 'w') { |f| f.write zlib_content }
+=&gt; 32</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Laten we de inhoud van het object controleren met <code>git cat-file</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">---
+$ git cat-file -p bd9dbf5aae1a3862dd1526723246b20206e5fc37
+what is up, doc?
+---</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dat is alles - je hebt een valide Git blob object gemaakt.</p>
+</div>
+<div class="paragraph">
+<p>Alle Git objecten worden op dezelfde manier opgeslagen, alleen met andere types - in plaats van de tekenreeks blob, begint de header met commit of tree.
+Daarnaast, alhoewel de inhoud van een blob zo ongeveer alles kan zijn, is de inhoud van een commit en tree zeer specifiek geformatteerd.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

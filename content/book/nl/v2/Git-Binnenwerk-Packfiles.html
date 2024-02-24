@@ -1,0 +1,198 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Binnenwerk
+    number: 10
+  section:
+    title: Packfiles
+    number: 4
+    cs_number: '10.4'
+    previous: book/nl/v2/Git-Binnenwerk-Git-Referenties
+    next: book/nl/v2/Git-Binnenwerk-De-Refspec
+title: Git - Packfiles
+
+---
+<h2 id="_packfiles">Packfiles</h2>
+<div class="paragraph">
+<p>Als je alle instructies in het voorbeeld van de hiervoorgaande sectie hebt gevolgd, zou je nu een test Git repository moeten hebben met 11 objecten — vier blobs, drie trees, drie commits en een tag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/01/55eb4229851634a0f03eb265b69f5a2d56f341 # tree 2
+.git/objects/1a/410efbd13591db07496601ebc7a059dd55cfe9 # commit 3
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a # test.txt v2
+.git/objects/3c/4e9cd789d88d8d89c1073707c3585e41b0e614 # tree 3
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30 # test.txt v1
+.git/objects/95/85191f37f7b0fb9444f35a9bf50de191beadc2 # tag
+.git/objects/ca/c0cab538b970a37ea1e769cbbde608743bc96d # commit 2
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4 # 'test content'
+.git/objects/d8/329fc1cc938780ffdd9f94e0d364e0ea74f579 # tree 1
+.git/objects/fa/49b077972391ad58037050f2a75f74e3671e92 # new.txt
+.git/objects/fd/f4fc3344e67ab068f836878b6c4951e3b15f3d # commit 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git comprimeert de inhoud van deze bestanden met zlib, en je slaat niet veel op, dus al deze bestanden nemen samen maar 925 bytes in beslag.
+Je zult wat lijviger inhoud aan de repository toevoegen om een interessante mogelijkheid van Git te demonstreren.
+Om het te demonstreren zullen we het <code>repo.rb</code> bestand van de Grit library toevoegen — dit is een broncode bestand van ongeveer 22K.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ curl https://raw.githubusercontent.com/mojombo/grit/master/lib/grit/repo.rb &gt; repo.rb
+$ git checkout master
+$ git add repo.rb
+$ git commit -m 'added repo.rb'
+[master 484a592] added repo.rb
+ 3 files changed, 709 insertions(+), 2 deletions(-)
+ delete mode 100644 bak/test.txt
+ create mode 100644 repo.rb
+ rewrite test.txt (100%)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je naar de resulterende tree kijkt, zie je de SHA-1 waarde die je repo.rb bestand heeft gekregen voor het nieuwe blob object:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5      repo.rb
+100644 blob e3f094f522629ae358806b17daf78246c27c007b      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt daarna <code>git cat-file</code> gebruiken om te zien hoe groot dat object is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -s 033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5
+22044</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wijzig nu dat bestand een beetje, en kijk wat er gebeurt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '# testing' &gt;&gt; repo.rb
+$ git commit -am 'modified repo.rb a bit'
+[master 2431da6] modified repo.rb a bit
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Kijk naar de tree die door die commit gemaakt is, en je zult iets interessants zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob b042a60ef7dff760008df33cee372b945b6e884e      repo.rb
+100644 blob e3f094f522629ae358806b17daf78246c27c007b      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De blob is nu een andere blob, wat inhoudt dat ondanks dat je maar een enkele regel aan het eind van een bestand van 400 regels hebt toegevoegd, Git de nieuwe inhoud als een volledig nieuw object heeft opgeslagen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -s b042a60ef7dff760008df33cee372b945b6e884e
+22054</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je hebt nu twee vrijwel identieke objecten van 22K op je schijf staan (elk gecomprimeerd tot ongeveer 7K).
+Zou het niet aardig zijn als Git een van deze volledig zou opslaan maar dan het tweede object alleen als de delta tussen deze en de eerste?</p>
+</div>
+<div class="paragraph">
+<p>Laat dit nu ook het geval zijn.
+Het initiële formaat waar Git objecten op schijf bewaard wordt een “loose” (los, ruimzittend) object formaat genoemd.
+Echter, van tijd tot tijd pakt Git een aantal van deze bestanden in een enkele binair bestand “packfile” genaamd in met als doel ruimte te besparen en meer efficiënt te zijn.
+Git doet dit als je teveel losse bestanden hebt, als je het <code>git gc</code> commando handmatig aanroept, of als je naar een remote server pusht.
+Om te zien wat er gebeurt, kan je Git handmatig vragen om de objecten in te pakken door het <code>git gc</code> commando aan te roepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc
+Counting objects: 18, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (14/14), done.
+Writing objects: 100% (18/18), done.
+Total 18 (delta 3), reused 0 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je in je objecten directory kijkt, zal je zien dat de meeste van je objecten zijn verdwenen en dat er een aantal andere bestanden zijn verschenen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/bd/9dbf5aae1a3862dd1526723246b20206e5fc37
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4
+.git/objects/info/packs
+.git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.idx
+.git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De objecten die zijn overgebleven zijn de blobs waar geen enkele commit nog naar wijst — in dit geval de blobs van het “what is up, doc?”-voorbeeld en het “test content”-voorbeeld die je eerder hebt gemaakt.
+Omdat je ze nooit aan enige commit hebt toegevoegd, worden ze beschouwd als bungelend (dangling) en worden ze niet in je nieuwe packfile ingepakt.</p>
+</div>
+<div class="paragraph">
+<p>De andere bestanden zijn je nieuwe packfile en een index.
+Het packfile bestand is een enkel bestand met daarin de inhoud van al de objecten die zijn verwijderd van je bestandssysteem.
+De index is een bestand die de relatieve beginpunten bevat in die packfile zodat je snel naar een specifiek object kunt zoeken.
+Wat cool is, is dat ondanks dat de bestanden op schijf voordat je het <code>gc</code> commando aanriep samen ongeveer 15K groot waren, het nieuwe packfile bestand maar 7K is.
+Je hebt schijfruimte-gebruik tot de helft verminderd door je objecten in te pakken.</p>
+</div>
+<div class="paragraph">
+<p>Hoe doet Git dit?
+Als Git objecten inpakt, kijkt het naar bestanden die vergelijkbare namen en grootte hebben, en slaat daarvan alleen de delta’s tussen de ene versie van het bestand en de andere op.
+Je kunt in het packfile bestand kijken en zien wat Git gedaan heeft om schijfruimte te besparen.
+Het <code>git verify-pack</code> binnenwerk commando stelt je in staat om te zien wat er ingepakt is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git verify-pack -v .git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.idx
+2431da676938450a4d72e260db3bf7b0f587bbc1 commit 223 155 12
+69bcdaff5328278ab1c0812ce0e07fa7d26a96d7 commit 214 152 167
+80d02664cb23ed55b226516648c7ad5d0a3deb90 commit 214 145 319
+43168a18b7613d1281e5560855a83eb8fde3d687 commit 213 146 464
+092917823486a802e94d727c820a9024e14a1fc2 commit 214 146 610
+702470739ce72005e2edff522fde85d52a65df9b commit 165 118 756
+d368d0ac0678cbe6cce505be58126d3526706e54 tag    130 122 874
+fe879577cb8cffcdf25441725141e310dd7d239b tree   136 136 996
+d8329fc1cc938780ffdd9f94e0d364e0ea74f579 tree   36 46 1132
+deef2e1b793907545e50a2ea2ddb5ba6c58c4506 tree   136 136 1178
+d982c7cb2c2a972ee391a85da481fc1f9127a01d tree   6 17 1314 1 \
+  deef2e1b793907545e50a2ea2ddb5ba6c58c4506
+3c4e9cd789d88d8d89c1073707c3585e41b0e614 tree   8 19 1331 1 \
+  deef2e1b793907545e50a2ea2ddb5ba6c58c4506
+0155eb4229851634a0f03eb265b69f5a2d56f341 tree   71 76 1350
+83baae61804e65cc73a7201a7252750c76066a30 blob   10 19 1426
+fa49b077972391ad58037050f2a75f74e3671e92 blob   9 18 1445
+b042a60ef7dff760008df33cee372b945b6e884e blob   22054 5799 1463
+033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5 blob   9 20 7262 1 \
+  b042a60ef7dff760008df33cee372b945b6e884e
+1f7a7a472abf3dd9643fd615f6da379c4acb3e3a blob   10 19 7282
+non delta: 15 objects
+chain length = 1: 3 objects
+.git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.pack: ok</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier verwijst de <code>033b4</code> blob die, als je het je nog kunt herinneren, de eerste versie van je repo.rb bestand is, naar de <code>b042a</code> blob, wat de tweede versie van het bestand was.
+De derde kolom in de uitvoer is de grootte van het object in het packfile bestand, dus je kunt zien dat <code>b042a</code> 22K van het bestand inneemt, aar dat <code>033b4</code> maar 9 bytes in beslag neemt.
+Wat ook interessant is, is dat de tweede versie van het bestaand degene is die intact opgeslagen is, terwijl de orginele versie is opgeslagen als een delta — de reden hiervoor is dat het waarschijnlijker is dat je snellere toegang nodig hebt naar de meest recente versie van het bestand.</p>
+</div>
+<div class="paragraph">
+<p>Het echte leuke van dit is, is dat het op elk gewenste moment weer opnieuw kan worden ingepakt.
+Git zal van op gezette tijden je database automatisch opnieuw inpakken, altijd met het doel nog meer ruimte te besparen, maar je kunt ook handmatig opnieuw laten inpakken door <code>git gc</code> zelf aan te roepen.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
