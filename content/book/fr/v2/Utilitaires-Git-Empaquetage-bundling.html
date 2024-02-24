@@ -1,0 +1,209 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: fr
+  chapter:
+    title: Utilitaires Git
+    number: 7
+  section:
+    title: Empaquetage (bundling)
+    number: 12
+    cs_number: '7.12'
+    previous: book/fr/v2/Utilitaires-Git-Sous-modules
+    next: book/fr/v2/Utilitaires-Git-Replace
+title: Git - Empaquetage (bundling)
+
+---
+<h2 id="s_bundling">Empaquetage (<em>bundling</em>)</h2>
+<div class="paragraph">
+<p>Bien que nous ayons déjà abordé les méthodes les plus communes de transfert de données Git par réseau (HTTP, SSH, etc.), il existe en fait une méthode supplémentaire qui n’est pas beaucoup utilisée mais qui peut s’avérer utile.</p>
+</div>
+<div class="paragraph">
+<p>Git est capable d’empaqueter ses données dans un fichier unique.
+Ceci peut servir dans de nombreux scénarios.
+Le réseau peut être en panne et vous souhaitez envoyer des modifications à vos collègues.
+Peut-être êtes-vous en train de travailler à distance et vous ne pouvez pas vous connecter au réseau local pour des raisons de sécurité.
+Peut-être que votre carte réseau ou votre carte wifi vient de tomber en panne.
+Peut-être encore n’avez-vous pas accès à un serveur partagé, et vous souhaitez envoyer à quelqu’un des mises à jour sans devoir transférer 40 <em>commits</em> via <code>format-patch</code>.</p>
+</div>
+<div class="paragraph">
+<p>Ce sont des situations où la commande <code>git bundle</code> est utile.
+La commande <code>bundle</code> va empaqueter tout ce qui serait normalement poussé sur le réseau avec une commande <code>git push</code> dans un fichier binaire qui peut être envoyé à quelqu’un par courriel ou copié sur une clé USB, puis de le dépaqueter dans un autre dépôt.</p>
+</div>
+<div class="paragraph">
+<p>Voyons un exemple simple.
+Supposons que vous avez un dépôt avec deux <em>commits</em> :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log
+commit 9a466c572fe88b195efd356c3f2bbeccdb504102
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Wed Mar 10 07:34:10 2010 -0800
+
+    second commit
+
+commit b1ec3248f39900d2a406049d762aa68e9641be25
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Wed Mar 10 07:34:01 2010 -0800
+
+    first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si vous souhaitez envoyer ce dépôt à quelqu’un et que vous n’avez pas accès en poussée à un dépôt, ou que simplement vous ne voulez pas en créer un, vous pouvez l’empaqueter avec <code>git bundle create</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bundle create repo.bundle HEAD master
+Décompte des objets: 6, fait.
+Delta compression using up to 2 threads.
+Compression des objets: 100% (2/2), fait.
+Écriture des objets : 100% (6/6), 441 bytes, fait.
+Total 6 (delta 0), reused 0 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>À présent, vous avez un fichier <code>repo.bundle</code> qui contient toutes les données nécessaires pour recréer la branche <code>master</code> du dépôt.
+Avec la commande <code>bundle</code>, vous devez lister toutes les références ou les intervalles spécifiques de <em>commits</em> que vous voulez inclure.
+Si vous le destinez à être cloné ailleurs, vous devriez aussi ajouter HEAD comme référence, comme nous l’avons fait.</p>
+</div>
+<div class="paragraph">
+<p>Vous pouvez envoyer ce fichier <code>repo.bundle</code> par courriel, ou le copier sur une clé USB et la tendre à un collègue.</p>
+</div>
+<div class="paragraph">
+<p>De l’autre côté, supposons qu’on vous a envoyé ce fichier <code>repo.bundle</code> et que vous voulez travailler sur le projet.
+Vous pouvez cloner le fichier binaire dans un répertoire, de la même manière que vous le feriez pour une URL.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone repo.bundle repo
+Initialized empty Git repository in /private/tmp/bundle/repo/.git/
+$ cd repo
+$ git log --oneline
+9a466c5 second commit
+b1ec324 first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si vous n’incluez pas HEAD dans les références, vous devez aussi spécifier <code>-b master</code> ou n’importe quelle branche incluse dans le paquet car sinon, il ne saura pas quelle branche extraire.</p>
+</div>
+<div class="paragraph">
+<p>Maintenant, supposons que vous faites 3 <em>commits</em> et que vous voulez renvoyer ces nouveaux <em>commits</em> via courriel ou clé USB.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline
+71b84da last commit - second repo
+c99cf5b fourth commit - second repo
+7011d3d third commit - second repo
+9a466c5 second commit
+b1ec324 first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nous devons déjà déterminer l’intervalle de <em>commits</em> que nous voulons inclure dans le colis.
+À la différence des protocoles réseau qui calculent automatiquement l’ensemble minimum des données à transférer, nous allons devoir les définir manuellement.
+Ici, vous pourriez tout à fait lancer la même commande et empaqueter le dépôt complet, ce qui marcherait mais c’est mieux de n’empaqueter que la différence ‑ seulement les 3 <em>commits</em> que nous avons localement créés.</p>
+</div>
+<div class="paragraph">
+<p>Pour le faire, vous allez devoir calculer la différence.
+Comme décrit dans <a href="{{< relurl "book/fr/v2/ch00/s_commit_ranges" >}}">Plages de <em>commits</em></a>, vous pouvez faire référence à un intervalle de <em>commits</em> de différentes manières.
+Pour désigner les trois <em>commits</em> que nous avons dans notre branche master et qui n’était pas dans la branche que nous avons initialement clonée, nous pouvons utiliser quelque chose comme <code>origin/master..master</code> ou <code>master ^origin/master</code>.
+Vous pouvez tester cela avec la sortie de la commande <code>log</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master ^origin/master
+71b84da last commit - second repo
+c99cf5b fourth commit - second repo
+7011d3d third commit - second repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Comme nous avons maintenant la liste des <em>commits</em> que nous voulons inclure dans le colis, empaquetons-les.
+Cela est réalisé avec la commande <code>git bundle create</code>, suivie d’un nom de fichier et des intervalles des <em>commits</em> que nous souhaitons inclure.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bundle create commits.bundle master ^9a466c5
+Comptage des objets : 11, fait.
+Delta compression using up to 2 threads.
+Compression des objets : 100% (3/3), fait.
+Écriture de objets : 100% (9/9), 775 bytes, fait.
+Total 9 (delta 0), reused 0 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nous avons à présent un fichier <code>commits.bundle</code> dans notre répertoire.
+Si nous le prenons et l’envoyons à un partenaire, il pourra l’importer dans le dépôt d’origine, même si du travail a été ajouté entre temps.</p>
+</div>
+<div class="paragraph">
+<p>Quand il récupère le colis, il peut l’inspecter pour voir ce qu’il contient avant de l’importer dans son dépôt.
+La première commande est <code>bundle verify</code> qui va s’assurer que le fichier est une fichier bundle Git valide et que le dépôt contient tous les ancêtres nécessaires pour appliquer correctement le colis.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bundle verify ../commits.bundle
+Le colis contient 1 référence :
+71b84daaf49abed142a373b6e5c59a22dc6560dc refs/heads/master
+Le colis exige cette référence
+9a466c572fe88b195efd356c3f2bbeccdb504102 second commit
+../commits.bundle est correct</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si la personne avait créé un colis ne contenant que les deux derniers commits qu’il avait ajoutés, plutôt que les trois, le dépôt initial n’aurait pas pu l’importer, car il aurait manqué un commit dans l’historique à reconstituer.
+La commande <code>verify</code> aurait ressemblé plutôt à ceci :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bundle verify ../commits-bad.bundle
+error: Le dépôt ne dispose pas des commits prérequis suivants :
+error: 7011d3d8fc200abe0ad561c011c3852a4b7bbe95 third commit - second repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Cependant, notre premier colis est valide, et nous pouvons récupérer des <em>commits</em> depuis celui-ci.
+Si vous souhaitez voir les branches présentes dans le colis qui peuvent être importées, il y a aussi une commande pour donner la liste des sommets des branches :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bundle list-heads ../commits.bundle
+71b84daaf49abed142a373b6e5c59a22dc6560dc refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>La sous-commande <code>verify</code> vous indiquera aussi les sommets.
+L’objectif est de voir ce qui peut être tiré, pour que vous puissiez utiliser les commandes <code>fetch</code> et <code>pull</code> pour importer des <em>commits</em> depuis le colis.
+Ici, nous allons récupérer la branche <code>master</code> du colis dans une branche appelée <code>other-master</code> dans notre dépôt :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git fetch ../commits.bundle master:other-master
+Depuis ../commits.bundle
+ * [nouvelle branche]      master     -&gt; other-master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Maintenant, nous pouvons voir que nous avons importé les <em>commits</em> sur la branche <code>other-master</code> ainsi que tous les <em>commits</em> que nous avons validés entre-temps dans notre propre branche <code>master</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --decorate --graph --all
+* 8255d41 (HEAD, master) third commit - first repo
+| * 71b84da (other-master) last commit - second repo
+| * c99cf5b fourth commit - second repo
+| * 7011d3d third commit - second repo
+|/
+* 9a466c5 second commit
+* b1ec324 first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ainsi, <code>git bundle</code> peut vraiment être utile pour partager du code ou réaliser des opérations nécessitant du réseau quand il n’y a pas de réseau ou de dépôt partagé.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
