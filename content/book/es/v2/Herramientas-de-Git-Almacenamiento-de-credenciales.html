@@ -1,0 +1,358 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Herramientas de Git
+    number: 7
+  section:
+    title: Almacenamiento de credenciales
+    number: 14
+    cs_number: '7.14'
+    previous: book/es/v2/Herramientas-de-Git-Replace
+    next: book/es/v2/Herramientas-de-Git-Resumen
+title: Git - Almacenamiento de credenciales
+
+---
+<h2 id="r_credential_caching">Almacenamiento de credenciales</h2>
+<div class="paragraph">
+<p>
+
+Si usa protocolo SSH para conectar a los remotos, es posible tener una llave sin clave, lo que permite tranferir la <code>data</code> sin tener que escribir el nombre de usuario y la clave cada vez.
+Sin embargo, esto no es posible por el protocolo HTTP - cada conexión necesita usuario y contraseña.
+Incluso se vuelve más complicado para sistemas con autenticación de dos pasos, donde el token que
+se usa para la clave es generado al azar y no puede ser reutilizado.</p>
+</div>
+<div class="paragraph">
+<p>Afortunadamente, Git tiene un sistema de credenciales que lo ayuda con esto.
+Git tiene las siguientes funciones disponibles:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>El “default” es no guardar cache para nada.
+Cada conexión solicitará el usuario y contraseña.</p>
+</li>
+<li>
+<p>El modo “cache” mantiene las credenciales en memoria por un cierto período de tiempo.
+Ninguna de las claves es guardada en disco, y son borradas del cache tras 15 minutos.</p>
+</li>
+<li>
+<p>El modo “store” guarda las credenciales en un archivo de texto plano en disco, y nunca expiran.
+Esto quiere decir que hasta que se cambie la contraseña en el host Git, no se necesitará escribir las credenciales de nuevo.
+La desventaja de este método es que sus claves son guardadas en texto plano en un archivo dentro de su máquina.</p>
+</li>
+<li>
+<p>Si está usando Mac, Git viene con el modo “osxkeychain”, el cual guarda en cache las credenciales en el llavero que está conectado a su cuenta de sistema.
+Este método guarda las claves en disco, y nunca expiran, pero están encriptadas con el mismo sistema que guarda los certificados HTTPS y los auto-completar de Safari.</p>
+</li>
+<li>
+<p>Si está en Windows, puede instalar un ayudante llamado “winstore.”
+Éste es similar al ayudante de “osxkeychain” descrito arriba, pero usa Windows Credential Store para controlar la información sensible.
+Se puede encontrar en <a href="https://gitcredentialstore.codeplex.com" class="bare">https://gitcredentialstore.codeplex.com</a>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Se puede elegir cualquiera de estos métodos mediante el valor de configuración de Git:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper cache</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Algunos de estos ayudantes tienen opciones.
+El modo “store” puede tomar un argumento <code>--file &lt;ruta&gt;', el cual personaliza la ubicación final del archivo en texto plano (el default es `~/.git-credentials</code>).</p>
+</div>
+<div class="paragraph">
+<p>El modo “cache” acepta la opción <code>--timeout &lt;segundos&gt;</code>, la cual cambia la cantidad de tiempo que el “demonio” se mantiene en ejecución (el default es “900”, o 15 minutos).
+Aquí hay un ejemplo de cómo configurar el modo “store” con un nombre de archivo personalizado:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper store --file ~/.my-credentials</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git incluso permite configurar varios modos.
+Cuando se buscan por credenciales para un host en particular, Git las mostrará en orden, y se detendrá después que la primer respuesta sea entregada.
+Cuando se guardan credenciales, Git mandará el usuario y contraseña a <strong>todos</strong> los modos en la lista, y se podrá elegir qué hacer con ellos.
+Aquí se muestra cómo se vería un archivo <code>.gitconfig</code> si tuviera un archivo de credenciales en una memoria, pero quisiera usar lo almacenado en cache cuando la memoria no esté conectada:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">[credential]
+    helper = store --file /mnt/thumbdrive/.git-credentials
+    helper = cache --timeout 30000</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_bajo_el_sombrero">Bajo el sombrero</h3>
+<div class="paragraph">
+<p>¿Cómo funciona todo esto?
+El comando raíz de Git para el asistente de credenciales es <code>git credential</code>, el cual toma un comando como argumento, y luego más inputs por medio de “stdin”.</p>
+</div>
+<div class="paragraph">
+<p>Esto podría ser más fácil de entender con un ejemplo.
+Supongamos que un modo de credenciales ha sido configurado, y que el asistente ha guardado credenciales para <code>mygithost</code>.
+Aquí hay una sesión que usa el comando “fill”, el cual es invocado cuando Git está intentando encontrar credenciales para el host:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential fill <b class="conum">(1)</b>
+protocol=https <b class="conum">(2)</b>
+host=mygithost
+<b class="conum">(3)</b>
+protocol=https <b class="conum">(4)</b>
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential fill <b class="conum">(5)</b>
+protocol=https
+host=unknownhost
+
+Username for 'https://unknownhost': bob
+Password for 'https://bob@unknownhost':
+protocol=https
+host=unknownhost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Este es el comando que inicia la interacción.</p>
+</li>
+<li>
+<p>Git-credential entonces espera por un input en “stdin”.
+Nosotros lo proveemos con lo que conocemos: el protocolo y el nombre de host.</p>
+</li>
+<li>
+<p>Una línea en blanco indica que el input está completo, y el sistema de credenciales debería responder con lo que conoce.</p>
+</li>
+<li>
+<p>Git-credential entonces entra en acción, y escribe en “stdout” los bits de información que encontró.</p>
+</li>
+<li>
+<p>Si no se encuentran credenciales, Git pregunta al usuario por el usuario y la contraseña, y los entrega de vuelta a “stdout” (aquí ya están conectados a la misma consola).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>El sistema de credenciales en realidad está invocando un programa que está separado de Git; el que figura en el valor de configuración <code>credential.helper</code>.
+Hay varias formas que puede tomar:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Configuration Value</th>
+<th class="tableblock halign-left valign-top">Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Runs <code>git-credential-foo</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo -a --opt=bcd</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Runs <code>git-credential-foo -a --opt=bcd</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/absolute/path/foo -xyz</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Runs <code>/absolute/path/foo -xyz</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>!f() { echo "password=s3cre7"; }; f</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Code after <code>!</code> evaluated in shell</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Así, los modos descritos arriba en realidad se llaman <code>git-credential-cache</code>, <code>git-credential-store</code>, y en adelante, los podemos configurar para que tomen argumentos de línea de comando.
+La forma general para conseguirlo es “git-credential-foo [args] &lt;acción&gt;.”
+El protocolo “stdin/stdout” es el mismo que “git-credential”, pero usan un conjunto ligeramente distinto de acciones:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>get</code> es una petición para un par usuario/contraseña.</p>
+</li>
+<li>
+<p><code>store</code> es una petición para guardar un grupo de credenciales en la memoria del modo.</p>
+</li>
+<li>
+<p><code>erase</code> purga las credenciales para las propiedades entregadas de la memoria del modo.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Para las acciones <code>store</code> y <code>erase</code>, no es necesaria una respuesta (Git la ignora de todos modos).
+Para la acción <code>get</code>, sin embargo, Git está muy interesado en lo que el modo tiene que decir.
+Si el modo no sabe nada útil, puede simplemente salir sin mostrar inforamción, pero si sabe algo, debería aumentar la información provista con la información que ha almacenado.
+El output es tratado como una serie de declaraciones de asignación; nada provisto remplazará lo que Git ya conoce.</p>
+</div>
+<div class="paragraph">
+<p>Aquí hay un ejemplo de lo explicado, pero saltando git-credential y yendo directo a git-credential-store:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-store --file ~/git.store store <b class="conum">(1)</b>
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential-store --file ~/git.store get <b class="conum">(2)</b>
+protocol=https
+host=mygithost
+
+username=bob <b class="conum">(3)</b>
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Aquí decimos con <code>git-credential-store</code> que guarde las credenciales: username “bob” y la clave “s3cre7”, que serán usadas cuando se accese a <code>https://mygithost</code>.</p>
+</li>
+<li>
+<p>Ahora vamos a recibir las credenciales.
+Proveemos las partes de la conexión que ya conocemos (<code>https://mygithost</code>), y una línea en blanco.</p>
+</li>
+<li>
+<p><code>git-credential-store</code> responde con el usuario y la contraseña que guardamos al comienzo.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Aquí se muestra cómo se vería <code>~/git.store</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>https://bob:s3cre7@mygithost</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es solamente una serie de líneas, cada una conteniendo una URL con credenciales.
+Los modos <code>osxkeychain</code> y <code>winsoter</code> usan el formato nativo de sus almacenamientos, mientras <code>cache</code> usa su propio formato en memoria (el cual no puede ser leído por ningún proceso).</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_un_cache_de_credenciales_personalizado">Un cache de credenciales personalizado</h3>
+<div class="paragraph">
+<p>Dado que <code>git-credential-store</code> y amigos son programas separados de Git, no es difícil de notar que <em>cualquier</em> programa puede ser un asistente de credenciales de Git.
+Los modos provistos por Git cubren muchos de los casos de uso, pero no todos.
+Por ejemplo, supongamos que tu equipo tiene credenciales que son compartidas con el equipo entero, tal vez para despliegue.
+Éstas están guardadas en un directorio compartido, pero no deseas copiarlas a tu almacén de credenciales, porque cambian de manera seguida.
+Ninguno de los modos existentes cubre este caso; veamos lo que tomaría para escribir tu propio modo.
+Existen muchas funcionalidades clave que necesita tener este programa:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>La única acción que necesitamos vigilar es <code>get</code>, en tanto que <code>store</code> y <code>erase</code> son operaciones de escritura, así que sólo saldremos limpiamente cuando sean recibidas.</p>
+</li>
+<li>
+<p>El formato de archivo de la credencial compartida es el mismo que se usa por <code>git-credential-store</code>.</p>
+</li>
+<li>
+<p>La ubicación de ese archivo es relativamente estándar, pero deberías permitir al usuario entregar una ruta alterna, por si acaso.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Una vez más, vamos a escribir esta extensión en Ruby, pero cualquier lenguaje funcionará siempre y cuando Git pueda ejecutar el producto final.
+Aquí está el código de nuestro nuevo asistente de credenciales:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+require 'optparse'
+
+path = File.expand_path '~/.git-credentials' # <b class="conum">(1)</b>
+OptionParser.new do |opts|
+    opts.banner = 'USAGE: git-credential-read-only [options] &lt;action&gt;'
+    opts.on('-f', '--file PATH', 'Specify path for backing store') do |argpath|
+        path = File.expand_path argpath
+    end
+end.parse!
+
+exit(0) unless ARGV[0].downcase == 'get' # <b class="conum">(2)</b>
+exit(0) unless File.exists? path
+
+known = {} # <b class="conum">(3)</b>
+while line = STDIN.gets
+    break if line.strip == ''
+    k,v = line.strip.split '=', 2
+    known[k] = v
+end
+
+File.readlines(path).each do |fileline| # <b class="conum">(4)</b>
+    prot,user,pass,host = fileline.scan(/^(.*?):\/\/(.*?):(.*?)@(.*)$/).first
+    if prot == known['protocol'] and host == known['host'] then
+        puts "protocol=#{prot}"
+        puts "host=#{host}"
+        puts "username=#{user}"
+        puts "password=#{pass}"
+        exit(0)
+    end
+end</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Aquí analizamos las opciones de la línea de comando, permitiendo al usuario especificar un archivo. El default es <code>~/.git-credentials</code>.</p>
+</li>
+<li>
+<p>Este programa sólo responde si la acción es <code>get</code> y el archivo de almacenamiento existe.</p>
+</li>
+<li>
+<p>Este bucle lee de “stdin” hasta que se encuentre la primer línea en blanco.
+Los inputs son guardados en el hash <code>known</code> para una posterior referencia.</p>
+</li>
+<li>
+<p>Este bucle lee el contenido del archivo de almacenamiento, buscando por concordancias.
+Si el protocolo y el host de <code>known</code> concuerdan con la línea, el programa imprime el resultado a “stdout” y sale.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Guardaremos nuestro modo como <code>git-credential-read-only</code>, ponlo en algún lugar en nuestro <code>PATH</code> y lo marcamos como ejecutable.
+Aquí se muestra cómo se vería una sesión interactiva:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-read-only --file=/mnt/shared/creds get
+protocol=https
+host=mygithost
+
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dado que su nombre comienza con “git-”, podemos usar la sintaxis simple para el valor de configuración:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper read-only --file /mnt/shared/creds</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Como se puede apreciar, extender este sistema es bastante sencillo, y puede resolver algunos problemas comunes para ti y tu equipo.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
