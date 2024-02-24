@@ -1,0 +1,292 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Herramientas de Git
+    number: 7
+  section:
+    title: Rerere
+    number: 9
+    cs_number: '7.9'
+    previous: book/es/v2/Herramientas-de-Git-Fusión-Avanzada
+    next: book/es/v2/Herramientas-de-Git-Haciendo-debug-con-Git
+title: Git - Rerere
+
+---
+<h2 id="r_rerere">Rerere</h2>
+<div class="paragraph">
+<p>La funcionalidad del "git rerere" es una característica oculta. El nombre se refiere a "reuse recorded resolution" y, como el nombre lo insinúa, te permite pedirle a Git que recuerde cómo resolviste un conflicto de hunk. Así la próxima vez que vea el mismo conflicto, Git puede resolverlo automáticamente por ti.</p>
+</div>
+<div class="paragraph">
+<p>Hay una serie de escenarios en los cuales esta funcinalidad podría ser realmente útil. Uno de los ejemplos mencionado en el manual es, si te quieres asegurar de que una rama temática longeva se unirá limpiamente, pero no quieres tener un montón de “commits” de unión por la mitad. Con "rerere" encendido, puedes unir ocasionalmente, resolver los conflictos, y luego revertir la unión. Si haces esto continuamente, entonces la unión final debería ser fácil porque "rerere" puede hacer todo por ti automáticamente.</p>
+</div>
+<div class="paragraph">
+<p>Esta misma táctica puede ser usada si quieres mantener una rama con “rebase”, de esta manera no tienes que lidiar con los mismos conflictos de “rebase” cada vez que lo haces. O si quieres tomar una rama que uniste y arreglar un montón de conflictos y entonces decidir hacer “rebase” en su lugar - probablemente no tengas que solucionar todos los mismos conflictos de nuevo.</p>
+</div>
+<div class="paragraph">
+<p>Otra situación es, cuando unes un montón de ramas temáticas en evolución juntas en una HEAD de pruebas ocasionalmente, como el mismo proyecto Git hace con frecuencia. Si las pruebas fallan, puedes rebobinar las uniones y rehacerlas sin la rama temática que hace fallar a las pruebas sin tener que re-resolver los conflictos de nuevo.</p>
+</div>
+<div class="paragraph">
+<p>Para activar la funcionalidad "rerere", simplemente tienes que ejecutar este ajuste de configuración:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global rerere.enabled true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Puedes encenderlo también creando el directorio ".git/rr-cache" en un repositorio específico, pero el ajuste de configuración es limpiador y puede ser hecho globalmente.</p>
+</div>
+<div class="paragraph">
+<p>Ahora veamos un ejemplo simple, similar al anterior. Digamos que tenemos un archivo que luce de esta manera:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">#! /usr/bin/env ruby
+
+def hello
+  puts 'hello world'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>En una rama, cambiamos la palabra "hello" por "hola", entonces, en otra rama cambiamos el "world" por "mundo", justo como antes.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/rerere1.png" >}}" alt="rerere1">
+</div>
+</div>
+<div class="paragraph">
+<p>Cuando unimos las dos ramas juntas, tendremos un conflicto de unión:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge i18n-world
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Recorded preimage for 'hello.rb'
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Deberías notar la nueva línea "Recorded preimage for FILE" ahí adentro. Si no, debería verse exactamente como un conflicto de unión normal. En este punto, "rerere" puede decirnos algunas cosas. Normalmente, podrías ejecutar <code>git status</code> en este punto para ver todo lo que entró en conflicto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status
+# On branch master
+# Unmerged paths:
+#   (use "git reset HEAD &lt;file&gt;..." to unstage)
+#   (use "git add &lt;file&gt;..." to mark resolution)
+#
+#	both modified:      hello.rb
+#</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sin embargo, "git rerere" también te dirá lo que ha registrado el estado pre-unión con <code>git rerere status</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere status
+hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Y <code>git rerere diff</code> mostrará el estado actual de la resolución - con lo que comenzaste a resolver y lo que has resuelto.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,11 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
++&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+   puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++=======
++  puts 'hello mundo'
++&gt;&gt;&gt;&gt;&gt;&gt;&gt; i18n-world
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Además (y esto no está realmente relacionado a "rerere"), puedes usar <code>ls-files -u</code> para ver los archivos que están en conflicto y las versiones anteriores, izquierda y derecha:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -u
+100644 39804c942a9c1f2c03dc7c5ebcd7f3e3a6b97519 1	hello.rb
+100644 a440db6e8d1fd76ad438a49025a9ad9ce746f581 2	hello.rb
+100644 54336ba847c3758ab604876419607e9443848474 3	hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora puedes resolverlo para hacer simplemente <code>puts 'hola mundo'</code> y puedes ejecutar el comando <code>rerere diff</code> de nuevo para ver lo que "rerere" recordará:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,7 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
+-  puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++  puts 'hola mundo'
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Eso básicamente dice: cuando Git ve un conflicto de hunk en un archivo "hello.rb" que tiene "hello mundo" en un lado y "hola world" en el otro, lo resolverá como "hola mundo".</p>
+</div>
+<div class="paragraph">
+<p>Ahora podemos marcarlo como resuleto y hacerle “commit”:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git commit
+Recorded resolution for 'hello.rb'.
+[master 68e16e5] Merge branch 'i18n'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora podemos ver que "Recorded resolution for FILE" (Registró solución para ARCHIVO).</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/rerere2.png" >}}" alt="rerere2">
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora, deshagamos esa unión y luego hagámosle “rebase” en la cima de nuestra rama maestra en su lugar. Podemos tener nuestra rama de vuelta usando <code>reset</code> como vimos en <a href="{{< relurl "book/es/v2/ch00/r_git_reset" >}}">Reiniciar Desmitificado</a>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard HEAD^
+HEAD is now at ad63f15 i18n the hello</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nuestra unión no está hecha. Ahora hagámos “rebase” a la rama temática.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout i18n-world
+Switched to branch 'i18n-world'
+
+$ git rebase master
+First, rewinding head to replay your work on top of it...
+Applying: i18n one word
+Using index info to reconstruct a base tree...
+Falling back to patching base and 3-way merge...
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Resolved 'hello.rb' using previous resolution.
+Failed to merge in the changes.
+Patch failed at 0001 i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora, tenemos el mismo conflicto de unión que esperábamos, pero échale un vistazo a la línea "Resolved FILE using previous resolution". Si miramos el archivo, veremos que ya está resuleto, ya no hay marcas de conflicto de unión en él.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Además, <code>git diff</code> te mostrará cómo fué re-resuleto automáticamente:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc hello.rb
+index a440db6,54336ba..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/rerere3.png" >}}" alt="rerere3">
+</div>
+</div>
+<div class="paragraph">
+<p>Puedes también recrear el archivo en conflicto con el comando “checkout”:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout --conflict=merge hello.rb
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt; ours
+  puts 'hola world'
+======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt; theirs
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vimos un ejemplo de esto en <a href="{{< relurl "book/es/v2/ch00/r_advanced_merging" >}}">Fusión Avanzada</a>.
+Por ahora, resolvámoslo sólo ejecuntando "rerere" de nuevo:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere
+Resolved 'hello.rb' using previous resolution.
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hemos re-resuelto el archivo automáticamente usando la resolución en caché "rerere". Ahora puedes añadir y continuar el “rebase” para completarlo.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git rebase --continue
+Applying: i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Entonces, si haces muchas re-uniones, o quieres mantener una rama temática actualizada con tu rama maestra sin un montón de uniones, o haces “rebase” a menudo, puedes encender "rerere" para ayudar un poco a tu vida.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

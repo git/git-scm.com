@@ -1,0 +1,179 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Herramientas de Git
+    number: 7
+  section:
+    title: Haciendo debug con Git
+    number: 10
+    cs_number: '7.10'
+    previous: book/es/v2/Herramientas-de-Git-Rerere
+    next: book/es/v2/Herramientas-de-Git-Submódulos
+title: Git - Haciendo debug con Git
+
+---
+<h2 id="_haciendo_debug_con_git">Haciendo debug con Git</h2>
+<div class="paragraph">
+<p>Git también provee unas cuantas herramientas para realizar un debug a los problemas en tus proyectos.
+Porque Git está diseñado para trabajar con casi cualquier tipo de proyecto, estas herramientas son bastante genéricas, pero pueden ayudar a cazar bugs o al culpable cuando las cosas salen mal.</p>
+</div>
+<div class="sect3">
+<h3 id="r_file_annotation">Anotaciones de archivo</h3>
+<div class="paragraph">
+<p>Si rastreas un bug en tu código y quieres saber cuándo fue introducido y por qué, la anotación de archivo será muchas veces tu mejor herramienta.
+Esta te muestra qué commit fue el último en modificar cada línea de cualquier archivo.
+Así que, si ves que un método en tu código tiene bugs, puedes anotar el archivo con <code>git blame</code> para ver cuándo cada línea del método fue editada por última vez y por quién.
+Este ejemplo usa la opción <code>-L</code> para limitar la salida desde las líneas 12 a 22:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git blame -L 12,22 simplegit.rb
+^4832fe2 (Scott Chacon  2008-03-15 10:31:28 -0700 12)  def show(tree = 'master')
+^4832fe2 (Scott Chacon  2008-03-15 10:31:28 -0700 13)   command("git show #{tree}")
+^4832fe2 (Scott Chacon  2008-03-15 10:31:28 -0700 14)  end
+^4832fe2 (Scott Chacon  2008-03-15 10:31:28 -0700 15)
+9f6560e4 (Scott Chacon  2008-03-17 21:52:20 -0700 16)  def log(tree = 'master')
+79eaf55d (Scott Chacon  2008-04-06 10:15:08 -0700 17)   command("git log #{tree}")
+9f6560e4 (Scott Chacon  2008-03-17 21:52:20 -0700 18)  end
+9f6560e4 (Scott Chacon  2008-03-17 21:52:20 -0700 19)
+42cf2861 (Magnus Chacon 2008-04-13 10:45:01 -0700 20)  def blame(path)
+42cf2861 (Magnus Chacon 2008-04-13 10:45:01 -0700 21)   command("git blame #{path}")
+42cf2861 (Magnus Chacon 2008-04-13 10:45:01 -0700 22)  end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nota que el primer campo es la parcial de SHA-1 del “commit” que modificó esa línea.
+Los siguientes dos campos son valores extraídos del “commit” - el nombre del autor y la fecha del commit - así podrás ver de manera sencilla quién modificó esa línea y cuándo.
+Tras estos viene el número de línea y el contenido del archivo.
+También nota las líneas del “commit” <code>^4832fe2</code>, que designan que esas líneas estuvieron en el “commit” original del archivo.
+Ese “commit” es cuando este archivo fue introducido por primera vez al proyecto, y esas líneas no han sido modificadas desde entonces.
+Esto es un poco confuso, porque ahora has visto al menos tres maneras diferentes en que Git usa el <code>^</code> para modificar el SHA-1 de un “commit”, pero eso es lo que significa aquí.</p>
+</div>
+<div class="paragraph">
+<p>Otra cosa interesante de Git, es que no rastrea los nombres de archivos de forma explícita.
+Registra las instantáneas y luego intenta averiguar lo que fué renombrado implícitamente, después del hecho.
+Una de las características interesantes de esto es que se puede preguntar todo tipo de movimiento de código también.
+Si pasas <code>-C</code> a` git blame`, Git analiza el archivo que estás anotando y trata de averiguar de dónde provienen originalmente los fragmentos de código si se copiaron desde otro lugar.
+Por ejemplo, digamos que estás modificando un archivo llamado <code>GITServerHandler.m</code> en múltiples archivos, uno de estos es <code>GITPackUpload.m</code>.
+Realizando un “blame” a <code>GITPackUpload.m</code> con la opción <code>-C</code>, se puede ver de dónde vinieron las secciones del código:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git blame -C -L 141,153 GITPackUpload.m
+f344f58d GITServerHandler.m (Scott 2009-01-04 141)
+f344f58d GITServerHandler.m (Scott 2009-01-04 142) - (void) gatherObjectShasFromC
+f344f58d GITServerHandler.m (Scott 2009-01-04 143) {
+70befddd GITServerHandler.m (Scott 2009-03-22 144)         //NSLog(@"GATHER COMMI
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 145)
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 146)         NSString *parentSha;
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 147)         GITCommit *commit = [g
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 148)
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 149)         //NSLog(@"GATHER COMMI
+ad11ac80 GITPackUpload.m    (Scott 2009-03-24 150)
+56ef2caf GITServerHandler.m (Scott 2009-01-05 151)         if(commit) {
+56ef2caf GITServerHandler.m (Scott 2009-01-05 152)                 [refDict setOb
+56ef2caf GITServerHandler.m (Scott 2009-01-05 153)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esto es realmente útil.
+Normalmente, se obtiene como el “commit original” aquel de dónde se copió el código, porque esta es la primera vez en la que se tocaron estas líneas en el archivo.
+Git te informa el “commit original” donde se escribieron esas líneas, incluso si esto fue hecho en otro archivo.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_binary_search">Búsqueda binaria</h3>
+<div class="paragraph">
+<p>Anotar un archivo ayuda si sabes dónde está el problema.
+Si no sabes lo que está mal, y ha habido decenas o cientos de “commits” desde el último estado en el que sabes que funcionó el código, probablemente recurrirás a <code>git bisect</code> para obtener ayuda.
+El comando <code>bisect</code> hace una búsqueda binaria a través de su historial de commits para ayudarte a identificar lo más rápidamente posible qué commit introdujo un problema.</p>
+</div>
+<div class="paragraph">
+<p>Supongamos que acabas de emitir un release de tu código en un entorno de producción, estás recibiendo informes de errores sobre algo que no estaba ocurriendo en tu entorno de desarrollo y no puedes imaginar por qué el código lo está haciendo.
+Regresas a tu código, y resulta que puedes reproducir el problema, pero no puedes averiguar qué está mal.
+Puedes biseccionar el código para averiguarlo.
+Primero ejecuta <code>git bisect start</code> para hacer que las cosas funcionen, y luego usas <code>git bisect bad</code> para decirle al sistema que el “commit” actual está roto.
+Entonces, debes decir a <code>bisect</code> cuándo fue el último estado bueno conocido, usando <code>git bisect good [good_commit]</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect start
+$ git bisect bad
+$ git bisect good v1.0
+Bisecting: 6 revisions left to test after this
+[ecb6e1bc347ccecc5f9350d878ce677feb13d3b2] error handling on repo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git se dió cuenta de que se produjeron alrededor de 12 commits entre el commit marcado como el último commit bueno (v1.0) y la versión mala actual, y comprobó el del medio para ti.
+En este punto, puedes ejecutar tu prueba para ver si el problema existe a partir de este “commit”.
+Si lo hace, entonces se introdujo en algún momento antes de este “commit” medio; si no lo hace, entonces el problema se introdujo en algún momento después del “commit” medio.
+Resulta que no hay ningún problema aquí, y le dices a Git escribiendo <code>git bisect good</code> y continúa tu viaje:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect good
+Bisecting: 3 revisions left to test after this
+[b047b02ea83310a70fd603dc8cd7a6cd13d15c04] secure this thing</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora estás en otro “commit”, a medio camino entre el que acabas de probar y tu mala comisión.
+Ejecutas la prueba de nuevo y descubres que este “commit” está roto, por lo que le dices a Git <code>git bisect bad</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect bad
+Bisecting: 1 revisions left to test after this
+[f71ce38690acf49c1f3c9bea38e09d82a5ce6014] drop exceptions table</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Este “commit” está bien, y ahora Git tiene toda la información que necesita para determinar dónde se introdujo el problema.
+Te dice el SHA-1 del primer “commit” erróneo y muestra algo de la información del “commit” con qué archivos se modificaron en ese “commit” para que puedas averiguar qué sucedió que pueda haber introducido este error:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect good
+b047b02ea83310a70fd603dc8cd7a6cd13d15c04 is first bad commit
+commit b047b02ea83310a70fd603dc8cd7a6cd13d15c04
+Author: PJ Hyett &lt;pjhyett@example.com&gt;
+Date:   Tue Jan 27 14:48:32 2009 -0800
+
+    secure this thing
+
+:040000 040000 40ee3e7821b895e52c1695092db9bdc4c61d1730
+f24d3c6ebcfc639b1a3814550e62d60b8e68a8e4 M  config</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Cuando hayas terminado, debes ejecutar <code>git bisect reset</code> para reiniciar el HEAD a donde estaba antes de comenzar, o terminará en un estado raro:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect reset</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esta es una herramienta poderosa que puede ayudarte a comprobar cientos de “commits” para un bug introducido en cuestión de minutos.
+De hecho, si tienes un script que retornará 0 si el proyecto está bien u otro número si el proyecto está mal, puedes automatizar completamente <code>git bisect</code>.
+En primer lugar, vuelve a decirle el alcance de la bisectriz, proporcionando los “commits” malos y buenos.
+Puedes hacerlo enumerándolos con el comando <code>bisect start</code> si lo deseas, listando primero el “commit” malo conocido y segundo el “commit” bueno conocido:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git bisect start HEAD v1.0
+$ git bisect run test-error.sh</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hacerlo ejecuta automáticamente <code>test-error.sh</code> en cada “commit” de “check-out” hasta que Git encuentre el primer “commit” roto.
+También puedes ejecutar algo como <code>make</code> o ` make tests` o lo que sea que ejecute pruebas automatizadas para ti.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
