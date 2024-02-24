@@ -1,0 +1,271 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: fr
+  chapter:
+    title: Utilitaires Git
+    number: 7
+  section:
+    title: Replace
+    number: 13
+    cs_number: '7.13'
+    previous: book/fr/v2/Utilitaires-Git-Empaquetage-bundling
+    next: book/fr/v2/Utilitaires-Git-Stockage-des-identifiants
+title: Git - Replace
+
+---
+<h2 id="s_replace">Replace</h2>
+<div class="paragraph">
+<p>Git manipule des objets immuables mais il fournit un moyen de faire comme s’il pouvait remplacer des objets de sa base de données par d’autres objets.</p>
+</div>
+<div class="paragraph">
+<p>La commande <code>replace</code> vous permet de spécifier un objet dans Git et de lui indiquer : « chaque fois que tu vois ceci, fais comme si c’était cette autre chose ».
+Ceci sert principalement à remplacer un <em>commit</em> par un autre dans votre historique.</p>
+</div>
+<div class="paragraph">
+<p>Par exemple, supposons que vous avez un énorme historique de code et que vous souhaitez scinder votre dépôt en un historique court pour les nouveaux développeurs et un plus important et long pour ceux intéressés par des statistiques.
+Vous pouvez générer un historique depuis l’autre avec <code>replace</code> en remplaçant le <em>commit</em> le plus ancien du nouvel historique par le dernier <em>commit</em> de l’historique ancien.
+C’est sympa parce que cela signifie que vous n’avez pas besoin de réécrire tous les <em>commits</em> du nouvel historique, comme vous devriez le faire pour les joindre tous les deux (à cause de l’effet de lien des SHA-1).</p>
+</div>
+<div class="paragraph">
+<p>Voyons ce que ça donne.
+Prenons un dépôt existant, découpons-le en deux dépôts, un récent et un historique, puis nous verrons comment les recombiner sans modifier les valeurs SHA-1 du dépôt récent, grâce à <code>replace</code>.</p>
+</div>
+<div class="paragraph">
+<p>Nous allons utiliser un dépôt simple avec cinq <em>commit</em> simples :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline
+ef989d8 fifth commit
+c6e1e95 fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nous souhaitons couper ceci en deux lignes d’historiques.
+Une ligne ira de <em>first commit</em> à <em>fourth commit</em> et sera la ligne historique.
+La seconde ligne ira de <em>fourth commit</em> à <em>fifth commit</em> et sera ligne récente.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/fr/v2/images/replace1.png" >}}" alt="replace1">
+</div>
+</div>
+<div class="paragraph">
+<p>Bien, la création de la ligne historique est simple, nous n’avons qu’à créer une branche dans l’historique et la pousser vers la branche <code>master</code> d’un nouveau dépôt distant.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch history c6e1e95
+$ git log --oneline --decorate
+ef989d8 (HEAD, master) fifth commit
+c6e1e95 (history) fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/fr/v2/images/replace2.png" >}}" alt="replace2">
+</div>
+</div>
+<div class="paragraph">
+<p>Maintenant, nous pouvons pousser la nouvelle branche <code>history</code> vers la branche <code>master</code> du nouveau dépôt :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add project-history https://github.com/schacon/project-history
+$ git push project-history history:master
+Décompte des objets : 12, fait.
+Delta compression using up to 2 threads.
+Compression des objets : 100% (4/4), fait.
+Écriture des objets : 100% (12/12), 907 bytes, fait.
+Total 12 (delta 0), reused 0 (delta 0)
+Dépaquetage des objets : 100% (12/12), fait.
+To git@github.com:schacon/project-history.git
+ * [nouvelle branche]      history -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Bien, notre projet historique est publié.
+Maintenant, la partie la plus compliquée consiste à tronquer l’historique récent pour le raccourcir.
+Nous avons besoin d’un recouvrement pour pouvoir remplacer un <em>commit</em> dans un historique par un équivalent dans l’autre, donc nous allons tronquer l’historique à <em>fourth commit</em> et <em>fifth commit</em>, pour que <em>fourth commit</em> soit en recouvrement.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --decorate
+ef989d8 (HEAD, master) fifth commit
+c6e1e95 (history) fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Il peut être utile de créer un <em>commit</em> de base qui contient les instructions sur la manière d’étendre l’historique, de sorte que les autres développeurs puissent savoir comment s’y prendre s’ils butent sur le premier <em>commit</em> et ont besoin de plus d’histoire.
+Donc, ce que nous allons faire, c’est créer un objet <em>commit</em> initial comme base avec les instructions, puis rebaser les <em>commits</em> restants (quatre et cinq) dessus.</p>
+</div>
+<div class="paragraph">
+<p>Nous avons besoin de choisir un point de découpe, qui pour nous est <em>third commit</em>, soit le SHA-1 <code>9c68fdc</code>.
+Donc, notre <em>commit</em> de base sera créé sur cet arbre.
+Nous pouvons créer notre <em>commit</em> de base en utilisant la commande <code>commit-tree</code>, qui accepte juste un arbre et nous fournit un SHA-1 d’un objet <em>commit</em> orphelin tout nouveau.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'get history from blah blah blah' | git commit-tree 9c68fdc^{tree}
+622e88e9cbfbacfb75b5279245b9fb38dfea10cf</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>La commande <code>commit-tree</code> fait partie de ce qu’on appelle les commandes de « plomberie ».
+Ce sont des commandes qui ne sont pas destinées à être utilisées directement, mais plutôt au sein d'<strong>autres</strong> commandes Git en tant que petits utilitaires.
+Dans les occasions où nous faisons des choses plus bizarres que de coutume comme actuellement, elles nous permettent de faire des actions de bas niveau qui ne sont pas destinées à une utilisation quotidienne.
+Pour en savoir plus sur les commandes de plomberie, référez-vous à <a href="{{< relurl "book/fr/v2/ch00/s_plumbing_porcelain" >}}">Plomberie et porcelaine</a>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/fr/v2/images/replace3.png" >}}" alt="replace3">
+</div>
+</div>
+<div class="paragraph">
+<p>OK, donc maintenant avec un <em>commit</em> de base, nous pouvons rebaser le reste de notre historique dessus avec la commande <code>git rebase --onto</code>.
+L’argument <code>--onto</code> sera l’empreinte SHA-1 que nous venons tout juste de récupérer avec la commande <code>commit-tree</code> et le point de rebasage sera <code>third commit</code> (le parent du premier <em>commit</em> que nous souhaitons garder, <code>9c68fdc</code>).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rebase --onto 622e88 9c68fdc
+First, rewinding head to replay your work on top of it...
+Applying: fourth commit
+Applying: fifth commit</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/fr/v2/images/replace4.png" >}}" alt="replace4">
+</div>
+</div>
+<div class="paragraph">
+<p>Bien, nous avons donc réécrit l’historique récent à la suite du <em>commit</em> de base qui contient les instructions pour reconstruire l’historique complet.
+Nous pouvons pousser ce nouvel historique vers un nouveau projet et quand des personnes clonent ce dépôt, elles ne voient que les deux <em>commits</em> les plus récents et un <em>commit</em> avec des instructions.</p>
+</div>
+<div class="paragraph">
+<p>Inversons les rôles et plaçons-nous dans la position d’une personne qui clone le projet pour la première fois et souhaite obtenir l’historique complet.
+Pour obtenir les données d’historique après avoir cloné ce dépôt tronqué, on doit ajouter un second dépôt distant pointant vers le dépôt historique et tout récupérer  :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://github.com/schacon/project
+$ cd project
+
+$ git log --oneline master
+e146b5f fifth commit
+81a708d fourth commit
+622e88e get history from blah blah blah
+
+$ git remote add project-history https://github.com/schacon/project-history
+$ git fetch project-history
+From https://github.com/schacon/project-history
+ * [nouvelle branche]      master     -&gt; project-history/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>À présent, le collaborateur aurait les <em>commits</em> récents dans la branche <code>master</code> et les <em>commits</em> historiques dans la branche <code>project-history/master</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master
+e146b5f fifth commit
+81a708d fourth commit
+622e88e get history from blah blah blah
+
+$ git log --oneline project-history/master
+c6e1e95 fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Pour combiner ces deux branches, vous pouvez simplement lancer <code>git replace</code> avec le <em>commit</em> que vous souhaitez remplacer suivi du <em>commit</em> qui remplacera.
+Donc nous voulons remplacer <code>fourth commit</code> dans la branche <code>master</code> par <code>fourth commit</code> de la branche <code>project-history/master</code> :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git replace 81a708d c6e1e95</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Maintenant, quand on regarde l’historique de la branche <code>master</code>, il apparaît comme ceci :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master
+e146b5f fifth commit
+81a708d fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sympa, non ? Sans devoir changer tous les SHA-1 en amont, nous avons pu remplacer un <em>commit</em> dans notre historique avec un autre entièrement différent et tous les outils normaux (<code>bisect</code>, <code>blame</code>, etc) fonctionnent de manière transparente.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/fr/v2/images/replace5.png" >}}" alt="replace5">
+</div>
+</div>
+<div class="paragraph">
+<p>Ce qui est intéressant, c’est que <code>fourth commit</code> a toujours un SHA-1 de <code>81a708d</code>, même s’il utilise en fait les données du <em>commit</em> <code>c6e1e95</code> par lequel nous l’avons remplacé.
+Même si vous lancez une commande comme <code>cat-file</code>, il montrera les données remplacées :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 81a708d
+tree 7bc544cf438903b65ca9104a1e30345eee6c083d
+parent 9c68fdceee073230f19ebb8b5e7fc71b479c0252
+author Scott Chacon &lt;schacon@gmail.com&gt; 1268712581 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1268712581 -0700
+
+fourth commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Souvenez-vous que le parent réel de <code>81a708d</code> était notre <em>commit</em> de base (<code>622e88e</code>) et non <code>9c68fdce</code> comme indiqué ici.</p>
+</div>
+<div class="paragraph">
+<p>Une autre chose intéressante est que les données sont conservées dans nos références :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git for-each-ref
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/heads/master
+c6e1e95051d41771a649f3145423f8809d1a74d4 commit	refs/remotes/history/master
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/remotes/origin/HEAD
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/remotes/origin/master
+c6e1e95051d41771a649f3145423f8809d1a74d4 commit	refs/replace/81a708dd0e167a3f691541c7a6463343bc457040</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ceci signifie qu’il est facile de partager notre remplacement avec d’autres personnes, puisque nous pouvons pousser ceci sur notre serveur et d’autres personnes pourront le télécharger.
+Ce n’est pas très utile dans le cas de la reconstruction d’historique que nous venons de voir (puisque tout le monde téléchargerait quand même les deux historiques, pourquoi alors les séparer ?), mais cela peut être utile dans d’autres circonstances.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

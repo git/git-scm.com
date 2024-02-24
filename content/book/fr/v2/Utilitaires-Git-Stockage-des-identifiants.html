@@ -1,0 +1,356 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: fr
+  chapter:
+    title: Utilitaires Git
+    number: 7
+  section:
+    title: Stockage des identifiants
+    number: 14
+    cs_number: '7.14'
+    previous: book/fr/v2/Utilitaires-Git-Replace
+    next: book/fr/v2/Utilitaires-Git-Résumé
+title: Git - Stockage des identifiants
+
+---
+<h2 id="s_credential_caching">Stockage des identifiants</h2>
+<div class="paragraph">
+<p>
+
+Si vous utilisez le transport SSH pour vous connecter à vos dépôts distants, il est possible d’avoir une clé sans mot de passe qui permet de transférer des données en sécurité sans devoir entrer un nom d’utilisateur et un mot de passe.
+Cependant, ce n’est pas possible avec les protocoles HTTP ‑ toute connexion nécessite un nom d’utilisateur et un mot de passe.
+Cela devient même plus difficile avec des systèmes à authentification à deux facteurs, où le mot de passe utilisé est généré dynamiquement au hasard et devient imprononçable.</p>
+</div>
+<div class="paragraph">
+<p>Heureusement, Git dispose d’un système de gestion d’identifiants qui peut faciliter cette gestion.
+Git propose de base quelques options :</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Par défaut, rien n’est mis en cache.
+Toutes les connexions vous demanderont votre nom d’utilisateur et votre mot de passe.</p>
+</li>
+<li>
+<p>Le mode « cache » conserve en mémoire les identifiants pendant un certain temps.
+Aucun mot de passe n’est stocké sur le disque et les identifiants sont oubliés après 15 minutes.</p>
+</li>
+<li>
+<p>Le mode « store » sauvegarde les identifiants dans un fichier texte simple sur le disque, et celui-ci n’expire jamais.
+Ceci signifie que tant que vous ne changerez pas votre mot de passe sur le serveur Git, vous n’aurez plus à entrer votre mot de passe.
+Le défaut de cette approche est que vos mots de passe sont stockés en clair dans un fichier texte dans votre répertoire personnel.</p>
+</li>
+<li>
+<p>Si vous utilisez un Mac, Git propose un mode « osxkeychain », qui met en cache les identifiants dans un trousseau sécurisé attaché à votre compte système.</p>
+</li>
+<li>
+<p>Si vous utilisez Windows, vous pouvez installer une application appelée « <code>Git Credential Manager for Windows</code> ».
+C’est similaire à l’assistant « osxkeychain » décrit ci-dessus, mais utilise le <em>Windows Credential Store</em> pour sauvegarder les informations sensibles.
+<em>winstore</em> peut être téléchargé à <a href="https://github.com/Microsoft/Git-Credential-Manager-for-Windows" class="bare">https://github.com/Microsoft/Git-Credential-Manager-for-Windows</a>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Vous pouvez choisir une de ces méthodes en paramétrant une valeur de configuration Git :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper cache</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Certains de ces assistants ont des options.
+L’assistant « store » accepte un argument <code>--file &lt;chemin&gt;</code> qui permet de personnaliser l’endroit où le fichier texte est sauvegardé (par défaut, c’est <code>~/.git-credentials</code>).
+L’assistant <code>cache</code> accepte une option <code>--timeout &lt;secondes&gt;</code> qui modifie la période de maintien en mémoire (par défaut, 900, soit 15 minutes).
+Voici un exemple de configuration de l’option « store » avec un nom de fichier personnalisé :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper 'store --file ~/.my-credentials'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git vous permet même de configurer plusieurs assistants.
+Lors de la recherche d’identifiants pour un serveur donné, Git les interrogera dans l’ordre jusqu’à la première réponse.
+Pour la sauvegarde des identifiants, Git enverra le nom d’utilisateur et le mot de passe à <strong>tous</strong> les assistants et ceux-ci pourront choisir ce qu’ils en font.
+Voici à quoi ressemblerait un <code>.gitconfig</code> si vous utilisiez un fichier d’identifiants sur une clé USB mais souhaiteriez utiliser l’option de cache pour éviter des frappes trop fréquentes si la clé n’est pas insérée.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">[credential]
+    helper = store --file /mnt/thumbdrive/.git-credentials
+    helper = cache --timeout 30000</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_sous_le_capot">Sous le capot</h3>
+<div class="paragraph">
+<p>Comment tout ceci fonctionne-t-il ?
+La commande d’origine de Git pour le système d’assistants d’indentification est <code>git credential</code>, qui accepte une commande comme argument, puis d’autres informations via stdin.</p>
+</div>
+<div class="paragraph">
+<p>Un exemple peut aider à mieux comprendre cela.
+Supposons qu’un assistant d’identification a été configuré et que l’assistant a stocké les identifiants pour <code>mygithost</code>.
+Voici une session qui utilise la commande « fill » qui est invoquée quand Git essaie de trouver les identifiants pour un hôte :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential fill <b class="conum">(1)</b>
+protocol=https <b class="conum">(2)</b>
+host=mygithost
+<b class="conum">(3)</b>
+protocol=https <b class="conum">(4)</b>
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential fill <b class="conum">(5)</b>
+protocol=https
+host=unknownhost
+
+Username for 'https://unknownhost': bob
+Password for 'https://bob@unknownhost':
+protocol=https
+host=unknownhost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>C’est la ligne de commande qui démarre l’interaction.</p>
+</li>
+<li>
+<p>Git-credential attend la saisie d’informations sur stdin.
+Nous lui fournissons les informations que nous connaissons : le protocole et le nom d’hôte.</p>
+</li>
+<li>
+<p>Une ligne vide indique que l’entrée est complète et le système d’identification devrait répondre avec les informations qu’il connaît.</p>
+</li>
+<li>
+<p>Git-credential prend alors la main et écrit sur la sortie standard les informations qu’il a trouvées.</p>
+</li>
+<li>
+<p>Si aucune information d’identification n’a été trouvée, Git demande le nom d’utilisateur et le mot de passe, et les fournit sur la sortie standard d’origine (ici elles sont rattachées à la même console).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Le système d’aide à l’identification invoque en fait un programme complètement séparé de Git lui-même.
+Lequel est invoqué et comment il est invoqué dépend de la valeur de configuration <code>credential.helper</code>.
+Cette valeur peut prendre plusieurs formes :</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Valeur de configuration</th>
+<th class="tableblock halign-left valign-top">Comportement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lance <code>git-credential-foo</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo -a --opt=bcd</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lance <code>git-credential-foo -a --opt=bcd</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/chemin/absolu/foo -xyz</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">lance <code>/chemin/absolu/foo -xyz</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>!f() { echo "password=s3cre7"; }; f</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Le code après <code>!</code> est évalué dans un shell</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Donc les assistants décrits ci-dessus sont en fait appelés <code>git-credential-cache</code>, <code>git-credential-store</code>, et ainsi de suite et nous pouvons les configurer pour accepter des arguments en ligne de commande.
+La forme générale pour ceci est <code>git-credential-foo [args] &lt;action&gt;</code>.
+Le protocole stdin/stdout est le même que pour git-credential, mais en utilisant un ensemble d’actions légèrement différent :</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>get</code> est une requête pour une paire nom d’utilisateur/mot de passe.</p>
+</li>
+<li>
+<p><code>store</code> est une requête pour sauvegarder des identifiants dans la mémoire de l’assistant.</p>
+</li>
+<li>
+<p><code>erase</code> purge de la mémoire de l’assistant les identifiants répondants aux critères.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Pour les actions <code>store</code> et <code>erase</code>, aucune réponse n’est exigée (Git les ignore de toute façon).
+Pour l’action <code>get</code> cependant, Git est très intéressé par ce que l’assistant peut en dire.
+Si l’assistant n’a rien à en dire d’utile, il peut simplement sortir sans rien produire, mais s’il sait quelque chose, il devrait augmenter l’information fournie avec celle qu’il a stockée.
+La sortie est traitée comme une série de déclarations d’affectation ; tout ce qui est fourni remplacera ce que Git connaît déjà.</p>
+</div>
+<div class="paragraph">
+<p>Voici le même exemple que ci-dessus, mais en sautant git-credential et en s’attaquant directement à git-credential-store :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-store --file ~/git.store store <b class="conum">(1)</b>
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential-store --file ~/git.store get <b class="conum">(2)</b>
+protocol=https
+host=mygithost
+
+username=bob <b class="conum">(3)</b>
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Ici nous indiquons à <code>git-credential-store</code> de sauvegarder des identifiants : le nom d’utilisateur (<em>username</em>) « bob » et le mot de passe (<em>password</em>) « s3cre7 » doivent être utilisés quand <code><a href="https://mygithost" class="bare">https://mygithost</a></code> est accédé.</p>
+</li>
+<li>
+<p>Maintenant, nous allons récupérer ces identifiants.
+Nous fournissons les parties de l’information de connexion que nous connaissons (<code><a href="https://mygithost" class="bare">https://mygithost</a></code>), suivi d’une ligne vide.</p>
+</li>
+<li>
+<p><code>git-credential-store</code> répond avec le nom d’utilisateur et le mot de passe que nous avons précédemment stockés.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Voici à quoi ressemble le fichier <code>~/git.store</code> :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>https://bob:s3cre7@mygithost</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>C’est juste une série de lignes, chacune contenant des URLs contenant les informations d’identification.
+Les assistants <code>osxkeychain</code> et <code>winstore</code> utilisent le format natif de leurs banques de stockage, tandis que <code>cache</code> utilise son propre format en mémoire (qu’aucun autre processus ne peut lire).</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_un_cache_didentifiants_personnalisé">Un cache d’identifiants personnalisé</h3>
+<div class="paragraph">
+<p>Étant donné que <code>git-credential-store</code> et consort sont des programmes séparés de Git, il y a peu à penser que <em>n’importe quel</em> programme peut être un assistant d’identification Git.
+Les assistants fournis par Git gèrent de nombreux cas d’utilisation habituels, mais pas tous.
+Par exemple, supposons que votre équipe dispose de certains identifiants qui sont partagés par tous, pour le déploiement.
+Ils sont stockés dans un répertoire partagé, mais vous ne les copiez pas dans votre propre magasin d’identifiants parce qu’ils changent souvent.
+Aucun assistant existant ne gère ce cas ; voyons ce qu’il faudrait pour écrire le nôtre.
+Ce programme doit présenter certaines fonctionnalités clé :</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>La seule action à laquelle nous devons répondre est <code>get</code> ; <code>store</code> et <code>erase</code> sont des opérations d’écriture, donc nous sortirons directement et proprement dans ces cas.</p>
+</li>
+<li>
+<p>Le format du fichier d’identifiants partagés est identique à celui utilisé par <code>git-credential-store</code>.</p>
+</li>
+<li>
+<p>L’emplacement de ce fichier est assez standard, mais nous devrions pouvoir laisser l’utilisateur spécifier une chemin en cas de besoin.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Une fois de plus, nous écrirons cette extension en Ruby, mais n’importe quel langage fonctionnera, tant que Git peut lancer un exécutable à la fin.
+Voici le code source complet de ce nouvel assistant d’identification :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+require 'optparse'
+
+path = File.expand_path '~/.git-credentials' # <b class="conum">(1)</b>
+OptionParser.new do |opts|
+    opts.banner = 'USAGE: git-credential-read-only [options] &lt;action&gt;'
+    opts.on('-f', '--file PATH', 'Specify path for backing store') do |argpath|
+        path = File.expand_path argpath
+    end
+end.parse!
+
+exit(0) unless ARGV[0].downcase == 'get' # <b class="conum">(2)</b>
+exit(0) unless File.exists? path
+
+known = {} # <b class="conum">(3)</b>
+while line = STDIN.gets
+    break if line.strip == ''
+    k,v = line.strip.split '=', 2
+    known[k] = v
+end
+
+File.readlines(path).each do |fileline| # <b class="conum">(4)</b>
+    prot,user,pass,host = fileline.scan(/^(.*?):\/\/(.*?):(.*?)@(.*)$/).first
+    if prot == known['protocol'] and host == known['host'] then
+        puts "protocol=#{prot}"
+        puts "host=#{host}"
+        puts "username=#{user}"
+        puts "password=#{pass}"
+        exit(0)
+    end
+end</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Ici, nous analysons les options de la ligne de commande, pour permettre à l’utilisateur de spécifier un fichier.
+Par défaut, c’est <code>~/.git-credentials</code>.</p>
+</li>
+<li>
+<p>Ce programme ne répondra que si l’action est <code>get</code> et si le fichier magasin existe.</p>
+</li>
+<li>
+<p>Cette boucle lit depuis stdin jusqu’à la première ligne vide.
+Les entrées sont stockées dans le <em>hash</em> <code>known</code> pour référence ultérieure.</p>
+</li>
+<li>
+<p>Cette boucle lit le contenu du fichier magasin, et recherche les correspondances.
+Si le protocole et l’hôte depuis <code>known</code> correspondent à la ligne, le programme imprime les résultats sur stdout et sort.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Nous allons sauvegarder notre assistant comme <code>git-credential-read-only</code>, le placer quelque part dans notre <code>PATH</code> et le marquer exécutable.
+Voici à quoi ressemble une session interactive :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-read-only --file=/mnt/shared/creds get
+protocol=https
+host=mygithost
+
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Puisque son nom commence par <code>git-</code>, nous pouvons utiliser une syntaxe simple pour la valeur de configuration :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper read-only --file /mnt/shared/creds</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Comme vous pouvez le voir, étendre ce système est plutôt direct et peut résoudre des problèmes communs pour vous et votre équipe.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
