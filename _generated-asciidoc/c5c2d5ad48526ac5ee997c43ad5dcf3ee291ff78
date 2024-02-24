@@ -1,0 +1,712 @@
+git-svn(1)
+==========
+
+名称
+--
+git-svn - Subversion 仓库和 Git 之间的双向操作
+
+概述
+--
+[verse]
+'git svn' <命令> [<选项>] [<参数>]
+
+描述
+--
+'git svn' 是一个 Subversion 和 Git 之间变更集的简单通道。 它用于 Subversion 和 Git 仓库之间变更的双向流动。
+
+'git svn' 可以跟踪标准 Subversion 仓库，遵循常见的 “主干/分支/标记” 布局，使用 --stdlayout 选项。 它还可以使用 -T/-t/-b 选项在任何布局中跟踪分支和标记（请参阅下面的 'init' 选项以及 'clone' 命令）。
+
+跟踪 Subversion 仓库（使用上述任何方法）后，可以通过 'fetch' 命令从 Subversion 更新 Git 仓库，并通过 'dcommit' 命令从 Git 更新 Subversion 仓库。
+
+命令
+--
+
+'init'::
+	为 'git svn' 初始化一个空的 Git 仓库，并添加元数据目录。 Subversion 的 URL 可以作为命令行参数，也可以作为 -T/-t/-b 的完整 URL 参数。 或者，可以指定要操作的目标目录作为第二参数。 通常情况下这个命令会在当前目录进行初始化。
+
+-T<trunk_subdir>;;
+--trunk=<trunk-subdir>;;
+-t<tags-subdir>;;
+--tags=<tags-subdir>;;
+-b<branches-subdir>;;
+--branches=<branches-subdir>;;
+-s;;
+--stdlayout;;
+	这些是用于 init 的可选命令行选项。 每个标志都可以指向相对的版本库路径 (--tags=project/tags) 或完整的 url (--tags=https://foo.org/project/tags)。 你可以指定多个 --tags 和/或 --branches 选项，以防你的 Subversion 仓库将标记或分支放在多个路径下。 选项 --stdlayout 是将 主干、标记、分支设置为相对路径的一种快捷方式，这是 Subversion 的默认设置。如果使用了其他的选项，它们将被优先考虑。
+--no-metadata;;
+	设置 [svn-remote] 配置的 'noMetadata' 选项。 不建议使用该选项，请在使用该选项前阅读本手册中 'svn.noMetadata' 部分。
+--use-svm-props;;
+	设置[svn-remote] 配置的 'useSvmProps' 选项。
+--use-svnsync-props;;
+	设置 [svn-remote] 配置的 'useSvnsyncProps' 选项。
+--rewrite-root=<地址>;;
+	设置 [svn-remote] 配置的 'rewriteRoot' 选项。
+--rewrite-uuid=<UUID>;;
+	设置 [svn-remote] 配置的 'rewriteUUID' 选项。
+--username=<用户>;;
+	对于由 SVN 处理认证的传输类型（http、https和纯svn），请指定用户名。 对于其他的传输类型(例如`svn+ssh:///`)，你必须在URL中包含用户名，例如：`svn+ssh://foo@svn.bar.com/project`
+--prefix=<前缀>;;
+	如果指定了 trunk/branches/tags，则可以指定一个前缀，将其添加到远程设备名称的前缀中。 前缀不会自动包含斜线，因此如果需要，请确保在参数中包含斜线。 如果指定了 --branches/-b，前缀必须包含斜线。 在任何情况下，我们都强烈建议设置前缀（带尾部斜线），因为这样你的 SVN 跟踪引用就会位于 "refs/remotes/$prefix/*"，这与 Git 自己的远程跟踪引用布局（refs/remotes/$remote/*）是兼容的。如果想跟踪共享一个仓库的多个项目，设置前缀也很有用。 默认情况下，前缀设置为 "origin/"。
++
+NOTE: 在 Git v2.0 之前，默认前缀是""（无前缀）。这意味着 SVN 跟踪的引用被放在 "refs/remotes/*" 目录下，这与 Git 自身远程跟踪引用的组织方式不兼容。 如果你还想要旧的默认值，可以通过在命令行中传递 `--prefix""` 来实现（如果你的 Perl Getopt::Long 版本小于 2.37，则 `--prefix=""` 可能不起作用）。
+
+--ignore-refs=<正则表达式>;;
+	当传递给 'init' 或 'clone' 时，该正则表达式将作为配置键保留。 有关 `--ignore-refs` 的描述，请参阅 'fetch'。
+--ignore-paths=<正则表达式>;;
+	当传递给 'init' 或 'clone' 时，该正则表达式将作为配置键保留。 有关 `--ignore-paths` 的描述，请参阅 'fetch'。
+--include-paths=<正则表达式>;;
+	当传递给 'init' 或 'clone' 时，该正则表达式将作为配置键保留。 有关 `--include-paths` 的描述，请参阅 'fetch'。
+--no-minimize-url;;
+	当跟踪多个目录时（使用 --stdlayout, --branches 或 --tags 选项），git svn 会尝试连接到 Subversion 仓库的根（或允许的最高级别）。 如果整个项目在仓库中移动，这一默认设置可以更好地跟踪历史，但在有读取权限限制的仓库中可能会引起问题。 如果传递 `--no-minimize-url`，git svn 就会按原样接受 URL，而不会尝试连接到更高级别的目录。 如果只跟踪一个 URL/branch（分支），该选项默认是关闭的（这样做没什么好处）。
+
+'fetch'::
+	从我们正在跟踪的 Subversion 远程仓库中获取未抓取的版本。 $GIT_DIR/config 文件中 [svn-remote "..."] 部分的名称可作为命令行参数指定。
++
+如果需要，这将自动更新 rev_map（详情请参见下文 FILES 部分中的 '$GIT_DIR/svn/\**/.rev_map.*'）。
+
+--localtime;;
+	以本地时区而非 UTC 来存储 Git 提交时间。 这样，'git log'（即使没有 --date=local ）显示的时间与 `svn log` 在本地时区显示的时间相同。
++
+但如果你希望自己的本地 Git 仓库能与他人的本地 Git 仓库互操作，要么就不要使用该选项，要么就在同一时区同时使用。
+
+--parent;;
+	仅从当前 HEAD 的 SVN 父节点获取。
+
+--ignore-refs=<正则表达式>;;
+	忽略与 Perl 正则表达式匹配的分支或标记的引用。^refs/remotes/origin/(?!tags/wanted-tag|wanted-branch).*$`之类的 "否定前瞻断言 " 可用于只允许某些引用。
++
+[verse]
+config key: svn-remote.<名称>.ignore-refs
++
+如果设置了 ignore-refs 配置键，并且还给出了命令行选项，则会同时使用这两种正则表达式。
+
+--ignore-paths=<正则表达式>;;
+	该选项允许指定一个 Perl 正则表达式，从而跳过所有与之匹配的 SVN 签出路径。 `--ignore-paths` 选项应与指定仓库的每次 'fetch'（包括 'clone'、'commit'、'rebase' 等导致的自动获取）操作相匹配。
++
+[verse]
+config key: svn-remote.<名称>.ignore-paths
++
+如果设置了 ignore-paths 配置键，并且还给出了命令行选项，则会同时使用这两种正则表达式。
++
+实例：
++
+--
+每次提取都跳过 "doc*" 目录;;
++
+------------------------------------------------------------------------
+--ignore-paths="^doc"
+------------------------------------------------------------------------
+
+跳过一级目录的 "branches"（分支） 和 "tag"（标签）;;
++
+------------------------------------------------------------------------
+--ignore-paths="^[^/]+/(?:branches|tags)"
+------------------------------------------------------------------------
+--
+
+--include-paths=<正则表达式>;;
+	该选项允许指定一个 Perl 正则表达式，使 SVN 在检出时只包含匹配的路径。 `-include-paths` 选项应与指定版本库的每次 “取回”（包括 “克隆”、"dcommit"、“变基” 等引起的自动取回）相匹配。`--ignore-paths` 优先于 `--include-paths`。
++
+[verse]
+config key: svn-remote.<名称>.include-paths
+
+--log-window-size=<n>;;
+	扫描 Subversion 历史记录时，每次请求获取 <n> 个日志条目。 默认值为 100。对于非常大的 Subversion 仓库，可能需要更大的值才能在合理的时间内完成 'clone'/'fetch'。但过大的值可能会导致更高的内存使用率和请求超时。
+
+'clone'::
+	运行 'init' 和 'fetch'。 它会根据传递给它的 URL 的基名自动创建一个目录；如果传递了第二个参数，则会创建一个目录并在目录内工作。 它接受所有 'init' 和 'fetch' 命令接受的参数，但 `--fetch-all` 和 `--parent` 除外。 克隆仓库后，'fetch' 命令可以更新修订版本，而不影响工作区；'rebase' 命令可以用最新的修改更新工作区。
+
+--preserve-empty-dirs;;
+	在本地 Git 仓库中为每个从 Subversion 获取的空目录创建一个占位符文件。 这包括通过删除 Subversion 仓库中的所有条目（但不包括目录本身）而变为空的目录。 占位符文件也会被跟踪，并在不再需要时删除。
+
+--placeholder-filename=<文件名>;;
+	设置由 --preserve-empty-dirs 创建的占位符文件的名称。 默认：".gitignore"
+
+'rebase'::
+	这将从当前 HEAD 的 SVN 父版本中获取修订版本，并将当前（未提交至 SVN）工作与之相对应。
++
+除了用 'git rebase' 而不是 'git merge' 保留线性历史记录以便于用 'git svn' 提交外，它的工作原理与 `svn update` 或 'git pull' 类似。
++
+它接受所有 'git svn fetch' 和 'git rebase' 接受的选项。 不过，`--fetch-all` 只从当前 [svn-remote] 获取，而不是所有 [svn-remote] 定义。
++
+和 'git rebase' 一样，它要求工作区是干净的，没有未提交的更改。
++
+如果需要，这将自动更新 rev_map（详情请参见下文 FILES 部分中的 '$GIT_DIR/svn/\**/.rev_map.*'）。
+
+-l;;
+--local;;
+	不要远程获取；只针对从上游 SVN 获取的最后一次提交运行 'git rebase'。
+
+'dcommit'::
+	将当前分支的每个差异直接提交到 SVN 仓库，然后重置或重置（取决于 SVN 和 head 之间是否有差异）。 这样，Git 中的每次提交都会在 SVN 中创建一个修订版本。
++
+当参数中指定了一个可选的 Git 分支名称（或 Git 提交对象名称）时，该子命令将在指定的分支而非当前分支上运行。
++
+使用 'dcommit' 比使用 'set-tree'（下文）更可取。
++
+--no-rebase;;
+	提交后，请勿变基或重置。
+--commit-url <地址>;;
+	提交到此 SVN URL（完整路径）。 这样做的目的是，如果用户后来获得了使用另一种传输方式（如 `svn+ssh://` 或 `https://`）提交的权限，那么使用一种传输方式（如匿名读取的 `svn://` 或 `http://`）创建的现有 'git svn' 仓库就可以重复使用。
++
+[verse]
+config key: svn-remote.<名称>.commiturl
+config key: svn.commiturl (覆盖所有的 svn-remote.<名称>.commiturl 选项)
++
+请注意，commiturl 配置键的 SVN URL 包括 SVN 分支。 如果你想为整个 SVN 仓库设置提交 URL，请使用 svn-remote.<名称>.pushurl。
++
+我们强烈反对将此选项用于任何其他目的（不要问）。
+
+--mergeinfo=<合并信息>;;
+	在 dcommit 时添加给定的合并信息（例如 `--mergeinfo="/branches/foo:1-10"`）。所有版本的 svn 服务器都可以存储此信息（作为属性），而从 1.5 版开始的 svn 客户端也可以使用它。要指定多个分支的合并信息，请在分支之间使用一个空格字符（`--mergeinfo="/branches/foo:1-10 /branches/bar:3,5-6,8"`)
++
+[verse]
+config key: svn.pushmergeinfo
++
+此选项将使 git-svn 在可能的情况下尝试自动填充 SVN 仓库中的 svn:mergeinfo 属性。目前，只有在提交非快进合并时才能这样做，即除了第一个合并之外的所有父合并都已推送到 SVN。
+
+--interactive;;
+	要求用户确认是否应将补丁集发送到 SVN。 对于每个补丁，用户可以回答 "yes"（接受此补丁）、"no"（放弃此补丁）、"all"（接受所有补丁）或 "quit"。
++
+如果答案是 "no" 或 "quit"，'git svn dcommit' 会立即返回，不会向 SVN 提交任何内容。
+
+'branch'::
+	在 SVN 代码库中创建一个分支。
+
+-m;;
+--message;;
+	允许指定提交信息。
+
+-t;;
+--tag;;
+	使用 tags_subdir 而不是 git svn init 时指定的 branches_subdir 创建标签。
+
+-d<路径>;;
+--destination=<l路径>;;
+
+	如果在 'init' 或 'clone' 命令中给出了一个以上的 --branches（或 --tags）选项，则必须提供你希望在 SVN 仓库中创建的分支（或标签）的位置。 <路径> 指定了创建分支或标签所要使用的路径，并应与某个已配置的分支或标签引用规范左侧的模式相匹配。 你可以使用以下命令查看这些引用规范
++
+	git config --get-all svn-remote.<名称>.branches git config --get-all svn-remote.<名称>.tags
++
+其中 <名称> 是 'init'（默认为 'svn'）的 -R 选项指定的 SVN 仓库名称。
+
+--username;;
+	指定执行提交的 SVN 用户名。 此选项覆盖 'username'（用户名） 配置属性。
+
+--commit-url;;
+	使用指定的 URL 连接到目标 Subversion 仓库。 这在源 SVN 仓库为只读的情况下非常有用。 此选项覆盖配置属性 'commiturl'。
++
+	git config --get-all svn-remote.<名称>.commiturl
++
+
+--parents;;
+	创建父文件夹。该参数等同于 svn cp 命令中的 --parents 参数，对于非标准仓库布局非常有用。
+
+'tag'::
+	在 SVN 代码库中创建一个标签。这是 'branch -t' 的简称。
+
+'log'::
+	这样，当 svn 用户引用 -r/--revision 时，就可以很容易地查找 svn 日志信息了。
++
+`svn log` 的以下特征得到了支持:
++
+--
+-r <n>[:<n>];;
+--revision=<n>[:<n>];;
+	支持，但不支持非数字参数： HEAD、NEXT、BASE、PREV 等...
+-v;;
+--verbose;;
+	它与 svn 日志中的 --verbose 输出不完全兼容，但相当接近。
+--limit=<n>;;
+	与 --max-count 不同，不计算合并/排除的提交次数
+--incremental;;
+	支持
+--
++
+新功能：
++
+--
+--show-commit;;
+	显示 Git 提交的 sha1，以及
+--oneline;;
+	我们的 --pretty=oneline 版本
+--
++
+NOTE: SVN 本身只存储 UTC 时间，不存储其他时间。常规的 svn 客户端会将 UTC 时间转换为本地时间（或基于 TZ= 环境）。该命令具有相同的行为。
++
+其他参数将直接传递给 'git log'
+
+'blame'::
+	显示文件每一行的最后修改版本和作者。该模式的输出默认与 `svn blame` 的输出格式兼容。与 SVN blame 命令一样，工作区中本地未提交的修改会被忽略；文件在 HEAD 修订版中的版本会被注释。未知参数会直接传递给 'git blame'。
++
+--git-format;;
+	输出格式与 'git blame' 相同，但使用 SVN 版本号而非 Git 提交哈希值。在这种模式下，尚未提交到 SVN 的修改（包括本地工作拷贝编辑）将显示为版本 0。
+
+'find-rev'::
+	如果给定的 SVN 版本号为 'rN'，则返回相应的 Git 提交哈希值（可选择在其后添加树形字符串，以指定搜索的分支）。 如果给出一个树形字符串，则返回相应的 SVN 版本号。
++
+-B;;
+--before;;
+	如果给定 SVN 修订版本，则不要求精确匹配，而是查找与指定修订版本时 SVN 仓库（当前分支上）状态相对应的提交。
++
+-A;;
+--after;;
+	如果给定的是 SVN 修订版本，则不要求完全匹配；如果没有完全匹配的版本，则返回在历史中向前搜索的最接近的匹配版本。
+
+'set-tree'::
+	您应该考虑使用 'dcommit' 而不是此命令。 将指定的提交或树对象提交到 SVN。 这依赖于导入的获取数据是最新的。 在提交到 SVN 时，该命令绝对不会进行任何修补，只会用树或提交中指定的文件覆盖文件。 所有的合并都假定是独立于 'git svn' 函数进行的。
+
+'create-ignore'::
+	递归查找目录上的 svn:ignore 属性，并创建匹配的 .gitignore 文件。生成的文件会被暂存以待提交，但不会提交。使用 -r/--revision 来引用特定版本。
+
+'show-ignore'::
+	递归查找并列出目录的 svn:ignore 属性。 输出结果适合附加到 $GIT_DIR/info/exclude 文件中。
+
+'mkdirs'::
+	根据 $GIT_DIR/svn/<引用名>/unhandled.log 文件中的信息，尝试重新创建 Git 核心无法跟踪的空目录。 当使用 "git svn clone" 和 "git svn rebase" 时，空目录会自动重建，因此 "mkdirs" 适用于 "git checkout" 或 "git reset" 等命令之后。 (更多信息请参阅 svn-remote.<名称>.automkdirs 配置文件选项）
+
+'commit-diff'::
+	从命令行提交两个树状参数的差异。 此命令并不依赖于在 `git svn init ` 版本库中。 该命令需要三个参数，(a) 要进行差异的原始树，(b) 新目录树的结果，(c) 目标 Subversion 仓库的 URL。 如果使用的是 'git svn' 感知的仓库（已用 'git svn' `init `过），则最后一个参数（URL）可以省略。 为此需要使用 -r<版本> 选项。
++
+提交信息可以通过 `-m` 或 `-F` 选项直接提供，也可以在第二个树对象表示提交对象时通过标记或提交间接提供，还可以通过调用编辑器（见下文的 `--edit` 选项）请求提供。
+
+-m <消息>;;
+--message=<msg>;;
+	使用给定的 `msg` 作为提交信息。此选项禁用 `--edit` 选项。
+
+-F <文件名>;;
+--file=<文件名>;;
+	从给定文件中获取提交信息。此选项禁用 `--edit` 选项。
+
+'info'::
+	显示文件或目录的信息，类似于 `svn info` 提供的信息。 目前不支持 -r/--revision 参数。 使用 --url 选项只输出 'URL:' 字段的值。
+
+'proplist'（属性列表）::
+	列出 Subversion 仓库中存储的指定文件或目录的属性。 使用 -r/--revision 可引用特定的 Subversion 版本。
+
+'propget'::
+	获取作为第一个参数给定的文件的 Subversion 属性。 可使用 -r/--revision 指定特定版本。
+
+'propset'::
+	将作为第一个参数给定的 Subversion 属性设置为作为第二个参数给定的值，该值适用于作为第三个参数给定的文件。
++
+例如：
++
+------------------------------------------------------------------------
+git svn propset svn:keywords "FreeBSD=%H" devel/py-tipper/Makefile
+------------------------------------------------------------------------
++
+这会将文件 'devel/py-tipper/Makefile' 的属性 'svn:keywords' 设置为 'FreeBSD=%H'。
+
+'show-externals'::
+	显示 Subversion 外部文件。 使用 -r/--revision 指定特定版本。
+
+'gc'::
+	压缩 $GIT_DIR/svn/<引用名>/unhandled.log 文件并删除 $GIT_DIR/svn/<引用名>/index 文件。
+
+'reset'::
+	撤销 'fetch'（获取）的效果，回到指定的修订版本。 这允许你重新 'fetch' 一个 SVN 修订版本。 通常情况下，SVN 修订版的内容永远不会改变，因此不需要 'reset'。 不过，如果 SVN 权限发生变化，或者你修改了 --ignore-paths 选项，'fetch' 可能会失败，提示 "not found in commit (在提交中未找到)"（文件以前不可见）或 "checksum mismatch (校验和不匹配)"（错过了修改）。 如果问题文件不能被永久忽略（使用 --ignore-paths 选项），修复 repo 的唯一方法就是使用 'reset'（重置）。
++
+只有 rev_map 和 refs/remotes/git-svn 会被修改（详见下文 FILES 部分中的"$GIT_DIR/svn/\**/.rev_map.*"）。 在 'reset' （重置）之后加上 'fetch'（获取），再用 'git reset' 或 'git rebase' 将本地分支移到新目录树上。
+
+-r <n>;;
+--revision=<n>;;
+	指定要保留的最新修订。 之后的修订版本都将被丢弃。
+-p;;
+--parent;;
+	同时丢弃指定的修订版本，保留最近的父版本。
+例如：;;
+假设 "master" 中有本地更改，但需要重新获取 "r2"（都是分支名）。
++
+------------
+    r1---r2---r3 remotes/git-svn
+                \
+                 A---B master
+------------
++
+修复导致 "r2 "不完整的忽略路径或 SVN 权限问题。 然后：
++
+[verse]
+git svn reset -r2 -p
+git svn fetch
++
+------------
+    r1---r2'--r3' remotes/git-svn
+      \
+       r2---r3---A---B master
+------------
++
+然后用 'git rebase' 修复 'master'。 切勿使用 'git merge'，否则您的历史记录将无法与未来的 'dcommit' 兼容！
++
+[verse]
+git rebase --onto remotes/git-svn A^ master
++
+------------
+    r1---r2'--r3' remotes/git-svn
+                \
+                 A'--B' master
+------------
+
+选项
+--
+
+--shared[=(false|true|umask|group|all|world|everybody)]::
+--template=<模板目录>::
+	仅用于 'init' 命令。 这些信息会直接传递给 'git init'。
+
+-r <参数>::
+--revision <参数>::
+	   与 'fetch'（获取 ） 命令一起使用。
++
+这样就可以支持部分/阉割历史的修订范围。 支持 $NUMBER、$NUMBER1:$NUMBER2（数字范围）、$NUMBER:HEAD 和 BASE:$NUMBER。
++
+这样可以在运行 fetch （获取）时建立部分镜像，但一般不建议这样做，因为历史记录会被跳过并丢失。
+
+-::
+--stdin::
+	仅与 'set-tree' 命令一起使用。
++
+从标准输入流读取提交列表，并按相反顺序提交。 每行只读取前导的 sha1，因此可以使用 'git rev-list --pretty=oneline' 输出。
+
+--rmdir::
+	仅与 'dcommit'、'set-tree' 和 'commit-diff' 命令一起使用。
++
+如果 SVN 目录树中没有文件，则删除目录。 SVN 可以对空目录进行版本控制，如果其中没有文件，默认情况下也不会删除。 Git 不能对空目录进行版本控制。 启用此标记后，提交到 SVN 的操作将与 Git 类似。
++
+[verse]
+配置键：svn.rmdir
+
+-e::
+--edit::
+	仅与 'dcommit'、'set-tree' 和 'commit-diff' 命令一起使用。
++
+在提交到 SVN 之前编辑提交信息。 对于提交对象，默认情况下是关闭的，而在提交树对象时则强制开启。
++
+[verse]
+配置键：svn.edit
+
+-l<数量>::
+--find-copies-harder::
+	仅与 'dcommit'、'set-tree' 和 'commit-diff' 命令一起使用。
++
+它们都会直接传递给 'git diff-tree'；更多信息请参见 linkgit:git-diff-tree[1] 。
++
+[verse]
+配置键：svn.l
+配置键：svn.findcopiesharder
+
+-A<文件名>::
+--authors-file=<文件名>::
+	Syntax is compatible with the file used by 'git cvsimport' but an empty email address can be supplied with '<jcs.pattystackzz@gmail.com>':
++
+------------------------------------------------------------------------
+	loginname =Stackzcryp<jcs.pattystackzz@gmail.com>
+------------------------------------------------------------------------
++
+如果指定此选项，'git svn' 遇到作者文件中不存在的 SVN 提交人名称，'git svn' 将中止操作。然后，用户必须添加适当的条目。 修改作者文件后重新运行以前的 'git svn' 命令应继续操作。
++
+[verse]
+配置键：svn.authorsfile
+
+--authors-prog=<文件名>::
+	如果指定了该选项，对于作者文件中不存在的每个 SVN 提交者名称，都会以提交者名称为第一个参数执行给定文件。 程序将返回一行 "Name <邮件地址>" 或 "Name <>"，并将其视为作者文件中的内容。
++
+由于历史原因，对于 'init' 和 'clone'，相对 'filename（文件名）' 首先会在当前目录下搜索，而对于 'fetch'，则会在工作树的根目录下搜索。如果未找到 'filename'，则会像 '$PATH' 中的其他命令一样进行搜索。
++
+[verse]
+配置键：svn.authorsProg
+
+-q::
+--quiet::
+	使 'git svn'不那么啰嗦。再指定一次，使其更不啰嗦。
+
+-m::
+--merge::
+-s<策略>::
+--strategy=<策略>::
+-p::
+--rebase-merges::
+	这些命令只与 'dcommit' 和 'rebase' 命令一起使用。
++
+如果无法使用 'git reset'（参见 'dcommit'），则在使用 'dcommit' 时直接传递给 'git rebase'。
+
+-n::
+--dry-run::
+	可与 'dcommit'、'rebase'、'branch' 和 'tag' 命令一起使用。
++
+对于 'dcommit'，打印出一系列 Git 参数，显示哪些差异将提交到 SVN。
++
+对于 'rebase'，显示与当前分支关联的上游 svn 仓库相关联的本地分支，以及将从中获取的 svn 仓库的 URL。
++
+对于 'branch'（分支） 和 'tag'（标记），显示创建分支或标记时用于复制的网址。
+
+--use-log-author::
+	在 Git 中检索 svn 提交（作为 'fetch'、'rebase' 或 'dcommit' 操作的一部分）时，查找日志信息中的第一行 `From:` 或 `Signed-off-by` 尾注，并将其作为作者字符串。
++
+[verse]
+配置键：svn.useLogAuthor
+
+--add-author-from::
+	从 Git 提交到 svn 时（作为 'set-tree' 或 'dcommit' 操作的一部分），如果现有日志信息中还没有 `From:` 或 `Signed-off-by` 尾注，则根据 Git 提交的作者字符串添加一行 `From:`。如果这样做，`--use-log-author` 将为所有提交获取有效的作者字符串。
++
+[verse]
+配置键：svn.addAuthorFrom
+
+高级选项
+----
+
+-i<GIT_SVN_ID>::
+--id <GIT_SVN_ID>::
+	这将设置 GIT_SVN_ID（而不是使用环境）。 这允许用户在跟踪单个 URL 时覆盖默认的引用名取值。 'log' 和 'dcommit' 命令不再需要将此开关作为参数。
+
+-R <远程名称>::
+--svn-remote <远程名称>::
+	指定要使用的 [svn-remote "<远程名称>"]部分，这允许跟踪 SVN 多个仓库。 默认："svn"
+
+--follow-parent::
+	只有在跟踪分支的情况下（使用仓库布局选项之一 --trunk、--tags、--branches、--stdlayout），该选项才有意义。对于每个被跟踪的分支，我们会尝试找出它的修订版本是从哪里复制的，并在该分支的第一次 Git 提交中设置一个合适的父分支。 当我们跟踪的目录在版本库中被移动过时，这一点尤其有用。 如果禁用此功能，'git svn' 创建的分支将全部是线性的，不会共享任何历史记录，这意味着不会有任何关于分支被分支或合并的信息。 不过，追踪冗长/复杂的历史可能需要很长时间，所以禁用该功能可能会加快克隆过程。该功能默认为启用，使用 --no-follow-parent 可以禁用它。
++
+[verse]
+config key: svn.followparent
+
+仅配置文件选项
+-------
+
+svn.noMetadata::
+svn-remote.<名称>.noMetadata::
+	这样就不会在每次提交的最后出现 'git-svn-id:' 行。
++
+这个选项只能用于一次性导入，因为如果没有元数据，'git svn' 将无法再次获取。此外，如果丢失了 '$GIT_DIR/svn/\**/.rev_map.*' 文件，'git svn' 将无法重建它们。
++
+'git svn log' 命令在使用此选项的仓库中也不起作用。 由于（希望）显而易见的原因，使用此选项与 'useSvmProps' 选项冲突.
++
+不建议使用该选项，因为它会导致难以在现有文档、错误报告和归档中查找到 SVN 修订版本号的旧引用。 如果你计划最终从 SVN 迁移到 Git，并确定要放弃 SVN 历史，请考虑 https://github.com/newren/git-filter-repo[git-filter-repo]。filter-repo 还允许重新格式化元数据，以方便阅读，并为非 "svn.authorsFile" 用户重写作者信息。
+
+svn.useSvmProps::
+svn-remote.<名称>.useSvmProps::
+	这样，'git svn' 就能从使用 SVN::Mirror （或 svk）创建的元数据镜像中重新映射仓库 URL 和 UUID。
++
+如果 SVN 修订版有 "svm:headrev" 属性，则该修订版很可能是由 SVN::Mirror（SVK 也在使用）创建的。 该属性包含一个仓库 UUID 和一个修订版本。 我们想让它看起来像是在镜像原始 URL，因此引入了一个辅助函数来返回原始身份 URL 和 UUID，并在提交消息中生成元数据时使用它。
+
+svn.useSvnsyncProps::
+svn-remote.<名称>.useSvnsyncprops::
+	与 useSvmProps 选项类似；适用于使用随 SVN 1.4.x 及更高版本发布的 svnsync(1) 命令的用户。
+
+svn-remote.<名称>.rewriteRoot::
+	这样，用户就可以通过其他 URL 创建仓库。 例如，管理员可以在本地服务器上运行 'git svn'（通过 file://访问），但希望在元数据中发布带有公共 http:// 或 svn:// URL 的仓库，这样用户就能看到公共 URL。
+
+svn-remote.<名称>.rewriteUUID::
+	与 useSvmProps 选项类似，适用于需要手动重新映射 UUID 的用户。在无法通过 useSvmProps 或 useSvnsyncProps 获取原始 UUID 的情况下，该选项可能非常有用。
+
+svn-remote.<名称>.pushurl::
+
+	与 Git 的 `remote.<名称>.pushurl` 类似，该键设计用于 'url' 通过只读传输指向 SVN 仓库的情况，以提供另一种读/写传输。假定这两个键都指向同一个仓库。与 'commiturl' 不同，'pushurl' 是一个基本路径。如果可以使用 'commiturl' 或 'pushurl'，则 'commiturl' 优先。
+
+svn.brokenSymlinkWorkaround::
+	此选项会禁用潜在的高代价检查，以解决因客户端损坏而检查到 SVN 中的符号链接的问题。 如果你追踪的 SVN 版本库中有很多不是符号链接的空 blob，请将此选项设为 "false"。 该选项可在运行 'git svn' 时修改，并在下一个版本获取时生效。 如果不设置，'git svn ' 将假定该选项为 "true"。
+
+svn.pathnameencoding::
+	指示 git svn 将路径名重新编码为给定的编码。 Windows 用户和在非 UTF8 本地环境中工作的用户可以使用它来避免文件名被非 ASCII 字符破坏。 有效的编码是 Perl 的编码模块所支持的编码。
+
+svn-remote.<名称>.automkdirs::
+	通常，"git svn clone" 和 "git svn rebase" 命令会尝试重新创建 Subversion 仓库中的空目录。 如果将此选项设为 "false"，那么只有在显式运行 "git svn mkdirs" 命令时才会创建空目录。 如果不设置，'git svn' 将假定该选项为 "true"。
+
+由于 noMetadata、rewriteRoot、rewriteUUID、useSvnsyncProps 和 useSvmProps 选项都会影响 'git svn' 生成和使用的元数据，因此必须在导入任何历史记录之前在配置文件中设置这些选项，而且一旦设置后就不得更改。
+
+此外，每个 svn-remote 部分只能使用其中一个选项，因为它们会影响 'git-svn-id:' 元数据行，但 rewriteRoot 和 rewriteUUID 可以一起使用。
+
+
+基本示例
+----
+
+跟踪和贡献 Subversion 管理项目的主干（忽略标签和分支）：
+
+------------------------------------------------------------------------
+# 克隆一个仓库（类似 git clone）：
+	git svn clone http://svn.example.com/project/trunk
+# 进入新克隆仓库的文件夹：
+	cd trunk
+# 用 git branch 再次确认目前在 master（主）分支上
+	git branch
+# 将一些工作进行本地的 Git 提交
+	git commit ...
+# 提交到 SVN 的内容，根据
+# SVN 中的最新更改：
+	git svn rebase
+# 现在将（之前用 Git 提交的）修改提交到 SVN、
+# 同时自动更新您的工作 HEAD：
+	git svn dcommit
+# 将 svn:ignore 设置附加到默认的 Git 排除文件
+	git svn show-ignore >> .git/info/exclude
+------------------------------------------------------------------------
+
+跟踪和参与整个 Subversion 管理的项目（包括主干、标签和分支）：
+
+------------------------------------------------------------------------
+# 用标准 SVN 目录布局克隆一个仓库（与 git clone 类似）：
+	git svn clone http://svn.example.com/project --stdlayout --prefix svn/
+# 或者，如果仓库使用非标准目录布局：
+	git svn clone http://svn.example.com/project -T tr -b branch -t tag --prefix svn/
+# 查看您克隆的所有分支和标签：
+	git branch -r
+# 在 SVN 中创建一个新分支
+	git svn branch waldo
+# 重置您的主分支为 trunk（或任何其他分支，用适当的名称替换 'trunk'
+# 替换为合适的名称）：
+	git reset --hard svn/trunk
+# 一次只能提交到一个分支/标签/主干。 使用
+# dcommit/rebase/show-ignore 的用法应与上述相同。
+------------------------------------------------------------------------
+
+最初的 'git svn clone' 可能相当耗时（尤其是对于大型 Subversion 仓库）。如果多人（或一人拥有多台机器）想用 'git svn' 与同一个 Subversion 仓库交互，可以先用 'git svn clone' 克隆服务器上的仓库，然后让每个人用 'git clone' 克隆该仓库：
+
+------------------------------------------------------------------------
+# 在服务器上进行初始导入
+	ssh server "cd /pub && git svn clone http://svn.example.com/project [options...]"
+# 克隆到本地 - 确保 refs/remotes/ 空间与服务器一致
+	mkdir project
+	cd project
+	git init
+	git remote add origin server:/pub/project
+	git config --replace-all remote.origin.fetch '+refs/remotes/*:refs/remotes/*'
+	git fetch
+# 防止将来从远程 Git 服务器获取/拉取、
+# 我们只想在将来的更新中使用 git svn
+	git config --remove-section remote.origin
+# 从刚刚获取的分支中创建一个本地分支
+	git checkout -b master FETCH_HEAD
+# 在本地初始化 "git svn"（确保使用相同的 URL 和
+--stdlayout/-T/-b/-t/-t--prefix 选项）。
+	git svn init http://svn.example.com/project [options...]
+# 从 Subversion 拉取最新修改
+	git svn rebase
+------------------------------------------------------------------------
+
+REBASE VS. PULL/MERGE （变基与拉取/合并对比）
+----------------------------------
+优先使用 'git svn rebase' 或 'git rebase'，而不是 'git pull' 或 'git merge' 来同步未整合提交与 'git svn' 分支。这样做将使未整合提交的历史与上游 SVN 仓库保持线性关系，并允许使用首选的 'git svn dcommit' 子命令将未整合提交推回 SVN。
+
+最初，'git svn' 建议开发者从 'git svn' 分支拉取或合并。 这是因为作者倾向于用 `git svn set-tree B` 来提交单个头，而不是用 `git svn set-tree A..B` 来提交多个头。使用 'git pull' 或 'git merge' 和 `git svn set-tree A..B` 会导致非线性历史在提交到 SVN 时被扁平化，这可能会导致合并提交意外地在 SVN 中逆转之前的提交。
+
+合并跟踪
+----
+虽然 'git svn' 可以跟踪采用标准布局的仓库的复制历史（包括分支和标记），但它还不能将发生在 git 内部的合并历史回溯到 SVN 用户的上游。 因此，我们建议用户尽可能在 Git 内部保持线性的历史记录，以方便与 SVN 兼容（见下文 “注意事项” 部分）。
+
+处理 svn 分支
+---------
+如果 'git svn' 被配置为获取分支（且 --follow-branches 有效），它有时会为一个 SVN 分支创建多个 Git 分支，这些附加分支的名称为 'branchname@nnn'（nnn 为 SVN 修订版本号）。 如果 'git svn' 无法为 SVN 分支的第一次提交找到父提交，就会创建这些附加分支，以便将该分支与其他分支的历史连接起来。
+
+通常，SVN 分支的第一次提交包括复制操作。'git svn' 会读取该提交，以获得创建分支的 SVN 版本。然后，它会尝试找到与该 SVN 版本相对应的 Git 提交，并将其作为分支的父分支。不过，也有可能没有合适的 Git 提交作为父分支。 除其他原因外，如果 SVN 分支是一个修订版本的副本，而 'git svn' 没有获取该修订版本（例如，因为它是一个用 `--revision` 跳过的旧修订版本），或者在 SVN 中复制了一个 'git svn' 不跟踪的目录（例如一个根本不跟踪的分支，或者一个已跟踪分支的子目录），就会出现这种情况。在这种情况下，'git svn' 仍会创建一个 Git 分支，但它不会使用现有的 Git 提交作为该分支的父提交，而是会读取该分支被复制的目录的 SVN 历史记录，并创建适当的 Git 提交。 信息 "Initializing parent:<分支名>"信息来表示。
+
+此外，它还会创建一个名为 '<分支名>@<SVN-版本>' 的特殊分支，其中 <SVN-版本> 是该分支复制自的 SVN 版本号。 该分支将指向该分支新创建的父提交。 如果该分支在 SVN 中被删除，后来又从不同版本重新创建，则会出现多个带 '@' 的分支。
+
+请注意，这可能意味着一个 SVN 修订版会创建多个 Git 提交。
+
+举个例子：在一个采用标准 trunk/tags/branches 布局的 SVN 代码库中，r.100 中创建了 trunk/sub 目录。 在 r.200 中，trunk/sub 被复制到 branches/ 中，从而被分支。'git svn clone -s' 会创建一个分支 'sub'。它还会为 r.100 至 r.199 创建新的 Git 提交，并将其作为分支 'sub' 的历史。这样，从 r.100 到 r.199 的每个修订版本都会有两个 Git 提交（一个包含 trunk/，一个包含 trunk/sub/）。最后，它会创建一个分支 'sub@200'，指向分支 'sub' 的新父提交（即 r.200 和 trunk/sub/ 的提交）。
+
+注意事项
+----
+
+为简单起见并与 Subversion 互操作，建议所有 'git svn' 用户直接从 SVN 服务器 clone、fetch 和 dcommit，避免在 Git 仓库和分支之间进行所有 'git clone'/'pull'/'merge'/'push' 操作。 在 Git 分支和用户之间交换代码的推荐方法是 'git format-patch' 和 'git am'，或直接 'dcommit' 到 SVN 仓库。
+
+不建议在计划 'dcommit' 的分支上运行 'git merge' 或 'git pull'，因为 Subversion 用户无法看到你所做的任何合并。 此外，如果您从 SVN 分支的镜像 Git 分支合并或拉取，'dcommit' 可能会提交到错误的分支。
+
+如果进行合并，请注意以下规则：'git svn dcommit' 会尝试提交在 SVN 的顶部提交
+------------------------------------------------------------------------
+git log --grep=^git-svn-id: --first-parent -1
+------------------------------------------------------------------------
+因此，您 “必须” 确保您要提交到的分支的最新提交是合并的 'first' 父提交。 否则就会出现混乱，尤其是当第一父提交是同一 SVN 分支上的旧提交时。
+
+'git clone' 不会克隆 refs/remotes/ 层次结构下的分支，也不会克隆任何 'git svn' 元数据或配置。 因此，如果要克隆，使用 'git svn' 创建和管理的仓库应该使用 'rsync' 来克隆。
+
+由于 'dcommit' 在内部使用变基操作，因此在 'dcommit' 之前 'git push' 的任何 Git 分支都需要强制覆盖远程仓库中的现有引用。 这通常被认为是不好的做法，详见 linkgit:git-push[1] 文档。
+
+不要在已经提交的变更上使用 linkgit:git-commit[1] 的 --amend 选项。 为其他用户修改已推送到远程仓库的提交被认为是不好的做法，SVN 中的 dcommit 就类似于这种做法。
+
+克隆 SVN 仓库时，如果没有使用描述仓库布局的选项（--trunk、--tags、--branches、--stdlayout），'git svn clone' 将创建一个完全线性历史的 Git 仓库，其中分支和标签在工作副本中显示为单独的目录。 虽然这是获取完整版本库副本的最简单方法，但对于有很多分支的项目来说，这会导致工作副本比主干大很多倍。因此，对于使用标准目录结构（trunk/branches/tags）的项目，建议克隆时使用选项 `--stdlayout`。如果项目使用非标准结构，和/或不需要分支和标签，最简单的做法是只克隆一个目录（通常是主干），而不提供任何仓库布局选项。 如果需要包含分支和标签的完整历史，则必须使用选项 `--trunk` / `--branches` / `--tags`。
+
+当使用多个 --branches 或 --tags 时，'git svn' 不会自动处理名称碰撞（例如，来自不同路径的两个分支具有相同的名称，或者一个分支和一个标签具有相同的名称）。 在这种情况下，使用 'init' 设置 Git 仓库，然后在第一次 'fetch' 之前，编辑 $GIT_DIR/config 文件，将分支和标签关联到不同的名称空间。 例如:
+
+	branches = stable/*:refs/remotes/svn/stable/*
+	branches = debug/*:refs/remotes/svn/debug/*
+
+配置
+--
+
+'git svn' 在版本库 $GIT_DIR/config 文件中存储 [svn-remote] 配置信息。 除了 'fetch' 键不接受通配符参数外，它与 Git 核心的 [remote] 部分类似，但它们由 'branch' 和 'tags' 键处理。 由于有些 SVN 仓库的配置比较奇怪，有多个项目，因此允许使用下面列出的通配符扩展：
+
+------------------------------------------------------------------------
+[svn-remote "project-a"]
+	url = http://server.org/svn
+	fetch = trunk/project-a:refs/remotes/project-a/trunk
+	branches = branches/*/project-a:refs/remotes/project-a/branches/*
+	branches = branches/release_*:refs/remotes/project-a/branches/release_*
+	branches = branches/re*se:refs/remotes/project-a/branches/*
+	tags = tags/*/project-a:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+请记住，本地引用中的 `*`（星号）通配符（位于 `:` 右边）*必须*是最右边的路径组件；*必须*是最右边的路径组件。(`:`右边）的通配符必须是最右边的路径组件；但是，远程通配符可以是任何地方的通配符，只要它是一个独立的路径组件（由 `:` 包围）。但远程通配符可以是任何位置，只要它是一个独立的路径组件（由 `/` 或 EOL 包围）。 这种类型的配置不会由 "init "自动创建，而应使用文本编辑器或 'git config' 手动输入。
+
+另请注意，每个单词只允许使用一个星号。例如：
+
+	branches = branches/re*se:refs/remotes/project-a/branches/*
+
+将匹配分支 'release'、'rese'、're123se'，但
+
+	branches = branches/re*s*e:refs/remotes/project-a/branches/*
+
+会产生错误。
+
+也可以使用大括号中以逗号分隔的名称列表来获取分支或标记的子集。例如：
+
+------------------------------------------------------------------------
+[svn-remote "huge-project"]
+	url = http://server.org/svn
+	fetch = trunk/src:refs/remotes/trunk
+	branches = branches/{red,green}/src:refs/remotes/project-a/branches/*
+	tags = tags/{1.0,2.0}/src:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+支持多个提取、分支和标记键：
+
+------------------------------------------------------------------------
+[svn-remote "messy-repo"]
+	url = http://server.org/svn
+	fetch = trunk/project-a:refs/remotes/project-a/trunk
+	fetch = branches/demos/june-project-a-demo:refs/remotes/project-a/demos/june-demo
+	branches = branches/server/*:refs/remotes/project-a/branches/*
+	branches = branches/demos/2011/*:refs/remotes/project-a/2011-demos/*
+	tags = tags/server/*:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+在这种配置下创建分支，需要使用 -d 或 --destination 标志来明确使用哪个位置：
+
+------------------------------------------------------------------------
+$ git svn branch -d branches/server release-2-3-0
+------------------------------------------------------------------------
+
+请注意，git-svn 会记录分支或标签出现过的最高修订版本。如果分支或标签的子集在获取后发生了变化，则必须手动编辑 $GIT_DIR/svn/.metadata，以根据情况移除（或重置）分支-最高修订和/或标签-最高修订。
+
+文件
+--
+$GIT_DIR/svn/\**/.rev_map.*::
+	Subversion 版本号与 Git 提交名之间的映射。 在未设置 noMetadata 选项的仓库中，可以根据每次提交末尾的 git-svn-id: 行重建该映射（详见上文 'svn.noMetadata' 部分）。
++
+如果 rev_map 丢失或不是最新的，'git svn fetch' 和 'git svn rebase' 会自动更新它。 'git svn reset' 会自动将其倒退。
+
+漏洞
+--
+
+我们会忽略除 svn:executable 之外的所有 SVN 属性。 任何未处理的属性都会记录到 $GIT_DIR/svn/<引用名>/unhandled.log 中
+
+重命名和复制的目录不会被 Git 检测到，因此在提交到 SVN 时也不会被跟踪。 我不打算添加这方面的支持，因为要在所有可能的情况下都能正常工作是相当困难和耗时的（Git 也做不到这一点）。 如果重命名和复制的文件足够相似，Git 可以检测到它们，那么我们就完全支持提交这些文件。
+
+在 SVN 中，提交修改到标签是可能的（尽管不鼓励）（因为标签只是一个目录副本，因此在技术上与分支相同）。在克隆 SVN 仓库时，'git svn' 无法知道将来是否会发生对标签的提交。因此它会采取保守做法，将所有 SVN 标签作为分支导入，并在标签名称前加上 'tags/'。
+
+参见
+--
+linkgit:git-rebase[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

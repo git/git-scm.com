@@ -1,0 +1,305 @@
+git-stash(1)
+============
+
+名称
+--
+git-stash - 将变化藏在一个脏工作区中
+
+概述
+--
+[verse]
+'git stash' list [<日志选项>]
+'git stash' show [-u | --include-untracked | --only-untracked] [<差异选项>] [<暂存>]
+'git stash' drop [-q | --quiet] [<暂存>]
+'git stash' pop [--index] [-q | --quiet] [<暂存>]
+'git stash' apply [--index] [-q | --quiet] [<暂存>]
+'git stash' branch <分支名> [<暂存>]
+'git stash' [push [-p | --patch] [-S | --staged] [-k | --[no-]keep-index] [-q | --quiet]
+	     [-u | --include-untracked] [-a | --all] [(-m | --message) <信息>]
+	     [--pathspec-from-file=<文件> [--pathspec-file-nul]]
+	     [--] [<路径规范>...]]
+'git stash' save [-p | --patch] [-S | --staged] [-k | --[no-]keep-index] [-q | --quiet]
+	     [-u | --include-untracked] [-a | --all] [<信息>]
+'git stash' clear
+'git stash' create [<信息>]
+'git stash' store [(-m | --message) <信息>] [-q | --quiet] <提交>
+
+描述
+--
+
+Use `git stash` when you want to record the current state of the working directory and the index, but want to go back to a clean working directory. The command saves your local modifications away and reverts the working directory to match the `HEAD` commit.
+
+The modifications stashed away by this command can be listed with `git stash list`, inspected with `git stash show`, and restored (potentially on top of a different commit) with `git stash apply`. Calling `git stash` without any arguments is equivalent to `git stash push`. A stash is by default listed as "WIP on 'branchname' ...", but you can give a more descriptive message on the command line when you create one.
+
+你最近创建的储藏库被保存在`refs/stash`中；旧的储藏库可以在这个引用的引用日志中找到，并且可以使用通常的引用日志语法来命名（例如，`stash@{0}`是最近创建的储藏库，`stash@{1}`是它之前的储藏库，`stash@{2.hours.ago}`也是可以的）。也可以通过指定储藏库的索引来引用储藏库（例如，整数`n`等同于`stash@{n}`）。
+
+命令
+--
+
+push [-p|--patch] [-S|--staged] [-k|--[no-]keep-index] [-u|--include-untracked] [-a|--all] [-q|--quiet] [(-m|--message) <message>] [--pathspec-from-file=<file> [--pathspec-file-nul]] [--] [<pathspec>...]::
+
+	Save your local modifications to a new 'stash entry' and roll them back to HEAD (in the working tree and in the index). The <message> part is optional and gives the description along with the stashed state.
++
+For quickly making a snapshot, you can omit "push". In this mode, non-option arguments are not allowed to prevent a misspelled subcommand from making an unwanted stash entry. The two exceptions to this are `stash -p` which acts as alias for `stash push -p` and pathspec elements, which are allowed after a double hyphen `--` for disambiguation.
+
+save [-p|--patch] [-S|--staged] [-k|--[no-]keep-index] [-u|--include-untracked] [-a|--all] [-q|--quiet] [<信息>]::
+
+	This option is deprecated in favour of 'git stash push'. It differs from "stash push" in that it cannot take pathspec. Instead, all non-option arguments are concatenated to form the stash message.
+
+list [<日志选项>]::
+
+	List the stash entries that you currently have. Each 'stash entry' is listed with its name (e.g. `stash@{0}` is the latest entry, `stash@{1}` is the one before, etc.), the name of the branch that was current when the entry was made, and a short description of the commit the entry was based on.
++
+----------------------------------------------------------------
+stash@{0}: WIP on submit: 6ebd0e2...更新 git-stash 文档
+stash@{1}: On master: 9cc0589... 添加 git-stash
+----------------------------------------------------------------
++
+该命令采用适用于 'git log' 命令的选项来控制显示的内容和方式。参见 linkgit:git-log[1]。
+
+show [-u|--include-untracked|--only-untracked] [<diff选项>] [<储藏目录>]::
+
+	Show the changes recorded in the stash entry as a diff between the stashed contents and the commit back when the stash entry was first created. By default, the command shows the diffstat, but it will accept any format known to 'git diff' (e.g., `git stash show -p stash@{1}` to view the second most recent entry in patch form). If no `<diff-option>` is provided, the default behavior will be given by the `stash.showStat`, and `stash.showPatch` config variables. You can also use `stash.showIncludeUntracked` to set whether `--include-untracked` is enabled by default.
+
+pop [--index] [-q|--quiet] [<暂存>]::
+
+	从贮藏库列表中移除一个单一的贮藏状态，并将其应用于当前工作区状态之上，也就是做`git stash push`的逆向操作。工作目录必须与索引匹配。
++
+应用状态可能会因为冲突而失败；在这种情况下，它不会被从贮藏库列表中删除。你需要手动解决冲突，并在之后调用 `git stash drop`。
+
+apply [--index] [-q|--quiet] [<暂存>]::
+
+	和 `pop` 一样，但不从贮藏库列表中删除该状态。与`pop`不同，`<贮藏项>`可以是任何看起来像由`stash push`或`stash create`创建的提交。
+
+branch <分支名> [<贮藏项>]::
+
+	Creates and checks out a new branch named `<branchname>` starting from the commit at which the `<stash>` was originally created, applies the changes recorded in `<stash>` to the new working tree and index. If that succeeds, and `<stash>` is a reference of the form `stash@{<revision>}`, it then drops the `<stash>`.
++
+This is useful if the branch on which you ran `git stash push` has changed enough that `git stash apply` fails due to conflicts. Since the stash entry is applied on top of the commit that was HEAD at the time `git stash` was run, it restores the originally stashed state with no conflicts.
+
+清除::
+	删除所有的贮藏条目。直接切断任何联系，而且可能无法恢复（可能的策略见下面的 "例子"）。
+
+Drop [-q|--quiet] [<贮藏项>]::
+
+	从贮藏条目列表中删除一个单一的贮藏条目。
+
+create::
+
+	Create a stash entry (which is a regular commit object) and return its object name, without storing it anywhere in the ref namespace. This is intended to be useful for scripts. It is probably not the command you want to use; see "push" above.
+
+保存::
+
+	Store a given stash created via 'git stash create' (which is a dangling merge commit) in the stash ref, updating the stash reflog. This is intended to be useful for scripts. It is probably not the command you want to use; see "push" above.
+
+选项
+--
+-a::
+--all::
+	这个选项只对`push`和`save`命令有效。
++
+所有被忽略的和未被追踪的文件也被贮藏起来，然后用`git clean`来清理。
+
+-u::
+--include-untracked::
+--no-include-untracked::
+	当与`push`和`save`命令一起使用时，所有未被追踪的文件也被贮藏起来，然后用`git clean`来清理。
++
+当与`show`命令一起使用时，显示贮藏库条目中未被追踪的文件作为差异的一部分。
+
+--only-untracked::
+	这个选项只对`show`命令有效。
++
+只显示贮藏库条目中未被追踪的文件作为差异的一部分。
+
+--index::
+	这个选项只对`pop`和`apply`命令有效。
++
+不仅试图恢复工作区的变化，而且恢复索引的变化。然而，这可能会在出现冲突时失败（这些冲突被存储在索引中，因此你不能再按原来的方式应用这些变化）。
+
+-k::
+--keep-index::
+--no-keep-index::
+	这个选项只对`push`和`save`命令有效。
++
+所有已经添加到索引中的变化都保持原样。
+
+-p::
+--patch::
+	这个选项只对`push`和`save`命令有效。
++
+Interactively select hunks from the diff between HEAD and the working tree to be stashed. The stash entry is constructed such that its index state is the same as the index state of your repository, and its worktree contains only the changes you selected interactively. The selected changes are then rolled back from your worktree. See the ``Interactive Mode'' section of linkgit:git-add[1] to learn how to operate the `--patch` mode.
++
+The `--patch` option implies `--keep-index`. You can use `--no-keep-index` to override this.
+
+-S::
+--staged::
+	这个选项只对`push`和`save`命令有效。
++
+只存放当前分阶段的修改。这类似于基本的`git commit`，只不过是将状态提交到贮藏室而不是当前分支。
++
+`--patch`选项要优先于这个选项。
+
+--pathspec-from-file=<file>::
+	这个选项只对`push`命令有效。
++
+Pathspec在 `<文件>` 中传递，而不是在命令行参数中传递。如果 `<文件>` 正好是 `-`，则使用标准输入。路径规范元素由 LF 或 CR/LF 分隔。可以引用配置变量 `core.quotePath` 的路径规范元素（请参见 linkgit:git-config[1]）。另请参见 `--pathspec-file-nul` 和全局 `--literal-pathspecs`。
+
+--pathspec-file-nul::
+	这个选项只对`push`命令有效。
++
+只有在使用 `--pathspec-from-file` 选项时才有意义。指定路径元素用 NUL 字符分隔，所有其他字符都按字面意思（包括换行符和引号）表示。
+
+-q::
+--quiet::
+	这个选项只对`apply`、`drop`、`pop`、`push`、`save`、`store`命令有效。
++
+静默，压制反馈信息。
+
+\--::
+	这个选项只对`push`命令有效。
++
+为了消除歧义，将路径规范与选项分开。
+
+<pathspec>...::
+	这个选项只对`push`命令有效。
++
+The new stash entry records the modified states only for the files that match the pathspec. The index entries and working tree files are then rolled back to the state in HEAD only for these files, too, leaving files that do not match the pathspec intact.
++
+更多细节请参见 linkgit:gitglossary[7] 中的 '路径规范' 条目。
+
+<暂存>::
+	这个选项只对`apply`、`branch`、`drop`、`pop`、`show`命令有效。
++
+一个形式为`stash@{<版本>}`的引用。如果没有给出`<贮藏项>`，则假定是最新的储藏库（即`stash@{0}`）。
+
+讨论
+--
+
+A stash entry is represented as a commit whose tree records the state of the working directory, and its first parent is the commit at `HEAD` when the entry was created. The tree of the second parent records the state of the index when the entry is made, and it is made a child of the `HEAD` commit. The ancestry graph looks like this:
+
+            .----W
+           /    /
+     -----H----I
+
+其中`H`是`HEAD`提交，`I`是记录索引状态的提交，`W`是记录工作区状态的提交。
+
+
+实例
+--
+
+拉进一个脏目录树::
+
+When you are in the middle of something, you learn that there are upstream changes that are possibly relevant to what you are doing. When your local changes do not conflict with the changes in the upstream, a simple `git pull` will let you move forward.
++
+However, there are cases in which your local changes do conflict with the upstream changes, and `git pull` refuses to overwrite your changes. In such a case, you can stash your changes away, perform a pull, and then unstash, like this:
++
+----------------------------------------------------------------
+$ git pull
+ ...
+文件 foobar 不是最新的，无法合并。
+$ git stash
+$ git pull
+$ git stash pop
+----------------------------------------------------------------
+
+中断的工作流程::
+
+When you are in the middle of something, your boss comes in and demands that you fix something immediately. Traditionally, you would make a commit to a temporary branch to store your changes away, and return to your original branch to make the emergency fix, like this:
++
+----------------------------------------------------------------
+# ... 嗨骇害 ...
+$ git switch -c my_wip
+$ git commit -a -m "我待会还得写点东西"
+$ git switch master
+$ edit emergency fix
+$ git commit -a -m "速速修复BUG"
+$ git switch my_wip
+$ git reset --soft HEAD^
+# ... 继续骇入 ...
+----------------------------------------------------------------
++
+你可以用'git stash'来简化上述工作，像这样：
++
+----------------------------------------------------------------
+# ... 嗨骇害 ...
+$ git stash
+$ edit emergency fix
+$ git commit -a -m "紧急修复"
+$ git stash pop
+# ... 继续骇入 ...
+----------------------------------------------------------------
+
+部分测试提交::
+
+当你想把工作区上的改动做两个或更多的提交，并且想在提交前测试每个改动时，你可以使用`git stash push --keep-index`：
++
+----------------------------------------------------------------
+# ... 嗨骇害 ...
+$ git add --patch foo # 仅将第一部分添加到索引中
+$ git stash push --keep-index # 将所有其他改动保存到储藏室中
+$ edit/build/test first part
+$ git commit -m '第一个部分' # 提交完全测试过的改动
+$ git stash pop # 准备处理所有其他改动
+# ... 重复以上五个步骤，直到剩下一个提交...
+$ 编辑/构建/测试剩余部分
+$ git commit foo -m '剩余部分'。
+----------------------------------------------------------------
+
+保存不相关的变化供将来使用::
+
+当你在进行大规模修改时，发现一些不相关的问题，你不想忘记修复，你可以进行修改，将其分阶段，然后使用 `git stash push --staged` 将其存放起来，以便将来使用。这类似于提交阶段性修改，只是提交的结果是在贮藏库而不是在当前分支。
++
+----------------------------------------------------------------
+# ... 嗨骇害 ...
+$ git add --patch foo               # 将不相关的改动添加到索引中
+$ git stash push --staged       # 将这些改动保存到储藏库中
+# ... 嗨骇害， 完成当前改动 ...
+$ git commit -m '大规模测试'        # 提交完全测试过的改动
+$ git switch fixup-branch        # 切换到另一个分支
+$ git stash pop                  # 完成已保存更改的工作
+----------------------------------------------------------------
+
+恢复被错误地清除/丢弃的贮藏库条目::
+
+If you mistakenly drop or clear stash entries, they cannot be recovered through the normal safety mechanisms. However, you can try the following incantation to get a list of stash entries that are still in your repository, but not reachable any more:
++
+----------------------------------------------------------------
+git fsck --unreachable |
+grep commit | cut -d -f3 |
+xargs git log --merges --no-walk --grep=WIP
+----------------------------------------------------------------
+
+配置
+--
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/stash.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+参见
+--
+linkgit:git-checkout[1], linkgit:git-commit[1], linkgit:git-reflog[1], linkgit:git-reset[1], linkgit:git-switch[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

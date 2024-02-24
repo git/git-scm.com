@@ -1,0 +1,90 @@
+git-index-pack(1)
+=================
+
+名称
+--
+git-index-pack - 为现有打包存档建立打包索引文件
+
+
+概述
+--
+[verse]
+'git index-pack' [-v] [-o <索引文件>] [--[no-]rev-index] <包文件>
+'git index-pack' --stdin [--fix-thin] [--keep] [-v] [-o <索引文件>]
+		  [--[no-]rev-index] [<包文件>]
+
+
+描述
+--
+从指定文件读取打包归档文件（.pack），为其建立打包索引文件（.idx），并为指定打包文件写入反向索引（.rev）。打包后的归档文件连同打包索引可以放在 Git 仓库的 objects/pack/ 目录中。
+
+
+选项
+--
+-v::
+	对正在发生的事情要言之有物，包括进度状态。
+
+-o <index-file>::
+	将生成的数据包索引写入指定的文件中。 如果没有这个选项，打包索引文件的名称是根据打包档案文件的名称构建的，将 .pack 替换为 .idx（如果打包档案的名称不是以 .pack 结尾，程序将失败）。
+
+--[no-]rev-index::
+	当提供这个标志时，生成一个与给定包对应的反向索引（一个 `.rev` 文件）。如果给了 `--verify`，确保现有的反向索引是正确的。优先于 `pack.writeReverseIndex`。
+
+--stdin::
+	当提供这个标志时，数据包将从标注输入流读取，然后将副本写入 <pack-file>。如果没有指定 <pack-file>，数据包会被写入当前 Git 仓库的 objects/pack/ 目录中，其默认名称由数据包内容决定。 如果没有指定 <pack-file>，可以考虑使用 --keep 来防止这个过程和 'git repack' 之间出现竞争状态。
+
+--fix-thin::
+	修正由 `git pack-objects --thin` 产生的 “轻量” 包（详见 linkgit:git-pack-objects[1]），将被删除的对象所基于的排除对象加入包中。这个选项只有在与 --stdin 结合时才有意义。
+
+--keep::
+	在将索引移到其最终目的地之前，为相关的包文件创建一个空的 .keep 文件。 这个选项通常需要和 --stdin一起使用，以防止同时进行的 "git repack" 进程在更新引用以使用 pack 中包含的对象之前删除新建的 pack 和 index。
+
+--keep=<消息>::
+	像 --keep 一样，在将索引移到最终目的地之前创建一个 .keep 文件，但不是创建一个空文件，而是在 .keep 文件中放入 '<消息>' 和一个 LF。 以后可以在所有的 .keep 文件中搜索 '<消息>' 信息，以找到任何已经失去作用的文件。
+
+--index-version=<版本>[,<偏移>]::
+	这是为测试套件准备的。它允许为生成的数据包索引强制选择版本，并对位于给定偏移量以上的对象强制选择 64 位索引条目。
+
+--strict[=<msg-id>=<severity>...]::
+如果数据包包含损坏的对象或链接，则 "死"。可选的逗号分隔列表 `<msg-id>=<severity>` 可用于改变某些可能问题的严重程度，例如 `--strict="missingEmail=ignore,badTagName=error"`。关于 `<msg-id>` 和 `<severity>` 的可能值，请参阅 linkgit:git-fsck[1] 中的 `fsck.<msg-id>` 配置选项。
+
+--progress-title::
+	仅供内部使用。
++
+设置进度条的标题。标题默认为 "Receiving objects"，当指定 `--stdin` 时为 "Indexing objects"。
+
+--check-self-contained-and-connected::
+	如果数据包中包含无法链接的链接则死亡。仅供内部使用。
+
+--fsck-objects[=<msg-id>=<severity>...]::
+	如果数据包中包含破损的对象进程会死亡，与 `--strict` 选项不同的是，不会因为断掉的链接而阻塞。如果数据包包含一个指向不存在的 .gitmodules blob 的树，则在进入数据包 /idx 文件名的哈希值之后打印该 blob 的哈希值（供调用者检查）（见 “注意事项”）。
++
+可选的逗号分隔列表"<msg-id>=<severity>"可用于改变某些可能问题的严重程度，例如 `--fsck-objects="missingEmail=ignore,badTagName=ignore"`。关于 `<msg-id>` 和 `<severity>` 的可能值，请参阅 linkgit:git-fsck[1] 中的 `fsck.<msg-id>` 配置选项。
+
+--threads=<n>::
+	指定解析 deltas 时产生的线程数量。这要求 index-pack 在编译时使用 pthreads，否则这个选项会被忽略并发出警告。 这是为了减少多处理器机器上的打包时间。然而，delta 搜索窗口所需的内存量要乘以线程的数量。 指定为 0 将导致 Git 自动检测 CPU 的数量并使用最多 3 个线程。
+
+--max-input-size=<尺寸>::
+	如果数据包大于 <size>，则死亡。
+
+--object-format=<哈希算法>::
+	为数据包指定给定的对象格式（哈希算法）。 有效值为 'sha1' 和（如果启用）'sha256'。 默认值是当前仓库的算法（由 `extensions.objectFormat` 设置），如果没有设置值或在仓库之外，则为 'sha1'。
++
+该选项不能与 --stdin 选项一起使用。
++
+注：目前，SHA-256 仓库与 SHA-1 仓库之间不能相互操作。
+
+过去，我们曾警告说，当我们引入此类互操作性功能时，SHA-256 仓库以后可能需要进行向后不兼容的更改。如今，我们只期待兼容的更改。此外，如果事实证明有必要进行此类修改，可以预期的是，用现在的 Git 创建的 SHA-256 仓库将可用于未来版本的 Git，而不会丢失数据。
+[]
+
+--promisor[=<信息>]::
+	在提交 pack-index 之前，为这个 pack 创建一个 .promosor 文件。在用 --fix-thin 编写 pack 时特别有帮助，因为在完全编写完 pack 之前，pack 的名字还不是最终的。如果提供了 `<message>`，那么该内容将被写入 .promosor 文件，供将来参考。参见 link:/docs/partial-clone/zh_HANS-CN[partial clone] 以了解更多信息。
+
+注释
+--
+
+索引创建完成后，pack/idx 文件名的哈希值会被打印到标准输出流。如果还使用了 --stdin 选项 ，则会以 "pack/t" 或 "keep/t" 作为前缀（如果成功创建了新的 .keep 文件）。这对移除用作锁的 .keep 文件很有用，可以防止上面提到的与 'git repack' 的竞争。
+
+GIT
+---
+属于 linkgit:git[1] 文档

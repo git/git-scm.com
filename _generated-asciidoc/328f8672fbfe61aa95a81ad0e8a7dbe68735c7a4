@@ -1,0 +1,203 @@
+git-merge-tree(1)
+=================
+
+NOM
+---
+git-merge-tree - Effectue une fusion sans toucher à l'index ou à l'arbre de travail
+
+
+SYNOPSIS
+--------
+[verse]
+'git merge-tree' [--write-tree] [<options>] <branche1> <branche2>
+'git merge-tree' [--trivial-merge] <arbre-base> <branche1> <branche2> (obsolète)
+
+[[NEWMERGE]]
+DESCRIPTION
+-----------
+
+Cette commande a un mode moderne `--write-tree` et un mode `--trivial-merge`. À l'exception de la section <<DEPMERGE,DESCRIPTION OBSOL ÈTE>> à la fin, le reste de cette documentation décrit le mode moderne `--write-tree`.
+
+Exécute une fusion, mais ne fait pas de nouveaux commits et ne lit ni n'écrit ni l'arbre de travail ni l'index.
+
+La fusion effectuée utilisera les mêmes caractéristiques que le linkgit:git-merge[1] « réel », y compris :
+
+  * fusion de contenu à trois branches des fichiers individuels
+  * détection de renommage
+  * gestion correcte des conflits de répertoires et de fichiers
+  * consolidation récursive des ancêtres (c.-à-d. lorsqu'il y a plus d'une base de fusion, créant une base de fusion virtuelle en fusionnant les bases de fusion)
+  * etc.
+
+Une fois la fusion terminée, un nouvel objet d'arborescence est créé au sommet. Voir `SORTIE` ci-dessous pour plus de détails.
+
+OPTIONS
+-------
+
+-z::
+	Ne pas citer les noms de fichiers dans la section <information de fichiers en conflit>, et terminer chaque nom de fichier avec un caractère NUL plutôt qu'un retour à la ligne. Commencer également la section des messages avec un caractère NUL au lieu d'une nouvelle ligne. Voir <<OUTPUT>> ci-dessous pour plus d'informations.
+
+--name-only::
+	Dans la section d'Information sur les fichiers en conflit, au lieu d'écrire une liste de tuples (mode, oid, étape, chemin) sur la sortie pour les fichiers en conflit, ne fournir qu'une liste de noms de fichiers avec des conflits (et ne pas lister les noms de fichiers plusieurs fois s'ils ont plusieurs étapes en conflit).
+
+--[no-]messages::
+	Écrire tous les messages d'information tels que « Auto-fusion <chemin> » ou les notes de CONFLIT jusqu'à la fin de la sortie. Si non précisé, le comportement par défaut est d'inclure ces messages s'il y a des conflits de fusion, et de les omettre autrement.
+
+--allow-unrelated-histories::
+	merge-tree sera en erreur par défaut si les deux branches spécifiées ne partagent aucune histoire commune. Ce drapeau peut être donné pour annuler cette vérification et faire poursuivre tout de même la fusion.
+
+--merge-base=<commit>::
+	Au lieu de trouver les bases de fustion pour la <branche1> et <branche2>, il n'y a pas de prise en charge pour spécifier une base de fusion pour la fusion et préciser plusieurs bases. Cette option est incompatible avec `--stdin`.
+
+[[OUTPUT]]
+SORTIE
+------
+
+Pour une fusion réussie, la sortie de git-merge-tree est simplement une ligne :
+
+	<OID de l'arbre de sommet>
+
+Alors que pour une fusion conflictuelle, la sortie est par défaut de la forme :
+
+	<OID de l'arbre supérieur>
+	<Information sur les fichiers en conflit>
+	<Messages d'information>
+
+Elles sont examinées individuellement ci-dessous.
+
+Cependant, il y a une exception. Si `--stdin` est passé, il y a une section supplémentaire au début, un caractère NUL à la fin, et toutes les sections se répètent pour chaque ligne d'entrée. Ainsi, si la première fusion est en conflit et que la seconde est propre, la production serait de la forme :
+
+	<Statut de fusion>
+	<OID de l'arbre supérieur>
+	<Information de fichiers en conflit>
+	<Messages d'information>
+	NUL
+	<Statut de fusion>
+	<OID de l'arbre supérieur>
+	NUL
+
+[[MS]]
+Status de fusion
+~~~~~~~~~~~~~~~~
+
+C'est un statut (nombre entier) suivi d'un caractère NUL. Le statut entier est :
+
+     0 : la fusion avait des conflits
+     1 : la fusion était propre
+     <0 : quelque chose a empêché la fusion de fonctionner (p. ex. accès au dépôt
+	objets empêché par le système de fichiers)
+
+[[OIDTLT]]
+OID de l'arbre supérieur
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+C'est un objet d'arbre qui représente ce qui serait extrait dans l'arbre de travail à la fin de `git merge`. S'il y avait des conflits, alors les fichiers dans cet arbre peuvent avoir des marqueurs de conflit intégrés. Cette section est toujours suivie d'une nouvelle ligne (ou NUL si `-z` est passé).
+
+[[CFI]]
+Information sur les fichiers en conflit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+C'est une séquence de lignes au format
+
+	<mode> <objet> <étape> <nom-de-fichier>
+
+Le nom du fichier sera cité comme expliqué pour la variable de configuration `core.quotePath` (voir linkgit:git-config[1]). Cependant, si l'option `--name-only` est passée, le mode, l'objet, et l'étape seront omis. Si l'option `-z` est passée, les "lignes" sont terminées par un caractère NUL au lieu d'un caractère de nouvelle ligne.
+
+[[IM]]
+Messages d'information
+~~~~~~~~~~~~~~~~~~~~~~
+
+Cette section fournit des messages d'information, généralement sur les conflits. Le format de la section varie considérablement selon que `-z` est passé.
+
+Si `-z` est passé :
+
+Le format de sortie est zéro ou plus enregistrements d'information sur les conflits, chacun de la forme :
+
+	<liste-de-chemins><type-de-conflit>NUL<message-de-conflit>NUL
+
+où <liste-de-chemins> est de la forme
+
+	<nombre-de-chemins>NUL<chemin1>NUL<chemin2>NUL...<cheminN>NUL
+
+et comprend des chemins (ou des noms de branches) touchés par le conflit ou le message d'information dans<message-de-conflit>. De plus, <type-de-conflit> est une chaîne stable expliquant le type de conflit, comme
+
+  * "Fusion automatique"
+  * "CONFLIT (renommage/suppression)"
+  * "CONFLIT (le sous-module manque d'une base de fusion)"
+  * "CONFLIT (binaire)"
+
+et <message-de-conflit> est un message plus détaillé sur le conflit qui souvent (mais pas toujours) embarque la <description-courte-stable>. Ces chaînes peuvent changer dans les futures versions Git. Quelques exemples :
+
+  * "Fusion automatique de <fichier>"
+  * "CONFLIT (renommage/suppression) :<ancienfichier> renommé... mais supprimé dans ..."
+  * "Échec de la fusion du sous-module <sous-module> (pas de base de fusion)"
+  * "Attention : ne peut pas fusionner des fichiers binaires : <nom-de-fichier>"
+
+Si `-z` n'est PAS passé :
+
+Cette section commence par une ligne vierge pour la séparer des sections précédentes, puis ne contient que les informations <message-de-conflit> de la section précédente (séparées par des nouvelles lignes). Ce sont des chaînes non-stables qui ne doivent pas être analysées par des scripts, et sont simplement destinées à la consommation humaine. De plus, notez que si les chaînes <message-de-conflit> ne contiennent généralement pas de nouvelles lignes intégrées, elles le font parfois. (Cependant, les messages libres n'auront jamais de caractère NUL intégré). Ainsi, l'ensemble de l'information est destiné aux lecteurs humains comme une agglomération de tous les messages de conflit.
+
+STATUT DE SORTIE
+----------------
+
+Pour une fusion réussie et non conflictuelle, le statut de sortie est de 0. Lorsque la fusion a des conflits, le statut de sortie est 1. Si la fusion n'est pas capable de se terminer (ou de démarrer) en raison d'une erreur quelconque, l'état de sortie est autre chose que 0 ou 1 (et la sortie n'est pas spécifiée). Lorsque --stdin est passé, le statut de retour est 0 pour les fusions réussies et conflictuelles, et autre chose que 0 ou 1 si elle ne peut pas compléter tous les fusions demandées.
+
+NOTES D'UTILISATION
+-------------------
+
+Cette commande est destinée à la plomberie de bas niveau, semblable à linkgit:git-hash-object[1], linkgit:git-mktree[1], linkgit:git-commit-tree[1], linkgit:git-write-tree[1], linkgit:git-update-ref[1], et linkgit:git-mktag[1]. Ainsi, elle peut être utilisée comme partie d'une série d'étapes telles que :
+
+       NEWTREE=$(git merge-tree --write-tree $BRANCH1 $BRANCH2)
+       test $? -eq 0 || die "Il y avait des conflits..."
+       NEWCOMMIT=$(git commit-tree $NEWTREE -p $BRANCH1 -p $BRANCH2)
+       git update-ref $BRANCH1 $NEWCOMMIT
+
+Notez que lorsque le statut de sortie est non-zéro, `NEWTREE` dans cette séquence contiendra beaucoup plus qu'un arbre.
+
+Pour les conflits, la sortie comprend les mêmes informations que vous obtiendriez avec linkgit:git-merge[1] :
+
+  * ce qui serait écrit à l'arbre de travail ((l'<<OIDTLT,OID de l'arbre de supraniveau>>))
+  * les étapes d'ordre supérieur qui seraient écrites dans l'index (l'<<CFI,Information de fichier en conflit>>)
+  * tous les messages qui auraient été affichés sur stdout (les <<IM,messages d'information>>)
+
+FORMAT D'ENTRÉE
+---------------
+Le format d'entrée de 'git merge-tree --stdin' est entièrement textuel. Chaque ligne a ce format :
+
+	[<commit-de-base> -- ]<branche1> <branche2>
+
+Si une ligne est séparée par `--`, la chaîne précédant le séparateur est utilisée pour spécifier une base de fusion pour la fusion et la chaîne suivant le séparateur décrit les branches à fusionner.
+
+ERREURS À ÉVITER
+----------------
+
+Ne PAS traverser l'arbre supérieur résultant pour essayer de trouver quels fichiers sont en conflit ; analyser la section d'<<CFI,Info de fichiers en conflits>>. Non seulement analyser un arbre entier serait horriblement lent dans les grands dépôts, mais il y a de nombreux types de conflits non représentables par des marqueurs de conflit (modifier/enlever, conflit de mode, fichier binaire changé des deux côtés, conflits fichiers/répertoires, diverses permutations de conflit de renommage, etc.)
+
+Ne PAS interpréter une liste d'<<CFI,info de fichiers en conflit>>fichiers comme une fusion propre ; vérifier l'état de sortie. Une fusion peut avoir des conflits sans avoir un conflit de fichiers individuels (il y a quelques types de conflits de renommage de répertoire qui tombent dans cette catégorie, et d'autres peuvent également être ajoutés à l'avenir).
+
+Ne PAS essayer de deviner ou de faire deviner à l'utilisateur les types de conflit de la liste <<CFI,info de fichiers en conflits>> . Les informations ne suffisent pas à le faire. Par exemple : les conflits renommage/renommage(1vers2) (les deux côtés ont renommé le même fichier différemment) se traduiront par trois fichiers différents ayant des étapes de commande supérieures (mais chacun n'a qu'une seule étape de commande supérieure), sans aucune façon ( à part la section de <<IM,messages d'information>>). Les conflits de fichiers/répertoire entraînent également un fichier avec exactement une étape de commande supérieure. Les conflits de renommage-possiblement-avec-des-répertoires (lorsque "merge.directoryRenames" est non réglé ou réglé sur "conflicts") entraînent également un fichier avec exactement une étape de commande supérieure. Dans tous les cas, la section des <<IM,messages informationnels>> a les informations nécessaires, bien qu'elle ne soit pas conçue pour être analysable par machine.
+
+Ne PAS supposer que chaque chemin d'<<CFI,info de fichiers en conflits>>, et les conflits logiques dans les <<IM, Messages informationnels>> ont une correspondance unique, ni qu'il y ait une correspondance unique, ni une correspondance plusieurs-vers-un. Il existe de nombreuses correspondances plusieurs-à-plusieurs, ce qui signifie que chaque chemin peut avoir de nombreux types de conflits logiques dans une fusion unique, et chaque type de conflit logique peut affecter de nombreux chemins.
+
+Ne PAS assumer que tous les noms de fichiers répertoriés dans la section des <<IM,Messages informationnels>> avaient des conflits. Des messages peuvent être inclus pour des fichiers qui n'ont pas de conflits, comme "Auto-merging <fichier>".
+
+ÉVITER de prendre les OIDS de l'<<CFI,information de fichiers en conflit>> et les ré-fusionner pour présenter les conflits à l'utilisateur. Cela va perdre de l'information. Au lieu de cela, regarder la version du fichier trouvé dans le ­<<OIDTLT,OID d'arborescence de sommet>> et l'afficher. En particulier, ce dernier aura des marqueurs de conflit annotés avec le branche/commit original en cours de fusion et, si des renommages étaient impliqués, le nom de fichier original. Bien que vous pourriez inclure le branche/commit original dans les annotations de conflit lors de la nouvelle fusion, le nom de fichier original n'est pas disponible à partir de l'<<CFI,Information de fichiers en conflit>>et donc vous perdriez des informations qui pourraient aider l'utilisateur à résoudre le conflit.
+
+[[DEPMERGE]]
+DESCRIPTION DÉCONSEILLÉE
+------------------------
+
+Comme spécifié dans la section <<NEWMERGE,DESCRIPTION>> et contrairement au reste de la documentation, cette section décrit le mode déprécié `--trivial-merge`.
+
+À part l'option `--trivial-merge` optionnelle, ce mode n'accepte aucune option.
+
+Ce mode lit trois arbres-esques, et produit des résultats triviaux de fusion et des étapes conflictuelles sur la sortie standard dans un format semi-diff. Comme cela a été conçu pour la consommation par des scripts de plus haut niveau et pour fusionner les résultats dans l'index, il omet les entrées qui correspondent à <branche1>. Le résultat de cette deuxième forme est semblable à ce que fait 'git read-tree -m', mais au lieu de stocker les résultats dans l'index, la commande produit les entrées sur la sortie standard.
+
+Ce formulaire n'a pas seulement une applicabilité limitée (une fusion triviale ne peut pas gérer les fusions de contenu de fichiers individuels, la détection de renom, la manipulation de conflits répertoires/fichiers, etc.), il est également difficile de travailler avec le format de sortie, et il sera généralement moins performant que la première même sur les fusions réussies (surtout dans les grands dépôts).
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

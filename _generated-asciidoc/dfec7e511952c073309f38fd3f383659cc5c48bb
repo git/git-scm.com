@@ -1,0 +1,209 @@
+git-daemon(1)
+=============
+
+名称
+--
+git-daemon - 一个非常简单的git存储库服务器
+
+概述
+--
+[verse]
+'git daemon' [--verbose] [--syslog] [--export-all]
+	     [--timeout=<n>] [--init-timeout=<n>] [--max-connections=<n>]
+	     [--strict-paths] [--base-path=<路径>] [--base-path-relaxed]
+	     [--user-path | --user-path=<路径>]
+	     [--interpolated-path=<路径模板>]
+	     [--reuseaddr] [--detach] [--pid-file=<文件>]
+	     [--enable=<服务>] [--disable=<服务>]
+	     [--allow-override=<服务>] [--forbid-override=<服务>]
+	     [--access-hook=<路径>] [--[no-]informative-errors]
+	     [--inetd |
+	      [--listen=<主机或 ip 地址>] [--port=<n>]
+	      [--user=<用户> [--group=<组>]]]
+	     [--log-destination=(stderr|syslog|none)]
+	     [<目录>...]
+
+描述
+--
+一个非常简单的 TCP Git 守护进程，通常在端口 "DEFAULT_GIT_PORT"（即 9418）上进行监听。 它等待一个要求提供服务的连接，如果该服务被启用，它将提供服务。
+
+它验证该目录是否有神奇的文件 "git-daemon-export-ok"，它将拒绝导出任何没有明确标记为这种方式导出的 Gi t目录（除非指定 `--export-all` 参数）。如果你把一些目录路径作为 "git daemon" 参数传递，那么提供的内容就会被限制在这些目录内的仓库。
+
+默认情况下，只有 "upload-pack "服务被启用，它为 "git fetch-pack" 和 "git ls-remote" 客户端服务，这些客户端是由 "git fetch"、"git pull" 和 "git clone " 调用的。
+
+这非常适合于只读更新，即从 Git 仓库拉取。
+
+还存在一个 `upload-archive`，为 'git archive' 服务。
+
+选项
+--
+--strict-paths::
+	准确匹配路径（即不允许 "/foo/repo"，而真正的路径是 "/foo/repo.git " 或 "/foo/repo/.git"），不做与用户相关的路径。 当这个选项被启用并且没有提供目录参数时，"git daemon" 将拒绝启动。
+
+--base-path=<路径>::
+	将所有的路径请求重新映射为相对于给定路径的请求。 这有点像 "Git root"--如果你在 example.com 上用 '--base-path=/srv/git' 运行 'git daemon'，那么如果你以后试图拉 'git://example.com/hello.git'，'git daemon' 将把路径解释为 `/srv/git/hello.git`。
+
+--base-path-relaxed::
+	如果启用了 --base-path，并且 repo 查找失败，使用这个选项，'git daemon' 将尝试在不加前缀的基础路径下进行查找。 这对于切换到 --base-path 的使用很有用，同时仍然允许使用旧的路径。
+
+--interpolated-path=<路径模板>::
+	为了支持虚拟主机，可以使用插值路径模板来动态地构建备用路径。 该模板支持由客户提供的目标主机名的 %H，但转换为小写字母；支持规范主机名的 %CH；支持服务器 IP 地址的 %IP；支持端口号的 %P；支持命名仓库的绝对路径的 %D。 在插值之后，该路径将根据目录列表进行验证。
+
+--export-all::
+	允许从所有看起来像 Git 仓库的目录（有 'objects' 和 'refs' 子目录）提取，即使它们没有 'git-daemon-export-ok' 文件。
+
+--inetd::
+	让服务器作为一个 inetd 服务运行。暗示 --syslog（可以用 `--log-destination=` 重写）。 与 --detach、--port、--listen、--user 和 --group 选项不兼容。
+
+--listen=<主机或 IP 地址>::
+	在一个特定的 IP 地址或主机名上收听。 IP 地址可以是一个 IPv4 地址，也可以是一个 IPv6 地址（如果支持）。 如果不支持 IPv6，那么 --listen=hostname也不被支持，--listen 必须给出一个 IPv4 地址。 可以多次给出。 与 `--inetd` 选项不兼容。
+
+--port=<n>::
+	在另一个端口上监听。 与 `--inetd` 选项不兼容。
+
+--init-timeout=<n>::
+	从建立连接到收到客户端请求之间的超时（以秒为单位）（通常是一个相当低的值，因为这基本上应该是即时的）。
+
+--timeout=<n>::
+	特定客户端子请求的超时（单位：秒）。这包括服务器处理子请求的时间和等待下一个客户端请求的时间。
+
+--max-connections=<n>::
+	最大并发客户数，默认为 32。 设置为零表示没有限制。
+
+--syslog::
+	是 `--log-destination=syslog` 的简称。
+
+--log-destination=<目的>::
+	发送日志信息到指定的目的地。 注意，这个选项并不意味着 --verbose，因此默认情况下只有错误情况会被记录下来。 <目的> 必须是以下之一：
++
+--
+标准错误::
+	写入标准错误。 注意，如果指定了 `--detach`，进程就会断开与真正的标准错误的连接，使得这个目的地实际上等同于 `none`。
+日志服务器::
+	写入 syslog，使用 `git-daemon` 标识符。
+none::
+	禁用所有日志记录。
+--
++
+如果指定了 `--inetd` 或 `--detach`，默认的目标是 `syslog`，否则是 `stderr`。
+
+--user-path::
+--user-path=<路径>::
+	允许在请求中使用 {tilde} 用户符号。 当没有指定参数时，对 git://host/{tilde}alice/foo 的请求会被视为访问用户 `alice` 的主目录下的 'foo' 仓库的请求。 如果指定了 `--user-path=path`，同样的请求将被视为访问用户 `alice` 的主目录下的 `path/foo` 仓库。
+
+--verbose::
+	记录有关传入连接和请求文件的详细信息。
+
+--reuseaddr::
+	在绑定监听套接字时使用 SO_REUSEADDR。 这允许服务器重新启动，而不必等待旧的连接超时。
+
+--detach::
+	从 shell 中分离出来。这意味着 --syslog。
+
+--pid-file=<文件>::
+	在 'file' 中保存进程 ID。 当守护进程在 `--inetd` 下运行时被忽略。
+
+--user=<用户>::
+--group=<组>::
+	在进入服务循环之前，改变 daemon 的 uid 和 gid。 当只给出 `--user` 而没有 `--group` 时，将使用用户的主要组 ID。 该选项的值是给 `getpwnam(3)` 和 `getgrnam(3)` 的，不支持数字 ID。
++
+当与 `--inetd` 一起使用时，给出这些选项是一个错误；如果需要，在催生 'git daemon' 之前，使用 inet daemon 的设施来实现同样的目的。
++
+像许多切换用户 ID 的程序一样，守护进程在运行 git 程序（如 `upload-pack` 和 `receive-pack`）时，不会重置 `$HOME` 之类的环境变量。当使用这个选项时，你可能还想在启动守护进程之前设置并导出 `HOME` 指向 `<user>` 的主目录，并确保该目录下的任何 Git 配置文件是 `<user>` 可以读取的。
+
+--enable=<服务>::
+--disable=<服务>::
+	在全站范围内默认启用/禁用该服务。 请注意，如果一个全站禁用的服务被标记为可重写，并且版本库用配置项启用了该服务，那么它仍然可以在每个版本库中启用。
+
+--allow-override=<服务>::
+--forbid-override=<服务>::
+	允许/禁止用每个版本库的配置来覆盖全站的默认值。 默认情况下，所有的服务都可以被覆盖。
+
+--[no-]informative-errors::
+	当信息性错误被打开时，git-daemon 会向客户端报告更多详细的错误，区分 "没有这样的仓库" 和 "仓库没有被导出" 这样的情况。这对客户端来说更方便，但可能会泄露未导出版本库的信息。 如果不启用信息性错误，所有错误都会向客户报告 "拒绝访问"。默认情况是 --no-informative-errors。
+
+--access-hook=<路径>::
+	每次客户端连接时，首先运行 <路径> 指定的外部命令，以服务名称（如 "upload-pack"）、仓库的路径、主机名（%H）、规范主机名（%CH）、IP 地址（%IP）和 TCP 端口（%P）作为其命令行参数。外部命令可以通过以非零状态退出来决定拒绝该服务（或通过以零状态退出来允许它）。 在做出这个决定时，它还可以查看 $REMOTE_ADDR 和 `$REMOTE_PORT` 环境变量来了解请求者的情况。
++
+外部命令可以选择在其标准输出中写入一行，在拒绝服务时作为错误信息发送给请求者。
+
+<目录>::
+	其余的参数提供了一个目录列表。如果指定了任何目录，那么 `git-daemon` 进程将只在所请求的目录包含在这些目录中时提供服务。如果指定了 `--strict-paths`，那么请求的目录必须与这些目录之一完全匹配。
+
+服务
+--
+
+这些服务可以通过该命令的命令行选项全局启用/禁用。 如果需要更精细的控制（例如，允许 'git archive' 只在守护进程所服务的几个选定的仓库中运行），可以使用每个仓库的配置文件来启用或禁用它们。
+
+upload-pack::
+	它为 'git fetch-pack' 和 'git ls-remote' 客户端服务。 它默认是启用的，但仓库可以通过设置 `daemon.uploadpack` 配置项为 `false` 来禁用它。
+
+upload-archive::
+	这为 'git archive --remote' 服务。 它默认是禁用的，但版本库可以通过设置 `daemon.uploadarch` 配置项为 `true` 来启用它。
+
+receive-pack::
+	它为 'git send-pack' 客户端服务，允许匿名推送。 它默认是禁用的，因为协议中没有认证（换句话说，任何人都可以推送任何东西到仓库，包括删除引用）。 这只适用于封闭的局域网环境，大家都很友好。 这个服务可以通过设置 `daemon.receivepack` 配置项为 `true` 来启用。
+
+实例
+--
+我们在 /etc/services 中假设如下::
++
+------------
+$ grep 9418 /etc/services
+git		9418/tcp		# Git 版本控制系统
+------------
+
+'git daemon' 作为 inetd 服务器::
+	要把 'git daemon' 设置为 inetd 服务，处理 `/pub/foo` 或 `/pub/bar` 内的任何仓库，在 `/etc/inetd` 中放入如下条目，全部放在一行：
++
+------------------------------------------------
+	git stream tcp nowait nobody  /usr/bin/git
+		git daemon --inetd --verbose --export-all
+		/pub/foo /pub/bar
+------------------------------------------------
+
+
+作为虚拟主机的 inetd 服务器的 'git daemon'::
+	要将 'git daemon' 设置为 inetd 服务，处理不同的虚拟主机 `www.example.com` 和 `www.example.org` 的仓库，在 `/etc/inetd` 中放置如下条目，全部在一行：
++
+------------------------------------------------
+	git stream tcp nowait nobody /usr/bin/git
+		git daemon --inetd --verbose --export-all
+		--interpolated-path=/pub/%H%D
+		/pub/www.example.org/software
+		/pub/www.example.com/software
+		/software
+------------------------------------------------
++
+在这个例子中，根级目录 `/pub` 将包含一个子目录，用于支持每个虚拟主机名。 此外，两台主机都简单地以 `git://www.example.com/software/repo.git` 的方式宣传仓库。 对于 1.4.0 之前的客户端，也可以从 `/software` 建立一个符号链接到相应的默认仓库。
+
+
+'git daemon' 作为虚拟主机的常规守护程序::
+	要把 'git daemon' 设置成一个普通的、非 inetd 的服务，处理基于 IP 地址的多个虚拟主机的存储库，可以像这样启动 daemon：
++
+------------------------------------------------
+	git daemon --verbose --export-all
+		--interpolated-path=/pub/%IP/%D
+		/pub/192.168.1.200/software
+		/pub/10.10.220.23/software
+------------------------------------------------
++
+在这个例子中，根级目录 `/pub` 将包含一个支持每个虚拟主机IP地址的子目录。 虽然仓库仍然可以通过主机名访问，但假设它们对应于这些 IP 地址。
+
+选择性地启用/禁用每个仓库的服务::
+	要启用 'git archive --remote' 并禁用 'git fetch'，在仓库的配置文件中要有以下内容（也就是在 `HEAD`、'refs' 和 'objects' 旁的 'config'文件）。
++
+----------------------------------------------------------------
+	[daemon]
+		uploadpack = false
+		uploadarch = true
+----------------------------------------------------------------
+
+
+环境变量
+----
+'git daemon' 将把 REMOTE_ADDR 设置为连接到它的客户端的 IP 地址，如果该 IP 地址是可用的。REMOTE_ADDR 将在执行服务时调用的钩子环境中可用。
+
+GIT
+---
+属于 linkgit:git[1] 文档

@@ -1,0 +1,345 @@
+git-clone(1)
+============
+
+NOM
+---
+git-clone - Clone un dépôt dans un nouveau répertoire
+
+
+SYNOPSIS
+--------
+[verse]
+'git clone' [--template=<répertoire-de-modèles>]
+	  [-l] [-s] [--no-hardlinks] [-q] [-n] [--bare] [--mirror]
+	  [-o <nom>] [-b <nom>] [-u <upload-pack>] [--reference <dépôt>]
+	  [--dissociate] [--separate-git-dir <répertoire-git>]
+	  [--depth <profondeur>] [--[no-]single-branch] [--no-tags]
+	  [--recurse-submodules[=<spéc-de-chemin>]] [--[no-]shallow-submodules]
+	  [--[no-]remote-submodules] [--jobs <n>] [--sparse] [--[no-]reject-shallow]
+	  [--filter=<filtre> [--also-filter-submodules]] [--] <dépôt>
+	  [<répertoire>]
+
+DESCRIPTION
+-----------
+
+Clone un dépôt dans un répertoire nouvellement créé, crée une branche de suivi à distance pour chaque branche du dépôt cloné (visible en utilisant `git branch --remotes`) et crée et extrait une branche initiale qui est dupliquée depuis la branche active actuelle du dépôt cloné.
+
+Après clonage, un simple `git fetch` sans argument va mettre à jour toutes les branches de suivi à distance, et `git pull` sans argument va en plus fusionner la branche master distante dans la branche master actuelle, si elle existe (ceci est inexact quand "--single-branch" est indiqué ; voir ci-dessous).
+
+Cette configuration par défaut est réalisée en créant des références aux sommets des branches distantes sous `refs/remotes/origin` et en initialisant les variables de configuration `remote.origin.url` et `remote.origin.fetch`.
+
+
+OPTIONS
+-------
+-l::
+--local::
+	Quand le dépôt à cloner est sur la machine locale, cette option court-circuite les mécanismes de transport « spécial Git » normaux et clone le dépôt en faisant une copie de HEAD et de tout ce qu'il y a dans les répertoires objects et refs. Les fichiers sous le répertoire `.git/objects/` sont liés physiquement si possible pour économiser l'espace disque.
++
+Si le dépôt est spécifié comme un chemin local (par exemple `/chemin/vers/le/dépôt`), c'est le comportement par défaut et --local ne sert à rien. Si le dépôt est spécifié par une URL, alors ce drapeau est ignoré (et l'optimisation du fait de localité n'est jamais utilisée). Spécifier `--no-local` permet de surcharger le comportement par défaut quand la forme `/chemin/vers/le/dépôt` est utilisée, et provoque l'utilisation de transport Git normal à la place.
++
+Si le répertoire `$GIT_DIR/objects` du dépôt a des liens symboliques ou est un lien symbolique, le clone échouera. C'est une mesure de sécurité pour empêcher la copie involontaire de fichiers en déréférençant les liens symboliques.
++
+*NOTE* : cette opération peut se dérouler avec une modification simultanée du dépôt source, similaire à l’exécution de `cp-r src dst` tout en modifiant `src`.
+
+--no-hardlinks::
+	Forcer le processus de clonage depuis un dépôt sur un système de fichier local à copier les fichiers sous le répertoire `.git\objects` au lieu d'utiliser des liens physiques. Ceci peut être voulu si vous souhaitez faire une copie de sauvegarde de votre dépôt.
+
+-s::
+--shared::
+	Quand le dépôt à cloner est sur la machine locale, au lieu d'utiliser des liens physiques, créer automatiquement `.git/objects/info/alternates` pour partager les objets du dépôt source. Le dépôt résultant démarre sans aucun objet qui lui soit propre.
++
+*NOTE* : c'est une opération potentiellement dangereuse ; *ne* l'utilisez *pas* à moins de comprendre ce qu'elle fait. Si vous clonez votre dépôt en utilisant cette option puis que vous supprimez des branches (ou utilisez toute autre commande Git qui élimine les références sur un commit existant) dans le dépôt source, certains objets peuvent ne plus être référencés (ou esseulés). Ces objets pourraient être supprimés lors d'opérations normales de Git (telles que `git commit`) qui appellent automatiquement `git maintenance --auto`. (Voir linkgit:git-maintenance[1].) Si ces objets sont supprimés et qu'ils étaient référencés dans un dépôt cloné, alors le dépôt cloné sera corrompu.
++
+Notez que lancer `git repack` sans l'option `--local` dans un dépôt cloné avec `--shared` va copier les objets depuis le dépôt source dans un paquet dans le répertoire cloné, éliminant de ce fait les économies d'espace disque de `clone --shared`. Par contre, il est possible de lancer `git gc`, qui utilise l'option `--local` par défaut.
++
+Si vous souhaitez casser la dépendance d'un dépôt cloné avec `--shared` à son dépôt source, vous pouvez simplement lancer `git repack -a` pour copier tous les objets depuis le dépôt source dans un paquet dans le dépôt cloné.
+
+--reference[-if-able] <dépôt>::
+	Si le dépôt référence est sur la machine locale, créer automatiquement `.git/objects/info/alternates` pour obtenir les objets depuis le dépôt référence. L'utilisation d'un dépôt déjà existant comme alternative nécessitera moins d'objets à copier depuis le dépôt à cloner, limitant les coûts de réseau et de stockage local. Avec l'utilisation de `--reference-if-able`, un répertoire inexistant est ignoré avec un message d'avertissement au lieu de faire échouer le clonage.
++
+*NOTE* : voir la NOTE pour l'option `--shared`, et aussi l'option `--dissociate`.
+
+--dissociate::
+	Emprunter les objets des dépôts référence spécifiés avec les options `--reference` seulement pour réduire les transferts réseau, et arrêter de les emprunter après la création d'un clone en créant les copies locales nécessaires des objets empruntés. Cette option peut aussi être utilisée lors d'un clonage local depuis un dépôt qui emprunte déjà des objets à un autre dépôt -- le nouveau dépôt va emprunter des objets au même dépôt, et cette option peut être utilisée pour arrêter l'emprunt.
+
+-q::
+--quiet::
+	Mode silencieux. L'avancement n'est pas affiché sur le flux d'erreur standard.
+
+-v::
+--verbose::
+	Mode verbeux. N'agit pas sur l'affichage de l'état d'avancement sur le flux d'erreur standard.
+
+--progress::
+	L'état d'avancement est affiché sur la sortie d'erreur standard quand elle est attachée à un terminal, à moins que `--quiet` soit spécifié. Ce drapeau force l'état d'avancement même si le flux d'erreur standard n'est pas dirigé vers un terminal.
+
+--server-option=<option>::
+	Transmettre la chaîne donnée au serveur lors d'une communication utilisant la version 2 du protocole. La chaîne donnée ne doit pas contenir de caractère NUL ou LF. La gestion par le serveur des options du serveur, y compris les options inconnues, est spécifique au serveur. Lorsque plusieurs `--server-option=<option>` sont donnés, ils sont tous envoyés à l'autre côté dans l'ordre indiqué sur la ligne de commande.
+
+-n::
+--no-checkout::
+	Aucune extraction de HEAD n'est effectuée après la fin du clonage.
+
+--[no-]reject-shallow::
+	Échouer si le dépôt source est un dépôt superficiel. La variable de configuration 'clone.rejectShallow' peut être utilisée pour spécifier la valeur par défaut.
+
+--bare::
+	Créer un dépôt Git « nu ». Cela signifie qu'au lieu de créer `<répertoire>` et de placer les fichiers administratifs dans `<répertoire>/.git`, faire de `<répertoire>` lui-même le `$GIT_DIR`. Cela implique évidemment l'option `--no-checkout` parce qu'il n'y a nulle part où extraire l'arbre de travail. De plus, les têtes de branches distantes sont également copiées directement dans les têtes de branches locales correspondantes, sans les préfixer de `refs/remotes/origin/`. Lorsque cette option est utilisée, ni les branches de suivi à distance ni les variables de configuration s'y rattachant ne sont créées.
+
+--sparse::
+	Employer une extraction clairsemée, avec seulement les fichiers dans le répertoire de plus haut niveau initialement présent. La commande linkgit:git-sparse-checkout[1] peut être utilisée pour agrandir le répertoire de travail si nécessaire.
+
+--filter=<spéc. du filtre>::
+	Utiliser la fonction de clonage partiel et demander que le serveur envoie un sous-ensemble d'objets accessibles selon un filtre d'objets donné. Lorsque l'on utilise `--filter`, le `<spéc-de-filtre>` fourni est utilisé pour le filtre de clonage partiel. Par exemple, `--filter=blob:none` filtrera tous les blobs (contenu des fichiers) jusqu'à ce que Git en ait besoin. De même, `--filter=blob:limit=<taille>` filtrera tous les blobs de taille au moins égale à `<taille>`. Pour plus de détails sur les spécifications de filtre, voir l'option `--filter` dans linkgit:git-rev-list[1].
+
+--also-filter-submodules::
+	Applique également le filtre de clonage partiel à tous les sous-modules du dépôt. Requiert `--filter` et `--recurse-submodules`. Ceci peut être activé par défaut en définissant l'option de configuration `clone.filterSubmodules`.
+
+--mirror::
+	Construire un miroir du dépôt source. Ceci implique `--bare`. Par rapport à `--bare`, `--mirror` fait correspondre non seulement les branches locales de la source sur les branches locales de la cible, mais également toutes les références (y compris les branches de suivi à distance, les notes, etc.) et elle définit une configuration de refspec telle que toutes ces références sont réécrites par un `git remote update` dans le dépôt cible.
+
+-o <nom>::
+--origin <nom>::
+	Au lieu d'utiliser le nom de distant `origin` pour suivre le dépôt amont, utiliser `<nom>`. Remplace `clone.defaultRemoteName` dans la configuration.
+
+-b <nom>::
+--branch <nom>::
+	Au lieu de pointer la HEAD nouvellement créée sur la branche pointée par la HEAD du dépôt cloné, pointer plutôt sur la branche `<nom>`. Dans un dépôt non-nu, c'est la branche qui sera extraite. `--branch` accepte aussi des étiquettes et détache alors la HEAD à ce commit dans le dépôt résultant.
+
+-u <upload-pack>::
+--upload-pack <upload-pack>::
+	Quand cette option est indiquée et que le dépôt à cloner est accédé via ssh, ceci spécifie un chemin différent de celui par défaut pour la commande lancée sur l'hôte distant.
+
+--template=<répertoire-de-modèles>::
+	Spécifier le répertoire depuis lequel les modèles vont être tirés ; (voir la section « RÉPERTOIRE DE MODÈLES » de linkgit:git-init[1].)
+
+-c <clé>=<valeur>::
+--config <clé>=<valeur>::
+	Définir une variable de configuration dans le dépôt nouvellement créé ; ceci prend effet immédiatement après que le dépôt est initialisé, mais avant que l'historique distant ne soit récupéré ou qu'un fichier soit extrait. La clé est dans le même format qu'attendu par linkgit:git-config[1] (par exemple, `core.eol=true`). Si des valeurs multiples sont fournies pour la même clé, chaque valeur sera écrite dans le fichier de configuration. Ceci sécurise, par exemple, l'ajout de spécificateurs de référence de récupération supplémentaires pour le dépôt distant d'origine.
++
+Du fait de limitations de l'implémentation actuelle, certaines variables de configuration ne prennent effet qu'après la première récupération ou la première extraction. Les variables de configuration connues pour ne pas prendre effet sont : `remote.<nom>.mirror` et `remote.<nom>.tagOpt`. Utilisez les options correspondantes `--mirror` et `--no-tags` à la place.
+
+--depth <profondeur>::
+	Créer un clone « superficiel » avec un historique tronqué au nombre spécifié de commits. Implique `--single-branch` à moins que `--no-single-branch` ne soit fourni pour récupérer les historiques proches des sommets de toutes les branches. Pour cloner des sous-modules de manière superficielle, passer aussi `--shallow-submodules`.
+
+--shallow-since=<date>::
+	Créer un clone superficiel avec un historique après le temps spécifié.
+
+--shallow-exclude=<révision>::
+	Créer un clone superficiel avec un historique, en excluant les commits joignables depuis une branche distante spécifiée ou une étiquette. Cette option peut être spécifiée plusieurs fois.
+
+--[no-]single-branch::
+	Cloner uniquement l'historique menant au sommet d'une seule branche, soit spécifiée par l'option `--branch`, soit la branche primaire sur laquelle la `HEAD` du distant pointe. Des récupérations subséquentes dans le dépôt résultant ne mettront à jour que la branche de suivi à distance de la branche pour laquelle cette option a été utilisée lors du clonage initial. Si la HEAD du dépôt distant ne pointait sur aucune branche quand le clonage `--single-branch` a été fait, aucune branche de suivi à distance n'est créée.
+
+--no-tags::
+	Ne cloner aucune étiquette et positionner `remote.<distant>.tagOpt=--no-tags` en configuration, de sorte que les futures opérations `git pull` et `git fetch` ne tireront aucune étiquette. Les récupérations explicites d'étiquette fonctionneront toujours (voir linkgit:git-fetch[1]).
++
+Peut être utilisé en conjonction avec `--single-branch` pour cloner et maintenir une branche sans autre référence qu'une unique branche clonée. C'est utile pour, par exemple, maintenir un minimum de clones de la branche par défaut d'un dépôt pour l'indexation de la recherche.
+
+--recurse-submodules[=<spéc de chemin>]::
+	Après création du clone, initialiser et cloner les sous-modules inclus à partir du spécificateur de chemin fourni. Si aucun spécificateur de chemin n'est fourni, tous les sous-modules sont initialisés et clonés. Cette option peut être spécifiée plus d'une fois pour des spécificateurs de chemins correspondant à des entrées différentes. Le clone résultant a la configuration `submodule.active` réglée sur le spécificateur de chemin fourni ou "." (qui signifie tous les sous-modules) si aucun spécificateur de chemin n'est fourni.
++
+Les sous-modules sont initialisés et clonés en utilisant leurs réglages par défaut. C'est équivalent à lancer `git submodule update --init --recursive <spéc de chemin>` immédiatement après la fin du clonage. Cette option est ignorée si le dépôt cloné n'a pas d'arbre de travail/d'extraction (c'est-à-dire si `--no-checkout`/`-n`, `--bare`, ou `--mirror` est fourni)
+
+--[no-]shallow-submodules::
+	Tous les sous-modules qui sont clonés seront superficiels avec une profondeur de 1.
+
+--[no-]remote-submodules::
+	Tous les sous-modules clonés utiliseront l'état de la branche de suivi à distance du sous-module pour mettre à jour le sous-module, plutôt que le SHA-1 enregistré par le superprojet. Équivalent à passer `--remote` à `git submodule update`.
+
+--separate-git-dir=<répertoire-git>::
+	Au lieu de placer le dépôt clone là où il est supposé être, placer le dépôt clone dans le répertoire spécifié, puis créer un lien symbolique Git indépendant du système de fichiers. Le résultat est un dépôt Git qui est séparé de son arbre de travail.
+
+--ref-format=<ref-format>::
+
+Spécifier le format de stockage de réf donné pour le dépôt. Les valeurs valides sont :
++
+
+
+[WARNING]
+====
+Missing `fr/ref-storage-format.txt`
+
+See original version for this content.
+====
+
+[]
+
+-j <n>::
+--jobs <n>::
+	Le nombre de sous-modules récupérés en même temps. Par défaut, l'option `submodule.fetchJobs`.
+
+<dépôt>::
+	Le dépôt (éventuellement distant) depuis lequel cloner. Voir les sections <<URLS, URL GIT>> ci-dessous pour plus d'information sur la spécification de dépôts.
+
+<répertoire>::
+	Le nom du nouveau répertoire dans lequel cloner. La partie « humaine » du dépôt source est utilisée si aucun répertoire n'est fourni explicitement (`dépôt` pour `/chemin/vers/un/dépôt.git` et `toto` pour `hôte.xz:toto/.git`). Cloner dans un répertoire existant n'est permis que si le répertoire en question est vide.
+
+--bundle-uri=<uri>::
+	Avant de récupérer depuis le distant, récupérer un colis à partir du `<uri>` donné et décompresser les données dans le dépôt local. Les références dans le colis seront stockées dans l'espace de nom caché `refs/bundle/*`. Cette option est incompatible avec `--depth`, `--shallow-since`, et `--shallow-exclude`.
+
+:git-clone: 1
+URL GIT[[URLS]]
+---------------
+
+En général, les URL contiennent une information sur le protocole de transport, l'adresse du serveur distant et le chemin vers le dépôt. En fonction du protocole de transport, certaines de ces informations peuvent être absentes.
+
+Git supporte les protocoles ssh, git, http et https (en plus, ftp et ftps peuvent être utilisés pour la récupération, mais ceux-ci sont inefficaces et déconseillés ; ne les utilisez pas).
+
+Le transport natif (c'est-à-dire l'URL git://) n'utilise pas d'authentification et ne devrait être utilisé qu'avec précaution sur des réseaux non sécurisés.
+
+Les syntaxes suivantes peuvent être utilisées avec eux :
+
+- ssh://{startsb}compte@{endsb}hôte.xz{startsb}:port{endsb}/chemin/du/dépôt.git/
+- git://hôte.xz{startsb}:port{endsb}/chemin/du/dépôt.git/
+- http{startsb}s{endsb}://hôte.xz{startsb}:port{endsb}/chemin/du/dépôt.git/
+- ftp{startsb}s{endsb}://hôte.xz{startsb}:port{endsb}/chemin/du/dépôt.git/
+
+Une syntaxe alternative de type scp peut aussi être utilisée pour le protocole ssh :
+
+- {startsb}compte@{endsb}hôte.xz:chemin/vers/le/dépôt.git/
+
+Cette syntaxe n'est reconnue que s'il n'y a pas de barre oblique devant les premiers deux-points. Cela permet de prendre en charge des chemins locaux qui contiendraient des deux-points. Par exemple, le chemin local `toto:titi` pourrait être spécifié comme un chemin absolu ou `./toto:titi` pour éviter d'être interprété comme une url ssh.
+
+Les protocoles ssh et git supportent en plus l'expansion ~utilisateur :
+
+- ssh://{startsb}compte@{endsb}hôte.xz{startsb}:port{endsb}/~{startsb}utilisateur{endsb}/chemin/du/dépôt.git/
+- git://hôte.xz{startsb}:port{endsb}/~{startsb}compte{endsb}/chemin/du/dépôt.git/
+- {startsb}compte@{endsb}hôte.xz:/~{startsb}compte{endsb}/chemin/du/dépôt.git/
+
+Pour les dépôts locaux, supportés aussi nativement par Git, les syntaxes suivantes sont aussi admises :
+
+- /chemin/du/dépôt.git/
+- \file:///chemin/du/dépôt.git/
+
+ifndef::git-clone[]
+Ces deux syntaxes sont à peu près équivalentes, à part lors d'un clonage, où la première implique l'option `--local`. Voir linkgit:git-clone[1] pour plus de détails.
+endif::git-clone[]
+
+ifdef::git-clone[]
+Ces deux syntaxes sont à peu près équivalentes, à part que la première implique l'option `--local`.
+endif::git-clone[]
+
+« git clone », « git fetch » et « git pull », mais pas « git push », acceptent également un fichier paquet approprié. Voir linkgit:git-bundle[1].
+
+Quand Git ne sait pas comment gérer un certain protocole, il essaie d'utiliser l'assistant de gestion de distant 'remote-<transport>', s'il existe. Pour requérir l'emploi d'un assistant spécifique, la syntaxe suivante peut être utilisée :
+
+- <transport>::<adresse>
+
+où <adresse> peut être un chemin, un serveur et chemin, ou une chaîne URL arbitraire reconnue par l'assistant de gestion de distant invoqué. Voir linkgit:gitremote-helpers[7] pour plus de détails.
+
+S'il y a un grand nombre de dépôts aux noms similaires et que vous souhaitez utiliser un format différent pour eux (de telle sorte que les URL que vous utiliserez seront réécrites en URL fonctionnelles), vous pouvez créer une section de configuration de la forme :
+
+------------
+	[url "<veritable-base-d-url>"]
+		insteadOf = <autre-base-d'URL>
+------------
+
+Par exemple, avec ceci :
+
+------------
+	[url "git://git.host.xz/"]
+		insteadOf = host.xz:/chemin/vers/
+		insteadOf = travail:
+------------
+
+une URL comme « travail:depot.git » ou « host.xz:/chemin/vers/depot.git » sera réécrite dans tout contexte qui requiert une URL en « git://git.host.xz/depot.git ».
+
+Si vous souhaitez réécrire les URL seulement pour pousser, vous pouvez créer une section de configuration de la forme :
+
+------------
+	[url "<veritable-base-d'URL>"]
+		pushInsteadOf = <autre-base-d-URL>
+------------
+
+Par exemple, avec ceci :
+
+------------
+	[url "ssh://exemple.org/"]
+		pushInsteadOf = git://exemple.org/
+------------
+
+une URL telle que « git://exemple.org/chemin/vers/le/depot.git » sera réécrite en « ssh://exemple.org/chemin/vers/le/depot.git » pour les poussées, mais les tirages utiliseront encore l'URL originale.
+[]
+
+EXEMPLES
+--------
+
+* Cloner depuis l'amont :
++
+------------
+$ git clone git://git.kernel.org/pub/scm/.../linux.git mon-linux
+$ cd mon-linux
+$ make
+------------
+
+
+* Créer un clone local qui emprunte depuis le répertoire actuel, sans rien extraire :
++
+------------
+$ git clone -l -s -n . ../copie
+$ cd ../copie
+$ git show-branch
+------------
+
+
+* Cloner depuis l'amont tout en empruntant depuis une répertoire local existant :
++
+------------
+$ git clone --reference /git/linux.git \
+	git://git.kernel.org/pub/scm/.../linux.git \
+	mon-linux
+$ cd mon-linux
+------------
+
+
+* Créer un dépôt nu pour publier les modifications :
++
+------------
+$ git clone --bare -l /home/proj/.git /pub/scm/proj.git
+------------
+
+CONFIGURATION
+-------------
+
+
+
+[WARNING]
+====
+Missing `fr/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/init.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/clone.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

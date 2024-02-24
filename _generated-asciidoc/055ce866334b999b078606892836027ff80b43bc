@@ -1,0 +1,167 @@
+git-receive-pack(1)
+===================
+
+名称
+--
+git-receive-pack - 接收推送到仓库的内容
+
+
+概述
+--
+[verse]
+'git receive-pack' <git-dir>
+
+描述
+--
+由 'git send-pack' 调用，并根据远程仓库提供的信息更新仓库。
+
+This command is usually not invoked directly by the end user. The UI for the protocol is on the 'git send-pack' side, and the program pair is meant to be used to push updates to a remote repository. For pull operations, see linkgit:git-fetch-pack[1].
+
+该命令允许在远程端创建并快速转发 sha1 refs（头/标签）（严格来说，运行 'git-receive-pack' 的是本地端，但对于坐在 send-pack 端的用户来说，它是在更新远程端）。 不明白吗？）
+
+文档 /howto 目录中还有其他使用更新和更新后钩子的实际例子。
+
+'git-receive-pack' 遵循 receive.denyNonFastForwards 配置选项，该选项会告诉它，如果引用的更新不是快速转发的，是否应拒绝更新。
+
+还有许多其他 receive.* 配置选项可用于调整其行为，参见 linkgit:git-config[1]。
+
+选项
+--
+<git-dir>::
+	要同步到的仓库。
+
+--http-backend-info-refs::
+	由 linkgit:git-http-backend[1] 使用，用于提供`$GIT_URL/info/refs?service=git-receive-pack`请求。参见 linkgit:git-upload-pack[1] 中的 `--http-backend-info-refs`。
+
+接收前钩子
+-----
+在更新任何引用之前，如果 $GIT_DIR/hooks/pre-receive 文件存在且可执行，则会无参数调用一次。 钩子的标准输入将为每个要更新的引用一行：
+
+       sha1-old SP sha1-new SP refname LF
+
+引用名值是相对于 $GIT_DIR 的；例如，主磁头的引用名值是 "refs/heads/master"。 每个引用名前面的两个 sha1 值是更新前后引用名的对象名称。 要创建的引用的 sha1-old 值应等于 0\{40}，而要删除的引用的 sha1-new 值应等于 0\{40}，否则 sha1-old 和 sha1-new 应是仓库中的有效对象。
+
+接受已签名的推送（参见 linkgit:git-push[1]）时，已签名的推送证书会保存在 blob 中，环境变量 `GIT_PUSH_CERT` 可以查看其对象名称。 示例参见 `post-receive` 钩子的描述。 此外，证书将使用 GPG 验证，验证结果将通过以下环境变量导出：
+
+`GIT_PUSH_CERT_SIGNER`::
+	签署推送证书的密钥所有者的姓名和电子邮件地址。
+
+`GIT_PUSH_CERT_KEY`::
+	签署推送证书的 GPG 密钥 ID。
+
+`GIT_PUSH_CERT_STATUS`::
+	推送证书的 GPG 验证状态，使用与 `git log` 系列命令（参见 linkgit:git-log[1]）的 `%G?` 格式相同的助记符。
+
+`GIT_PUSH_CERT_NONCE`::
+	进程要求签名者在推送证书中包含的 nonce 字符串。 如果该字符串与推送证书中 "nonce" 标头记录的值不一致，则可能表明该证书是有效的，但是从另一个 "git push" 会话中重放的。
+
+`GIT_PUSH_CERT_NONCE_STATUS`::
+`UNSOLICITED`;;
+	"git push --signed" sent a nonce when we did not ask it to send one.
+`MISSING`;;
+	"git push --signed" 不发送任何 nonce 头信息。
+`BAD`;;
+	"git push --signed" sent a bogus nonce.
+`OK`;;
+	"git push --signed" 没有发送任何 nonce 头信息。
+`SLOP`;;
+	"git push --signed" sent a nonce different from what we asked it to send now, but in a previous session. See `GIT_PUSH_CERT_NONCE_SLOP` environment variable.
+
+`GIT_PUSH_CERT_NONCE_SLOP`::
+	"git push --signed" sent a nonce different from what we asked it to send now, but in a different session whose starting time is different by this many seconds from the current session. Only meaningful when `GIT_PUSH_CERT_NONCE_STATUS` says `SLOP`. Also read about `receive.certNonceSlop` variable in linkgit:git-config[1].
+
+在更新任何引用名和执行任何快进检查之前，都会调用此钩子。
+
+如果预接收钩子以非零的退出状态退出，则不会执行更新，也不会调用更新、后接收和后更新钩子。 如果不支持更新，这将有助于快速退出。
+
+请参阅下文有关隔离环境的说明。
+
+更新钩子
+----
+在更新每个引用之前，如果 $GIT_DIR/hooks/update 文件存在且可执行，则每个引用都会调用一次该文件，其中包含三个参数：
+
+       $GIT_DIR/hooks/update refname sha1-old sha1-new
+
+引用名参数是相对于 $GIT_DIR 的；例如，主文件头的引用名是 "refs/heads/master"。 两个 sha1 参数分别是更新前后引用名的对象名称。 请注意，钩子是在引用名更新之前调用的，因此要么 sha1-old 是 0\{40}（意思是还没有这样的 ref），要么它应该与引用名中记录的一致。
+
+如果钩子不允许更新指定的引用，则应以非零状态退出。 否则，钩子将以 0 状态退出。
+
+成功执行此钩子（退出状态为零）并不能确保 ref 会被更新，这只是一个前提条件。 因此，使用此钩子发送通知（如电子邮件）不是一个好主意。 请考虑使用 post-receive 钩子。
+
+接收后钩子
+-----
+在所有引用被更新（或试图更新）后，如果有任何 引用更新成功，并且 $GIT_DIR/hooks/post-receive 文件存在且可执行，则将无参数调用一次。 钩子的标准输入将为每个成功更新的引用写一行：
+
+       sha1-old SP sha1-new SP refname LF
+
+引用名的值是相对于 $GIT_DIR 的；例如，主磁头的 refname 值是 "refs/heads/master"。 每个引用名前的两个 sha1 值是更新前后引用名的对象名称。 创建的引用的 sha1-old 值将等于 0\{40}，而删除的引用的 sha1-new 值将等于 0\{40}，否则 sha1-old 和 sha1-new 应该是仓库中的有效对象。
+
+在接受签名推送后，可以检查 `GIT_PUSH_CERT*` 环境变量，就像在 `pre-receive` 钩子中一样。
+
+使用这个钩子，就能轻松生成描述版本库更新的邮件。 本示例脚本会为每个引用发送一封邮件，列出推送到仓库的提交，并将签名良好的推送证书记录到日志服务中：
+
+----
+#!/bin/sh
+# 发送提交更新的信息
+while read oval nval ref
+do
+	if expr "$oval" : '0*$' >/dev/null
+	then
+		echo "Created a new ref, with the following commits:"
+		git rev-list --pretty "$nval"
+	else
+		echo "New commits:"
+		git rev-list --pretty "$nval" "^$oval"
+	fi |
+	mail -s "Changes to ref $ref" commit-list@mydomain
+done
+# 记录已经签署的推送证书如果
+if test -n "${GIT_PUSH_CERT-}" && test ${GIT_PUSH_CERT_STATUS} = G
+then
+	(
+		echo expected nonce is ${GIT_PUSH_NONCE}
+		git cat-file blob ${GIT_PUSH_CERT}
+	) | mail -s "push certificate from $GIT_PUSH_CERT_SIGNER" push-log@mydomain
+fi
+exit 0
+----
+
+该钩子调用的退出代码将被忽略，但如果退出代码为非零，则会生成错误信息。
+
+请注意，当该钩子运行时，引用名有可能没有 sha1-new。 如果在 'git-receive-pack' 更新引用之后，但在钩子评估之前，其他用户修改了引用，就很容易发生这种情况。 建议钩子依赖 sha1-new 而不是引用名的当前值。
+
+更新后钩子
+-----
+在所有其他处理之后，如果至少有一个引用被更新，并且 $GIT_DIR/hooks/post-update 文件存在且可执行，那么 post-update 就会被调用，并显示已更新的引用列表。 这可用于执行任何仓库范围内的清理任务。
+
+该钩子调用的退出代码将被忽略；此时 'git-receive-pac' 唯一要做的就是退出。
+
+例如，如果仓库已打包并通过哑传输提供服务，则可使用此钩子运行 `git update-server-info`。
+
+----
+#!/bin/sh
+exec git update-server-info
+----
+
+
+隔离环境
+----
+
+当 `receive-pack` 接收对象时，它们会被放置到 `$GIT_DIR/objects` 目录中的临时 “隔离” 目录，只有在 `pre-receive` 钩子完成后才会迁移到主对象存储区。如果在此之前推送失败，临时目录将被完全删除。
+
+这有一些用户可见的效果和注意事项：
+
+  1. 由于传入数据包问题、对象丢失或由于 `pre-receive` 钩子而导致的推送失败不会在磁盘上留下任何数据。这通常有助于防止重复失败的推送占满磁盘，但会增加调试难度。
+
+  2. 任何由 `pre-receive` 钩子创建的对象都将在隔离区目录中创建（只有在成功时才会迁移）。
+
+  3. `pre-receive` 钩子不得更新任何引用以指向被隔离的对象。访问版本库的其他程序将无法看到这些对象（如果预接收钩子失败，这些引用就会损坏）。为了安全起见，任何来自 `pre-receive` 钩子的引用更新都会被自动拒绝。
+
+
+参见
+--
+linkgit:git-send-pack[1], linkgit:gitnamespaces[7]
+
+GIT
+---
+属于 linkgit:git[1] 文档

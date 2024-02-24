@@ -1,0 +1,249 @@
+git-notes(1)
+============
+
+名称
+--
+git-notes - 添加或查看对象注释
+
+概述
+--
+[verse]
+'git notes' [list [<object>]]
+'git notes' add [-f] [--allow-empty] [--[no-]separator | --separator=<paragraph-break>] [--[no-]stripspace] [-F <file> | -m <msg> | (-c | -C) <object>] [<object>]
+'git notes' copy [-f] ( --stdin | <from-object> [<to-object>] )
+'git notes' append [--allow-empty] [--[no-]separator | --separator=<paragraph-break>] [--[no-]stripspace] [-F <file> | -m <msg> | (-c | -C) <object>] [<object>]
+'git notes' edit [--allow-empty] [<object>] [--[no-]stripspace]
+'git notes' show [<object>]
+'git notes' merge [-v | -q] [-s <strategy> ] <notes-ref>
+'git notes' merge --commit [-v | -q]
+'git notes' merge --abort [-v | -q]
+'git notes' remove [--ignore-missing] [--stdin] [<object>...]
+'git notes' prune [-n] [-v]
+'git notes' get-ref
+
+
+描述
+--
+添加、移除或读取附加在对象上的注释，而不影响对象本身。
+
+默认情况下，注释被保存在 `refs/notes/commits` 中，并且可以覆盖此默认设置。请参阅下面的 OPTIONS、CONFIGURATION 和 ENVIRONMENT 部分。如果该引用不存在，当首次需要存储注释时，它将被静默地创建。
+
+注释的一个典型用途是在不改变提交本身的情况下补充提交信息。注释可以通过 "git log "与原始提交信息一起显示。为了将这些注释与保存在提交对象中的消息区分开来，注释会像消息一样缩进，在未缩进的一行后面写上 "注释（<参考名称>）："（或 "注释："用于`参考/注释/提交`）。
+
+注释也可以通过使用`git format-patch`选项添加到补丁中，`--notes`。这样的注释会作为补丁注释添加在三个破折号的分隔线之后。
+
+To change which notes are shown by 'git log', see the "notes.displayRef" discussion in <<CONFIGURATION>>.
+
+参见 "notes.rewrite.<command>"配置，以了解在重写提交的命令中携带笔记的方法。
+
+
+次级单位
+----
+
+list::
+	列出给定对象的注释对象。如果没有给定对象，则显示所有注解对象及其注解的对象的列表（格式为"<注解对象><注解对象>"）。 如果没有给出子命令，这是默认的子命令。
+
+add::
+	Add notes for a given object (defaults to HEAD). Abort if the object already has notes (use `-f` to overwrite existing notes). However, if you're using `add` interactively (using an editor to supply the notes contents), then - instead of aborting - the existing notes will be opened in the editor (like the `edit` subcommand). If you specify multiple `-m` and `-F`, a blank line will be inserted between the messages. Use the `--separator` option to insert other delimiters.
+
+copy::
+	将第一个对象的注释复制到第二个对象上（默认为HEAD）。如果第二个对象已经有注解，或者第一个对象没有注解，则放弃（使用-f将现有注解覆盖到第二个对象）。这个子命令等同于。`git notes add [-f] -C $(git notes list <from-object>) <to-object>`。
++
+在`--stdin`模式下，采取格式为
++
+----------
+<from-object> SP <to-object> [ SP <rest> ] LF
+----------
++
+在标准输入中，将每个<from-object>中的注释复制到相应的<to-object>中。（可选的`<rest>`被忽略，以便命令可以读取给`post-rewrite`钩的输入）。
+
+append::
+	将 `-m` 或 `-F` 选项指定的新信息附加到现有注释中，或将不存在的信息作为新注释添加到对象中（默认为 HEAD）。 当添加到现有注释时，每条新信息前都会添加一个空行作为段间分隔符。 分隔符可使用 `--separator` 选项自定义。
+
+edit::
+	编辑一个给定对象的注释（默认为HEAD）。
+
+show::
+	显示一个给定对象的注释（默认为HEAD）。
+
+merge::
+	将给定的注释参考文献合并到当前的注释参考文献中。 这将尝试把给定的注释（称为 "远程"）自合并基础（如果有的话）以来所做的修改合并到当前的注释（称为 "本地"）。
++
+如果出现冲突，并且没有给出自动解决冲突笔记的策略（见 "NOTES MERGE STRATEGIES "一节），就会使用 "手动 "解决器。这个解决方法在一个特殊的工作树（`.git/NOTES_MERGE_WORKTREE`）中检查出冲突的笔记，并指示用户手动解决那里的冲突。 完成后，用户可以用 "git notes merge --commit "最终完成合并，或者用 "git notes merge --abort "中止合并。
+
+remove::
+	删除给定对象的注释（默认为HEAD）。当从命令行给出零或一个对象时，这相当于给`edit`子命令指定一个空的注释信息。
+
+prune::
+	删除所有不存在/无法到达的对象的注释。
+
+get-ref::
+	打印当前的注释参考。这提供了一个简单的方法来检索当前的笔记参考文献（例如从脚本中）。
+
+选项
+--
+-f::
+--force::
+	当向一个已经有注释的对象添加注释时，覆盖现有的注释（而不是中止）。
+
+-m <消息>::
+--message=<msg>::
+	Use the given note message (instead of prompting). If multiple `-m` options are given, their values are concatenated as separate paragraphs. Lines starting with `#` and empty lines other than a single line between paragraphs will be stripped out. If you wish to keep them verbatim, use `--no-stripspace`.
+
+-F <文件>::
+--file=<文件>::
+	Take the note message from the given file. Use '-' to read the note message from the standard input. Lines starting with `#` and empty lines other than a single line between paragraphs will be stripped out. If you wish to keep them verbatim, use `--no-stripspace`.
+
+-C <对象>::
+--reuse-message=<object>::
+	Take the given blob object (for example, another note) as the note message. (Use `git notes copy <object>` instead to copy notes between objects.). By default, message will be copied verbatim, but if you wish to strip out the lines starting with `#` and empty lines other than a single line between paragraphs, use with`--stripspace` option.
+
+-c <对象>::
+--reedit-message=<object>::
+	像'-C'一样，但有了`-c'就会调用编辑器，这样用户就可以进一步编辑注释信息。
+
+--allow-empty::
+	允许存储一个空的笔记对象。默认行为是自动删除空笔记。
+
+--[no-]separator, --separator=<paragraph-break>::
+	指定用于自定义段落间分隔符的字符串（根据需要在末尾添加换行符）。如果使用 `--no-separator`，则段落之间不添加分隔符。 默认为空行。
+
+--[no-]stripspace::
+	Strip leading and trailing whitespace from the note message. Also strip out empty lines other than a single line between paragraphs. Lines starting with `#` will be stripped out in non-editor cases like `-m`, `-F` and `-C`, but not in editor case like `git notes edit`, `-c`, etc.
+
+--ref <ref>::
+	操纵<ref>中的笔记树。 这覆盖了`GIT_NOTES_REF`和 "core.notesRef "配置。 当Ref以`refs/notes/`开始时，指定完整的Ref名称；当它以`notes/`开始时，`refs/`，否则`refs/notes/`前缀，形成Ref的全名。
+
+--ignore-missing::
+	不要认为请求从一个没有附加注释的对象上删除注释是一个错误。
+
+--stdin::
+	还可以从标准输入中读取对象名称来删除注释（你没有理由不把它与命令行的对象名称结合起来）。
+
+-n::
+--dry-run::
+	不要删除任何东西；只是报告其注释将被删除的对象名称。
+
+-s <strategy>::
+--strategy=<strategy>::
+	合并笔记时，使用给定的策略解决笔记冲突。以下策略是被认可的。"手动"（默认）、"我们的"、"他们的"、"联合 "和 "cat_sort_uniq"。 这个选项覆盖了 "notes.mergeStrategy "的配置设置。 关于每种笔记合并策略的更多信息，请看下面的 "笔记合并策略 "部分。
+
+--commit::
+	最终确定一个正在进行的'git notes merge'。当您解决了'git notes merge'存储在.git/NOTES_MERGE_WORKTREE中的冲突后，使用此选项。这将修正由'git notes merge'创建的部分合并提交（存储在.git/NOTES_MERGE_PARTIAL中），加入.git/NOTES_MERGE_WORKTREE中的注释。存储在 .git/NOTES_MERGE_REF 符号参考中的注释会被更新到结果提交中。
+
+--abort::
+	中止/重置正在进行的 "git笔记合并"，即有冲突的笔记合并。这只是删除了所有与笔记合并有关的文件。
+
+-q::
+--quiet::
+	合并笔记时，要安静地操作。
+
+-v::
+--verbose::
+	当合并笔记时，要更加详细。 当修剪注释时，报告所有被删除注释的对象名称。
+
+
+讨论
+--
+
+提交注释是包含关于一个对象的额外信息（通常是补充提交信息的信息）的 blobs。 这些blobs取自注释参考。 一个注释参考通常是一个包含 "文件 "的分支，这些文件的路径是它们所描述的对象的名称，出于性能的考虑，还包括一些目录分隔符 footnote:[允许的路径名有'bf'`/`'fe'`/`'30'`/`'...`/`'680d5a...'的形式：一串由两个十六进制数字组成的目录名，后面是一个带有其余对象ID的文件名。]
+
+每一个笔记的变化都会在指定的笔记参考号上创建一个新的提交。 因此，你可以通过调用，例如，`git log -p notes/commits`，来检查笔记的历史。 目前，提交信息只记录了哪个操作触发了更新，而提交者的身份则根据通常的规则确定（见 linkgit:git-commit[1]）。 这些细节在未来可能会发生变化。
+
+也允许注释直接指向树状对象，在这种情况下，可以用`git log -p -g <refname>`读取注释的历史。
+
+
+注释 合并策略
+-------
+
+默认的笔记合并策略是 "手动"，它在一个用于解决笔记冲突的特殊工作树（`.git/NOTES_MERGE_WORKTREE`）中检查出冲突的笔记，并指示用户在该工作树中解决冲突。 完成后，用户可以用 "git notes merge --commit "最终完成合并，或者用 "git notes merge --abort "中止合并。
+
+用户可以使用-s/--strategy选项或相应地配置notes.mergeStrategy，从以下内容中选择一个自动合并策略。
+
+"我们的 "自动解决冲突的注释，支持本地版本（即当前的注释参考）。
+
+"他们的 "自动解决笔记冲突，有利于远程版本（即给定的笔记参考文献被合并到当前的笔记参考文献中）。
+
+"union "通过串联本地和远程版本自动解决注释冲突。
+
+"cat_sort_uniq "与 "union "类似，但除了连接本地和远程版本之外，这个策略还对结果行进行排序，并从结果中删除重复的行。这相当于对本地和远程版本应用 "cat | sort | uniq "shell流水线。如果笔记是基于行的格式，希望在合并结果中避免重复的行，那么这个策略就很有用。 请注意，如果本地或远程版本在合并前包含重复的行，这些行也会被这个笔记合并策略所删除。
+
+
+实例
+--
+
+你可以使用注释来添加提交时无法获得的信息的注释。
+
+------------
+$ git notes add -m 'Tested-by: Johannes Sixt <j6t@kdbg.org>' 72a144e2
+$ git show -s 72a144e
+[...]
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+注意事项。
+    测试者： Johannes Sixt <j6t@kdbg.org>
+------------
+
+原则上，笔记是一个普通的Git blob，任何种类的（非）格式都可以接受。 你可以使用 "git hash-object "从任意文件中二进制安全地创建注释。
+
+------------
+$ cc *.c
+$ blob=$(git hash-object -w a.out)
+$ git notes --ref=built add --allow-empty -C "$blob" HEAD
+------------
+
+(你不能简单地使用`git notes --ref=built add -F a.out HEAD`，因为这不是二进制安全的。) 当然，用'git log'来显示非文本格式的笔记没有什么意义，所以如果你使用这样的笔记，你可能需要写一些特殊用途的工具来对它们做一些有用的事情。
+
+
+[[CONFIGURATION]]
+配置
+--
+
+core.notesRef::
+	读取和操作的注释，而不是`refs/notes/commits`。 必须是一个不简略的参考文献名称。 这个设置可以通过环境和命令行来覆盖。
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/includes/cmd-config-section-rest.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/notes.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+环境变量
+----
+
+`GIT_NOTES_REF`::
+	从哪个参考文献来操作笔记，而不是`refs/notes/commits`。 这覆盖了`core.notesRef'的设置。
+
+`GIT_NOTES_DISPLAY_REF`::
+	以冒号为界的参考文献或globs列表，表示除了默认的`core.notesRef`或`GIT_NOTES_REF`之外，在显示提交信息时要从哪些参考文献读取。 这取代了`notes.displayRef`的设置。
++
+对于不存在的 refs 将会发出警告，但是不匹配任何 refs 的 glob 会被默默地忽略。
+
+`GIT_NOTES_REWRITE_MODE`::
+	在重写过程中复制注释时，如果目标提交已经有一个注释，该如何处理。 必须是`overwrite`, `concatenate`, `cat_sort_uniq`, 或 `ignore`之一。 这覆盖了`core.rewriteMode`的设置。
+
+`GIT_NOTES_REWRITE_REF`::
+	当重写提交时，要从原始提交中复制哪些注释到重写的提交中。 必须是一个以冒号分隔的 refs 或 globs 列表。
++
+如果环境中没有设置，要复制的笔记列表取决于`notes.rewrite.<command>`和`notes.rewriteRef`设置。
+
+GIT
+---
+属于 linkgit:git[1] 文档

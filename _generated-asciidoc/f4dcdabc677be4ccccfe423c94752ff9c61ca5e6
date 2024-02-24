@@ -1,0 +1,119 @@
+git-credential(1)
+=================
+
+NAME
+----
+git-credential – Abrufen und Speichern von Zugangsdaten von Benutzern
+
+ÜBERSICHT
+---------
+------------------
+'git credential' (fill|approve|reject)
+------------------
+
+BESCHREIBUNG
+------------
+
+Git verfügt über eine interne Schnittstelle zum Speichern und Abrufen von Zugangsdaten, die von systemeigenen Assistenten bereitgestellt werden. Darüber hinaus wird der Benutzer zur Eingabe von Benutzernamen und Passwörtern aufgefordert. Der Befehl git-credential macht diese Schnittstelle für Skripte zugänglich, die Anmeldedaten auf die gleiche Weise wie Git abrufen, speichern oder zur Eingabe von Anmeldedaten auffordern möchten. Das Design dieser skriptfähigen Schnittstelle modelliert die interne C-API; siehe credential.h für weitere Hintergrundinformationen zu den Konzepten.
+
+git-credential benutzt eine „Funktions“-Option auf der Kommandozeile (entweder `fill`, `approve` oder `reject`) und findet eine Credential-Beschreibung auf stdin (siehe <<IOFMT,INPUT/OUTPUT FORMAT>>).
+
+Falls die Funktion `fill` ist, wird git-credential versuchen, der Beschreibung die Attribute „username“ und „password“ hinzuzufügen, indem es die Konfigurationsdateien ausliest, die Hilfsprogramme der konfigurierten Credentials kontaktiert oder den Benutzer abfragt. Die Attribute „username“ und „password“ der Credential-Information werden dann zusammen mit den bereits vorhandenen Attributen nach stdout ausgegeben.
+
+Falls die Funktion `approve` (genehmigt) ist, wird git-credential die Beschreibung an alle konfigurierten Credential-Hilfsprogramme senden, die das Credential zur späteren Wiederverwendung abspeichern können.
+
+Wenn die Aktion `reject` (ablehnen) ist, dann übermittelt git-credential die Information an alle konfigurierten Credential-Hilfsprogramme, die jedes der gespeicherten Credentials, die der Beschreibung entsprechen wieder löschen können.
+
+Falls die Operation `approve` oder `reject` ist, sollte keine Meldung ausgegeben werden.
+
+TYPISCHE ANWENDUNG VON GIT-CREDENTIAL
+-------------------------------------
+
+Eine Anwendung, die git-credential nutzt, wird typischerweise `git credential`, wie in den folgenden Schritten beschrieben, verwenden:
+
+  1. Eine kontextabhängige Credential-Beschreibung erstellen.
++
+Wenn wir z.B. ein Passwort für `https://example.com/foo.git` benötigen, könnten wir die folgende Credential-Beschreibung erstellen (vergessen Sie nicht die Leerzeile am Ende; sie teilt `git credential` mit, dass die Eingabe der Informationen abgeschlossen ist):
+
+	 protocol=https
+	 host=example.com
+	 path=foo.git
+
+  2. Fordern Sie git-credential auf, dieser Beschreibung einen Benutzernamen und ein Passwort zuzuordnen. Dafür wird `git-credential fill` ausgeführt, wobei die Beschreibung aus Schritt (1) in die Standardeingabe übernommen wird. Die vollständige Beschreibung des Credentials (einschließlich des Credentials an sich, d.h. des Benutzernamens und des Passwortes) wird wie bei der Standardausgabe erzeugt:
+
+	protocol=https
+	host=example.com
+	username=bob
+	password=secr3t
++
+Meistens bedeutet dies, dass die in der Eingabe angegebenen Attribute in der Ausgabe wiederholt werden, aber Git kann auch die Beschreibung des Credentials modifizieren, z.B. durch Entfernen des `path`-Attributs, wenn das Protokoll HTTP(s) ist und `credential.useHttpPath` auf „false“ gesetzt ist.
++
+Falls `git credential` das Passwort kannte, hat der Anwender in diesem Schritt möglicherweise kein Passwort eingegeben (der User kann stattdessen ein Passwort eingegeben haben, um die Keychain zu entsperren oder es wurde keine Benutzerinteraktion durchgeführt, wenn der Schlüsselbund bereits entsperrt war), bevor er `password=secr3t` zurückgab.
+
+  3. Rufen Sie mit dem Zugangscode (z.B. mit dem Benutzernamen und dem Passwort aus Schritt (2)) die URL auf und prüfen Sie, ob sie akzeptiert wird.
+
+  4. Meldet den Erfolg oder Misserfolg des Passworts. Wenn der Zugangscode den erfolgreichen Abschluss der Operation erlaubt hat, kann er mit dem Vermerk „approve“ versehen werden, um `git credential` mitzuteilen, dass er bei seinem nächsten Aufruf wieder verwendet werden soll. Falls die Zugangsberechtigung während der Operation zurückgewiesen wurde, verwenden Sie die Option „reject“, so dass `git credential` bei dem nächsten Aufruf nach einem neuen Passwort fragt. In beiden Fällen sollte `git credential` mit der in Schritt (2) erhaltenen Beschreibung der Anmeldeinformationen (die auch die in Schritt (1) angegebenen enthalten) versehen werden.
+
+[[IOFMT]]
+EIN-/AUSGABE-FORMAT
+-------------------
+
+`git credential` liest und/oder schreibt (abhängig von der verwendeten Aktion) Credential-Informationen in seine Standard-Ein-/Ausgabe. Diese Informationen können entweder den Schlüsseln entsprechen, für welche die `git credential` die Zugangsdaten erhalten soll (z.B. Host, Protokoll, Pfad) oder den tatsächlich zu erhaltenden Zugangsdaten (Benutzername/Passwort).
+
+Der Zugangscode wird in ein Set von festgelegten Attributen aufgeteilt, ein Attribut pro Zeile. Jedes Attribut wird durch ein Schlüssel-Wert-Paar angegeben, getrennt durch ein `=` (Gleichheitszeichen), gefolgt von einem Zeilenumbruch.
+
+Der Schlüssel kann beliebige Bytes außer `=`, Zeilenumbruch oder NUL enthalten. Der Wert kann beliebige Bytes außer Zeilenumbruch oder NUL enthalten.
+
+Attributes with keys that end with C-style array brackets `[]` can have multiple values. Each instance of a multi-valued attribute forms an ordered list of values - the order of the repeated attributes defines the order of the values. An empty multi-valued attribute (`key[]=\n`) acts to clear any previous entries and reset the list.
+
+In all cases, all bytes are treated as-is (i.e., there is no quoting, and one cannot transmit a value with newline or NUL in it). The list of attributes is terminated by a blank line or end-of-file.
+
+Git beherrscht die folgenden Attribute:
+
+`protocol`::
+
+	Das Protokoll, für das die Anmeldeinformationen verwendet werden sollen (z.B. `https`).
+
+`host`::
+
+	Der Remote-Hostname für eine Netzwerkanmeldung. Dazu gehört auch die Port-Nummer, falls eine festgelegt wurde (z.B. „example.com:8088“).
+
+`path`::
+
+	Der Pfad, mit dem das Credential verwendet wird. Wenn Sie z.B. auf ein entferntes https-Repository zugreifen, ist dies der Pfad des Repositorys auf dem Server.
+
+`username`::
+
+	Der Benutzername der Zugangsberechtigung, falls wir bereits einen haben (z.B. von einer URL, der Konfiguration, dem Benutzer oder von einem zuvor ausgeführten Helper).
+
+`password`::
+
+	Das Passwort für das Credential, falls wir es hinterlegen wollen.
+
+`password_expiry_utc`::
+
+	Generated passwords such as an OAuth access token may have an expiry date. When reading credentials from helpers, `git credential fill` ignores expired passwords. Represented as Unix time UTC, seconds since 1970.
+
+`oauth_refresh_token`::
+
+	An OAuth refresh token may accompany a password that is an OAuth access token. Helpers must treat this attribute as confidential like the password attribute. Git itself has no special behaviour for this attribute.
+
+`url`::
+
+	Wenn dieses spezielle Attribut von `git credential` ausgewertet wird, dann wird der Wert als URL geparst und so behandelt, als ob seine Bestandteile ausgelesen würden (z.B. wird sich `url=https://example.com` so verhalten, als ob `protocol=https` und `host=example.com` bereitgestellt sind). Auf diese Weise können Aufrufer vermeiden, URLs selbst zu parsen.
++
+Beachten Sie, dass die Angabe eines Protokolls obligatorisch ist, und wenn die URL keinen Hostnamen angibt (z. B. "cert:////pfad/zur/Datei"), enthält der Zugangscode ein Hostname-Attribut, dessen Wert eine leere Zeichenfolge ist.
++
+Komponenten, die in der URL fehlen (z.B. gibt es im obigen Beispiel keinen Benutzernamen), werden nicht gesetzt.
+
+`wwwauth[]`::
+
+	When an HTTP response is received by Git that includes one or more 'WWW-Authenticate' authentication headers, these will be passed by Git to credential helpers.
++
+Each 'WWW-Authenticate' header value is passed as a multi-valued attribute 'wwwauth[]', where the order of the attributes is the same as they appear in the HTTP response. This attribute is 'one-way' from Git to pass additional information to credential helpers.
+
+Unrecognised attributes are silently discarded.
+
+GIT
+---
+Teil der linkgit:git[1] Suite

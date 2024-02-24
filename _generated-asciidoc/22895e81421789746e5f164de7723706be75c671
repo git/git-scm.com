@@ -1,0 +1,276 @@
+git-cvsserver(1)
+================
+
+名称
+--
+git-cvsserver - Git 的 CVS 服务器模拟器
+
+概述
+--
+
+SSH:
+
+[verse]
+export CVS_SERVER="git cvsserver"
+'cvs' -d :ext:user@server/path/repo.git co <HEAD 名称>
+
+pserver (/etc/inetd.conf):
+
+[verse]
+无人值守的 cvspserver tcp 流服务器 /usr/bin/git-cvsserver git-cvsserver pserver
+
+用法：
+
+[verse]
+'git-cvsserver' [<多个选项>] [pserver|server] [<目录> ...]
+
+描述
+--
+
+该程序是 Git 的 CVS 仿真层。
+
+它的功能性很强。然而，并非所有方法都能实现，而对于那些已实现的方法，并非所有开关都能实现。
+
+测试使用 CLI CVS 客户端和 Eclipse CVS 插件进行。大多数功能在这两个客户端上都能正常运行。
+
+选项
+--
+
+All these options obviously only make sense if enforced by the server side. They have been implemented to resemble the linkgit:git-daemon[1] options as closely as possible.
+
+--base-path <路径>::
+在请求的 CVSROOT 前加上 ‘路径’
+
+--strict-paths::
+不允许递归到子目录中
+
+--export-all::
+不要在配置中检查 `gitcvs.enabled`。如果要使用此选项，还必须指定允许使用的目录列表（见下文）。
+
+-V::
+--version::
+打印版本信息并退出
+
+-h::
+-H::
+--help::
+打印使用信息并退出
+
+<目录>::
+其余参数提供了一个目录列表。如果没有给出目录，则允许所有目录。除非指定了 `--export-all`，否则这些目录中的仓库仍需要使用 `gitcvs.enabled` 配置选项。
+
+局限
+--
+
+CVS 客户端不能标记、分支或执行 Git 合并。
+
+'git-cvsserver' 将 Git 分支映射到 CVS 模块。这与大多数 CVS 用户的预期大相径庭，因为在 CVS 中，模块通常代表一个或多个目录。
+
+安装
+--
+
+1. 如果要通过 pserver 提供 CVS 访问，请在 /etc/inetd.conf 中添加一行，如
++
+--
+------
+   cvspserver stream tcp nowait nobody git-cvsserver pserver
+
+------
+注意：有些 inetd 服务器允许您独立于 argv[0] 的值（即程序假定执行的名称）指定可执行文件的名称。在这种情况下，/etc/inetd.conf 中的正确行应如下所示
+
+------
+   cvspserver stream tcp nowait nobody /usr/bin/git-cvsserver git-cvsserver pserver
+
+------
+
+pserver 默认只提供匿名访问。要提交您必须创建的 pserver 账户，只需在您希望 cvsserver 允许写入的软件源的配置文件中添加 gitcvs.authdb 设置即可，例如:
+
+------
+
+   [gitcvs]
+	authdb = /etc/cvsserver/passwd
+
+------
+例如，这些文件的格式是用户名，然后是加密密码:
+
+------
+   myuser:sqkNi8zPf01HI
+   myuser:$1$9K7FzU28$VfF6EoPYCJEYcVQwATgOP/
+   myuser:$5$.NqmNH1vwfzGpV8B$znZIcumu1tNLATgV2l6e1/mY8RzhUDHMOaVOeL1cxV3
+------
+您可以使用 Apache 自带的 'htpasswd' 工具来创建这些文件，但只能使用 -d 选项（如果您的系统支持 -B）。
+
+最好使用在您的平台上管理密码哈希创建的特定系统实用程序（例如 Linux 中的 mkpasswd、OpenBSD 中的 encrypt 或 NetBSD 中的 pwhash），然后将其粘贴到正确的位置。
+
+然后通过 pserver 方法提供密码，例如:
+------
+   cvs -d:pserver:someuser:somepassword@server:/path/repo.git co <HEAD 名>
+------
+SSH 访问无需特殊设置，只需在 PATH 中安装 Git 工具即可。如果客户端不接受 CVS_SERVER 环境变量，可以将 'git-cvsserver' 更名为 `cvs`。
+
+注意：较新的 CVS 版本（>= 1.12.11）也支持直接在 CVSROOT 中指定 CVS_SERVER，如
+
+------
+   cvs -d ":ext;CVS_SERVER=git cvsserver:user@server/path/repo.git" co <HEAD 名称>
+------
+This has the advantage that it will be saved in your 'CVS/Root' files and you don't need to worry about always setting the correct environment variable. SSH users restricted to 'git-shell' don't need to override the default with CVS_SERVER (and shouldn't) as 'git-shell' understands `cvs` to mean 'git-cvsserver' and pretends that the other end runs the real 'cvs' better.
+--
+2. 对于希望从 CVS 访问的每个仓库，都需要在仓库中编辑配置并添加以下部分。
++
+--
+------
+   [gitcvs]
+        enabled=1
+        # 可选项，用于调试
+	logFile=/path/to/logfile
+
+------
+注意：需要确保每个调用 'git-cvsserver' 的用户都有写入日志文件和数据库的权限（参见 <<dbbackend,数据库后台>>）。如果要通过 SSH 提供写访问权限，用户当然也需要有写访问 Git 仓库本身的权限。
+
+你还需要确保每个仓库都是 "裸仓库"（没有 Git 索引文件），这样 `cvs commit` 才能工作。参见 linkgit:gitcvs-migration[7]。
+
+[[configaccessmethod]]
+所有配置变量都可以针对特定的访问方法进行重载。有效的方法名称是 "ext"（用于 SSH 访问）和 "pserver"。下面的配置示例将禁止 pserver 访问，但仍允许通过 SSH 访问。
+------
+   [gitcvs]
+        enabled=0
+
+   [gitcvs "ext"]
+        enabled=1
+------
+--
+3. If you didn't specify the CVSROOT/CVS_SERVER directly in the checkout command, automatically saving it in your 'CVS/Root' files, then you need to set them explicitly in your environment. CVSROOT should be set as per normal, but the directory should point at the appropriate Git repo. As above, for SSH clients _not_ restricted to 'git-shell', CVS_SERVER should be set to 'git-cvsserver'.
++
+--
+------
+   export CVSROOT=:ext:user@server:/var/git/project.git
+   export CVS_SERVER="git cvsserver"
+------
+--
+4. For SSH clients that will make commits, make sure their server-side .ssh/environment files (or .bashrc, etc., according to their specific shell) export appropriate values for GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, and GIT_COMMITTER_EMAIL. For SSH clients whose login shell is bash, .bashrc may be a reasonable alternative.
+
+5. Clients should now be able to check out the project. Use the CVS 'module' name to indicate what Git 'head' you want to check out. This also sets the name of your newly checked-out directory, unless you tell it otherwise with `-d <dir-name>`. For example, this checks out 'master' branch to the `project-master` directory:
++
+------
+   cvs co -d project-master master
+------
+
+[[dbbackend]]
+数据库后台
+-----
+
+'git-cvsserver' 为每个 Git 头（即 CVS 模块）使用一个数据库来存储有关仓库的信息，以保持一致的 CVS 版本号。每次提交后都需要更新（即写入）数据库。
+
+如果直接使用 `git`（而不是使用 'git-cvsserver'）提交，则更新需要在下一次使用 'git-cvsserver' 访问仓库时进行，与访问方式和请求的操作无关。
+
+这就意味着，即使只提供读取访问权限（例如使用 pserver 方法），'git-cvsserver' 也必须拥有对数据库的写入访问权限，才能可靠地工作（否则就需要确保在执行 'git-cvsserver' 的任何时候数据库都是最新的）。
+
+By default it uses SQLite databases in the Git directory, named `gitcvs.<module-name>.sqlite`. Note that the SQLite backend creates temporary files in the same directory as the database file on write so it might not be enough to grant the users using 'git-cvsserver' write access to the database file without granting them write access to the directory, too.
+
+The database cannot be reliably regenerated in a consistent form after the branch it is tracking has changed. Example: For merged branches, 'git-cvsserver' only tracks one branch of development, and after a 'git merge' an incrementally updated database may track a different branch than a database regenerated from scratch, causing inconsistent CVS revision numbers. `git-cvsserver` has no way of knowing which branch it would have picked if it had been run incrementally pre-merge. So if you have to fully or partially (from old backup) regenerate the database, you should be suspicious of pre-existing CVS sandboxes.
+
+您可以使用以下配置变量配置数据库后台：
+
+配置数据库后台
+~~~~~~~
+
+'git-cvsserver' 使用 Perl DBI 模块。如果要更改这些变量，请阅读其文档，尤其是有关 `DBI->connect()` 的文档。
+
+gitcvs.dbName::
+	Database name. The exact meaning depends on the selected database driver, for SQLite this is a filename. Supports variable substitution (see below). May not contain semicolons (`;`). Default: '%Ggitcvs.%m.sqlite'
+
+gitcvs.dbDriver::
+	Used DBI driver. You can specify any available driver for this here, but it might not work. cvsserver is tested with 'DBD::SQLite', reported to work with 'DBD::Pg', and reported *not* to work with 'DBD::mysql'. Please regard this as an experimental feature. May not contain colons (`:`). Default: 'SQLite'
+
+gitcvs.dbuser::
+	数据库用户。只有在设置 `dbDriver` 时才有用，因为 SQLite 没有数据库用户的概念。支持变量替换（见下文）。
+
+gitcvs.dbPass::
+	Database password. Only useful if setting `dbDriver`, since SQLite has no concept of database passwords.
+
+gitcvs.dbTableNamePrefix::
+	Database table name prefix. Supports variable substitution (see below). Any non-alphabetic characters will be replaced with underscores.
+
+所有变量也可按访问方法设置，请参阅<<configaccessmethod,上文>>。
+
+变量替换
+^^^^
+在 `dbDriver` 和 `dbUser` 中，可以使用以下变量：
+
+%G::
+	Git 目录名称
+%g::
+	Git 目录名称，其中除字母数字、`.` 和 `-` 之外的所有字符均替换为 `_`（这样可以方便在文件名中使用该目录名称）
+%m::
+	CVS 模块/Git 头名称
+%a::
+	访问方法（"ext" 或 "pserver" 之一）
+%u::
+	Name of the user running 'git-cvsserver'. If no name can be determined, the numeric uid is used.
+
+环境变量
+----
+
+在某些情况下，这些变量省去了命令行选项，从而可以通过 git-shell 更方便地限制使用。
+
+GIT_CVSSERVER_BASE_PATH::
+	该变量取代 --base-path 的参数。
+
+GIT_CVSSERVER_ROOT::
+	该变量指定了一个单一目录，取代了 `<目录>...` 参数列表。除非指定了 `--export-all`，否则仓库仍需要使用 `gitcvs.enabled` 配置选项。
+
+设置这些环境变量后，可能无法使用相应的命令行参数。
+
+ECLIPSE CVS 客户端说明
+-----------------
+
+使用 Eclipse CVS 客户端进行签出：
+
+1. 选择 "创建新项目 -> 从 CVS 签出"
+2. 创建新位置。有关如何选择正确协议的详细信息，请参阅下面的说明。
+3. 浏览可用的 "模块"。它将为你提供一份软件源中的模块头列表。在这里，你无法浏览模块树。只能浏览头部。
+4. 在询问要签出哪个分支/标记时，选择 `HEAD`。取消勾选 "launch commit wizard" （登录后提交）以避免提交 .project 文件。
+
+Protocol notes: If you are using anonymous access via pserver, just select that. Those using SSH access should choose the 'ext' protocol, and configure 'ext' access on the Preferences->Team->CVS->ExtConnection pane. Set CVS_SERVER to "`git cvsserver`". Note that password support is not good when using 'ext', you will definitely want to have SSH keys setup.
+
+或者，你也可以使用 Eclipse 提供的非标准 extssh 协议。在这种情况下，CVS_SERVER 会被忽略，你必须用 'git-cvsserver' 替换服务器上的 cvs 工具，或者修改你的 `.bashrc` 以便调用 'cvs' 时能有效地调用 'git-cvsserver'。
+
+已知工作的客户
+-------
+
+- 在 Debian 上的 CVS 1.12.9
+- MacOSX 上的 CVS 1.11.17（来自 Fink 软件包）
+- MacOSX 上的 Eclipse 3.0、3.1.2（参见 Eclipse CVS 客户端说明）
+- TortoiseCVS
+
+支持的业务
+-----
+
+支持正常使用所需的所有操作，包括签出、差异、状态、更新、日志、添加、删除、提交。
+
+Most CVS command arguments that read CVS tags or revision numbers (typically -r) work, and also support any git refspec (tag, branch, commit ID, etc). However, CVS revision numbers for non-default branches are not well emulated, and cvs log does not show tags or branches at all. (Non-main-branch CVS revision numbers superficially resemble CVS revision numbers, but they actually encode a git commit ID directly, rather than represent the number of revisions since the branch point.)
+
+Note that there are two ways to checkout a particular branch. As described elsewhere on this page, the "module" parameter of cvs checkout is interpreted as a branch name, and it becomes the main branch. It remains the main branch for a given sandbox even if you temporarily make another branch sticky with cvs update -r. Alternatively, the -r argument can indicate some other branch to actually checkout, even though the module is still the "main" branch. Tradeoffs (as currently implemented): Each new "module" creates a new database on disk with a history for the given module, and after the database is created, operations against that main branch are fast. Or alternatively, -r doesn't take any extra disk space, but may be significantly slower for many operations, like cvs update.
+
+If you want to refer to a git refspec that has characters that are not allowed by CVS, you have two options. First, it may just work to supply the git refspec directly to the appropriate CVS -r argument; some CVS clients don't seem to do much sanity checking of the argument. Second, if that fails, you can use a special character escape mechanism that only uses characters that are valid in CVS tags. A sequence of 4 or 5 characters of the form (underscore (`"_"`), dash (`"-"`), one or two characters, and dash (`"-"`)) can encode various characters based on the one or two letters: `"s"` for slash (`"/"`), `"p"` for period (`"."`), `"u"` for underscore (`"_"`), or two hexadecimal digits for any byte value at all (typically an ASCII number, or perhaps a part of a UTF-8 encoded character).
+
+Legacy monitoring operations are not supported (edit, watch and related). Exports and tagging (tags and branches) are not supported at this stage.
+
+CRLF 行尾转换
+~~~~~~~~~
+
+默认情况下，服务器会将所有文件的 `-k` 模式留空，这将导致 CVS 客户端将这些文件视为文本文件，并在某些平台上进行行尾转换。
+
+You can make the server use the end-of-line conversion attributes to set the `-k` modes for files by setting the `gitcvs.usecrlfattr` config variable. See linkgit:gitattributes[5] for more information about end-of-line conversion.
+
+Alternatively, if `gitcvs.usecrlfattr` config is not enabled or the attributes do not allow automatic detection for a filename, then the server uses the `gitcvs.allBinary` config for the default setting. If `gitcvs.allBinary` is set, then file not otherwise specified will default to '-kb' mode. Otherwise the `-k` mode is left blank. But if `gitcvs.allBinary` is set to "guess", then the correct `-k` mode will be guessed based on the contents of the file.
+
+为了与 'cvs' 保持一致，最好将 `gitcvs.usecrlfattr` 设为 true，将 `gitcvs.allBinary` 设为 "guess"，从而覆盖默认值。
+
+依赖
+--
+'git-cvsserver' 取决于 DBD::SQLite。
+
+GIT
+---
+属于 linkgit:git[1] 文档

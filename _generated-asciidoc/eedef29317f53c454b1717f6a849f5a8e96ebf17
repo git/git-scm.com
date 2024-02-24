@@ -1,0 +1,199 @@
+git-merge-tree(1)
+=================
+
+名称
+--
+git-merge-tree - Perform merge without touching index or working tree
+
+
+概述
+--
+[verse]
+'git merge-tree' [--write-tree] [<options>] <branch1> <branch2>
+'git merge-tree' [--trivial-merge] <base-tree> <branch1> <branch2> (deprecated)
+
+[[NEWMERGE]]
+描述
+--
+
+This command has a modern `--write-tree` mode and a deprecated `--trivial-merge` mode. With the exception of the <<DEPMERGE,DEPRECATED DESCRIPTION>> section at the end, the rest of this documentation describes the modern `--write-tree` mode.
+
+执行合并，但不做任何新的提交，也不从工作区或索引中读取或写入。
+
+The performed merge will use the same features as the "real" linkgit:git-merge[1], including:
+
+  * 单个文件的多路合并
+  * rename detection
+  * 正确处理目录/文件冲突
+  * 递归祖先合并（即当有一个以上的合并基数时，通过合并基数创建一个虚拟合并基数）。
+  * 等等。
+
+合并完成后，会创建一个新的顶层树对象。 详见下面的 “输出”。
+
+选项
+--
+
+-z::
+	在 <冲突文件信息> 部分不要引用文件名，每个文件名用 NUL 字符而不是换行来结束。 在信息部分也要用 NUL 字符而不是换行来开始。 更多信息见下面的 <<OUTPUT>>。
+
+--name-only::
+	在冲突的文件信息部分，不要为冲突的文件写一个（mode, oid, stage, path）图元列表来输出，只需提供一个有冲突的文件名列表（如果文件有多个冲突的阶段，不多次列出文件名）。
+
+--[no-]messages::
+	将任何信息性的消息，如"Auto-merging <path>" 或冲突通知写到标准输出流的末尾。 如果没有指定，默认情况下，如果有合并冲突，就包括这些信息，否则就省略它们。
+
+--allow-unrelated-histories::
+	如果指定的两个分支没有共同的历史，merge-tree 默认会出错。 这个标志可以用来覆盖这个检查，并使合并继续进行。
+
+--merge-base=<commit>::
+	不需要为 <branch1> 和 <branch2> 寻找合并基础，而是为合并指定一个合并基础，目前不支持指定多个合并基础。该选项与 `--stdin` 不兼容。
+
+[[OUTPUT]]
+输出
+--
+
+对于一个成功的合并，git-merge-tree 的输出仅仅是一行：
+
+	<OID of toplevel tree>
+
+而对于有冲突的合并，默认的输出形式是：
+
+	<OID of toplevel tree>
+	<Conflicted file info>
+	<Informational messages>
+
+下面将分别讨论这些问题。
+
+然而，有一个例外。 如果通过了 `--stdin`，那么在开头有一个额外的部分，在结尾有一个 NUL 字符，然后所有的部分在每行输入中都会重复。 因此，如果第一次合并是冲突的，而第二次是干净的，输出将是这样的形式：
+
+	<Merge status>
+	<OID of toplevel tree>
+	<Conflicted file info>
+	<Informational messages>
+	NUL
+	<Merge status>
+	<OID of toplevel tree>
+	NUL
+
+[[MS]]
+Merge status
+~~~~~~~~~~~~
+
+这是一个整数状态，后面有一个 NUL 字符。 整数状态是：
+
+     0：合并后有冲突
+     1： 合并是干净的
+     <0：有什么东西阻止了合并的运行（例如，文件系统拒绝对仓库对象的访问
+	 对象的访问被文件系统拒绝)
+
+[[OIDTLT]]
+顶层目录树的 OID
+~~~~~~~~~~
+
+这是一个树状对象，代表在`git merge` 结束时工作区上检查出来的东西。 如果有冲突，那么这个目录树中的文件可能会有嵌入式冲突标记。 这一部分的后面总是有一个换行符（如果传递了 `-z` 则为 NUL）。
+
+[[CFI]]
+冲突的文件信息
+~~~~~~~
+
+这是一连串的行，格式为
+
+	<mode> <object> <stage> <filename>
+
+The filename will be quoted as explained for the configuration variable `core.quotePath` (see linkgit:git-config[1]). However, if the `--name-only` option is passed, the mode, object, and stage will be omitted. If `-z` is passed, the "lines" are terminated by a NUL character instead of a newline character.
+
+[[IM]]
+Informational messages
+~~~~~~~~~~~~~~~~~~~~~~
+
+这一部分提供信息，通常是关于冲突的信息。 该部分的格式因是否传递了 `-z` 而有很大不同。
+
+如果 `-z`被传递：
+
+输出格式是零条或更多的冲突信息记录，每条记录的形式都是：
+
+	<list-of-paths><conflict-type>NUL<conflict-message>NUL
+
+其中 <list-of-paths> 的形式为
+
+	<number-of-paths>NUL<path1>NUL<path2>NUL...<pathN>NUL
+
+并包括受冲突影响的路径（或分支名称）或 <conflict-message> 中的信息消息。 另外，<conflict-type> 是一个稳定的字符串，解释了冲突的类型，比如说
+
+  * "Auto-merging"
+  * "CONFLICT (rename/delete)"
+  * "CONFLICT (submodule lacks merge base)"
+  * "CONFLICT (binary)"
+
+和 <conflict-message> 是关于冲突的更详细的信息，通常（但不一定）会嵌入 <stable-short-type-description> 中。 这些字符串在未来的Git版本中可能会改变。 一些例子：
+
+  * "Auto-merging <file>"
+  * "CONFLICT (rename/delete): <oldfile> 被重命名... 但在... 被删除。"
+  * “合并子模块 <submodule> 失败（没有合并基础）”
+  * “警告：不能合并二进制文件： <filename>”
+
+如果没有传递 `-z`：
+
+这一节以空行开始，与前几节分开，然后只包含前一节的 <conflict-message> 信息（用换行符分开）。 这些是不稳定的字符串，不应该被脚本解析，只是为了供人使用。 另外，请注意，虽然 <conflict-message> 字符串通常不包含嵌入式换行符，但有时也会包含。 (然而，自由格式的信息永远不会有一个嵌入的 NUL 字符）。 所以，整个信息块是作为所有冲突信息的集合体提供给人类阅读的。
+
+退出状态码
+-----
+
+如果合并成功，没有冲突，退出状态为 0；如果合并有冲突，退出状态为 1；如果合并由于某种错误而无法完成（或开始），退出状态为 0 或 1 以外的内容（而且输出结果未指明）。 当传递 --stdin 时，对于成功的合并和有冲突的合并，返回状态都是 0，如果不能完成所有要求的合并，则返回 0 或 1 以外的其他状态。
+
+USAGE NOTES
+-----------
+
+这个命令旨在作为低级的底层命令，类似于 linkgit:git-hash-object[1]，linkgit:git-mktree[1]， linkgit:git-commit-tree[1]， linkgit:git-write-tree[1]，linkgit:git-update-ref[1] 和 linkgit:git-mktag[1]。 因此，它可以作为一系列步骤的一部分来使用，比如：
+
+       NEWTREE=$(git merge-tree --write-tree $BRANCH1 $BRANCH2)
+       test $? -eq 0 || die "There were conflicts..."
+       NEWCOMMIT=$(git commit-tree $NEWTREE -p $BRANCH1 -p $BRANCH2)
+       git update-ref $BRANCH1 $NEWCOMMIT
+
+注意，当退出状态为非零时，这个序列中的 `NEWTREE` 将包含很多输出，而不仅仅是一棵目录树。
+
+对于冲突，输出包括你用 linkgit:git-merge[1] 得到的相同信息：
+
+  * 什么会被写入工作区（<<OIDTLT,顶层目录树树的 OID>>）
+  * 将被写入索引的高阶阶段（<<CFI,冲突的文件信息>>）
+  * 任何会被打印到标准输出流的信息（<<IM,信息性信息>>）。
+
+输入格式
+----
+'git merge-tree --stdin' 的输入格式是完全基于文本的。每一行都有这样的格式：
+
+	[<基础提交> -- ]<分支1> <分支2>
+
+如果一行被 `--` 分隔，分隔符前的字符串用于指定合并的基础，分隔符后的字符串描述要合并的分支。
+
+应避免的错误
+------
+
+不要在产生的顶层目录树中寻找哪些文件有冲突，而要解析 <<CFI,冲突文件信息>> 部分。 在大型存储库中，不仅解析整个目录树会慢得吓人，而且有许多冲突类型无法用冲突标记来表示（修改/删除，模式冲突，二进制文件在两边都有改变，文件/目录冲突，各种重命名冲突的变种，等等。）
+
+不要把一个空的 <<CFI,冲突文件信息>> 列表理解为一个干净的合并；检查退出状态。 一个合并可以有冲突而没有单个文件的冲突（有几种类型的目录重命名冲突属于这个类别，其他的也可能在将来被添加）。
+
+Do NOT attempt to guess or make the user guess the conflict types from the <<CFI,Conflicted file info>> list. The information there is insufficient to do so. For example: Rename/rename(1to2) conflicts (both sides renamed the same file differently) will result in three different files having higher order stages (but each only has one higher order stage), with no way (short of the <<IM,Informational messages>> section) to determine which three files are related. File/directory conflicts also result in a file with exactly one higher order stage. Possibly-involved-in-directory-rename conflicts (when "merge.directoryRenames" is unset or set to "conflicts") also result in a file with exactly one higher order stage. In all cases, the <<IM,Informational messages>> section has the necessary info, though it is not designed to be machine parseable.
+
+Do NOT assume that each path from <<CFI,Conflicted file info>>, and the logical conflicts in the <<IM,Informational messages>> have a one-to-one mapping, nor that there is a one-to-many mapping, nor a many-to-one mapping. Many-to-many mappings exist, meaning that each path can have many logical conflict types in a single merge, and each logical conflict type can affect many paths.
+
+不要认为 <<IM,信息消息>> 部分列出的所有文件名都有冲突。 对于没有冲突的文件，可以包括信息，如 "Auto-merging <文件>"。
+
+避免从 <<CFI,冲突文件信息>> 中提取 OIDS，并将它们重新合并以向用户展示冲突。 这将丢失信息。 相反，在 <<OIDTLT,顶层目录树的OID>> 中查找文件的版本，并显示它。 特别是，后者将有冲突标记，并标明被合并的原始分支/提交，如果涉及重名，则标明原始文件名。 虽然你可以在重新合并时将原始分支/提交包括在冲突标记的注释中，但原始文件名不能从 <<CFI,冲突文件信息>> 中获得，因此你会失去可能帮助用户解决冲突的信息。
+
+[[DEPMERGE]]
+DEPRECATED DESCRIPTION
+----------------------
+
+根据 <<NEWMERGE,DESCRIPTION>>，与本文档的其他部分不同，本节描述了被废弃的 `--trivial-merge` 模式。
+
+除了可选的 `--trivial-merge` 外，该模式不接受任何选项。
+
+这种模式读取三个树状的，并将琐碎的合并结果和冲突的阶段以 semi-diff 格式输出到标准输出。 由于这是为更高级别的脚本设计的，以消耗并将结果合并回索引中，所以它省略了与 <branch1> 相匹配的条目。 第二种形式的结果类似于三方 "git read-tree -m" 的做法，但该命令不是将结果存储在索引中，而是将条目输出到标准输出。
+
+这种形式不仅适用性有限（一个琐碎的合并不能处理单个文件的内容合并、重命名检测、适当的目录/文件冲突处理等），输出格式也很难处理，而且即使在成功的合并中，它的性能一般也不如第一种形式（特别是在大型仓库中工作）。
+
+GIT
+---
+属于 linkgit:git[1] 文档
