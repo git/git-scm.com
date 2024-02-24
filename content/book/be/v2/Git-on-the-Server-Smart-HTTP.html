@@ -1,0 +1,111 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: be
+  chapter:
+    title: Git on the Server
+    number: 4
+  section:
+    title: Smart HTTP
+    number: 6
+    cs_number: '4.6'
+    previous: book/be/v2/Git-on-the-Server-Git-Daemon
+    next: book/be/v2/Git-on-the-Server-GitWeb
+title: Git - Smart HTTP
+
+---
+<h2 id="_smart_http_2">Smart HTTP</h2>
+<div class="paragraph">
+<p>
+We now have authenticated access through SSH and unauthenticated access through <code>git://</code>, but there is also a protocol that can do both at the same time.
+Setting up Smart HTTP is basically just enabling a CGI script that is provided with Git called <code>git-http-backend</code> on the server.
+This CGI will read the path and headers sent by a <code>git fetch</code> or <code>git push</code> to an HTTP URL and determine if the client can communicate over HTTP (which is true for any client since version 1.6.6).
+If the CGI sees that the client is smart, it will communicate smartly with it; otherwise it will fall back to the dumb behavior (so it is backward compatible for reads with older clients).</p>
+</div>
+<div class="paragraph">
+<p>Let’s walk through a very basic setup.
+We’ll set this up with Apache as the CGI server.
+If you don’t have Apache setup, you can do so on a Linux box with something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo apt-get install apache2 apache2-utils
+$ a2enmod cgi alias env</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This also enables the <code>mod_cgi</code>, <code>mod_alias</code>, and <code>mod_env</code> modules, which are all needed for this to work properly.</p>
+</div>
+<div class="paragraph">
+<p>You’ll also need to set the Unix user group of the <code>/srv/git</code> directories to <code>www-data</code> so your web server can read- and write-access the repositories, because the Apache instance running the CGI script will (by default) be running as that user:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ chgrp -R www-data /srv/git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Next we need to add some things to the Apache configuration to run the <code>git-http-backend</code> as the handler for anything coming into the <code>/git</code> path of your web server.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">SetEnv GIT_PROJECT_ROOT /srv/git
+SetEnv GIT_HTTP_EXPORT_ALL
+ScriptAlias /git/ /usr/lib/git-core/git-http-backend/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you leave out <code>GIT_HTTP_EXPORT_ALL</code> environment variable, then Git will only serve to unauthenticated clients the repositories with the <code>git-daemon-export-ok</code> file in them, just like the Git daemon did.</p>
+</div>
+<div class="paragraph">
+<p>Finally you’ll want to tell Apache to allow requests to <code>git-http-backend</code> and make writes be authenticated somehow, possibly with an Auth block like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&lt;Files "git-http-backend"&gt;
+    AuthType Basic
+    AuthName "Git Access"
+    AuthUserFile /srv/git/.htpasswd
+    Require expr !(%{QUERY_STRING} -strmatch '*service=git-receive-pack*' || %{REQUEST_URI} =~ m#/git-receive-pack$#)
+    Require valid-user
+&lt;/Files&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That will require you to create a <code>.htpasswd</code> file containing the passwords of all the valid users.
+Here is an example of adding a “schacon” user to the file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ htpasswd -c /srv/git/.htpasswd schacon</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>There are tons of ways to have Apache authenticate users, you’ll have to choose and implement one of them.
+This is just the simplest example we could come up with.
+You’ll also almost certainly want to set this up over SSL so all this data is encrypted.</p>
+</div>
+<div class="paragraph">
+<p>We don’t want to go too far down the rabbit hole of Apache configuration specifics, since you could well be using a different server or have different authentication needs.
+The idea is that Git comes with a CGI called <code>git-http-backend</code> that when invoked will do all the negotiation to send and receive data over HTTP.
+It does not implement any authentication itself, but that can easily be controlled at the layer of the web server that invokes it.
+You can do this with nearly any CGI-capable web server, so go with the one that you know best.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Заўвага</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>For more information on configuring authentication in Apache, check out the Apache docs here: <a href="https://httpd.apache.org/docs/current/howto/auth.html" class="bare">https://httpd.apache.org/docs/current/howto/auth.html</a></p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
