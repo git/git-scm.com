@@ -1,0 +1,279 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: sl
+  chapter:
+    title: Orodja Git
+    number: 7
+  section:
+    title: Zamenjava
+    number: 13
+    cs_number: '7.13'
+    previous: book/sl/v2/Orodja-Git-Povezovanje-v-pakete
+    next: book/sl/v2/Orodja-Git-Shramba-poverilnic
+title: Git - Zamenjava
+
+---
+<h2 id="_replace">Zamenjava</h2>
+<div class="paragraph">
+<p>Kot smo poudarili že prej, objekti v objektni podatkovni bazi Git niso spremenljivi, vendar Git ponuja zanimiv način pretvarjanja zamenjave objektov v svoji podatkovni bazi z drugimi objekti.</p>
+</div>
+<div class="paragraph">
+<p>Ukaz <code>replace</code> vam omogoča določiti objekt v Gitu in povedati »vsakič, ko se sklicuješ na <em>ta</em> objekt, se pretvarjaj, da je <em>drugačen</em> objekt«.
+To je najpogostejše uporabno za zamenjavo ene potrditve v vaši zgodovini z drugo, brez da morate ponovno zgraditi celo zgodovino z recimo <code>git filter-branch</code>.</p>
+</div>
+<div class="paragraph">
+<p>Na primer, predpostavimo, da imate veliko zgodovino kode in želite razdeliti svoj repozitorij v eno hitro zgodovino za nove razvijalce in eno veliko daljšo in večjo zgodovino za ljudi, ki jih zanima rudarjenje podatkov.
+Presadite lahko eno zgodovino v drugo z zamenjavo najnovejše potrditve v novi vrstici z najnovejšo potrditvijo na stari.
+To je dobro, ker pomeni, da vam ni treba dejansko prepisati vsake potrditve v novi zgodovini, kot bi običajno morali, da ju združite skupaj (ker nadrejenost vpliva na SHA-1).</p>
+</div>
+<div class="paragraph">
+<p>Poskusimo to.
+Vzemimo obstoječi repozitorij, ga razdelimo v dva repozitorija, enega novejšega in enega zgodovinskega, ter nato bomo videli, kako lahko ponovno kombiniramo oba brez sprememb zadnjih vrednosti SHA-1 repozitorija preko <code>replace</code>.</p>
+</div>
+<div class="paragraph">
+<p>Uporabili bomo enostaven repozitorij s petimi enostavnimi potrditvami:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline
+ef989d8 Fifth commit
+c6e1e95 Fourth commit
+9c68fdc Third commit
+945704c Second commit
+c1822cf First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To želimo prelomiti v dve liniji zgodovine.
+Ena linija gre iz prve potrditve v četrto potrditev — ta bo zgodovinska.
+Druga linija bo vsebovala samo potrditvi štiri in pet — to bo novejša zgodovina.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/replace1.png" >}}" alt="Primer zgodovine Git">
+</div>
+<div class="title">Slika 163. Primer zgodovine Git</div>
+</div>
+<div class="paragraph">
+<p>Torej, ustvarjanje zgodovinske zgodovine je enostavno, lahko damo zgolj vejo v zgodovino in nato potisnemo to vejo v vejo <code>master</code> novega oddaljenega repozitorija.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch history c6e1e95
+$ git log --oneline --decorate
+ef989d8 (HEAD, master) Fifth commit
+c6e1e95 (history) Fourth commit
+9c68fdc Third commit
+945704c Second commit
+c1822cf First commit</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/replace2.png" >}}" alt="Ustvarjanje nove veje `history`">
+</div>
+<div class="title">Slika 164. Ustvarjanje nove veje <code>history</code>
+</div>
+</div>
+<div class="paragraph">
+<p>Sedaj lahko potisnemo novo vejo <code>history</code> v vejo <code>master</code> našega novega repozitorija:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console?prompt=$" data-lang="console?prompt=$">$ git remote add project-history https://github.com/schacon/project-history
+$ git push project-history history:master
+Counting objects: 12, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (12/12), 907 bytes, done.
+Total 12 (delta 0), reused 0 (delta 0)
+Unpacking objects: 100% (12/12), done.
+To git@github.com:schacon/project-history.git
+ * [new branch]      history -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dobro, sedaj je torej naša zgodovina objavljena.
+Sedaj je težji del skrajšanje naše novejše zgodovine navzdol, da je manjša.
+Narediti moramo prekrivanje, da lahko zamenjamo potrditev v eni enakovredni potrditvi v drugo, torej bomo skrajšali to na samo potrditvi štiri in pet (torej se potrditev štiri prekrije).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --decorate
+ef989d8 (HEAD, master) Fifth commit
+c6e1e95 (history) Fourth commit
+9c68fdc Third commit
+945704c Second commit
+c1822cf First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>V tem primeru je uporabno ustvariti osnovno potrditev, da ima navodila, kako razširiti zgodovino, tako da drugi razvijalci vejo, kaj narediti, če pridejo do prve potrditve v skrajšani zgodovini in morajo imeti več.
+Torej, kar bomo naredili, je ustvarjanje začetnega objekta potrditve kot naše osnovne točke z navodili, nato pa bomo ponovno bazirali ostali potrditvi (štiri in pet) na vrhu le te.</p>
+</div>
+<div class="paragraph">
+<p>Da to naredimo, moramo izbrati točko za razdelitev, ki bo za nas tretja potrditev, ki je <code>9c68fdc</code> v jeziku SHA.
+Torej naša osnovna potrditev bo osnovana na tem drevesu.
+Ustvarimo lahko našo osnovno potrditev z uporabo ukaza <code>commit-tree</code>, ki samo vzame drevo in nam vrne popolnoma nov objekt potrditve SHA-1 brez nadrejene.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'Get history from blah blah blah' | git commit-tree 9c68fdc^{tree}
+622e88e9cbfbacfb75b5279245b9fb38dfea10cf</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Opomba</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Ukaz <code>commit-tree</code> je eden izmed skupkov ukazov, ki se običajno imenujejo kot ukazi »napeljave« (angl. <em>plumbing</em>).
+Ti ukazi v splošnem niso mišljeni za neposredno uporabo, vendar so namesto tega uporabljeni pri <strong>drugih</strong> ukazih Git, da opravljajo manjše naloge.
+Občasno, ko delamo bolj čudne stvari kot to, nam omogočajo narediti resnično nižje nivojske stvari, vendar niso mišljeni za vsakodnevno uporabo.
+Več o ukazih napeljave lahko preberete v <a href="{{< relurl "book/sl/v2/ch00/_plumbing_porcelain" >}}">Napeljava in keramika</a>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/replace3.png" >}}" alt="Ustvarjanje osnovne potrditve z uporabo `commit-tree`">
+</div>
+<div class="title">Slika 165. Ustvarjanje osnovne potrditve z uporabo <code>commit-tree</code>
+</div>
+</div>
+<div class="paragraph">
+<p>Torej sedaj, ko imamo osnovno potrditev, lahko naredimo ponovno baziranje na naši preostali zgodovini na vrhu tega z <code>git rebase --onto</code>.
+Argument <code>--onto</code> bo SHA-1, ki smo ga ravno dobili iz <code>commit-tree</code>, in točka ponovnega baziranja bo tretja potrditev (nadrejena prve potrditve, ki jo želimo obdržati, <code>9c68fdc</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rebase --onto 622e88 9c68fdc
+First, rewinding head to replay your work on top of it...
+Applying: fourth commit
+Applying: fifth commit</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/replace4.png" >}}" alt="Ponovno baziranje zgodovine na vrh osnovne potrditve">
+</div>
+<div class="title">Slika 166. Ponovno baziranje zgodovine na vrh osnovne potrditve</div>
+</div>
+<div class="paragraph">
+<p>Torej sedaj smo prepisali svojo novejšo zgodovino na vrhu ovržene osnovne potrditve, ki ima sedaj v njej navodila, kako rekonstruirati celotno zgodovino, če to želimo.
+Potisnemo lahko to novo zgodovino v nov projekt in sedaj, ko bodo ljudje klonirali ta repozitorij, bodo videli samo zadnji dve potrditvi in nato osnovno potrditev z navodili.</p>
+</div>
+<div class="paragraph">
+<p>Sedaj preklopimo vloge nekomu, ki prvič klonira projekt, in želi celotno zgodovino.
+Da dobimo podatke zgodovine po kloniranju tega skrajšanega repozitorija, bi nekdo moral dodati drugo daljavo za zgodovinski repozitorij in jo prenesti:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console?prompt=$" data-lang="console?prompt=$">$ git clone https://github.com/schacon/project
+$ cd project
+
+$ git log --oneline master
+e146b5f Fifth commit
+81a708d Fourth commit
+622e88e Get history from blah blah blah
+
+$ git remote add project-history https://github.com/schacon/project-history
+$ git fetch project-history
+From https://github.com/schacon/project-history
+ * [new branch]      master     -&gt; project-history/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sedaj bi sodelavec moral imeti svoje zadnje potrditve v veji <code>master</code> in zgodovinske potrditve v veji <code>project-history/master</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master
+e146b5f Fifth commit
+81a708d Fourth commit
+622e88e Get history from blah blah blah
+
+$ git log --oneline project-history/master
+c6e1e95 Fourth commit
+9c68fdc Third commit
+945704c Second commit
+c1822cf First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Da jih kombinirate, lahko enostavno pokličete <code>git replace</code> s potrditvijo, ki jo želite zamenjati, in nato dodate potrditev, ki jo želite z njo zamenjati.
+Torej želimo zamenjati četrto potrditev v veji <code>master</code> s četrto potrditvijo v veji <code>project-history/master</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git replace 81a708d c6e1e95</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Če sedaj pogledate zgodovino veje <code>master</code>, je videti nekako takole:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master
+e146b5f Fifth commit
+81a708d Fourth commit
+9c68fdc Third commit
+945704c Second commit
+c1822cf First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Odlično, kajne? Brez da moramo spremeniti vse SHA-1 povratnega toka, smo lahko zamenjali eno potrditev v naši zgodovini s popolnoma drugo potrditvijo in vsa običajna orodja (<code>bisect</code>, <code>blame</code> itd) bodo delovala, kakor pričakujemo.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/replace5.png" >}}" alt="Kombiniranje potrditev z `git replace`">
+</div>
+<div class="title">Slika 167. Kombiniranje potrditev z <code>git replace</code>
+</div>
+</div>
+<div class="paragraph">
+<p>Zanimivo je, da še vedno kaže <code>81a708d</code> kot SHA-1, čeprav dejansko uporablja podatke potrditve <code>c6e1e95</code>, s katero smo jo zamenjali.
+Tudi če poženete ukaz, kot je <code>cat-file</code>, vam bo pokazal zamenjane podatke:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console?prompt=$" data-lang="console?prompt=$">$ git cat-file -p 81a708d
+tree 7bc544cf438903b65ca9104a1e30345eee6c083d
+parent 9c68fdceee073230f19ebb8b5e7fc71b479c0252
+author Scott Chacon &lt;schacon@gmail.com&gt; 1268712581 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1268712581 -0700
+
+fourth commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zapomniti si je dobro, da je bila dejansko nadrejena <code>81a708d</code> označba mesta potrditve (<code>622e88e</code>) in ne <code>9c68fdce</code>, kakor je tu zabeleženo.</p>
+</div>
+<div class="paragraph">
+<p>Druga zanimiva stvar je, da so ti podatki vključeni v naših referencah:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git for-each-ref
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/heads/master
+c6e1e95051d41771a649f3145423f8809d1a74d4 commit	refs/remotes/history/master
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/remotes/origin/HEAD
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/remotes/origin/master
+c6e1e95051d41771a649f3145423f8809d1a74d4 commit	refs/replace/81a708dd0e167a3f691541c7a6463343bc457040</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To pomeni, da je našo zamenjavo enostavno deliti z drugimi, ker lahko potisnemo to na svoj strežnik in drugi ljudje lahko to enostavno prenesejo.
+To ni toliko koristno v primeru presajanja zgodovine, kot smo šli skozi tu (ker bi vsak prenesel obe zgodovini tako ali tako, torej zakaj ju sploh ločevati?), vendar je lahko uporabno v drugih okoliščinah.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
