@@ -1,0 +1,581 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - git-filter-branch Documentation
+docname: git-filter-branch
+version: 2.13.7
+aliases:
+- "/docs/git-filter-branch/2.13.7/index.html"
+
+---
+<div class="sect1">
+<h2 id="_name"><a class="anchor" href="#_name"></a>NAME</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-filter-branch - Rewrite branches</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_synopsis"><a class="anchor" href="#_synopsis"></a>SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="verseblock">
+<pre class="content"><em>git filter-branch</em> [--env-filter &lt;command&gt;] [--tree-filter &lt;command&gt;]
+	[--index-filter &lt;command&gt;] [--parent-filter &lt;command&gt;]
+	[--msg-filter &lt;command&gt;] [--commit-filter &lt;command&gt;]
+	[--tag-name-filter &lt;command&gt;] [--subdirectory-filter &lt;directory&gt;]
+	[--prune-empty]
+	[--original &lt;namespace&gt;] [-d &lt;directory&gt;] [-f | --force]
+	[--] [&lt;rev-list options&gt;&#8230;&#8203;]</pre>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description"><a class="anchor" href="#_description"></a>DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Lets you rewrite Git revision history by rewriting the branches mentioned
+in the &lt;rev-list options&gt;, applying custom filters on each revision.
+Those filters can modify each tree (e.g. removing a file or running
+a perl rewrite on all files) or information about each commit.
+Otherwise, all information (including original commit times or merge
+information) will be preserved.</p>
+</div>
+<div class="paragraph">
+<p>The command will only rewrite the <em>positive</em> refs mentioned in the
+command line (e.g. if you pass <em>a..b</em>, only <em>b</em> will be rewritten).
+If you specify no filters, the commits will be recommitted without any
+changes, which would normally have no effect.  Nevertheless, this may be
+useful in the future for compensating for some Git bugs or such,
+therefore such a usage is permitted.</p>
+</div>
+<div class="paragraph">
+<p><strong>NOTE</strong>: This command honors <code>.git/info/grafts</code> file and refs in
+the <code>refs/replace/</code> namespace.
+If you have any grafts or replacement refs defined, running this command
+will make them permanent.</p>
+</div>
+<div class="paragraph">
+<p><strong>WARNING</strong>! The rewritten history will have different object names for all
+the objects and will not converge with the original branch.  You will not
+be able to easily push and distribute the rewritten branch on top of the
+original branch.  Please do not use this command if you do not know the
+full implications, and avoid using it anyway, if a simple single commit
+would suffice to fix your problem.  (See the "RECOVERING FROM UPSTREAM
+REBASE" section in <a href='{{< relurl "docs/git-rebase" >}}'>git-rebase[1]</a> for further information about
+rewriting published history.)</p>
+</div>
+<div class="paragraph">
+<p>Always verify that the rewritten version is correct: The original refs,
+if different from the rewritten ones, will be stored in the namespace
+<em>refs/original/</em>.</p>
+</div>
+<div class="paragraph">
+<p>Note that since this operation is very I/O expensive, it might
+be a good idea to redirect the temporary directory off-disk with the
+<code>-d</code> option, e.g. on tmpfs.  Reportedly the speedup is very noticeable.</p>
+</div>
+<div class="sect2">
+<h3 id="_filters"><a class="anchor" href="#_filters"></a>Filters</h3>
+<div class="paragraph">
+<p>The filters are applied in the order as listed below.  The &lt;command&gt;
+argument is always evaluated in the shell context using the <em>eval</em> command
+(with the notable exception of the commit filter, for technical reasons).
+Prior to that, the <code>$GIT_COMMIT</code> environment variable will be set to contain
+the id of the commit being rewritten.  Also, GIT_AUTHOR_NAME,
+GIT_AUTHOR_EMAIL, GIT_AUTHOR_DATE, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL,
+and GIT_COMMITTER_DATE are taken from the current commit and exported to
+the environment, in order to affect the author and committer identities of
+the replacement commit created by <a href='{{< relurl "docs/git-commit-tree" >}}'>git-commit-tree[1]</a> after the
+filters have run.</p>
+</div>
+<div class="paragraph">
+<p>If any evaluation of &lt;command&gt; returns a non-zero exit status, the whole
+operation will be aborted.</p>
+</div>
+<div class="paragraph">
+<p>A <em>map</em> function is available that takes an "original sha1 id" argument
+and outputs a "rewritten sha1 id" if the commit has been already
+rewritten, and "original sha1 id" otherwise; the <em>map</em> function can
+return several ids on separate lines if your commit filter emitted
+multiple commits.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_options"><a class="anchor" href="#_options"></a>OPTIONS</h2>
+<div class="sectionbody">
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---env-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---env-filterltcommandgt"></a>--env-filter &lt;command&gt; </dt>
+<dd>
+<p>This filter may be used if you only need to modify the environment
+in which the commit will be performed.  Specifically, you might
+want to rewrite the author/committer name/email/time environment
+variables (see <a href='{{< relurl "docs/git-commit-tree" >}}'>git-commit-tree[1]</a> for details).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---tree-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---tree-filterltcommandgt"></a>--tree-filter &lt;command&gt; </dt>
+<dd>
+<p>This is the filter for rewriting the tree and its contents.
+The argument is evaluated in shell with the working
+directory set to the root of the checked out tree.  The new tree
+is then used as-is (new files are auto-added, disappeared files
+are auto-removed - neither .gitignore files nor any other ignore
+rules <strong>HAVE ANY EFFECT</strong>!).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---index-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---index-filterltcommandgt"></a>--index-filter &lt;command&gt; </dt>
+<dd>
+<p>This is the filter for rewriting the index.  It is similar to the
+tree filter but does not check out the tree, which makes it much
+faster.  Frequently used with <code>git rm --cached
+--ignore-unmatch ...</code>, see EXAMPLES below.  For hairy
+cases, see <a href='{{< relurl "docs/git-update-index" >}}'>git-update-index[1]</a>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---parent-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---parent-filterltcommandgt"></a>--parent-filter &lt;command&gt; </dt>
+<dd>
+<p>This is the filter for rewriting the commit&#8217;s parent list.
+It will receive the parent string on stdin and shall output
+the new parent string on stdout.  The parent string is in
+the format described in <a href='{{< relurl "docs/git-commit-tree" >}}'>git-commit-tree[1]</a>: empty for
+the initial commit, "-p parent" for a normal commit and
+"-p parent1 -p parent2 -p parent3 &#8230;&#8203;" for a merge commit.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---msg-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---msg-filterltcommandgt"></a>--msg-filter &lt;command&gt; </dt>
+<dd>
+<p>This is the filter for rewriting the commit messages.
+The argument is evaluated in the shell with the original
+commit message on standard input; its standard output is
+used as the new commit message.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---commit-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---commit-filterltcommandgt"></a>--commit-filter &lt;command&gt; </dt>
+<dd>
+<p>This is the filter for performing the commit.
+If this filter is specified, it will be called instead of the
+<em>git commit-tree</em> command, with arguments of the form
+"&lt;TREE_ID&gt; [(-p &lt;PARENT_COMMIT_ID&gt;)&#8230;&#8203;]" and the log message on
+stdin.  The commit id is expected on stdout.</p>
+<div class="paragraph">
+<p>As a special extension, the commit filter may emit multiple
+commit ids; in that case, the rewritten children of the original commit will
+have all of them as parents.</p>
+</div>
+<div class="paragraph">
+<p>You can use the <em>map</em> convenience function in this filter, and other
+convenience functions, too.  For example, calling <em>skip_commit "$@"</em>
+will leave out the current commit (but not its changes! If you want
+that, use <em>git rebase</em> instead).</p>
+</div>
+<div class="paragraph">
+<p>You can also use the <code>git_commit_non_empty_tree "$@"</code> instead of
+<code>git commit-tree "$@"</code> if you don&#8217;t wish to keep commits with a single parent
+and that makes no change to the tree.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---tag-name-filterltcommandgt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---tag-name-filterltcommandgt"></a>--tag-name-filter &lt;command&gt; </dt>
+<dd>
+<p>This is the filter for rewriting tag names. When passed,
+it will be called for every tag ref that points to a rewritten
+object (or to a tag object which points to a rewritten object).
+The original tag name is passed via standard input, and the new
+tag name is expected on standard output.</p>
+<div class="paragraph">
+<p>The original tags are not deleted, but can be overwritten;
+use "--tag-name-filter cat" to simply update the tags.  In this
+case, be very careful and make sure you have the old tags
+backed up in case the conversion has run afoul.</p>
+</div>
+<div class="paragraph">
+<p>Nearly proper rewriting of tag objects is supported. If the tag has
+a message attached, a new tag object will be created with the same message,
+author, and timestamp. If the tag has a signature attached, the
+signature will be stripped. It is by definition impossible to preserve
+signatures. The reason this is "nearly" proper, is because ideally if
+the tag did not change (points to the same object, has the same name, etc.)
+it should retain any signature. That is not the case, signatures will always
+be removed, buyer beware. There is also no support for changing the
+author or timestamp (or the tag message for that matter). Tags which point
+to other tags will be rewritten to point to the underlying commit.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---subdirectory-filterltdirectorygt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---subdirectory-filterltdirectorygt"></a>--subdirectory-filter &lt;directory&gt; </dt>
+<dd>
+<p>Only look at the history which touches the given subdirectory.
+The result will contain that directory (and only that) as its
+project root. Implies <a href="#Remap_to_ancestor">Remap to ancestor</a>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---prune-empty"> <a class="anchor" href="#Documentation/git-filter-branch.txt---prune-empty"></a>--prune-empty </dt>
+<dd>
+<p>Some filters will generate empty commits that leave the tree untouched.
+This option instructs git-filter-branch to remove such commits if they
+have exactly one or zero non-pruned parents; merge commits will
+therefore remain intact.  This option cannot be used together with
+<code>--commit-filter</code>, though the same effect can be achieved by using the
+provided <code>git_commit_non_empty_tree</code> function in a commit filter.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---originalltnamespacegt"> <a class="anchor" href="#Documentation/git-filter-branch.txt---originalltnamespacegt"></a>--original &lt;namespace&gt; </dt>
+<dd>
+<p>Use this option to set the namespace where the original commits
+will be stored. The default value is <em>refs/original</em>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt--dltdirectorygt"> <a class="anchor" href="#Documentation/git-filter-branch.txt--dltdirectorygt"></a>-d &lt;directory&gt; </dt>
+<dd>
+<p>Use this option to set the path to the temporary directory used for
+rewriting.  When applying a tree filter, the command needs to
+temporarily check out the tree to some directory, which may consume
+considerable space in case of large projects.  By default it
+does this in the <em>.git-rewrite/</em> directory but you can override
+that choice by this parameter.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt--f"> <a class="anchor" href="#Documentation/git-filter-branch.txt--f"></a>-f </dt>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt---force"> <a class="anchor" href="#Documentation/git-filter-branch.txt---force"></a>--force </dt>
+<dd>
+<p><em>git filter-branch</em> refuses to start with an existing temporary
+directory or when there are already refs starting with
+<em>refs/original/</em>, unless forced.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-filter-branch.txt-ltrev-listoptionsgt82308203"> <a class="anchor" href="#Documentation/git-filter-branch.txt-ltrev-listoptionsgt82308203"></a>&lt;rev-list options&gt;&#8230;&#8203; </dt>
+<dd>
+<p>Arguments for <em>git rev-list</em>.  All positive refs included by
+these options are rewritten.  You may also specify options
+such as <code>--all</code>, but you must use <code>--</code> to separate them from
+the <em>git filter-branch</em> options. Implies <a href="#Remap_to_ancestor">Remap to ancestor</a>.</p>
+</dd>
+</dl>
+</div>
+<div class="sect2">
+<h3 id="Remap_to_ancestor"><a class="anchor" href="#Remap_to_ancestor"></a>Remap to ancestor</h3>
+<div class="paragraph">
+<p>By using <a href='{{< relurl "docs/git-rev-list" >}}'>git-rev-list[1]</a> arguments, e.g., path limiters, you can limit the
+set of revisions which get rewritten. However, positive refs on the command
+line are distinguished: we don&#8217;t let them be excluded by such limiters. For
+this purpose, they are instead rewritten to point at the nearest ancestor that
+was not excluded.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_examples"><a class="anchor" href="#_examples"></a>Examples</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Suppose you want to remove a file (containing confidential information
+or copyright violation) from all commits:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --tree-filter 'rm filename' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>However, if the file is absent from the tree of some commit,
+a simple <code>rm filename</code> will fail for that tree and commit.
+Thus you may instead want to use <code>rm -f filename</code> as the script.</p>
+</div>
+<div class="paragraph">
+<p>Using <code>--index-filter</code> with <em>git rm</em> yields a significantly faster
+version.  Like with using <code>rm filename</code>, <code>git rm --cached filename</code>
+will fail if the file is absent from the tree of a commit.  If you
+want to "completely forget" a file, it does not matter when it entered
+history, so we also add <code>--ignore-unmatch</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --index-filter 'git rm --cached --ignore-unmatch filename' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, you will get the rewritten history saved in HEAD.</p>
+</div>
+<div class="paragraph">
+<p>To rewrite the repository to look as if <code>foodir/</code> had been its project
+root, and discard all other history:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --subdirectory-filter foodir -- --all</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Thus you can, e.g., turn a library subdirectory into a repository of
+its own.  Note the <code>--</code> that separates <em>filter-branch</em> options from
+revision options, and the <code>--all</code> to rewrite all branches and tags.</p>
+</div>
+<div class="paragraph">
+<p>To set a commit (which typically is at the tip of another
+history) to be the parent of the current initial commit, in
+order to paste the other history behind the current history:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --parent-filter 'sed "s/^\$/-p &lt;graft-id&gt;/"' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>(if the parent string is empty - which happens when we are dealing with
+the initial commit - add graftcommit as a parent).  Note that this assumes
+history with a single root (that is, no merge without common ancestors
+happened).  If this is not the case, use:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --parent-filter \
+	'test $GIT_COMMIT = &lt;commit-id&gt; &amp;&amp; echo "-p &lt;graft-id&gt;" || cat' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or even simpler:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>echo "$commit-id $graft-id" &gt;&gt; .git/info/grafts
+git filter-branch $graft-id..HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To remove commits authored by "Darl McBribe" from the history:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --commit-filter '
+	if [ "$GIT_AUTHOR_NAME" = "Darl McBribe" ];
+	then
+		skip_commit "$@";
+	else
+		git commit-tree "$@";
+	fi' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The function <em>skip_commit</em> is defined as follows:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>skip_commit()
+{
+	shift;
+	while [ -n "$1" ];
+	do
+		shift;
+		map "$1";
+		shift;
+	done;
+}</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The shift magic first throws away the tree id and then the -p
+parameters.  Note that this handles merges properly! In case Darl
+committed a merge between P1 and P2, it will be propagated properly
+and all children of the merge will become merge commits with P1,P2
+as their parents instead of the merge commit.</p>
+</div>
+<div class="paragraph">
+<p><strong>NOTE</strong> the changes introduced by the commits, and which are not reverted
+by subsequent commits, will still be in the rewritten branch. If you want
+to throw out <em>changes</em> together with the commits, you should use the
+interactive mode of <em>git rebase</em>.</p>
+</div>
+<div class="paragraph">
+<p>You can rewrite the commit log messages using <code>--msg-filter</code>.  For
+example, <em>git svn-id</em> strings in a repository created by <em>git svn</em> can
+be removed this way:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --msg-filter '
+	sed -e "/^git-svn-id:/d"
+'</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you need to add <em>Acked-by</em> lines to, say, the last 10 commits (none
+of which is a merge), use this command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --msg-filter '
+	cat &amp;&amp;
+	echo "Acked-by: Bugs Bunny &lt;bunny@bugzilla.org&gt;"
+' HEAD~10..HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>--env-filter</code> option can be used to modify committer and/or author
+identity.  For example, if you found out that your commits have the wrong
+identity due to a misconfigured user.email, you can make a correction,
+before publishing the project, like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --env-filter '
+	if test "$GIT_AUTHOR_EMAIL" = "root@localhost"
+	then
+		GIT_AUTHOR_EMAIL=john@example.com
+	fi
+	if test "$GIT_COMMITTER_EMAIL" = "root@localhost"
+	then
+		GIT_COMMITTER_EMAIL=john@example.com
+	fi
+' -- --all</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To restrict rewriting to only part of the history, specify a revision
+range in addition to the new branch name.  The new branch name will
+point to the top-most revision that a <em>git rev-list</em> of this range
+will print.</p>
+</div>
+<div class="paragraph">
+<p>Consider this history:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>     D--E--F--G--H
+    /     /
+A--B-----C</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To rewrite only commits D,E,F,G,H, but leave A, B and C alone, use:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch ... C..H</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To rewrite commits E,F,G,H, use one of these:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch ... C..H --not D
+git filter-branch ... D..H --not C</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To move the whole tree into a subdirectory, or remove it from there:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --index-filter \
+	'git ls-files -s | sed "s-\t\"*-&amp;newsubdir/-" |
+		GIT_INDEX_FILE=$GIT_INDEX_FILE.new \
+			git update-index --index-info &amp;&amp;
+	 mv "$GIT_INDEX_FILE.new" "$GIT_INDEX_FILE"' HEAD</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_checklist_for_shrinking_a_repository"><a class="anchor" href="#_checklist_for_shrinking_a_repository"></a>Checklist for Shrinking a Repository</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-filter-branch can be used to get rid of a subset of files,
+usually with some combination of <code>--index-filter</code> and
+<code>--subdirectory-filter</code>.  People expect the resulting repository to
+be smaller than the original, but you need a few more steps to
+actually make it smaller, because Git tries hard not to lose your
+objects until you tell it to.  First make sure that:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>You really removed all variants of a filename, if a blob was moved
+over its lifetime.  <code>git log --name-only --follow --all -- filename</code>
+can help you find renames.</p>
+</li>
+<li>
+<p>You really filtered all refs: use <code>--tag-name-filter cat -- --all</code>
+when calling git-filter-branch.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Then there are two ways to get a smaller repository.  A safer way is
+to clone, that keeps your original intact.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Clone it with <code>git clone file:///path/to/repo</code>.  The clone
+will not have the removed objects.  See <a href='{{< relurl "docs/git-clone" >}}'>git-clone[1]</a>.  (Note
+that cloning with a plain path just hardlinks everything!)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>If you really don&#8217;t want to clone it, for whatever reasons, check the
+following points instead (in this order).  This is a very destructive
+approach, so <strong>make a backup</strong> or go back to cloning it.  You have been
+warned.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Remove the original refs backed up by git-filter-branch: say <code>git
+for-each-ref --format="%(refname)" refs/original/ | xargs -n 1 git
+update-ref -d</code>.</p>
+</li>
+<li>
+<p>Expire all reflogs with <code>git reflog expire --expire=now --all</code>.</p>
+</li>
+<li>
+<p>Garbage collect all unreferenced objects with <code>git gc --prune=now</code>
+(or if your git-gc is not new enough to support arguments to
+<code>--prune</code>, use <code>git repack -ad; git prune</code> instead).</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_notes"><a class="anchor" href="#_notes"></a>Notes</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-filter-branch allows you to make complex shell-scripted rewrites
+of your Git history, but you probably don&#8217;t need this flexibility if
+you&#8217;re simply <em>removing unwanted data</em> like large files or passwords.
+For those operations you may want to consider
+<a href="http://rtyley.github.io/bfg-repo-cleaner/">The BFG Repo-Cleaner</a>,
+a JVM-based alternative to git-filter-branch, typically at least
+10-50x faster for those use-cases, and with quite different
+characteristics:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Any particular version of a file is cleaned exactly <em>once</em>. The BFG,
+unlike git-filter-branch, does not give you the opportunity to
+handle a file differently based on where or when it was committed
+within your history. This constraint gives the core performance
+benefit of The BFG, and is well-suited to the task of cleansing bad
+data - you don&#8217;t care <em>where</em> the bad data is, you just want it
+<em>gone</em>.</p>
+</li>
+<li>
+<p>By default The BFG takes full advantage of multi-core machines,
+cleansing commit file-trees in parallel. git-filter-branch cleans
+commits sequentially (i.e. in a single-threaded manner), though it
+<em>is</em> possible to write filters that include their own parallelism,
+in the scripts executed against each commit.</p>
+</li>
+<li>
+<p>The <a href="http://rtyley.github.io/bfg-repo-cleaner/#examples">command options</a>
+are much more restrictive than git-filter branch, and dedicated just
+to the tasks of removing unwanted data- e.g:
+<code>--strip-blobs-bigger-than 1M</code>.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Part of the <a href='{{< relurl "docs/git" >}}'>git[1]</a> suite</p>
+</div>
+</div>
+</div>

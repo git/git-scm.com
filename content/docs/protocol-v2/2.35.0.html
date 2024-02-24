@@ -1,0 +1,845 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - protocol-v2 Documentation
+docname: protocol-v2
+version: 2.35.0
+aliases:
+- "/docs/protocol-v2/2.35.0/index.html"
+- "/docs/protocol-v2/2.35.1/index.html"
+- "/docs/protocol-v2/2.35.2/index.html"
+- "/docs/protocol-v2/2.35.3/index.html"
+- "/docs/protocol-v2/2.35.4/index.html"
+- "/docs/protocol-v2/2.35.5/index.html"
+- "/docs/protocol-v2/2.35.6/index.html"
+- "/docs/protocol-v2/2.35.7/index.html"
+- "/docs/protocol-v2/2.35.8/index.html"
+- "/docs/protocol-v2/2.36.0/index.html"
+- "/docs/protocol-v2/2.36.1/index.html"
+- "/docs/protocol-v2/2.36.2/index.html"
+- "/docs/protocol-v2/2.36.3/index.html"
+- "/docs/protocol-v2/2.36.4/index.html"
+- "/docs/protocol-v2/2.36.5/index.html"
+- "/docs/protocol-v2/2.36.6/index.html"
+- "/docs/protocol-v2/2.37.0/index.html"
+- "/docs/protocol-v2/2.37.1/index.html"
+- "/docs/protocol-v2/2.37.2/index.html"
+- "/docs/protocol-v2/2.37.3/index.html"
+- "/docs/protocol-v2/2.37.4/index.html"
+- "/docs/protocol-v2/2.37.5/index.html"
+- "/docs/protocol-v2/2.37.6/index.html"
+- "/docs/protocol-v2/2.37.7/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This document presents a specification for a version 2 of Git&#8217;s wire
+protocol.  Protocol v2 will improve upon v1 in the following ways:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Instead of multiple service names, multiple commands will be
+supported by a single service</p>
+</li>
+<li>
+<p>Easily extendable as capabilities are moved into their own section
+of the protocol, no longer being hidden behind a NUL byte and
+limited by the size of a pkt-line</p>
+</li>
+<li>
+<p>Separate out other information hidden behind NUL bytes (e.g. agent
+string as a capability and symrefs can be requested using <em>ls-refs</em>)</p>
+</li>
+<li>
+<p>Reference advertisement will be omitted unless explicitly requested</p>
+</li>
+<li>
+<p>ls-refs command to explicitly request some refs</p>
+</li>
+<li>
+<p>Designed with http and stateless-rpc in mind.  With clear flush
+semantics the http remote helper can simply act as a proxy</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>In protocol v2 communication is command oriented.  When first contacting a
+server a list of capabilities will advertised.  Some of these capabilities
+will be commands which a client can request be executed.  Once a command
+has completed, a client can reuse the connection and request that other
+commands be executed.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_packet_line_framing"><a class="anchor" href="#_packet_line_framing"></a>Packet-Line Framing</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>All communication is done using packet-line framing, just as in v1.  See
+<code>Documentation/technical/pack-protocol.txt</code> and
+<code>Documentation/technical/protocol-common.txt</code> for more information.</p>
+</div>
+<div class="paragraph">
+<p>In protocol v2 these special packets will have the following semantics:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><em>0000</em> Flush Packet (flush-pkt) - indicates the end of a message</p>
+</li>
+<li>
+<p><em>0001</em> Delimiter Packet (delim-pkt) - separates sections of a message</p>
+</li>
+<li>
+<p><em>0002</em> Response End Packet (response-end-pkt) - indicates the end of a
+response for stateless connections</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_initial_client_request"><a class="anchor" href="#_initial_client_request"></a>Initial Client Request</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In general a client can request to speak protocol v2 by sending
+<code>version=2</code> through the respective side-channel for the transport being
+used which inevitably sets <code>GIT_PROTOCOL</code>.  More information can be
+found in <code>pack-protocol.txt</code> and <code>http-protocol.txt</code>, as well as the
+<code>GIT_PROTOCOL</code> definition in <code>git.txt</code>. In all cases the
+response from the server is the capability advertisement.</p>
+</div>
+<div class="sect2">
+<h3 id="_git_transport"><a class="anchor" href="#_git_transport"></a>Git Transport</h3>
+<div class="paragraph">
+<p>When using the git:// transport, you can request to use protocol v2 by
+sending "version=2" as an extra parameter:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>003egit-upload-pack /project.git\0host=myserver.com\0\0version=2\0</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_ssh_and_file_transport"><a class="anchor" href="#_ssh_and_file_transport"></a>SSH and File Transport</h3>
+<div class="paragraph">
+<p>When using either the ssh:// or file:// transport, the GIT_PROTOCOL
+environment variable must be set explicitly to include "version=2".
+The server may need to be configured to allow this environment variable
+to pass.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_http_transport"><a class="anchor" href="#_http_transport"></a>HTTP Transport</h3>
+<div class="paragraph">
+<p>When using the http:// or https:// transport a client makes a "smart"
+info/refs request as described in <code>http-protocol.txt</code> and requests that
+v2 be used by supplying "version=2" in the <code>Git-Protocol</code> header.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>C: GET $GIT_URL/info/refs?service=git-upload-pack HTTP/1.0
+C: Git-Protocol: version=2</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A v2 server would reply:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>S: 200 OK
+S: &lt;Some headers&gt;
+S: ...
+S:
+S: 000eversion 2\n
+S: &lt;capability-advertisement&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Subsequent requests are then made directly to the service
+<code>$GIT_URL/git-upload-pack</code>. (This works the same for git-receive-pack).</p>
+</div>
+<div class="paragraph">
+<p>Uses the <code>--http-backend-info-refs</code> option to
+<a href='{{< relurl "docs/git-upload-pack" >}}'>git-upload-pack[1]</a>.</p>
+</div>
+<div class="paragraph">
+<p>The server may need to be configured to pass this header&#8217;s contents via
+the <code>GIT_PROTOCOL</code> variable. See the discussion in <code>git-http-backend.txt</code>.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_capability_advertisement"><a class="anchor" href="#_capability_advertisement"></a>Capability Advertisement</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A server which decides to communicate (based on a request from a client)
+using protocol version 2, notifies the client by sending a version string
+in its initial response followed by an advertisement of its capabilities.
+Each capability is a key with an optional value.  Clients must ignore all
+unknown keys.  Semantics of unknown values are left to the definition of
+each key.  Some capabilities will describe commands which can be requested
+to be executed by the client.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>capability-advertisement = protocol-version
+      capability-list
+      flush-pkt</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>protocol-version = PKT-LINE("version 2" LF)
+capability-list = *capability
+capability = PKT-LINE(key[=value] LF)</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>key = 1*(ALPHA | DIGIT | "-_")
+value = 1*(ALPHA | DIGIT | " -_.,?\/{}[]()&lt;&gt;!@#$%^&amp;*+=:;")</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_command_request"><a class="anchor" href="#_command_request"></a>Command Request</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>After receiving the capability advertisement, a client can then issue a
+request to select the command it wants with any particular capabilities
+or arguments.  There is then an optional section where the client can
+provide any command specific parameters or queries.  Only a single
+command can be requested at a time.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>request = empty-request | command-request
+empty-request = flush-pkt
+command-request = command
+    capability-list
+    delim-pkt
+    command-args
+    flush-pkt
+command = PKT-LINE("command=" key LF)
+command-args = *command-specific-arg</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>command-specific-args are packet line framed arguments defined by
+each individual command.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The server will then check to ensure that the client&#8217;s request is
+comprised of a valid command as well as valid capabilities which were
+advertised.  If the request is valid the server will then execute the
+command.  A server MUST wait till it has received the client&#8217;s entire
+request before issuing a response.  The format of the response is
+determined by the command being executed, but in all cases a flush-pkt
+indicates the end of the response.</p>
+</div>
+<div class="paragraph">
+<p>When a command has finished, and the client has received the entire
+response from the server, a client can either request that another
+command be executed or can terminate the connection.  A client may
+optionally send an empty request consisting of just a flush-pkt to
+indicate that no more requests will be made.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_capabilities"><a class="anchor" href="#_capabilities"></a>Capabilities</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There are two different types of capabilities: normal capabilities,
+which can be used to convey information or alter the behavior of a
+request, and commands, which are the core actions that a client wants to
+perform (fetch, push, etc).</p>
+</div>
+<div class="paragraph">
+<p>Protocol version 2 is stateless by default.  This means that all commands
+must only last a single round and be stateless from the perspective of the
+server side, unless the client has requested a capability indicating that
+state should be maintained by the server.  Clients MUST NOT require state
+management on the server side in order to function correctly.  This
+permits simple round-robin load-balancing on the server side, without
+needing to worry about state management.</p>
+</div>
+<div class="sect2">
+<h3 id="_agent"><a class="anchor" href="#_agent"></a>agent</h3>
+<div class="paragraph">
+<p>The server can advertise the <code>agent</code> capability with a value <code>X</code> (in the
+form <code>agent=X</code>) to notify the client that the server is running version
+<code>X</code>.  The client may optionally send its own agent string by including
+the <code>agent</code> capability with a value <code>Y</code> (in the form <code>agent=Y</code>) in its
+request to the server (but it MUST NOT do so if the server did not
+advertise the agent capability). The <code>X</code> and <code>Y</code> strings may contain any
+printable ASCII characters except space (i.e., the byte range 32 &lt; x &lt;
+127), and are typically of the form "package/version" (e.g.,
+"git/1.8.3.1"). The agent strings are purely informative for statistics
+and debugging purposes, and MUST NOT be used to programmatically assume
+the presence or absence of particular features.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_ls_refs"><a class="anchor" href="#_ls_refs"></a>ls-refs</h3>
+<div class="paragraph">
+<p><code>ls-refs</code> is the command used to request a reference advertisement in v2.
+Unlike the current reference advertisement, ls-refs takes in arguments
+which can be used to limit the refs sent from the server.</p>
+</div>
+<div class="paragraph">
+<p>Additional features not supported in the base command will be advertised
+as the value of the command in the capability advertisement in the form
+of a space separated list of features: "&lt;command&gt;=&lt;feature 1&gt; &lt;feature 2&gt;"</p>
+</div>
+<div class="paragraph">
+<p>ls-refs takes in the following arguments:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   symrefs
+In addition to the object pointed by it, show the underlying ref
+pointed by it when showing a symbolic ref.
+   peel
+Show peeled tags.
+   ref-prefix &lt;prefix&gt;
+When specified, only references having a prefix matching one of
+the provided prefixes are displayed. Multiple instances may be
+given, in which case references matching any prefix will be
+shown. Note that this is purely for optimization; a server MAY
+show refs not matching the prefix if it chooses, and clients
+should filter the result themselves.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>unborn</em> feature is advertised the following argument can be
+included in the client&#8217;s request.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   unborn
+The server will send information about HEAD even if it is a symref
+pointing to an unborn branch in the form "unborn HEAD
+symref-target:&lt;target&gt;".</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The output of ls-refs is as follows:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>output = *ref
+  flush-pkt
+obj-id-or-unborn = (obj-id | "unborn")
+ref = PKT-LINE(obj-id-or-unborn SP refname *(SP ref-attribute) LF)
+ref-attribute = (symref | peeled)
+symref = "symref-target:" symref-target
+peeled = "peeled:" obj-id</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_fetch"><a class="anchor" href="#_fetch"></a>fetch</h3>
+<div class="paragraph">
+<p><code>fetch</code> is the command used to fetch a packfile in v2.  It can be looked
+at as a modified version of the v1 fetch where the ref-advertisement is
+stripped out (since the <code>ls-refs</code> command fills that role) and the
+message format is tweaked to eliminate redundancies and permit easy
+addition of future extensions.</p>
+</div>
+<div class="paragraph">
+<p>Additional features not supported in the base command will be advertised
+as the value of the command in the capability advertisement in the form
+of a space separated list of features: "&lt;command&gt;=&lt;feature 1&gt; &lt;feature 2&gt;"</p>
+</div>
+<div class="paragraph">
+<p>A <code>fetch</code> request can take the following arguments:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   want &lt;oid&gt;
+Indicates to the server an object which the client wants to
+retrieve.  Wants can be anything and are not limited to
+advertised objects.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   have &lt;oid&gt;
+Indicates to the server an object which the client has locally.
+This allows the server to make a packfile which only contains
+the objects that the client needs. Multiple 'have' lines can be
+supplied.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   done
+Indicates to the server that negotiation should terminate (or
+not even begin if performing a clone) and that the server should
+use the information supplied in the request to construct the
+packfile.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   thin-pack
+Request that a thin pack be sent, which is a pack with deltas
+which reference base objects not contained within the pack (but
+are known to exist at the receiving end). This can reduce the
+network traffic significantly, but it requires the receiving end
+to know how to "thicken" these packs by adding the missing bases
+to the pack.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   no-progress
+Request that progress information that would normally be sent on
+side-band channel 2, during the packfile transfer, should not be
+sent.  However, the side-band channel 3 is still used for error
+responses.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   include-tag
+Request that annotated tags should be sent if the objects they
+point to are being sent.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   ofs-delta
+Indicate that the client understands PACKv2 with delta referring
+to its base by position in pack rather than by an oid.  That is,
+they can read OBJ_OFS_DELTA (aka type 6) in a packfile.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>shallow</em> feature is advertised the following arguments can be
+included in the clients request as well as the potential addition of the
+<em>shallow-info</em> section in the server&#8217;s response as explained below.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   shallow &lt;oid&gt;
+A client must notify the server of all commits for which it only
+has shallow copies (meaning that it doesn't have the parents of
+a commit) by supplying a 'shallow &lt;oid&gt;' line for each such
+object so that the server is aware of the limitations of the
+client's history.  This is so that the server is aware that the
+client may not have all objects reachable from such commits.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   deepen &lt;depth&gt;
+Requests that the fetch/clone should be shallow having a commit
+depth of &lt;depth&gt; relative to the remote side.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   deepen-relative
+Requests that the semantics of the "deepen" command be changed
+to indicate that the depth requested is relative to the client's
+current shallow boundary, instead of relative to the requested
+commits.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   deepen-since &lt;timestamp&gt;
+Requests that the shallow clone/fetch should be cut at a
+specific time, instead of depth.  Internally it's equivalent to
+doing "git rev-list --max-age=&lt;timestamp&gt;". Cannot be used with
+"deepen".</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   deepen-not &lt;rev&gt;
+Requests that the shallow clone/fetch should be cut at a
+specific revision specified by '&lt;rev&gt;', instead of a depth.
+Internally it's equivalent of doing "git rev-list --not &lt;rev&gt;".
+Cannot be used with "deepen", but can be used with
+"deepen-since".</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>filter</em> feature is advertised, the following argument can be
+included in the client&#8217;s request:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   filter &lt;filter-spec&gt;
+Request that various objects from the packfile be omitted
+using one of several filtering techniques. These are intended
+for use with partial clone and partial fetch operations. See
+`rev-list` for possible "filter-spec" values. When communicating
+with other processes, senders SHOULD translate scaled integers
+(e.g. "1k") into a fully-expanded form (e.g. "1024") to aid
+interoperability with older receivers that may not understand
+newly-invented scaling suffixes. However, receivers SHOULD
+accept the following suffixes: 'k', 'm', and 'g' for 1024,
+1048576, and 1073741824, respectively.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>ref-in-want</em> feature is advertised, the following argument can
+be included in the client&#8217;s request as well as the potential addition of
+the <em>wanted-refs</em> section in the server&#8217;s response as explained below.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   want-ref &lt;ref&gt;
+Indicates to the server that the client wants to retrieve a
+particular ref, where &lt;ref&gt; is the full name of a ref on the
+server.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>sideband-all</em> feature is advertised, the following argument can be
+included in the client&#8217;s request:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   sideband-all
+Instruct the server to send the whole response multiplexed, not just
+the packfile section. All non-flush and non-delim PKT-LINE in the
+response (not only in the packfile section) will then start with a byte
+indicating its sideband (1, 2, or 3), and the server may send "0005\2"
+(a PKT-LINE of sideband 2 with no payload) as a keepalive packet.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>packfile-uris</em> feature is advertised, the following argument
+can be included in the client&#8217;s request as well as the potential
+addition of the <em>packfile-uris</em> section in the server&#8217;s response as
+explained below.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   packfile-uris &lt;comma-separated list of protocols&gt;
+Indicates to the server that the client is willing to receive
+URIs of any of the given protocols in place of objects in the
+sent packfile. Before performing the connectivity check, the
+client should download from all given URIs. Currently, the
+protocols supported are "http" and "https".</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the <em>wait-for-done</em> feature is advertised, the following argument
+can be included in the client&#8217;s request.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   wait-for-done
+Indicates to the server that it should never send "ready", but
+should wait for the client to say "done" before sending the
+packfile.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The response of <code>fetch</code> is broken into a number of sections separated by
+delimiter packets (0001), with each section beginning with its section
+header. Most sections are sent only when the packfile is sent.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>output = acknowledgements flush-pkt |
+  [acknowledgments delim-pkt] [shallow-info delim-pkt]
+  [wanted-refs delim-pkt] [packfile-uris delim-pkt]
+  packfile flush-pkt</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>acknowledgments = PKT-LINE("acknowledgments" LF)
+    (nak | *ack)
+    (ready)
+ready = PKT-LINE("ready" LF)
+nak = PKT-LINE("NAK" LF)
+ack = PKT-LINE("ACK" SP obj-id LF)</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>shallow-info = PKT-LINE("shallow-info" LF)
+ *PKT-LINE((shallow | unshallow) LF)
+shallow = "shallow" SP obj-id
+unshallow = "unshallow" SP obj-id</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>wanted-refs = PKT-LINE("wanted-refs" LF)
+*PKT-LINE(wanted-ref LF)
+wanted-ref = obj-id SP refname</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>packfile-uris = PKT-LINE("packfile-uris" LF) *packfile-uri
+packfile-uri = PKT-LINE(40*(HEXDIGIT) SP *%x20-ff LF)</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>packfile = PKT-LINE("packfile" LF)
+    *PKT-LINE(%x01-03 *%x00-ff)</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>   acknowledgments section
+* If the client determines that it is finished with negotiations by
+  sending a "done" line (thus requiring the server to send a packfile),
+  the acknowledgments sections MUST be omitted from the server's
+  response.</pre>
+</div>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Always begins with the section header "acknowledgments"</p>
+</li>
+<li>
+<p>The server will respond with "NAK" if none of the object ids sent
+as have lines were common.</p>
+</li>
+<li>
+<p>The server will respond with "ACK obj-id" for all of the
+object ids sent as have lines which are common.</p>
+</li>
+<li>
+<p>A response cannot have both "ACK" lines as well as a "NAK"
+line.</p>
+</li>
+<li>
+<p>The server will respond with a "ready" line indicating that
+the server has found an acceptable common base and is ready to
+make and send a packfile (which will be found in the packfile
+section of the same response)</p>
+</li>
+<li>
+<p>If the server has found a suitable cut point and has decided
+to send a "ready" line, then the server can decide to (as an
+optimization) omit any "ACK" lines it would have sent during
+its response.  This is because the server will have already
+determined the objects it plans to send to the client and no
+further negotiation is needed.</p>
+<div class="literalblock">
+<div class="content">
+<pre>   shallow-info section
+* If the client has requested a shallow fetch/clone, a shallow
+  client requests a fetch or the server is shallow then the
+  server's response may include a shallow-info section.  The
+  shallow-info section will be included if (due to one of the
+  above conditions) the server needs to inform the client of any
+  shallow boundaries or adjustments to the clients already
+  existing shallow boundaries.</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Always begins with the section header "shallow-info"</p>
+</li>
+<li>
+<p>If a positive depth is requested, the server will compute the
+set of commits which are no deeper than the desired depth.</p>
+</li>
+<li>
+<p>The server sends a "shallow obj-id" line for each commit whose
+parents will not be sent in the following packfile.</p>
+</li>
+<li>
+<p>The server sends an "unshallow obj-id" line for each commit
+which the client has indicated is shallow, but is no longer
+shallow as a result of the fetch (due to its parents being
+sent in the following packfile).</p>
+</li>
+<li>
+<p>The server MUST NOT send any "unshallow" lines for anything
+which the client has not indicated was shallow as a part of
+its request.</p>
+<div class="literalblock">
+<div class="content">
+<pre>   wanted-refs section
+* This section is only included if the client has requested a
+  ref using a 'want-ref' line and if a packfile section is also
+  included in the response.</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Always begins with the section header "wanted-refs".</p>
+</li>
+<li>
+<p>The server will send a ref listing ("&lt;oid&gt; &lt;refname&gt;") for
+each reference requested using <em>want-ref</em> lines.</p>
+</li>
+<li>
+<p>The server MUST NOT send any refs which were not requested
+using <em>want-ref</em> lines.</p>
+<div class="literalblock">
+<div class="content">
+<pre>   packfile-uris section
+* This section is only included if the client sent
+  'packfile-uris' and the server has at least one such URI to
+  send.</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Always begins with the section header "packfile-uris".</p>
+</li>
+<li>
+<p>For each URI the server sends, it sends a hash of the pack&#8217;s
+contents (as output by git index-pack) followed by the URI.</p>
+</li>
+<li>
+<p>The hashes are 40 hex characters long. When Git upgrades to a new
+hash algorithm, this might need to be updated. (It should match
+whatever index-pack outputs after "pack\t" or "keep\t".</p>
+<div class="literalblock">
+<div class="content">
+<pre>   packfile section
+* This section is only included if the client has sent 'want'
+  lines in its request and either requested that no more
+  negotiation be done by sending 'done' or if the server has
+  decided it has found a sufficient cut point to produce a
+  packfile.</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Always begins with the section header "packfile"</p>
+</li>
+<li>
+<p>The transmission of the packfile begins immediately after the
+section header</p>
+</li>
+<li>
+<p>The data transfer of the packfile is always multiplexed, using
+the same semantics of the <em>side-band-64k</em> capability from
+protocol version 1.  This means that each packet, during the
+packfile data stream, is made up of a leading 4-byte pkt-line
+length (typical of the pkt-line format), followed by a 1-byte
+stream code, followed by the actual data.</p>
+<div class="literalblock">
+<div class="content">
+<pre> The stream code can be one of:
+1 - pack data
+2 - progress messages
+3 - fatal error message just before stream aborts</pre>
+</div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_server_option"><a class="anchor" href="#_server_option"></a>server-option</h3>
+<div class="paragraph">
+<p>If advertised, indicates that any number of server specific options can be
+included in a request.  This is done by sending each option as a
+"server-option=&lt;option&gt;" capability line in the capability-list section of
+a request.</p>
+</div>
+<div class="paragraph">
+<p>The provided options must not contain a NUL or LF character.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_object_format"><a class="anchor" href="#_object_format"></a> object-format</h3>
+<div class="paragraph">
+<p>The server can advertise the <code>object-format</code> capability with a value <code>X</code> (in the
+form <code>object-format=X</code>) to notify the client that the server is able to deal
+with objects using hash algorithm X.  If not specified, the server is assumed to
+only handle SHA-1.  If the client would like to use a hash algorithm other than
+SHA-1, it should specify its object-format string.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_session_idsession_id"><a class="anchor" href="#_session_idsession_id"></a>session-id=&lt;session id&gt;</h3>
+<div class="paragraph">
+<p>The server may advertise a session ID that can be used to identify this process
+across multiple requests. The client may advertise its own session ID back to
+the server as well.</p>
+</div>
+<div class="paragraph">
+<p>Session IDs should be unique to a given process. They must fit within a
+packet-line, and must not contain non-printable or whitespace characters. The
+current implementation uses trace2 session IDs (see
+<a href="{{< relurl "docs/api-trace2" >}}">api-trace2</a> for details), but this may change and users of
+the session ID should not rely on this fact.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_object_info"><a class="anchor" href="#_object_info"></a>object-info</h3>
+<div class="paragraph">
+<p><code>object-info</code> is the command to retrieve information about one or more objects.
+Its main purpose is to allow a client to make decisions based on this
+information without having to fully fetch objects. Object size is the only
+information that is currently supported.</p>
+</div>
+<div class="paragraph">
+<p>An <code>object-info</code> request takes the following arguments:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>size
+Requests size information to be returned for each listed object id.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>oid &lt;oid&gt;
+Indicates to the server an object which the client wants to obtain
+information for.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The response of <code>object-info</code> is a list of the requested object ids
+and associated requested information, each separated by a single space.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>output = info flush-pkt</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>info = PKT-LINE(attrs) LF)
+	*PKT-LINE(obj-info LF)</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>attrs = attr | attrs SP attrs</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>attr = "size"</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>obj-info = obj-id SP obj-size</pre>
+</div>
+</div>
+</div>
+</div>
+</div>

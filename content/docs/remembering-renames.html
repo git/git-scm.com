@@ -1,0 +1,938 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - remembering-renames Documentation
+docname: remembering-renames
+version: 2.42.0
+latest-changes: 2.42.0
+aliases:
+- "/docs/remembering-renames/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>Rebases and cherry-picks involve a sequence of merges whose results are
+recorded as new single-parent commits.  The first parent side of those
+merges represent the "upstream" side, and often include a far larger set of
+changes than the second parent side.  Traditionally, the renames on the
+first-parent side of that sequence of merges were repeatedly re-detected
+for every merge.  This file explains why it is safe and effective during
+rebases and cherry-picks to remember renames on the upstream side of
+history as an optimization, assuming all merges are automatic and clean
+(i.e. no conflicts and not interrupted for user input or editing).</p>
+</div>
+<div class="paragraph">
+<p>Outline:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Assumptions</p>
+</li>
+<li>
+<p>How rebasing and cherry-picking work</p>
+</li>
+<li>
+<p>Why the renames on MERGE_SIDE1 in any given pick are <strong>always</strong> a
+superset of the renames on MERGE_SIDE1 for the next pick.</p>
+</li>
+<li>
+<p>Why any rename on MERGE_SIDE1 in any given pick is <em>almost</em> always also
+a rename on MERGE_SIDE1 for the next pick</p>
+</li>
+<li>
+<p>A detailed description of the counter-examples to #3.</p>
+</li>
+<li>
+<p>Why the special cases in #4 are still fully reasonable to use to pair
+up files for three-way content merging in the merge machinery, and why
+they do not affect the correctness of the merge.</p>
+</li>
+<li>
+<p>Interaction with skipping of "irrelevant" renames</p>
+</li>
+<li>
+<p>Additional items that need to be cached</p>
+</li>
+<li>
+<p>How directory rename detection interacts with the above and why this
+optimization is still safe even if merge.directoryRenames is set to
+"true".</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_0_assumptions"><a class="anchor" href="#_0_assumptions"></a>0. Assumptions</h3>
+<div class="paragraph">
+<p>There are two assumptions that will hold throughout this document:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The upstream side where commits are transplanted to is treated as the
+first parent side when rebase/cherry-pick call the merge machinery</p>
+</li>
+<li>
+<p>All merges are fully automatic</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>and a third that will hold in sections 2-5 for simplicity, that I&#8217;ll later
+address in section 8:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>No directory renames occur</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Let me explain more about each assumption and why I include it:</p>
+</div>
+<div class="paragraph">
+<p>The first assumption is merely for the purposes of making this document
+clearer; the optimization implementation does not actually depend upon it.
+However, the assumption does hold in all cases because it reflects the way
+that both rebase and cherry-pick were implemented; and the implementation
+of cherry-pick and rebase are not readily changeable for backwards
+compatibility reasons (see for example the discussion of the --ours and
+--theirs flag in the documentation of <code>git checkout</code>, particularly the
+comments about how they behave with rebase).  The optimization avoids
+checking first-parent-ness, though.  It checks the conditions that make the
+optimization valid instead, so it would still continue working if someone
+changed the parent ordering that cherry-pick and rebase use.  But making
+this assumption does make this document much clearer and prevents me from
+having to repeat every example twice.</p>
+</div>
+<div class="paragraph">
+<p>If the second assumption is violated, then the optimization simply is
+turned off and thus isn&#8217;t relevant to consider.  The second assumption can
+also be stated as "there is no interruption for a user to resolve conflicts
+or to just further edit or tweak files".  While real rebases and
+cherry-picks are often interrupted (either because it&#8217;s an interactive
+rebase where the user requested to stop and edit, or because there were
+conflicts that the user needs to resolve), the cache of renames is not
+stored on disk, and thus is thrown away as soon as the rebase or cherry
+pick stops for the user to resolve the operation.</p>
+</div>
+<div class="paragraph">
+<p>The third assumption makes sections 2-5 simpler, and allows people to
+understand the basics of why this optimization is safe and effective, and
+then I can go back and address the specifics in section 8.  It is probably
+also worth noting that if directory renames do occur, then the default of
+merge.directoryRenames being set to "conflict" means that the operation
+will stop for users to resolve the conflicts and the cache will be thrown
+away, and thus that there won&#8217;t be an optimization to apply.  So, the only
+reason we need to address directory renames specifically, is that some
+users will have set merge.directoryRenames to "true" to allow the merges to
+continue to proceed automatically.  The optimization is still safe with
+this config setting, but we have to discuss a few more cases to show why;
+this discussion is deferred until section 8.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_1_how_rebasing_and_cherry_picking_work"><a class="anchor" href="#_1_how_rebasing_and_cherry_picking_work"></a>1. How rebasing and cherry-picking work</h3>
+<div class="paragraph">
+<p>Consider the following setup (from the git-rebase manpage):</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre> A---B---C topic
+/
+  D---E---F---G main</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>After rebasing or cherry-picking topic onto main, this will appear as:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre> A'--B'--C' topic
+/
+ D---E---F---G main</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The way the commits A', B', and C' are created is through a series of
+merges, where rebase or cherry-pick sequentially uses each of the three
+A-B-C commits in a special merge operation.  Let&#8217;s label the three commits
+in the merge operation as MERGE_BASE, MERGE_SIDE1, and MERGE_SIDE2.  For
+this picture, the three commits for each of the three merges would be:</p>
+</div>
+<div class="paragraph">
+<p>To create A':
+   MERGE_BASE:   E
+   MERGE_SIDE1:  G
+   MERGE_SIDE2:  A</p>
+</div>
+<div class="paragraph">
+<p>To create B':
+   MERGE_BASE:   A
+   MERGE_SIDE1:  A'
+   MERGE_SIDE2:  B</p>
+</div>
+<div class="paragraph">
+<p>To create C':
+   MERGE_BASE:   B
+   MERGE_SIDE1:  B'
+   MERGE_SIDE2:  C</p>
+</div>
+<div class="paragraph">
+<p>Sometimes, folks are surprised that these three-way merges are done.  It
+can be useful in understanding these three-way merges to view them in a
+slightly different light.  For example, in creating C', you can view it as
+either:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Apply the changes between B &amp; C to B'</p>
+</li>
+<li>
+<p>Apply the changes between B &amp; B' to C</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Conceptually the two statements above are the same as a three-way merge of
+B, B', and C, at least the parts before you decide to record a commit.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_2_why_the_renames_on_merge_side1_in_any_given_pick_are_always_a"><a class="anchor" href="#_2_why_the_renames_on_merge_side1_in_any_given_pick_are_always_a"></a>2. Why the renames on MERGE_SIDE1 in any given pick are always a</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_superset_of_the_renames_on_merge_side1_for_the_next_pick"><a class="anchor" href="#_superset_of_the_renames_on_merge_side1_for_the_next_pick"></a>superset of the renames on MERGE_SIDE1 for the next pick.</h3>
+<div class="paragraph">
+<p>The merge machinery uses the filenames it is fed from MERGE_BASE,
+MERGE_SIDE1, and MERGE_SIDE2.  It will only move content to a different
+filename under one of three conditions:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>To make both pieces of a conflict available to a user during conflict
+resolution (examples: directory/file conflict, add/add type conflict
+such as symlink vs. regular file)</p>
+</li>
+<li>
+<p>When MERGE_SIDE1 renames the file.</p>
+</li>
+<li>
+<p>When MERGE_SIDE2 renames the file.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>First, let&#8217;s remember what commits are involved in the first and second
+picks of the cherry-pick or rebase sequence:</p>
+</div>
+<div class="paragraph">
+<p>To create A':
+   MERGE_BASE:   E
+   MERGE_SIDE1:  G
+   MERGE_SIDE2:  A</p>
+</div>
+<div class="paragraph">
+<p>To create B':
+   MERGE_BASE:   A
+   MERGE_SIDE1:  A'
+   MERGE_SIDE2:  B</p>
+</div>
+<div class="paragraph">
+<p>So, in particular, we need to show that the renames between E and G are a
+superset of those between A and A'.</p>
+</div>
+<div class="paragraph">
+<p>A' is created by the first merge.  A' will only have renames for one of the
+three reasons listed above.  The first case, a conflict, results in a
+situation where the cache is dropped and thus this optimization doesn&#8217;t
+take effect, so we need not consider that case.  The third case, a rename
+on MERGE_SIDE2 (i.e. from G to A), will show up in A' but it also shows up
+in A&#8201;&#8212;&#8201;therefore when diffing A and A' that path does not show up as a
+rename.  The only remaining way for renames to show up in A' is for the
+rename to come from MERGE_SIDE1.  Therefore, all renames between A and A'
+are a subset of those between E and G.  Equivalently, all renames between E
+and G are a superset of those between A and A'.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_3_why_any_rename_on_merge_side1_in_any_given_pick_is_almost"><a class="anchor" href="#_3_why_any_rename_on_merge_side1_in_any_given_pick_is_almost"></a>3. Why any rename on MERGE_SIDE1 in any given pick is <em>almost</em></h3>
+
+</div>
+<div class="sect2">
+<h3 id="_always_also_a_rename_on_merge_side1_for_the_next_pick"><a class="anchor" href="#_always_also_a_rename_on_merge_side1_for_the_next_pick"></a>always also a rename on MERGE_SIDE1 for the next pick.</h3>
+<div class="paragraph">
+<p>Let&#8217;s again look at the first two picks:</p>
+</div>
+<div class="paragraph">
+<p>To create A':
+   MERGE_BASE:   E
+   MERGE_SIDE1:  G
+   MERGE_SIDE2:  A</p>
+</div>
+<div class="paragraph">
+<p>To create B':
+   MERGE_BASE:   A
+   MERGE_SIDE1:  A'
+   MERGE_SIDE2:  B</p>
+</div>
+<div class="paragraph">
+<p>Now let&#8217;s look at any given rename from MERGE_SIDE1 of the first pick, i.e.
+any given rename from E to G.  Let&#8217;s use the filenames <em>oldfile</em> and
+<em>newfile</em> for demonstration purposes.  That first pick will function as
+follows; when the rename is detected, the merge machinery will do a
+three-way content merge of the following:
+    E:oldfile
+    G:newfile
+    A:oldfile
+and produce a new result:
+    A':newfile</p>
+</div>
+<div class="paragraph">
+<p>Note above that I&#8217;ve assumed that E&#8594;A did not rename oldfile.  If that
+side did rename, then we most likely have a rename/rename(1to2) conflict
+that will cause the rebase or cherry-pick operation to halt and drop the
+in-memory cache of renames and thus doesn&#8217;t need to be considered further.
+In the special case that E&#8594;A does rename the file but also renames it to
+newfile, then there is no conflict from the renaming and the merge can
+succeed.  In this special case, the rename is not valid to cache because
+the second merge will find A:newfile in the MERGE_BASE (see also the new
+testcases in t6429 with "rename same file identically" in their
+description).  So a rename/rename(1to1) needs to be specially handled by
+pruning renames from the cache and decrementing the dir_rename_counts in
+the current and leading directories associated with those renames.  Or,
+since these are really rare, one could just take the easy way out and
+disable the remembering renames optimization when a rename/rename(1to1)
+happens.</p>
+</div>
+<div class="paragraph">
+<p>The previous paragraph handled the cases for E&#8594;A renaming oldfile, let&#8217;s
+continue assuming that oldfile is not renamed in A.</p>
+</div>
+<div class="paragraph">
+<p>As per the diagram for creating B', MERGE_SIDE1 involves the changes from A
+to A'.  So, we are curious whether A:oldfile and A':newfile will be viewed
+as renames.  Note that:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>There will be no A':oldfile (because there could not have been a
+G:oldfile as we do not do break detection in the merge machinery and
+G:newfile was detected as a rename, and by the construction of the
+rename above that merged cleanly, the merge machinery will ensure there
+is no <em>oldfile</em> in the result).</p>
+</li>
+<li>
+<p>There will be no A:newfile (if there had been, we would have had a
+rename/add conflict).</p>
+</li>
+<li>
+<p>Clearly A:oldfile and A':newfile are "related" (A':newfile came from a
+clean three-way content merge involving A:oldfile).</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>We can also expound on the third point above, by noting that three-way
+content merges can also be viewed as applying the differences between the
+base and one side to the other side.  Thus we can view A':newfile as
+having been created by taking the changes between E:oldfile and G:newfile
+(which were detected as being related, i.e. &lt;50% changed) to A:oldfile.</p>
+</div>
+<div class="paragraph">
+<p>Thus A:oldfile and A':newfile are just as related as E:oldfile and
+G:newfile are&#8201;&#8212;&#8201;they have exactly identical differences.  Since the latter
+were detected as renames, A:oldfile and A':newfile should also be
+detectable as renames almost always.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_4_a_detailed_description_of_the_counter_examples_to_3"><a class="anchor" href="#_4_a_detailed_description_of_the_counter_examples_to_3"></a>4. A detailed description of the counter-examples to #3.</h3>
+<div class="paragraph">
+<p>We already noted in section 3 that rename/rename(1to1) (i.e. both sides
+renaming a file the same way) was one counter-example.  The more
+interesting bit, though, is why did we need to use the "almost" qualifier
+when stating that A:oldfile and A':newfile are "almost" always detectable
+as renames?</p>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s repeat an earlier point that section 3 made:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>A':newfile was created by applying the changes between E:oldfile and
+G:newfile to A:oldfile.  The changes between E:oldfile and G:newfile were
+&lt;50% of the size of E:oldfile.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If those changes that were &lt;50% of the size of E:oldfile are also &lt;50% of
+the size of A:oldfile, then A:oldfile and A':newfile will be detectable as
+renames.  However, if there is a dramatic size reduction between E:oldfile
+and A:oldfile (but the changes between E:oldfile, G:newfile, and A:oldfile
+still somehow merge cleanly), then traditional rename detection would not
+detect A:oldfile and A':newfile as renames.</p>
+</div>
+<div class="paragraph">
+<p>Here&#8217;s an example where that can happen:
+  * E:oldfile had 20 lines
+  * G:newfile added 10 new lines at the beginning of the file
+  * A:oldfile kept the first 3 lines of the file, and deleted all the rest
+then
+  &#8658; A':newfile would have 13 lines, 3 of which matches those in A:oldfile.
+E:oldfile &#8594; G:newfile would be detected as a rename, but A:oldfile and
+A':newfile would not be.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_5_why_the_special_cases_in_4_are_still_fully_reasonable_to_use_to"><a class="anchor" href="#_5_why_the_special_cases_in_4_are_still_fully_reasonable_to_use_to"></a>5. Why the special cases in #4 are still fully reasonable to use to</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_pair_up_files_for_three_way_content_merging_in_the_merge_machinery"><a class="anchor" href="#_pair_up_files_for_three_way_content_merging_in_the_merge_machinery"></a>pair up files for three-way content merging in the merge machinery,</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_and_why_they_do_not_affect_the_correctness_of_the_merge"><a class="anchor" href="#_and_why_they_do_not_affect_the_correctness_of_the_merge"></a>and why they do not affect the correctness of the merge.</h3>
+<div class="paragraph">
+<p>In the rename/rename(1to1) case, A:newfile and A':newfile are not renames
+since they use the <strong>same</strong> filename.  However, files with the same filename
+are obviously fine to pair up for three-way content merging (the merge
+machinery has never employed break detection).  The interesting
+counter-example case is thus not the rename/rename(1to1) case, but the case
+where A did not rename oldfile.  That was the case that we spent most of
+the time discussing in sections 3 and 4.  The remainder of this section
+will be devoted to that case as well.</p>
+</div>
+<div class="paragraph">
+<p>So, even if A:oldfile and A':newfile aren&#8217;t detectable as renames, why is
+it still reasonable to pair them up for three-way content merging in the
+merge machinery?  There are multiple reasons:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>As noted in sections 3 and 4, the diff between A:oldfile and A':newfile
+is <strong>exactly</strong> the same as the diff between E:oldfile and G:newfile.  The
+latter pair were detected as renames, so it seems unlikely to surprise
+users for us to treat A:oldfile and A':newfile as renames.</p>
+</li>
+<li>
+<p>In fact, "oldfile" and "newfile" were at one point detected as renames
+due to how they were constructed in the E..G chain.  And we used that
+information once already in this rebase/cherry-pick.  I think users
+would be unlikely to be surprised at us continuing to treat the files
+as renames and would quickly understand why we had done so.</p>
+</li>
+<li>
+<p>Marking or declaring files as renames is <strong>not</strong> the end goal for merges.
+Merges use renames to determine which files make sense to be paired up
+for three-way content merges.</p>
+</li>
+<li>
+<p>A:oldfile and A':newfile were <em>already</em> paired up in a three-way
+content merge; that is how A':newfile was created.  In fact, that
+three-way content merge was clean.  So using them again in a later
+three-way content merge seems very reasonable.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>However, the above is focusing on the common scenarios.  Let&#8217;s try to look
+at all possible unusual scenarios and compare without the optimization to
+with the optimization.  Consider the following theoretical cases; we will
+then dive into each to determine which of them are possible,
+and if so, what they mean:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Without the optimization, the second merge results in a conflict.
+With the optimization, the second merge also results in a conflict.
+Questions: Are the conflicts confusingly different?  Better in one case?</p>
+</li>
+<li>
+<p>Without the optimization, the second merge results in NO conflict.
+With the optimization, the second merge also results in NO conflict.
+Questions: Are the merges the same?</p>
+</li>
+<li>
+<p>Without the optimization, the second merge results in a conflict.
+With the optimization, the second merge results in NO conflict.
+Questions: Possible?  Bug, bugfix, or something else?</p>
+</li>
+<li>
+<p>Without the optimization, the second merge results in NO conflict.
+With the optimization, the second merge results in a conflict.
+Questions: Possible?  Bug, bugfix, or something else?</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>I&#8217;ll consider all four cases, but out of order.</p>
+</div>
+<div class="paragraph">
+<p>The fourth case is impossible.  For the code without the remembering
+renames optimization to not get a conflict, B:oldfile would need to exactly
+match A:oldfile&#8201;&#8212;&#8201;if it doesn&#8217;t, there would be a modify/delete conflict.
+If A:oldfile matches B:oldfile exactly, then a three-way content merge
+between A:oldfile, A':newfile, and B:oldfile would have no conflict and
+just give us the version of newfile from A' as the result.</p>
+</div>
+<div class="paragraph">
+<p>From the same logic as the above paragraph, the second case would indeed
+result in identical merges.  When A:oldfile exactly matches B:oldfile, an
+undetected rename would say, "Oh, I see one side didn&#8217;t modify <em>oldfile</em>
+and the other side deleted it.  I&#8217;ll delete it.  And I see you have this
+brand new file named <em>newfile</em> in A', so I&#8217;ll keep it."  That gives the
+same results as three-way content merging A:oldfile, A':newfile, and
+B:oldfile&#8201;&#8212;&#8201;a removal of oldfile with the version of newfile from A'
+showing up in the result.</p>
+</div>
+<div class="paragraph">
+<p>The third case is interesting.  It means that A:oldfile and A':newfile were
+not just similar enough, but that the changes between them did not conflict
+with the changes between A:oldfile and B:oldfile.  This would validate our
+hunch that the files were similar enough to be used in a three-way content
+merge, and thus seems entirely correct for us to have used them that way.
+(Sidenote: One particular example here may be enlightening.  Let&#8217;s say that
+B was an immediate revert of A.  B clearly would have been a clean revert
+of A, since A was B&#8217;s immediate parent.  One would assume that if you can
+pick a commit, you should also be able to cherry-pick its immediate revert.
+However, this is one of those funny corner cases; without this
+optimization, we just successfully picked a commit cleanly, but we are
+unable to cherry-pick its immediate revert due to the size differences
+between E:oldfile and A:oldfile.)</p>
+</div>
+<div class="paragraph">
+<p>That leaves only the first case to consider&#8201;&#8212;&#8201;when we get conflicts both
+with or without the optimization.  Without the optimization, we&#8217;ll have a
+modify/delete conflict, where both A':newfile and B:oldfile are left in the
+tree for the user to deal with and no hints about the potential similarity
+between the two.  With the optimization, we&#8217;ll have a three-way content
+merged A:oldfile, A':newfile, and B:oldfile with conflict markers
+suggesting we thought the files were related but giving the user the chance
+to resolve.  As noted above, I don&#8217;t think users will find us treating
+<em>oldfile</em> and <em>newfile</em> as related as a surprise since they were between E
+and G.  In any event, though, this case shouldn&#8217;t be concerning since we
+hit a conflict in both cases, told the user what we know, and asked them to
+resolve it.</p>
+</div>
+<div class="paragraph">
+<p>So, in summary, case 4 is impossible, case 2 yields the same behavior, and
+cases 1 and 3 seem to provide as good or better behavior with the
+optimization than without.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_6_interaction_with_skipping_of_irrelevant_renames"><a class="anchor" href="#_6_interaction_with_skipping_of_irrelevant_renames"></a>6. Interaction with skipping of "irrelevant" renames</h3>
+<div class="paragraph">
+<p>Previous optimizations involved skipping rename detection for paths
+considered to be "irrelevant".  See for example the following commits:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>32a56dfb99 ("merge-ort: precompute subset of sources for which we
+need rename detection", 2021-03-11)</p>
+</li>
+<li>
+<p>2fd9eda462 ("merge-ort: precompute whether directory rename
+detection is needed", 2021-03-11)</p>
+</li>
+<li>
+<p>9bd342137e ("diffcore-rename: determine which relevant_sources are
+no longer relevant", 2021-03-13)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Relevance is always determined by what the <em>other</em> side of history has
+done, in terms of modifying a file that our side renamed, or adding a
+file to a directory which our side renamed.  This means that a path
+that is "irrelevant" when picking the first commit of a series in a
+rebase or cherry-pick, may suddenly become "relevant" when picking the
+next commit.</p>
+</div>
+<div class="paragraph">
+<p>The upshot of this is that we can only cache rename detection results
+for relevant paths, and need to re-check relevance in subsequent
+commits.  If those subsequent commits have additional paths that are
+relevant for rename detection, then we will need to redo rename
+detection&#8201;&#8212;&#8201;though we can limit it to the paths for which we have not
+already detected renames.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_7_additional_items_that_need_to_be_cached"><a class="anchor" href="#_7_additional_items_that_need_to_be_cached"></a>7. Additional items that need to be cached</h3>
+<div class="paragraph">
+<p>It turns out we have to cache more than just renames; we also cache:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>A) non-renames (i.e. unpaired deletes)
+B) counts of renames within directories
+C) sources that were marked as RELEVANT_LOCATION, but which were
+   downgraded to RELEVANT_NO_MORE
+D) the toplevel trees involved in the merge</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>These are all stored in struct rename_info, and respectively appear in
+  * cached_pairs (along side actual renames, just with a value of NULL)
+  * dir_rename_counts
+  * cached_irrelevant
+  * merge_trees</p>
+</div>
+<div class="paragraph">
+<p>The reason for (A) comes from the irrelevant renames skipping
+optimization discussed in section 6.  The fact that irrelevant renames
+are skipped means we only get a subset of the potential renames
+detected and subsequent commits may need to run rename detection on
+the upstream side on a subset of the remaining renames (to get the
+renames that are relevant for that later commit).  Since unpaired
+deletes are involved in rename detection too, we don&#8217;t want to
+repeatedly check that those paths remain unpaired on the upstream side
+with every commit we are transplanting.</p>
+</div>
+<div class="paragraph">
+<p>The reason for (B) is that diffcore_rename_extended() is what
+generates the counts of renames by directory which is needed in
+directory rename detection, and if we don&#8217;t run
+diffcore_rename_extended() again then we need to have the output from
+it, including dir_rename_counts, from the previous run.</p>
+</div>
+<div class="paragraph">
+<p>The reason for &#169; is that merge-ort&#8217;s tree traversal will again think
+those paths are relevant (marking them as RELEVANT_LOCATION), but the
+fact that they were downgraded to RELEVANT_NO_MORE means that
+dir_rename_counts already has the information we need for directory
+rename detection.  (A path which becomes RELEVANT_CONTENT in a
+subsequent commit will be removed from cached_irrelevant.)</p>
+</div>
+<div class="paragraph">
+<p>The reason for (D) is that is how we determine whether the remember
+renames optimization can be used.  In particular, remembering that our
+sequence of merges looks like:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Merge 1:
+MERGE_BASE:   E
+MERGE_SIDE1:  G
+MERGE_SIDE2:  A
+=&gt; Creates    A'</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Merge 2:
+MERGE_BASE:   A
+MERGE_SIDE1:  A'
+MERGE_SIDE2:  B
+=&gt; Creates    B'</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>It is the fact that the trees A and A' appear both in Merge 1 and in
+Merge 2, with A as a parent of A' that allows this optimization.  So
+we store the trees to compare with what we are asked to merge next
+time.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_8_how_directory_rename_detection_interacts_with_the_above_and"><a class="anchor" href="#_8_how_directory_rename_detection_interacts_with_the_above_and"></a>8. How directory rename detection interacts with the above and</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_why_this_optimization_is_still_safe_even_if"><a class="anchor" href="#_why_this_optimization_is_still_safe_even_if"></a>why this optimization is still safe even if</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_merge_directoryrenames_is_set_to_true"><a class="anchor" href="#_merge_directoryrenames_is_set_to_true"></a>merge.directoryRenames is set to "true".</h3>
+<div class="paragraph">
+<p>As noted in the assumptions section:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>"""
+...if directory renames do occur, then the default of
+merge.directoryRenames being set to "conflict" means that the operation
+will stop for users to resolve the conflicts and the cache will be
+thrown away, and thus that there won't be an optimization to apply.
+So, the only reason we need to address directory renames specifically,
+is that some users will have set merge.directoryRenames to "true" to
+allow the merges to continue to proceed automatically.
+"""</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let&#8217;s remember that we need to look at how any given pick affects the next
+one.  So let&#8217;s again use the first two picks from the diagram in section
+one:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>First pick does this three-way merge:
+  MERGE_BASE:   E
+  MERGE_SIDE1:  G
+  MERGE_SIDE2:  A
+  =&gt; creates A'</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Second pick does this three-way merge:
+  MERGE_BASE:   A
+  MERGE_SIDE1:  A'
+  MERGE_SIDE2:  B
+  =&gt; creates B'</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, directory rename detection exists so that if one side of history
+renames a directory, and the other side adds a new file to the old
+directory, then the merge (with merge.directoryRenames=true) can move the
+file into the new directory.  There are two qualitatively different ways to
+add a new file to an old directory: create a new file, or rename a file
+into that directory.  Also, directory renames can be done on either side of
+history, so there are four cases to consider:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>MERGE_SIDE1 renames old dir, MERGE_SIDE2 adds new file to   old dir</p>
+</li>
+<li>
+<p>MERGE_SIDE1 renames old dir, MERGE_SIDE2 renames  file into old dir</p>
+</li>
+<li>
+<p>MERGE_SIDE1 adds new file to   old dir, MERGE_SIDE2 renames old dir</p>
+</li>
+<li>
+<p>MERGE_SIDE1 renames  file into old dir, MERGE_SIDE2 renames old dir</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>One last note before we consider these four cases: There are some
+important properties about how we implement this optimization with
+respect to directory rename detection that we need to bear in mind
+while considering all of these cases:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>rename caching occurs <strong>after</strong> applying directory renames</p>
+</li>
+<li>
+<p>a rename created by directory rename detection is recorded for the side
+of history that did the directory rename.</p>
+</li>
+<li>
+<p>dir_rename_counts, the nested map of
+{oldname &#8658; {newname &#8658; count}},
+   is cached between runs as well.  This basically means that directory
+   rename detection is also cached, though only on the side of history
+   that we cache renames for (MERGE_SIDE1 as far as this document is
+   concerned; see the assumptions section).  Two interesting sub-notes
+   about these counts:</p>
+</li>
+<li>
+<p>If we need to perform rename-detection again on the given side (e.g.
+some paths are relevant for rename detection that weren&#8217;t before),
+then we clear dir_rename_counts and recompute it, making use of
+cached_pairs.  The reason it is important to do this is optimizations
+around RELEVANT_LOCATION exist to prevent us from computing
+unnecessary renames for directory rename detection and from computing
+dir_rename_counts for irrelevant directories; but those same renames
+or directories may become necessary for subsequent merges.  The
+easiest way to "fix up" dir_rename_counts in such cases is to just
+recompute it.</p>
+</li>
+<li>
+<p>If we prune rename/rename(1to1) entries from the cache, then we also
+need to update dir_rename_counts to decrement the counts for the
+involved directory and any relevant parent directories (to undo what
+update_dir_rename_counts() in diffcore-rename.c incremented when the
+rename was initially found).  If we instead just disable the
+remembering renames optimization when the exceedingly rare
+rename/rename(1to1) cases occur, then dir_rename_counts will get
+re-computed the next time rename detection occurs, as noted above.</p>
+</li>
+<li>
+<p>the side with multiple commits to pick, is the side of history that we
+do NOT cache renames for.  Thus, there are no additional commits to
+change the number of renames in a directory, except for those done by
+directory rename detection (which always pad the majority).</p>
+</li>
+<li>
+<p>the "renames" we cache are modified slightly by any directory rename,
+as noted below.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Now, with those notes out of the way, let&#8217;s go through the four cases
+in order:</p>
+</div>
+<div class="paragraph">
+<p>Case 1: MERGE_SIDE1 renames old dir, MERGE_SIDE2 adds new file to old dir</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>This case looks like this:</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   E,   Has olddir/
+MERGE_SIDE1:  G,   Renames olddir/ -&gt; newdir/
+MERGE_SIDE2:  A,   Adds olddir/newfile
+=&gt; creates    A',  With newdir/newfile</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   A,   Has olddir/newfile
+MERGE_SIDE1:  A',  Has newdir/newfile
+MERGE_SIDE2:  B,   Modifies olddir/newfile
+=&gt; expected   B',  with threeway-merged newdir/newfile from above</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>In this case, with the optimization, note that after the first commit:
+  * MERGE_SIDE1 remembers olddir/ -&gt; newdir/
+  * MERGE_SIDE1 has cached olddir/newfile -&gt; newdir/newfile
+Given the cached rename noted above, the second merge can proceed as
+expected without needing to perform rename detection from A -&gt; A'.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Case 2: MERGE_SIDE1 renames old dir, MERGE_SIDE2 renames  file into old dir</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>This case looks like this:
+  MERGE_BASE:   E    oldfile, olddir/
+  MERGE_SIDE1:  G    oldfile, olddir/ -&gt; newdir/
+  MERGE_SIDE2:  A    oldfile -&gt; olddir/newfile
+  =&gt; creates    A',  With newdir/newfile representing original oldfile</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   A    olddir/newfile
+MERGE_SIDE1:  A'   newdir/newfile
+MERGE_SIDE2:  B    modify olddir/newfile
+=&gt; expected   B',  with threeway-merged newdir/newfile from above</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>In this case, with the optimization, note that after the first commit:
+  * MERGE_SIDE1 remembers olddir/ -&gt; newdir/
+  * MERGE_SIDE1 has cached olddir/newfile -&gt; newdir/newfile
+  (NOT oldfile -&gt; newdir/newfile; compare to case with
+   (p-&gt;status == 'R' &amp;&amp; new_path) in possibly_cache_new_pair())</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Given the cached rename noted above, the second merge can proceed as
+expected without needing to perform rename detection from A -&gt; A'.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Case 3: MERGE_SIDE1 adds new file to   old dir, MERGE_SIDE2 renames old dir</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>This case looks like this:</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   E,   Has olddir/
+MERGE_SIDE1:  G,   Adds olddir/newfile
+MERGE_SIDE2:  A,   Renames olddir/ -&gt; newdir/
+=&gt; creates    A',  With newdir/newfile</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   A,   Has newdir/, but no notion of newdir/newfile
+MERGE_SIDE1:  A',  Has newdir/newfile
+MERGE_SIDE2:  B,   Has newdir/, but no notion of newdir/newfile
+=&gt; expected   B',  with newdir/newfile from A'</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>In this case, with the optimization, note that after the first commit there
+were no renames on MERGE_SIDE1, and any renames on MERGE_SIDE2 are tossed.
+But the second merge didn't need any renames so this is fine.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Case 4: MERGE_SIDE1 renames  file into old dir, MERGE_SIDE2 renames old dir</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>This case looks like this:</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   E,   Has olddir/
+MERGE_SIDE1:  G,   Renames oldfile -&gt; olddir/newfile
+MERGE_SIDE2:  A,   Renames olddir/ -&gt; newdir/
+=&gt; creates    A',  With newdir/newfile representing original oldfile</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>MERGE_BASE:   A,   Has oldfile
+MERGE_SIDE1:  A',  Has newdir/newfile
+MERGE_SIDE2:  B,   Modifies oldfile
+=&gt; expected   B',  with threeway-merged newdir/newfile from above</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>In this case, with the optimization, note that after the first commit:
+  * MERGE_SIDE1 remembers oldfile -&gt; newdir/newfile
+  (NOT oldfile -&gt; olddir/newfile; compare to case of second
+   block under p-&gt;status == 'R' in possibly_cache_new_pair())
+  * MERGE_SIDE2 renames are tossed because only MERGE_SIDE1 is remembered</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Given the cached rename noted above, the second merge can proceed as
+expected without needing to perform rename detection from A -&gt; A'.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Finally, I&#8217;ll just note here that interactions with the
+skip-irrelevant-renames optimization means we sometimes don&#8217;t detect
+renames for any files within a directory that was renamed, in which
+case we will not have been able to detect any rename for the directory
+itself.  In such a case, we do not know whether the directory was
+renamed; we want to be careful to avoid caching some kind of "this
+directory was not renamed" statement.  If we did, then a subsequent
+commit being rebased could add a file to the old directory, and the
+user would expect it to end up in the correct directory&#8201;&#8212;&#8201;something
+our erroneous "this directory was not renamed" cache would preclude.</p>
+</div>
+</div>

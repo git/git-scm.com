@@ -1,0 +1,485 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - bitmap-format Documentation
+docname: bitmap-format
+version: 2.38.0
+aliases:
+- "/docs/bitmap-format/2.38.0/index.html"
+- "/docs/bitmap-format/2.38.1/index.html"
+- "/docs/bitmap-format/2.38.2/index.html"
+- "/docs/bitmap-format/2.38.3/index.html"
+- "/docs/bitmap-format/2.38.4/index.html"
+- "/docs/bitmap-format/2.38.5/index.html"
+- "/docs/bitmap-format/2.39.0/index.html"
+- "/docs/bitmap-format/2.39.1/index.html"
+- "/docs/bitmap-format/2.39.2/index.html"
+- "/docs/bitmap-format/2.39.3/index.html"
+- "/docs/bitmap-format/2.40.0/index.html"
+- "/docs/bitmap-format/2.40.1/index.html"
+- "/docs/bitmap-format/2.41.0/index.html"
+- "/docs/bitmap-format/2.42.0/index.html"
+- "/docs/bitmap-format/2.42.1/index.html"
+
+---
+<div class="sect1">
+<h2 id="_pack_and_multi_pack_bitmaps"><a class="anchor" href="#_pack_and_multi_pack_bitmaps"></a>Pack and multi-pack bitmaps</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Bitmaps store reachability information about the set of objects in a packfile,
+or a multi-pack index (MIDX). The former is defined obviously, and the latter is
+defined as the union of objects in packs contained in the MIDX.</p>
+</div>
+<div class="paragraph">
+<p>A bitmap may belong to either one pack, or the repository&#8217;s multi-pack index (if
+it exists). A repository may have at most one bitmap.</p>
+</div>
+<div class="paragraph">
+<p>An object is uniquely described by its bit position within a bitmap:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>If the bitmap belongs to a packfile, the <em>n</em>th bit corresponds to
+the <em>n</em>th object in pack order. For a function <code>offset</code> which maps
+objects to their byte offset within a pack, pack order is defined as
+follows:</p>
+<div class="literalblock">
+<div class="content">
+<pre>o1 &lt;= o2 &lt;==&gt; offset(o1) &lt;= offset(o2)</pre>
+</div>
+</div>
+</li>
+<li>
+<p>If the bitmap belongs to a MIDX, the <em>n</em>th bit corresponds to the
+<em>n</em>th object in MIDX order. With an additional function <code>pack</code> which
+maps objects to the pack they were selected from by the MIDX, MIDX order
+is defined as follows:</p>
+<div class="literalblock">
+<div class="content">
+<pre>o1 &lt;= o2 &lt;==&gt; pack(o1) &lt;= pack(o2) /\ offset(o1) &lt;= offset(o2)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The ordering between packs is done according to the MIDX&#8217;s .rev file.
+Notably, the preferred pack sorts ahead of all other packs.</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The on-disk representation (described below) of a bitmap is the same regardless
+of whether or not that bitmap belongs to a packfile or a MIDX. The only
+difference is the interpretation of the bits, which is described above.</p>
+</div>
+<div class="paragraph">
+<p>Certain bitmap extensions are supported (see: Appendix B). No extensions are
+required for bitmaps corresponding to packfiles. For bitmaps that correspond to
+MIDXs, both the bit-cache and rev-cache extensions are required.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_on_disk_format"><a class="anchor" href="#_on_disk_format"></a>On-disk format</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>A header appears at the beginning:</p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-4-bytesignature"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-4-bytesignature"></a>4-byte signature:  </dt>
+<dd>
+<p>{<em>B</em>, <em>I</em>, <em>T</em>, <em>M</em>}</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-2-byteversionnumbernetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-2-byteversionnumbernetworkbyteorder"></a>2-byte version number (network byte order):  </dt>
+<dd>
+<p>The current implementation only supports version 1
+of the bitmap index (the same one as JGit).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-2-byteflagsnetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-2-byteflagsnetworkbyteorder"></a>2-byte flags (network byte order):  </dt>
+<dd>
+<p>The following flags are supported:</p>
+<div class="ulist">
+<ul>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-BITMAPOPTFULLDAG0x1REQUIRED"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-BITMAPOPTFULLDAG0x1REQUIRED"></a>BITMAP_OPT_FULL_DAG (0x1) REQUIRED:  </dt>
+<dd>
+<p>This flag must always be present. It implies that the
+bitmap index has been generated for a packfile or
+multi-pack index (MIDX) with full closure (i.e. where
+every single object in the packfile/MIDX can find its
+parent links inside the same packfile/MIDX). This is a
+requirement for the bitmap index format, also present in
+JGit, that greatly reduces the complexity of the
+implementation.</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-BITMAPOPTHASHCACHE0x4"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-BITMAPOPTHASHCACHE0x4"></a>BITMAP_OPT_HASH_CACHE (0x4):  </dt>
+<dd>
+<p>If present, the end of the bitmap file contains
+<code>N</code> 32-bit name-hash values, one per object in the
+pack/MIDX. The format and meaning of the name-hash is
+described below.</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-BITMAPOPTLOOKUPTABLE0x10"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-BITMAPOPTLOOKUPTABLE0x10"></a>BITMAP_OPT_LOOKUP_TABLE (0x10):  </dt>
+<dd>
+<p>If present, the end of the bitmap file contains a table
+containing a list of <code>N</code> &lt;commit_pos, offset, xor_row&gt;
+triplets. The format and meaning of the table is described
+below.</p>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+Unlike the xor_offset used to compress an individual bitmap,
+<code>xor_row</code> stores an <strong>absolute</strong> index into the lookup table, not a location
+relative to the current entry.
+</td>
+</tr>
+</table>
+</div>
+</dd>
+</dl>
+</div>
+</li>
+</ul>
+</div>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-4-byteentrycountnetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-4-byteentrycountnetworkbyteorder"></a>4-byte entry count (network byte order):  </dt>
+<dd>
+<p>The total count of entries (bitmapped commits) in this bitmap index.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-20-bytechecksum"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-20-bytechecksum"></a>20-byte checksum:  </dt>
+<dd>
+<p>The SHA1 checksum of the pack/MIDX this bitmap index
+belongs to.</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p>4 EWAH bitmaps that act as type indexes</p>
+<div class="paragraph">
+<p>Type indexes are serialized after the hash cache in the shape
+of four EWAH bitmaps stored consecutively (see Appendix A for
+the serialization format of an EWAH bitmap).</p>
+</div>
+<div class="paragraph">
+<p>There is a bitmap for each Git object type, stored in the following
+order:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Commits</p>
+</li>
+<li>
+<p>Trees</p>
+</li>
+<li>
+<p>Blobs</p>
+</li>
+<li>
+<p>Tags</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>In each bitmap, the `n`th bit is set to true if the `n`th object
+in the packfile or multi-pack index is of that type.</p>
+</div>
+<div class="paragraph">
+<p>The obvious consequence is that the OR of all 4 bitmaps will result
+in a full set (all bits set), and the AND of all 4 bitmaps will
+result in an empty bitmap (no bits set).</p>
+</div>
+</li>
+<li>
+<p>N entries with compressed bitmaps, one for each indexed commit</p>
+<div class="paragraph">
+<p>Where <code>N</code> is the total amount of entries in this bitmap index.
+Each entry contains the following:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-4-byteobjectpositionnetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-4-byteobjectpositionnetworkbyteorder"></a>4-byte object position (network byte order):  </dt>
+<dd>
+<p>The position <strong>in the index for the packfile or
+multi-pack index</strong> where the bitmap for this commit is
+found.</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-1-byteXOR-offset"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-1-byteXOR-offset"></a>1-byte XOR-offset:  </dt>
+<dd>
+<p>The xor offset used to compress this bitmap. For an entry
+in position <code>x</code>, a XOR offset of <code>y</code> means that the actual
+bitmap representing this commit is composed by XORing the
+bitmap for this entry with the bitmap in entry <code>x-y</code> (i.e.
+the bitmap <code>y</code> entries before this one).</p>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+This compression can be recursive. In order to
+XOR this entry with a previous one, the previous entry needs
+to be decompressed first, and so on.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The hard-limit for this offset is 160 (an entry can only be
+xor&#8217;ed against one of the 160 entries preceding it). This
+number is always positive, and hence entries are always xor&#8217;ed
+with <strong>previous</strong> bitmaps, not bitmaps that will come afterwards
+in the index.</p>
+</div>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-1-byteflagsforthisbitmap"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-1-byteflagsforthisbitmap"></a>1-byte flags for this bitmap:  </dt>
+<dd>
+<p>At the moment the only available flag is <code>0x1</code>, which hints
+that this bitmap can be re-used when rebuilding bitmap indexes
+for the repository.</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p>The compressed bitmap itself, see Appendix A.</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-TRAILER"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-TRAILER"></a>TRAILER:  </dt>
+<dd>
+<p>Trailing checksum of the preceding contents.</p>
+</dd>
+</dl>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_appendix_a_serialization_format_for_an_ewah_bitmap"><a class="anchor" href="#_appendix_a_serialization_format_for_an_ewah_bitmap"></a>Appendix A: Serialization format for an EWAH bitmap</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Ewah bitmaps are serialized in the same protocol as the JAVAEWAH
+library, making them backwards compatible with the JGit
+implementation:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>4-byte number of bits of the resulting UNCOMPRESSED bitmap</p>
+</li>
+<li>
+<p>4-byte number of words of the COMPRESSED bitmap, when stored</p>
+</li>
+<li>
+<p>N x 8-byte words, as specified by the previous field</p>
+<div class="paragraph">
+<p>This is the actual content of the compressed bitmap.</p>
+</div>
+</li>
+<li>
+<p>4-byte position of the current RLW for the compressed
+bitmap</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>All words are stored in network byte order for their corresponding
+sizes.</p>
+</div>
+<div class="paragraph">
+<p>The compressed bitmap is stored in a form of run-length encoding, as
+follows.  It consists of a concatenation of an arbitrary number of
+chunks.  Each chunk consists of one or more 64-bit words</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>H  L_1  L_2  L_3 .... L_M</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>H is called RLW (run length word).  It consists of (from lower to higher
+order bits):</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>1 bit: the repeated bit B</p>
+</li>
+<li>
+<p>32 bits: repetition count K (unsigned)</p>
+</li>
+<li>
+<p>31 bits: literal word count M (unsigned)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The bitstream represented by the above chunk is then:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>K repetitions of B</p>
+</li>
+<li>
+<p>The bits stored in <code>L_1</code> through <code>L_M</code>.  Within a word, bits at
+lower order come earlier in the stream than those at higher
+order.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The next word after <code>L_M</code> (if any) must again be a RLW, for the next
+chunk.  For efficient appending to the bitstream, the EWAH stores a
+pointer to the last RLW in the stream.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_appendix_b_optional_bitmap_sections"><a class="anchor" href="#_appendix_b_optional_bitmap_sections"></a>Appendix B: Optional Bitmap Sections</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>These sections may or may not be present in the <code>.bitmap</code> file; their
+presence is indicated by the header flags section described above.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_name_hash_cache"><a class="anchor" href="#_name_hash_cache"></a>Name-hash cache</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If the BITMAP_OPT_HASH_CACHE flag is set, the end of the bitmap contains
+a cache of 32-bit values, one per object in the pack/MIDX. The value at
+position <code>i</code> is the hash of the pathname at which the `i`th object
+(counting in index or multi-pack index order) in the pack/MIDX can be found.
+This can be fed into the delta heuristics to compare objects with similar
+pathnames.</p>
+</div>
+<div class="paragraph">
+<p>The hash algorithm used is:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>hash = 0;
+while ((c = *name++))
+ if (!isspace(c))
+  hash = (hash &gt;&gt; 2) + (c &lt;&lt; 24);</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Note that this hashing scheme is tied to the BITMAP_OPT_HASH_CACHE flag.
+If implementations want to choose a different hashing scheme, they are
+free to do so, but MUST allocate a new header flag (because comparing
+hashes made under two different schemes would be pointless).</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_commit_lookup_table"><a class="anchor" href="#_commit_lookup_table"></a>Commit lookup table</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If the BITMAP_OPT_LOOKUP_TABLE flag is set, the last <code>N * (4 + 8 + 4)</code>
+bytes (preceding the name-hash cache and trailing hash) of the <code>.bitmap</code>
+file contains a lookup table specifying the information needed to get
+the desired bitmap from the entries without parsing previous unnecessary
+bitmaps.</p>
+</div>
+<div class="paragraph">
+<p>For a <code>.bitmap</code> containing <code>nr_entries</code> reachability bitmaps, the table
+contains a list of <code>nr_entries</code> &lt;commit_pos, offset, xor_row&gt; triplets
+(sorted in the ascending order of <code>commit_pos</code>). The content of i&#8217;th
+triplet is -</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-commitpos4byteintegernetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-commitpos4byteintegernetworkbyteorder"></a>commit_pos (4 byte integer, network byte order):  </dt>
+<dd>
+<p>It stores the object position of a commit (in the midx or pack
+index).</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-offset8byteintegernetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-offset8byteintegernetworkbyteorder"></a>offset (8 byte integer, network byte order):  </dt>
+<dd>
+<p>The offset from which that commit&#8217;s bitmap can be read.</p>
+</dd>
+</dl>
+</div>
+</li>
+<li>
+<p></p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/bitmap-format.txt-xorrow4byteintegernetworkbyteorder"> <a class="anchor" href="#Documentation/technical/bitmap-format.txt-xorrow4byteintegernetworkbyteorder"></a>xor_row (4 byte integer, network byte order):  </dt>
+<dd>
+<p>The position of the triplet whose bitmap is used to compress
+this one, or <code>0xffffffff</code> if no such bitmap exists.</p>
+</dd>
+</dl>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>

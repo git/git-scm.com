@@ -1,0 +1,98 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - send-pack-pipeline Documentation
+docname: send-pack-pipeline
+version: 2.0.5
+latest-changes: 2.0.5
+aliases:
+- "/docs/send-pack-pipeline/index.html"
+
+---
+<div class="sect1">
+<h2 id="_overall_operation"><a class="anchor" href="#_overall_operation"></a>Overall operation</h2>
+<div class="sectionbody">
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Connects to the remote side and invokes git-receive-pack.</p>
+</li>
+<li>
+<p>Learns what refs the remote has and what commit they point at.
+Matches them to the refspecs we are pushing.</p>
+</li>
+<li>
+<p>Checks if there are non-fast-forwards.  Unlike fetch-pack,
+the repository send-pack runs in is supposed to be a superset
+of the recipient in fast-forward cases, so there is no need
+for want/have exchanges, and fast-forward check can be done
+locally.  Tell the result to the other end.</p>
+</li>
+<li>
+<p>Calls pack_objects() which generates a packfile and sends it
+over to the other end.</p>
+</li>
+<li>
+<p>If the remote side is new enough (v1.1.0 or later), wait for
+the unpack and hook status from the other end.</p>
+</li>
+<li>
+<p>Exit with appropriate error codes.</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_pack_objects_pipeline"><a class="anchor" href="#_pack_objects_pipeline"></a>Pack_objects pipeline</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This function gets one file descriptor (<code>fd</code>) which is either a
+socket (over the network) or a pipe (local).  What&#8217;s written to
+this fd goes to git-receive-pack to be unpacked.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>send-pack ---&gt; fd ---&gt; receive-pack</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The function pack_objects creates a pipe and then forks.  The
+forked child execs pack-objects with --revs to receive revision
+parameters from its standard input. This process will write the
+packfile to the other end.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre> send-pack
+    |
+    pack_objects() ---&gt; fd ---&gt; receive-pack
+       | ^ (pipe)
+v |
+      (child)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The child dup2&#8217;s to arrange its standard output to go back to
+the other end, and read its standard input to come from the
+pipe.  After that it exec&#8217;s pack-objects.  On the other hand,
+the parent process, before starting to feed the child pipeline,
+closes the reading side of the pipe and fd to receive-pack.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre> send-pack
+    |
+    pack_objects(parent)
+       |
+v [0]
+      pack-objects [0] ---&gt; receive-pack</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>[jc: the pipeline was much more complex and needed documentation before
+ I understood an earlier bug, but now it is trivial and straightforward.]</p>
+</div>
+</div>
+</div>

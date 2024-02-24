@@ -1,0 +1,445 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - api-parse-options Documentation
+docname: api-parse-options
+version: 2.20.0
+aliases:
+- "/docs/api-parse-options/2.20.0/index.html"
+- "/docs/api-parse-options/2.20.1/index.html"
+- "/docs/api-parse-options/2.20.2/index.html"
+- "/docs/api-parse-options/2.20.3/index.html"
+- "/docs/api-parse-options/2.20.4/index.html"
+- "/docs/api-parse-options/2.20.5/index.html"
+- "/docs/api-parse-options/2.21.0/index.html"
+- "/docs/api-parse-options/2.21.1/index.html"
+- "/docs/api-parse-options/2.21.2/index.html"
+- "/docs/api-parse-options/2.21.3/index.html"
+- "/docs/api-parse-options/2.21.4/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>The parse-options API is used to parse and massage options in Git
+and to provide a usage help with consistent look.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_basics"><a class="anchor" href="#_basics"></a>Basics</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The argument vector <code>argv[]</code> may usually contain mandatory or optional
+<em>non-option arguments</em>, e.g. a filename or a branch, and <em>options</em>.
+Options are optional arguments that start with a dash and
+that allow to change the behavior of a command.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>There are basically three types of options:
+<em>boolean</em> options,
+options with (mandatory) <em>arguments</em> and
+options with <em>optional arguments</em>
+(i.e. a boolean option that can be adjusted).</p>
+</li>
+<li>
+<p>There are basically two forms of options:
+<em>Short options</em> consist of one dash (<code>-</code>) and one alphanumeric
+character.
+<em>Long options</em> begin with two dashes (<code>--</code>) and some
+alphanumeric characters.</p>
+</li>
+<li>
+<p>Options are case-sensitive.
+Please define <em>lower-case long options</em> only.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The parse-options API allows:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><em>stuck</em> and <em>separate form</em> of options with arguments.
+<code>-oArg</code> is stuck, <code>-o Arg</code> is separate form.
+<code>--option=Arg</code> is stuck, <code>--option Arg</code> is separate form.</p>
+</li>
+<li>
+<p>Long options may be <em>abbreviated</em>, as long as the abbreviation
+is unambiguous.</p>
+</li>
+<li>
+<p>Short options may be bundled, e.g. <code>-a -b</code> can be specified as <code>-ab</code>.</p>
+</li>
+<li>
+<p>Boolean long options can be <em>negated</em> (or <em>unset</em>) by prepending
+<code>no-</code>, e.g. <code>--no-abbrev</code> instead of <code>--abbrev</code>. Conversely,
+options that begin with <code>no-</code> can be <em>negated</em> by removing it.
+Other long options can be unset (e.g., set string to NULL, set
+integer to 0) by prepending <code>no-</code>.</p>
+</li>
+<li>
+<p>Options and non-option arguments can clearly be separated using the <code>--</code>
+option, e.g. <code>-a -b --option -- --this-is-a-file</code> indicates that
+<code>--this-is-a-file</code> must not be processed as an option.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_steps_to_parse_options"><a class="anchor" href="#_steps_to_parse_options"></a>Steps to parse options</h2>
+<div class="sectionbody">
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><code>#include "parse-options.h"</code></p>
+</li>
+<li>
+<p>define a NULL-terminated
+<code>static const char * const builtin_foo_usage[]</code> array
+containing alternative usage strings</p>
+</li>
+<li>
+<p>define <code>builtin_foo_options</code> array as described below
+in section <em>Data Structure</em>.</p>
+</li>
+<li>
+<p>in <code>cmd_foo(int argc, const char **argv, const char *prefix)</code>
+call</p>
+<div class="literalblock">
+<div class="content">
+<pre>argc = parse_options(argc, argv, prefix, builtin_foo_options, builtin_foo_usage, flags);</pre>
+</div>
+</div>
+<div class="paragraph">
+<p><code>parse_options()</code> will filter out the processed options of <code>argv[]</code> and leave the
+non-option arguments in <code>argv[]</code>.
+<code>argc</code> is updated appropriately because of the assignment.</p>
+</div>
+<div class="paragraph">
+<p>You can also pass NULL instead of a usage array as the fifth parameter of
+parse_options(), to avoid displaying a help screen with usage info and
+option list.  This should only be done if necessary, e.g. to implement
+a limited parser for only a subset of the options that needs to be run
+before the full parser, which in turn shows the full help message.</p>
+</div>
+<div class="paragraph">
+<p>Flags are the bitwise-or of:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codePARSEOPTKEEPDASHDASHcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codePARSEOPTKEEPDASHDASHcode"></a><code>PARSE_OPT_KEEP_DASHDASH</code> </dt>
+<dd>
+<p>Keep the <code>--</code> that usually separates options from
+non-option arguments.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codePARSEOPTSTOPATNONOPTIONcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codePARSEOPTSTOPATNONOPTIONcode"></a><code>PARSE_OPT_STOP_AT_NON_OPTION</code> </dt>
+<dd>
+<p>Usually the whole argument vector is massaged and reordered.
+Using this flag, processing is stopped at the first non-option
+argument.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codePARSEOPTKEEPARGV0code"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codePARSEOPTKEEPARGV0code"></a><code>PARSE_OPT_KEEP_ARGV0</code> </dt>
+<dd>
+<p>Keep the first argument, which contains the program name.  It&#8217;s
+removed from argv[] by default.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codePARSEOPTKEEPUNKNOWNcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codePARSEOPTKEEPUNKNOWNcode"></a><code>PARSE_OPT_KEEP_UNKNOWN</code> </dt>
+<dd>
+<p>Keep unknown arguments instead of erroring out.  This doesn&#8217;t
+work for all combinations of arguments as users might expect
+it to do.  E.g. if the first argument in <code>--unknown --known</code>
+takes a value (which we can&#8217;t know), the second one is
+mistakenly interpreted as a known option.  Similarly, if
+<code>PARSE_OPT_STOP_AT_NON_OPTION</code> is set, the second argument in
+<code>--unknown value</code> will be mistakenly interpreted as a
+non-option, not as a value belonging to the unknown option,
+the parser early.  That&#8217;s why parse_options() errors out if
+both options are set.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codePARSEOPTNOINTERNALHELPcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codePARSEOPTNOINTERNALHELPcode"></a><code>PARSE_OPT_NO_INTERNAL_HELP</code> </dt>
+<dd>
+<p>By default, parse_options() handles <code>-h</code>, <code>--help</code> and
+<code>--help-all</code> internally, by showing a help screen.  This option
+turns it off and allows one to add custom handlers for these
+options, or to just leave them unknown.</p>
+</dd>
+</dl>
+</div>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_data_structure"><a class="anchor" href="#_data_structure"></a>Data Structure</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The main data structure is an array of the <code>option</code> struct,
+say <code>static struct option builtin_add_options[]</code>.
+There are some macros to easily define options:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTABBREVampintvarcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTABBREVampintvarcode"></a><code>OPT__ABBREV(&amp;int_var)</code> </dt>
+<dd>
+<p>Add <code>--abbrev[=&lt;n&gt;]</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTCOLORampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTCOLORampintvardescriptioncode"></a><code>OPT__COLOR(&amp;int_var, description)</code> </dt>
+<dd>
+<p>Add <code>--color[=&lt;when&gt;]</code> and <code>--no-color</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTDRYRUNampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTDRYRUNampintvardescriptioncode"></a><code>OPT__DRY_RUN(&amp;int_var, description)</code> </dt>
+<dd>
+<p>Add <code>-n, --dry-run</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTFORCEampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTFORCEampintvardescriptioncode"></a><code>OPT__FORCE(&amp;int_var, description)</code> </dt>
+<dd>
+<p>Add <code>-f, --force</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTQUIETampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTQUIETampintvardescriptioncode"></a><code>OPT__QUIET(&amp;int_var, description)</code> </dt>
+<dd>
+<p>Add <code>-q, --quiet</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTVERBOSEampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTVERBOSEampintvardescriptioncode"></a><code>OPT__VERBOSE(&amp;int_var, description)</code> </dt>
+<dd>
+<p>Add <code>-v, --verbose</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTGROUPdescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTGROUPdescriptioncode"></a><code>OPT_GROUP(description)</code> </dt>
+<dd>
+<p>Start an option group. <code>description</code> is a short string that
+describes the group or an empty string.
+Start the description with an upper-case letter.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTBOOLshortlongampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTBOOLshortlongampintvardescriptioncode"></a><code>OPT_BOOL(short, long, &amp;int_var, description)</code> </dt>
+<dd>
+<p>Introduce a boolean option. <code>int_var</code> is set to one with
+<code>--option</code> and set to zero with <code>--no-option</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTCOUNTUPshortlongampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTCOUNTUPshortlongampintvardescriptioncode"></a><code>OPT_COUNTUP(short, long, &amp;int_var, description)</code> </dt>
+<dd>
+<p>Introduce a count-up option.
+Each use of <code>--option</code> increments <code>int_var</code>, starting from zero
+(even if initially negative), and <code>--no-option</code> resets it to
+zero. To determine if <code>--option</code> or <code>--no-option</code> was encountered at
+all, initialize <code>int_var</code> to a negative value, and if it is still
+negative after parse_options(), then neither <code>--option</code> nor
+<code>--no-option</code> was seen.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTBITshortlongampintvardescriptionmaskcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTBITshortlongampintvardescriptionmaskcode"></a><code>OPT_BIT(short, long, &amp;int_var, description, mask)</code> </dt>
+<dd>
+<p>Introduce a boolean option.
+If used, <code>int_var</code> is bitwise-ored with <code>mask</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTNEGBITshortlongampintvardescriptionmaskcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTNEGBITshortlongampintvardescriptionmaskcode"></a><code>OPT_NEGBIT(short, long, &amp;int_var, description, mask)</code> </dt>
+<dd>
+<p>Introduce a boolean option.
+If used, <code>int_var</code> is bitwise-anded with the inverted <code>mask</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTSETINTshortlongampintvardescriptionintegercode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTSETINTshortlongampintvardescriptionintegercode"></a><code>OPT_SET_INT(short, long, &amp;int_var, description, integer)</code> </dt>
+<dd>
+<p>Introduce an integer option.
+<code>int_var</code> is set to <code>integer</code> with <code>--option</code>, and
+reset to zero with <code>--no-option</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTSTRINGshortlongampstrvarargstrdescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTSTRINGshortlongampstrvarargstrdescriptioncode"></a><code>OPT_STRING(short, long, &amp;str_var, arg_str, description)</code> </dt>
+<dd>
+<p>Introduce an option with string argument.
+The string argument is put into <code>str_var</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTSTRINGLISTshortlongampstructstringlistargstrdescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTSTRINGLISTshortlongampstructstringlistargstrdescriptioncode"></a><code>OPT_STRING_LIST(short, long, &amp;struct string_list, arg_str, description)</code> </dt>
+<dd>
+<p>Introduce an option with string argument.
+The string argument is stored as an element in <code>string_list</code>.
+Use of <code>--no-option</code> will clear the list of preceding values.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTINTEGERshortlongampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTINTEGERshortlongampintvardescriptioncode"></a><code>OPT_INTEGER(short, long, &amp;int_var, description)</code> </dt>
+<dd>
+<p>Introduce an option with integer argument.
+The integer is put into <code>int_var</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTMAGNITUDEshortlongampunsignedlongvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTMAGNITUDEshortlongampunsignedlongvardescriptioncode"></a><code>OPT_MAGNITUDE(short, long, &amp;unsigned_long_var, description)</code> </dt>
+<dd>
+<p>Introduce an option with a size argument. The argument must be a
+non-negative integer and may include a suffix of <em>k</em>, <em>m</em> or <em>g</em> to
+scale the provided value by 1024, 1024^2 or 1024^3 respectively.
+The scaled value is put into <code>unsigned_long_var</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTEXPIRYDATEshortlongamptimestamptvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTEXPIRYDATEshortlongamptimestamptvardescriptioncode"></a><code>OPT_EXPIRY_DATE(short, long, &amp;timestamp_t_var, description)</code> </dt>
+<dd>
+<p>Introduce an option with expiry date argument, see <code>parse_expiry_date()</code>.
+The timestamp is put into <code>timestamp_t_var</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTCALLBACKshortlongampvarargstrdescriptionfuncptrcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTCALLBACKshortlongampvarargstrdescriptionfuncptrcode"></a><code>OPT_CALLBACK(short, long, &amp;var, arg_str, description, func_ptr)</code> </dt>
+<dd>
+<p>Introduce an option with argument.
+The argument will be fed into the function given by <code>func_ptr</code>
+and the result will be put into <code>var</code>.
+See <em>Option Callbacks</em> below for a more elaborate description.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTFILENAMEshortlongampvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTFILENAMEshortlongampvardescriptioncode"></a><code>OPT_FILENAME(short, long, &amp;var, description)</code> </dt>
+<dd>
+<p>Introduce an option with a filename argument.
+The filename will be prefixed by passing the filename along with
+the prefix argument of <code>parse_options()</code> to <code>prefix_filename()</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTARGUMENTlongdescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTARGUMENTlongdescriptioncode"></a><code>OPT_ARGUMENT(long, description)</code> </dt>
+<dd>
+<p>Introduce a long-option argument that will be kept in <code>argv[]</code>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTNUMBERCALLBACKampvardescriptionfuncptrcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTNUMBERCALLBACKampvardescriptionfuncptrcode"></a><code>OPT_NUMBER_CALLBACK(&amp;var, description, func_ptr)</code> </dt>
+<dd>
+<p>Recognize numerical options like -123 and feed the integer as
+if it was an argument to the function given by <code>func_ptr</code>.
+The result will be put into <code>var</code>.  There can be only one such
+option definition.  It cannot be negated and it takes no
+arguments.  Short options that happen to be digits take
+precedence over it.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTCOLORFLAGshortlongampintvardescriptioncode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTCOLORFLAGshortlongampintvardescriptioncode"></a><code>OPT_COLOR_FLAG(short, long, &amp;int_var, description)</code> </dt>
+<dd>
+<p>Introduce an option that takes an optional argument that can
+have one of three values: "always", "never", or "auto".  If the
+argument is not given, it defaults to "always".  The <code>--no-</code> form
+works like <code>--long=never</code>; it cannot take an argument.  If
+"always", set <code>int_var</code> to 1; if "never", set <code>int_var</code> to 0; if
+"auto", set <code>int_var</code> to 1 if stdout is a tty or a pager,
+0 otherwise.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTNOOPNOARGshortlongcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTNOOPNOARGshortlongcode"></a><code>OPT_NOOP_NOARG(short, long)</code> </dt>
+<dd>
+<p>Introduce an option that has no effect and takes no arguments.
+Use it to hide deprecated options that are still to be recognized
+and ignored silently.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTPASSTHRUshortlongampcharvarargstrdescriptionflagscode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTPASSTHRUshortlongampcharvarargstrdescriptionflagscode"></a><code>OPT_PASSTHRU(short, long, &amp;char_var, arg_str, description, flags)</code> </dt>
+<dd>
+<p>Introduce an option that will be reconstructed into a char* string,
+which must be initialized to NULL. This is useful when you need to
+pass the command-line option to another command. Any previous value
+will be overwritten, so this should only be used for options where
+the last one specified on the command line wins.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTPASSTHRUARGVshortlongampargvarrayvarargstrdescriptionflagscode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTPASSTHRUARGVshortlongampargvarrayvarargstrdescriptionflagscode"></a><code>OPT_PASSTHRU_ARGV(short, long, &amp;argv_array_var, arg_str, description, flags)</code> </dt>
+<dd>
+<p>Introduce an option where all instances of it on the command-line will
+be reconstructed into an argv_array. This is useful when you need to
+pass the command-line option, which can be specified multiple times,
+to another command.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-parse-options.txt-codeOPTCMDMODEshortlongampintvardescriptionenumvalcode"> <a class="anchor" href="#Documentation/technical/api-parse-options.txt-codeOPTCMDMODEshortlongampintvardescriptionenumvalcode"></a><code>OPT_CMDMODE(short, long, &amp;int_var, description, enum_val)</code> </dt>
+<dd>
+<p>Define an "operation mode" option, only one of which in the same
+group of "operating mode" options that share the same <code>int_var</code>
+can be given by the user. <code>enum_val</code> is set to <code>int_var</code> when the
+option is used, but an error is reported if other "operating mode"
+option has already set its value to the same <code>int_var</code>.</p>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>The last element of the array must be <code>OPT_END()</code>.</p>
+</div>
+<div class="paragraph">
+<p>If not stated otherwise, interpret the arguments as follows:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>short</code> is a character for the short option
+(e.g. <code>'e'</code> for <code>-e</code>, use <code>0</code> to omit),</p>
+</li>
+<li>
+<p><code>long</code> is a string for the long option
+(e.g. <code>"example"</code> for <code>--example</code>, use <code>NULL</code> to omit),</p>
+</li>
+<li>
+<p><code>int_var</code> is an integer variable,</p>
+</li>
+<li>
+<p><code>str_var</code> is a string variable (<code>char *</code>),</p>
+</li>
+<li>
+<p><code>arg_str</code> is the string that is shown as argument
+(e.g. <code>"branch"</code> will result in <code>&lt;branch&gt;</code>).
+If set to <code>NULL</code>, three dots (<code>...</code>) will be displayed.</p>
+</li>
+<li>
+<p><code>description</code> is a short string to describe the effect of the option.
+It shall begin with a lower-case letter and a full stop (<code>.</code>) shall be
+omitted at the end.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_option_callbacks"><a class="anchor" href="#_option_callbacks"></a>Option Callbacks</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The function must be defined in this form:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>int func(const struct option *opt, const char *arg, int unset)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The callback mechanism is as follows:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Inside <code>func</code>, the only interesting member of the structure
+given by <code>opt</code> is the void pointer <code>opt-&gt;value</code>.
+<code>*opt-&gt;value</code> will be the value that is saved into <code>var</code>, if you
+use <code>OPT_CALLBACK()</code>.
+For example, do <code>*(unsigned long *)opt-&gt;value = 42;</code> to get 42
+into an <code>unsigned long</code> variable.</p>
+</li>
+<li>
+<p>Return value <code>0</code> indicates success and non-zero return
+value will invoke <code>usage_with_options()</code> and, thus, die.</p>
+</li>
+<li>
+<p>If the user negates the option, <code>arg</code> is <code>NULL</code> and <code>unset</code> is 1.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_sophisticated_option_parsing"><a class="anchor" href="#_sophisticated_option_parsing"></a>Sophisticated option parsing</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you need, for example, option callbacks with optional arguments
+or without arguments at all, or if you need other special cases,
+that are not handled by the macros above, you need to specify the
+members of the <code>option</code> structure manually.</p>
+</div>
+<div class="paragraph">
+<p>This is not covered in this document, but well documented
+in <code>parse-options.h</code> itself.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_examples"><a class="anchor" href="#_examples"></a>Examples</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>See <code>test-parse-options.c</code> and
+<code>builtin/add.c</code>,
+<code>builtin/clone.c</code>,
+<code>builtin/commit.c</code>,
+<code>builtin/fetch.c</code>,
+<code>builtin/fsck.c</code>,
+<code>builtin/rm.c</code>
+for real-world examples.</p>
+</div>
+</div>
+</div>

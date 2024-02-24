@@ -1,0 +1,104 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - api-lockfile Documentation
+docname: api-lockfile
+version: 2.0.5
+aliases:
+- "/docs/api-lockfile/2.0.5/index.html"
+- "/docs/api-lockfile/2.1.4/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>The lockfile API serves two purposes:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Mutual exclusion.  When we write out a new index file, first
+we create a new file <code>$GIT_DIR/index.lock</code>, write the new
+contents into it, and rename it to the final destination
+<code>$GIT_DIR/index</code>.  We try to create the <code>$GIT_DIR/index.lock</code>
+file with O_EXCL so that we can notice and fail when somebody
+else is already trying to update the index file.</p>
+</li>
+<li>
+<p>Automatic cruft removal.  After we create the "lock" file, we
+may decide to <code>die()</code>, and we would want to make sure that we
+remove the file that has not been committed to its final
+destination.  This is done by remembering the lockfiles we
+created in a linked list and cleaning them up from an
+<code>atexit(3)</code> handler.  Outstanding lockfiles are also removed
+when the program dies on a signal.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_the_functions"><a class="anchor" href="#_the_functions"></a>The functions</h2>
+<div class="sectionbody">
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/api-lockfile.txt-holdlockfileforupdate"> <a class="anchor" href="#Documentation/technical/api-lockfile.txt-holdlockfileforupdate"></a>hold_lock_file_for_update </dt>
+<dd>
+<p>Take a pointer to <code>struct lock_file</code>, the filename of
+the final destination (e.g. <code>$GIT_DIR/index</code>) and a flag
+<code>die_on_error</code>.  Attempt to create a lockfile for the
+destination and return the file descriptor for writing
+to the file.  If <code>die_on_error</code> flag is true, it dies if
+a lock is already taken for the file; otherwise it
+returns a negative integer to the caller on failure.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-lockfile.txt-commitlockfile"> <a class="anchor" href="#Documentation/technical/api-lockfile.txt-commitlockfile"></a>commit_lock_file </dt>
+<dd>
+<p>Take a pointer to the <code>struct lock_file</code> initialized
+with an earlier call to <code>hold_lock_file_for_update()</code>,
+close the file descriptor and rename the lockfile to its
+final destination.  Returns 0 upon success, a negative
+value on failure to close(2) or rename(2).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-lockfile.txt-rollbacklockfile"> <a class="anchor" href="#Documentation/technical/api-lockfile.txt-rollbacklockfile"></a>rollback_lock_file </dt>
+<dd>
+<p>Take a pointer to the <code>struct lock_file</code> initialized
+with an earlier call to <code>hold_lock_file_for_update()</code>,
+close the file descriptor and remove the lockfile.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-lockfile.txt-closelockfile"> <a class="anchor" href="#Documentation/technical/api-lockfile.txt-closelockfile"></a>close_lock_file </dt>
+<dd>
+<p>Take a pointer to the <code>struct lock_file</code> initialized
+with an earlier call to <code>hold_lock_file_for_update()</code>,
+and close the file descriptor.  Returns 0 upon success,
+a negative value on failure to close(2).</p>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>Because the structure is used in an <code>atexit(3)</code> handler, its
+storage has to stay throughout the life of the program.  It
+cannot be an auto variable allocated on the stack.</p>
+</div>
+<div class="paragraph">
+<p>Call <code>commit_lock_file()</code> or <code>rollback_lock_file()</code> when you are
+done writing to the file descriptor.  If you do not call either
+and simply <code>exit(3)</code> from the program, an <code>atexit(3)</code> handler
+will close and remove the lockfile.</p>
+</div>
+<div class="paragraph">
+<p>If you need to close the file descriptor you obtained from
+<code>hold_lock_file_for_update</code> function yourself, do so by calling
+<code>close_lock_file()</code>.  You should never call <code>close(2)</code> yourself!
+Otherwise the <code>struct
+lock_file</code> structure still remembers that the file descriptor
+needs to be closed, and a later call to <code>commit_lock_file()</code> or
+<code>rollback_lock_file()</code> will result in duplicate calls to
+<code>close(2)</code>.  Worse yet, if you <code>close(2)</code>, open another file
+descriptor for completely different purpose, and then call
+<code>commit_lock_file()</code> or <code>rollback_lock_file()</code>, they may close
+that unrelated file descriptor.</p>
+</div>
+</div>
+</div>

@@ -1,0 +1,658 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - git-bisect Documentation
+docname: git-bisect
+version: 2.42.0
+aliases:
+- "/docs/git-bisect/2.42.0/index.html"
+- "/docs/git-bisect/2.42.1/index.html"
+
+---
+<div class="sect1">
+<h2 id="_name"><a class="anchor" href="#_name"></a>NAME</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-bisect - Use binary search to find the commit that introduced a bug</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_synopsis"><a class="anchor" href="#_synopsis"></a>SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="verseblock">
+<pre class="content"><em>git bisect</em> &lt;subcommand&gt; &lt;options&gt;</pre>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description"><a class="anchor" href="#_description"></a>DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The command takes various subcommands, and different options depending
+on the subcommand:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>git bisect start [--term-{new,bad}=&lt;term&gt; --term-{old,good}=&lt;term&gt;]
+	  [--no-checkout] [--first-parent] [&lt;bad&gt; [&lt;good&gt;...]] [--] [&lt;paths&gt;...]
+git bisect (bad|new|&lt;term-new&gt;) [&lt;rev&gt;]
+git bisect (good|old|&lt;term-old&gt;) [&lt;rev&gt;...]
+git bisect terms [--term-good | --term-bad]
+git bisect skip [(&lt;rev&gt;|&lt;range&gt;)...]
+git bisect reset [&lt;commit&gt;]
+git bisect (visualize|view)
+git bisect replay &lt;logfile&gt;
+git bisect log
+git bisect run &lt;cmd&gt;...
+git bisect help</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This command uses a binary search algorithm to find which commit in
+your project&#8217;s history introduced a bug. You use it by first telling
+it a "bad" commit that is known to contain the bug, and a "good"
+commit that is known to be before the bug was introduced. Then <code>git
+bisect</code> picks a commit between those two endpoints and asks you
+whether the selected commit is "good" or "bad". It continues narrowing
+down the range until it finds the exact commit that introduced the
+change.</p>
+</div>
+<div class="paragraph">
+<p>In fact, <code>git bisect</code> can be used to find the commit that changed
+<strong>any</strong> property of your project; e.g., the commit that fixed a bug, or
+the commit that caused a benchmark&#8217;s performance to improve. To
+support this more general usage, the terms "old" and "new" can be used
+in place of "good" and "bad", or you can choose your own terms. See
+section "Alternate terms" below for more information.</p>
+</div>
+<div class="sect2">
+<h3 id="_basic_bisect_commands_start_bad_good"><a class="anchor" href="#_basic_bisect_commands_start_bad_good"></a>Basic bisect commands: start, bad, good</h3>
+<div class="paragraph">
+<p>As an example, suppose you are trying to find the commit that broke a
+feature that was known to work in version <code>v2.6.13-rc2</code> of your
+project. You start a bisect session as follows:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start
+$ git bisect bad                 # Current version is bad
+$ git bisect good v2.6.13-rc2    # v2.6.13-rc2 is known to be good</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Once you have specified at least one bad and one good commit, <code>git
+bisect</code> selects a commit in the middle of that range of history,
+checks it out, and outputs something similar to the following:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>Bisecting: 675 revisions left to test after this (roughly 10 steps)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You should now compile the checked-out version and test it. If that
+version works correctly, type</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect good</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If that version is broken, type</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect bad</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then <code>git bisect</code> will respond with something like</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>Bisecting: 337 revisions left to test after this (roughly 9 steps)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Keep repeating the process: compile the tree, test it, and depending
+on whether it is good or bad run <code>git bisect good</code> or <code>git bisect bad</code>
+to ask for the next commit that needs testing.</p>
+</div>
+<div class="paragraph">
+<p>Eventually there will be no more revisions left to inspect, and the
+command will print out a description of the first bad commit. The
+reference <code>refs/bisect/bad</code> will be left pointing at that commit.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bisect_reset"><a class="anchor" href="#_bisect_reset"></a>Bisect reset</h3>
+<div class="paragraph">
+<p>After a bisect session, to clean up the bisection state and return to
+the original HEAD, issue the following command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect reset</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By default, this will return your tree to the commit that was checked
+out before <code>git bisect start</code>.  (A new <code>git bisect start</code> will also do
+that, as it cleans up the old bisection state.)</p>
+</div>
+<div class="paragraph">
+<p>With an optional argument, you can return to a different commit
+instead:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect reset &lt;commit&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For example, <code>git bisect reset bisect/bad</code> will check out the first
+bad revision, while <code>git bisect reset HEAD</code> will leave you on the
+current bisection commit and avoid switching commits at all.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_alternate_terms"><a class="anchor" href="#_alternate_terms"></a>Alternate terms</h3>
+<div class="paragraph">
+<p>Sometimes you are not looking for the commit that introduced a
+breakage, but rather for a commit that caused a change between some
+other "old" state and "new" state. For example, you might be looking
+for the commit that introduced a particular fix. Or you might be
+looking for the first commit in which the source-code filenames were
+finally all converted to your company&#8217;s naming standard. Or whatever.</p>
+</div>
+<div class="paragraph">
+<p>In such cases it can be very confusing to use the terms "good" and
+"bad" to refer to "the state before the change" and "the state after
+the change". So instead, you can use the terms "old" and "new",
+respectively, in place of "good" and "bad". (But note that you cannot
+mix "good" and "bad" with "old" and "new" in a single session.)</p>
+</div>
+<div class="paragraph">
+<p>In this more general usage, you provide <code>git bisect</code> with a "new"
+commit that has some property and an "old" commit that doesn&#8217;t have that
+property. Each time <code>git bisect</code> checks out a commit, you test if that
+commit has the property. If it does, mark the commit as "new";
+otherwise, mark it as "old". When the bisection is done, <code>git bisect</code>
+will report which commit introduced the property.</p>
+</div>
+<div class="paragraph">
+<p>To use "old" and "new" instead of "good" and bad, you must run <code>git
+bisect start</code> without commits as argument and then run the following
+commands to add the commits:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git bisect old [&lt;rev&gt;]</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>to indicate that a commit was before the sought change, or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git bisect new [&lt;rev&gt;...]</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>to indicate that it was after.</p>
+</div>
+<div class="paragraph">
+<p>To get a reminder of the currently used terms, use</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git bisect terms</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can get just the old (respectively new) term with <code>git bisect terms
+--term-old</code> or <code>git bisect terms --term-good</code>.</p>
+</div>
+<div class="paragraph">
+<p>If you would like to use your own terms instead of "bad"/"good" or
+"new"/"old", you can choose any names you like (except existing bisect
+subcommands like <code>reset</code>, <code>start</code>, &#8230;&#8203;) by starting the
+bisection using</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git bisect start --term-old &lt;term-old&gt; --term-new &lt;term-new&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For example, if you are looking for a commit that introduced a
+performance regression, you might use</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git bisect start --term-old fast --term-new slow</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Or if you are looking for the commit that fixed a bug, you might use</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git bisect start --term-new fixed --term-old broken</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then, use <code>git bisect &lt;term-old&gt;</code> and <code>git bisect &lt;term-new&gt;</code> instead
+of <code>git bisect good</code> and <code>git bisect bad</code> to mark commits.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bisect_visualizeview"><a class="anchor" href="#_bisect_visualizeview"></a>Bisect visualize/view</h3>
+<div class="paragraph">
+<p>To see the currently remaining suspects in <em>gitk</em>, issue the following
+command during the bisection process (the subcommand <code>view</code> can be used
+as an alternative to <code>visualize</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect visualize</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git detects a graphical environment through various environment variables:
+<code>DISPLAY</code>, which is set in X Window System environments on Unix systems.
+<code>SESSIONNAME</code>, which is set under Cygwin in interactive desktop sessions.
+<code>MSYSTEM</code>, which is set under Msys2 and Git for Windows.
+<code>SECURITYSESSIONID</code>, which may be set on macOS in interactive desktop sessions.</p>
+</div>
+<div class="paragraph">
+<p>If none of these environment variables is set, <em>git log</em> is used instead.
+You can also give command-line options such as <code>-p</code> and <code>--stat</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect visualize --stat</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bisect_log_and_bisect_replay"><a class="anchor" href="#_bisect_log_and_bisect_replay"></a>Bisect log and bisect replay</h3>
+<div class="paragraph">
+<p>After having marked revisions as good or bad, issue the following
+command to show what has been done so far:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect log</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you discover that you made a mistake in specifying the status of a
+revision, you can save the output of this command to a file, edit it to
+remove the incorrect entries, and then issue the following commands to
+return to a corrected state:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect reset
+$ git bisect replay that-file</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_avoiding_testing_a_commit"><a class="anchor" href="#_avoiding_testing_a_commit"></a>Avoiding testing a commit</h3>
+<div class="paragraph">
+<p>If, in the middle of a bisect session, you know that the suggested
+revision is not a good one to test (e.g. it fails to build and you
+know that the failure does not have anything to do with the bug you
+are chasing), you can manually select a nearby commit and test that
+one instead.</p>
+</div>
+<div class="paragraph">
+<p>For example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect good/bad			# previous round was good or bad.
+Bisecting: 337 revisions left to test after this (roughly 9 steps)
+$ git bisect visualize			# oops, that is uninteresting.
+$ git reset --hard HEAD~3		# try 3 revisions before what
+					# was suggested</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then compile and test the chosen revision, and afterwards mark
+the revision as good or bad in the usual manner.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bisect_skip"><a class="anchor" href="#_bisect_skip"></a>Bisect skip</h3>
+<div class="paragraph">
+<p>Instead of choosing a nearby commit by yourself, you can ask Git to do
+it for you by issuing the command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect skip                 # Current version cannot be tested</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>However, if you skip a commit adjacent to the one you are looking for,
+Git will be unable to tell exactly which of those commits was the
+first bad one.</p>
+</div>
+<div class="paragraph">
+<p>You can also skip a range of commits, instead of just one commit,
+using range notation. For example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect skip v2.5..v2.6</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This tells the bisect process that no commit after <code>v2.5</code>, up to and
+including <code>v2.6</code>, should be tested.</p>
+</div>
+<div class="paragraph">
+<p>Note that if you also want to skip the first commit of the range you
+would issue the command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect skip v2.5 v2.5..v2.6</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This tells the bisect process that the commits between <code>v2.5</code> and
+<code>v2.6</code> (inclusive) should be skipped.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_cutting_down_bisection_by_giving_more_parameters_to_bisect_start"><a class="anchor" href="#_cutting_down_bisection_by_giving_more_parameters_to_bisect_start"></a>Cutting down bisection by giving more parameters to bisect start</h3>
+<div class="paragraph">
+<p>You can further cut down the number of trials, if you know what part of
+the tree is involved in the problem you are tracking down, by specifying
+path parameters when issuing the <code>bisect start</code> command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start -- arch/i386 include/asm-i386</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you know beforehand more than one good commit, you can narrow the
+bisect space down by specifying all of the good commits immediately after
+the bad commit when issuing the <code>bisect start</code> command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start v2.6.20-rc6 v2.6.20-rc4 v2.6.20-rc1 --
+                   # v2.6.20-rc6 is bad
+                   # v2.6.20-rc4 and v2.6.20-rc1 are good</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_bisect_run"><a class="anchor" href="#_bisect_run"></a>Bisect run</h3>
+<div class="paragraph">
+<p>If you have a script that can tell if the current source code is good
+or bad, you can bisect by issuing the command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect run my_script arguments</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Note that the script (<code>my_script</code> in the above example) should exit
+with code 0 if the current source code is good/old, and exit with a
+code between 1 and 127 (inclusive), except 125, if the current source
+code is bad/new.</p>
+</div>
+<div class="paragraph">
+<p>Any other exit code will abort the bisect process. It should be noted
+that a program that terminates via <code>exit(-1)</code> leaves $? = 255, (see the
+exit(3) manual page), as the value is chopped with <code>&amp; 0377</code>.</p>
+</div>
+<div class="paragraph">
+<p>The special exit code 125 should be used when the current source code
+cannot be tested. If the script exits with this code, the current
+revision will be skipped (see <code>git bisect skip</code> above). 125 was chosen
+as the highest sensible value to use for this purpose, because 126 and 127
+are used by POSIX shells to signal specific error status (127 is for
+command not found, 126 is for command found but not executable&#8212;&#8203;these
+details do not matter, as they are normal errors in the script, as far as
+<code>bisect run</code> is concerned).</p>
+</div>
+<div class="paragraph">
+<p>You may often find that during a bisect session you want to have
+temporary modifications (e.g. s/#define DEBUG 0/#define DEBUG 1/ in a
+header file, or "revision that does not have this commit needs this
+patch applied to work around another problem this bisection is not
+interested in") applied to the revision being tested.</p>
+</div>
+<div class="paragraph">
+<p>To cope with such a situation, after the inner <em>git bisect</em> finds the
+next revision to test, the script can apply the patch
+before compiling, run the real test, and afterwards decide if the
+revision (possibly with the needed patch) passed the test and then
+rewind the tree to the pristine state.  Finally the script should exit
+with the status of the real test to let the <code>git bisect run</code> command loop
+determine the eventual outcome of the bisect session.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_options"><a class="anchor" href="#_options"></a>OPTIONS</h2>
+<div class="sectionbody">
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/git-bisect.txt---no-checkout"> <a class="anchor" href="#Documentation/git-bisect.txt---no-checkout"></a>--no-checkout </dt>
+<dd>
+<div class="paragraph">
+<p>Do not checkout the new working tree at each iteration of the bisection
+process. Instead just update a special reference named <code>BISECT_HEAD</code> to make
+it point to the commit that should be tested.</p>
+</div>
+<div class="paragraph">
+<p>This option may be useful when the test you would perform in each step
+does not require a checked out tree.</p>
+</div>
+<div class="paragraph">
+<p>If the repository is bare, <code>--no-checkout</code> is assumed.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="Documentation/git-bisect.txt---first-parent"> <a class="anchor" href="#Documentation/git-bisect.txt---first-parent"></a>--first-parent </dt>
+<dd>
+<div class="paragraph">
+<p>Follow only the first parent commit upon seeing a merge commit.</p>
+</div>
+<div class="paragraph">
+<p>In detecting regressions introduced through the merging of a branch, the merge
+commit will be identified as introduction of the bug and its ancestors will be
+ignored.</p>
+</div>
+<div class="paragraph">
+<p>This option is particularly useful in avoiding false positives when a merged
+branch contained broken or non-buildable commits, but the merge itself was OK.</p>
+</div>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_examples"><a class="anchor" href="#_examples"></a>EXAMPLES</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>Automatically bisect a broken build between v1.2 and HEAD:</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start HEAD v1.2 --      # HEAD is bad, v1.2 is good
+$ git bisect run make                # "make" builds the app
+$ git bisect reset                   # quit the bisect session</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Automatically bisect a test failure between origin and HEAD:</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start HEAD origin --    # HEAD is bad, origin is good
+$ git bisect run make test           # "make test" builds and tests
+$ git bisect reset                   # quit the bisect session</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Automatically bisect a broken test case:</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ cat ~/test.sh
+#!/bin/sh
+make || exit 125                     # this skips broken builds
+~/check_test_case.sh                 # does the test case pass?
+$ git bisect start HEAD HEAD~10 --   # culprit is among the last 10
+$ git bisect run ~/test.sh
+$ git bisect reset                   # quit the bisect session</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Here we use a <code>test.sh</code> custom script. In this script, if <code>make</code>
+fails, we skip the current commit.
+<code>check_test_case.sh</code> should <code>exit 0</code> if the test case passes,
+and <code>exit 1</code> otherwise.</p>
+</div>
+<div class="paragraph">
+<p>It is safer if both <code>test.sh</code> and <code>check_test_case.sh</code> are
+outside the repository to prevent interactions between the bisect,
+make and test processes and the scripts.</p>
+</div>
+</li>
+<li>
+<p>Automatically bisect with temporary modifications (hot-fix):</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ cat ~/test.sh
+#!/bin/sh
+
+# tweak the working tree by merging the hot-fix branch
+# and then attempt a build
+if	git merge --no-commit --no-ff hot-fix &amp;&amp;
+	make
+then
+	# run project specific test and report its status
+	~/check_test_case.sh
+	status=$?
+else
+	# tell the caller this is untestable
+	status=125
+fi
+
+# undo the tweak to allow clean flipping to the next commit
+git reset --hard
+
+# return control
+exit $status</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This applies modifications from a hot-fix branch before each test run,
+e.g. in case your build or test environment changed so that older
+revisions may need a fix which newer ones have already. (Make sure the
+hot-fix branch is based off a commit which is contained in all revisions
+which you are bisecting, so that the merge does not pull in too much, or
+use <code>git cherry-pick</code> instead of <code>git merge</code>.)</p>
+</div>
+</li>
+<li>
+<p>Automatically bisect a broken test case:</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start HEAD HEAD~10 --   # culprit is among the last 10
+$ git bisect run sh -c "make || exit 125; ~/check_test_case.sh"
+$ git bisect reset                   # quit the bisect session</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This shows that you can do without a run script if you write the test
+on a single line.</p>
+</div>
+</li>
+<li>
+<p>Locate a good region of the object graph in a damaged repository</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start HEAD &lt;known-good-commit&gt; [ &lt;boundary-commit&gt; ... ] --no-checkout
+$ git bisect run sh -c '
+	GOOD=$(git for-each-ref "--format=%(objectname)" refs/bisect/good-*) &amp;&amp;
+	git rev-list --objects BISECT_HEAD --not $GOOD &gt;tmp.$$ &amp;&amp;
+	git pack-objects --stdout &gt;/dev/null &lt;tmp.$$
+	rc=$?
+	rm -f tmp.$$
+	test $rc = 0'
+
+$ git bisect reset                   # quit the bisect session</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this case, when <em>git bisect run</em> finishes, bisect/bad will refer to a commit that
+has at least one parent whose reachable graph is fully traversable in the sense
+required by <em>git pack objects</em>.</p>
+</div>
+</li>
+<li>
+<p>Look for a fix instead of a regression in the code</p>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start
+$ git bisect new HEAD    # current commit is marked as new
+$ git bisect old HEAD~10 # the tenth commit from now is marked as old</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or:</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git bisect start --term-old broken --term-new fixed
+$ git bisect fixed
+$ git bisect broken HEAD~10</pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_getting_help"><a class="anchor" href="#_getting_help"></a>Getting help</h3>
+<div class="paragraph">
+<p>Use <code>git bisect</code> to get a short usage description, and <code>git bisect
+help</code> or <code>git bisect -h</code> to get a long usage description.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_see_also"><a class="anchor" href="#_see_also"></a>SEE ALSO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><a href="{{< relurl "docs/git-bisect-lk2009" >}}">Fighting regressions with git bisect</a>,
+<a href='{{< relurl "docs/git-blame" >}}'>git-blame[1]</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Part of the <a href='{{< relurl "docs/git" >}}'>git[1]</a> suite</p>
+</div>
+</div>
+</div>

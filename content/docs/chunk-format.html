@@ -1,0 +1,169 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - chunk-format Documentation
+docname: chunk-format
+version: 2.31.0
+latest-changes: 2.31.0
+aliases:
+- "/docs/chunk-format/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>Some file formats in Git use a common concept of "chunks" to describe
+sections of the file. This allows structured access to a large file by
+scanning a small "table of contents" for the remaining data. This common
+format is used by the <code>commit-graph</code> and <code>multi-pack-index</code> files. See
+<a href="{{< relurl "docs/pack-format" >}}">the <code>multi-pack-index</code> format</a> and
+<a href="{{< relurl "docs/commit-graph-format" >}}">the <code>commit-graph</code> format</a> for
+how they use the chunks to describe structured data.</p>
+</div>
+<div class="paragraph">
+<p>A chunk-based file format begins with some header information custom to
+that format. That header should include enough information to identify
+the file type, format version, and number of chunks in the file. From this
+information, that file can determine the start of the chunk-based region.</p>
+</div>
+<div class="paragraph">
+<p>The chunk-based region starts with a table of contents describing where
+each chunk starts and ends. This consists of (C+1) rows of 12 bytes each,
+where C is the number of chunks. Consider the following table:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>| Chunk ID (4 bytes) | Chunk Offset (8 bytes) |
+|--------------------|------------------------|
+| ID[0]              | OFFSET[0]              |
+| ...                | ...                    |
+| ID[C]              | OFFSET[C]              |
+| 0x0000             | OFFSET[C+1]            |</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Each row consists of a 4-byte chunk identifier (ID) and an 8-byte offset.
+Each integer is stored in network-byte order.</p>
+</div>
+<div class="paragraph">
+<p>The chunk identifier <code>ID[i]</code> is a label for the data stored within this
+fill from <code>OFFSET[i]</code> (inclusive) to <code>OFFSET[i+1]</code> (exclusive). Thus, the
+size of the <code>i`th chunk is equal to the difference between `OFFSET[i+1]</code>
+and <code>OFFSET[i]</code>. This requires that the chunk data appears contiguously
+in the same order as the table of contents.</p>
+</div>
+<div class="paragraph">
+<p>The final entry in the table of contents must be four zero bytes. This
+confirms that the table of contents is ending and provides the offset for
+the end of the chunk-based data.</p>
+</div>
+<div class="paragraph">
+<p>Note: The chunk-based format expects that the file contains <em>at least</em> a
+trailing hash after <code>OFFSET[C+1]</code>.</p>
+</div>
+<div class="paragraph">
+<p>Functions for working with chunk-based file formats are declared in
+<code>chunk-format.h</code>. Using these methods provide extra checks that assist
+developers when creating new file formats.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_writing_chunk_based_file_formats"><a class="anchor" href="#_writing_chunk_based_file_formats"></a>Writing chunk-based file formats</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To write a chunk-based file format, create a <code>struct chunkfile</code> by
+calling <code>init_chunkfile()</code> and pass a <code>struct hashfile</code> pointer. The
+caller is responsible for opening the <code>hashfile</code> and writing header
+information so the file format is identifiable before the chunk-based
+format begins.</p>
+</div>
+<div class="paragraph">
+<p>Then, call <code>add_chunk()</code> for each chunk that is intended for write. This
+populates the <code>chunkfile</code> with information about the order and size of
+each chunk to write. Provide a <code>chunk_write_fn</code> function pointer to
+perform the write of the chunk data upon request.</p>
+</div>
+<div class="paragraph">
+<p>Call <code>write_chunkfile()</code> to write the table of contents to the <code>hashfile</code>
+followed by each of the chunks. This will verify that each chunk wrote
+the expected amount of data so the table of contents is correct.</p>
+</div>
+<div class="paragraph">
+<p>Finally, call <code>free_chunkfile()</code> to clear the <code>struct chunkfile</code> data. The
+caller is responsible for finalizing the <code>hashfile</code> by writing the trailing
+hash and closing the file.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_reading_chunk_based_file_formats"><a class="anchor" href="#_reading_chunk_based_file_formats"></a>Reading chunk-based file formats</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To read a chunk-based file format, the file must be opened as a
+memory-mapped region. The chunk-format API expects that the entire file
+is mapped as a contiguous memory region.</p>
+</div>
+<div class="paragraph">
+<p>Initialize a <code>struct chunkfile</code> pointer with <code>init_chunkfile(NULL)</code>.</p>
+</div>
+<div class="paragraph">
+<p>After reading the header information from the beginning of the file,
+including the chunk count, call <code>read_table_of_contents()</code> to populate
+the <code>struct chunkfile</code> with the list of chunks, their offsets, and their
+sizes.</p>
+</div>
+<div class="paragraph">
+<p>Extract the data information for each chunk using <code>pair_chunk()</code> or
+<code>read_chunk()</code>:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>pair_chunk()</code> assigns a given pointer with the location inside the
+memory-mapped file corresponding to that chunk&#8217;s offset. If the chunk
+does not exist, then the pointer is not modified.</p>
+</li>
+<li>
+<p><code>read_chunk()</code> takes a <code>chunk_read_fn</code> function pointer and calls it
+with the appropriate initial pointer and size information. The function
+is not called if the chunk does not exist. Use this method to read chunks
+if you need to perform immediate parsing or if you need to execute logic
+based on the size of the chunk.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>After calling these methods, call <code>free_chunkfile()</code> to clear the
+<code>struct chunkfile</code> data. This will not close the memory-mapped region.
+Callers are expected to own that data for the timeframe the pointers into
+the region are needed.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_examples"><a class="anchor" href="#_examples"></a>Examples</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>These file formats use the chunk-format API, and can be used as examples
+for future formats:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>commit-graph:</strong> see <code>write_commit_graph_file()</code> and <code>parse_commit_graph()</code>
+in <code>commit-graph.c</code> for how the chunk-format API is used to write and
+parse the commit-graph file format documented in
+<a href="{{< relurl "docs/commit-graph-format" >}}">the commit-graph file format</a>.</p>
+</li>
+<li>
+<p><strong>multi-pack-index:</strong> see <code>write_midx_internal()</code> and <code>load_multi_pack_index()</code>
+in <code>midx.c</code> for how the chunk-format API is used to write and
+parse the multi-pack-index file format documented in
+<a href="{{< relurl "docs/pack-format" >}}">the multi-pack-index file format</a>.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
