@@ -1,0 +1,97 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git op de server
+    number: 4
+  section:
+    title: Git Daemon
+    number: 5
+    cs_number: '4.5'
+    previous: book/nl/v2/Git-op-de-server-De-server-opzetten
+    next: book/nl/v2/Git-op-de-server-Slimme-HTTP
+title: Git - Git Daemon
+
+---
+<h2 id="_git_daemon">Git Daemon</h2>
+<div class="paragraph">
+<p>
+Nu gaan we een daemon opzetten die repositories verspreid via het “Git” protocol.
+Dit is een gebruikelijke keuze voor snelle, ongeauthenticerde toegang tot je Git data.
+Onthoud dat omdat dit geen geauthenticeerde service is, alles wat je verspreid publiek is in het netwerk.</p>
+</div>
+<div class="paragraph">
+<p>Als je deze server buiten je firewall draait, zou het alleen gebruikt moeten worden voor projecten die publiekelijk zichtbaar zijn naar de wereld.
+Als de server die je draait binnen je firewall staat, zou je het kunnen gebruiken voor projecten met een groot aantal mensen of computers (continue integratie of build servers) die alleen-lees-toegang hebben, waarvoor je niet een SSH sleutel wilt toevoegen voor elk van deze.</p>
+</div>
+<div class="paragraph">
+<p>In elk geval, het Git protocol is relatief simpel om op te zetten.
+Het enige wat je hoeft te doen is dit commando in de achtergrond (daemonize) draaien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git daemon --reuseaddr --base-path=/srv/git/ /srv/git/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De <code>--reuseaddr</code> optie staat de server toe om te herstarten zonder te wachten tot oude connecties een time-out krijgen, de <code>--base-path</code> optie staat mensen toe om projecten te clonen zonder het volledige pad te specificeren, en het pad aan het einde vertelt de Git daemon waar hij moet kijken voor de te exporteren repositories.
+Als je een firewall draait, zul je er poort 9418 open moeten zetten op de machine waar je dit op gaat doen.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt dit proces op een aantal manieren daemoniseren, afhankelijk van het besturingssystem waarop je draait.</p>
+</div>
+<div class="paragraph">
+<p>Omdat <code>systemd</code> het meest gebruikte init systeem is onder de moderne Linux distributies, kan je dat gebruiken voor dat doel.
+Simpelweg een bestand in <code>/etc/systemd/system/git-daemon.service</code> zetten met deze inhoud:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">[Unit]
+Description=Start Git Daemon
+
+[Service]
+ExecStart=/usr/bin/git daemon --reuseaddr --base-path=/srv/git/ /srv/git/
+
+Restart=always
+RestartSec=500ms
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=git-daemon
+
+User=git
+Group=git
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het zal je op zijn gevallen dat de Git daemon hier wordt gestart met <code>git</code> als zowel de group als user.
+Pas het aan aan jouw standaard en org ervoor dat de gebruiker bestaat op het systeem.
+Controleer ook dat de Git binary inderdaad op <code>/usr/bin/git</code> staat en wijzig het pad indien noodzakelijk.</p>
+</div>
+<div class="paragraph">
+<p>Als laatste roep je <code>systemctl enable git-daemon</code> aan om de service automatisch te starten op boot-tijd, en je kunt de service starten en stoppen met respectievelijk <code>systemctl start git-daemon</code> en <code>systemctl stop git-daemon</code>.</p>
+</div>
+<div class="paragraph">
+<p>Op andere systemen zul je misschien <code>xinetd</code> willen gebruiken, een script in je <code>sysvinit</code> systeem, of iets anders — zolang je dat commando maar ge-daemoniseerd krijgt en deze op een of andere manier in de gaten gehouden wordt.</p>
+</div>
+<div class="paragraph">
+<p>Vervolgens zul je Git moeten vertellen op welke repositories je onauthenticeerde Gitserver gebaseerde toegang toestaat.
+Je kunt dit doen voor elke repository door een bestand genaamd <code>git-deamon-export-ok</code> te maken.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd /path/to/project.git
+$ touch git-daemon-export-ok</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het feit dat dit bestand er is geeft aan dat Git dat project zonder authenticatie kan verspreiden.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

@@ -1,0 +1,292 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Branchen in Git
+    number: 3
+  section:
+    title: Branches in vogelvlucht
+    number: 1
+    cs_number: '3.1'
+    previous: book/nl/v2/Git-Basics-Samenvatting
+    next: book/nl/v2/Branchen-in-Git-Eenvoudig-branchen-en-mergen
+title: Git - Branches in vogelvlucht
+
+---
+<p>
+Bijna elk VCS ondersteunt een bepaalde vorm van branchen.
+Branchen komt erop neer dat je een tak afsplitst van de hoofd-ontwikkellijn en daar verder mee gaat werken zonder aan de hoofdlijn te komen.
+Bij veel VCS’en is dat nogal een duur proces, vaak wordt er een nieuwe kopie gemaakt van de directory waar je broncode in staat, wat lang kan duren voor grote projecten.</p><p>Sommige mensen verwijzen naar het branch model in Git als de "killer eigenschap", en het onderscheidt Git zeker in de VCS-gemeenschap.
+Waarom is het zo bijzonder?
+De manier waarop Git brancht is ongelooflijk lichtgewicht, waardoor branch operaties vrijwel direct uitgevoerd zijn en het wisselen tussen de branches over het algemeen net zo snel.
+In tegenstelling tot vele andere VCS’s, moedigt Git juist een workflow aan waarbij vaak gebrancht en gemerged wordt, zelfs meerdere keren per dag.
+Deze eigenschap begrijpen en de techniek beheersen geeft je een krachtig en uniek gereedschap en kan letterlijk de manier waarop je ontwikkelt veranderen.</p>
+<h2 id="_git_branches_overview">Branches in vogelvlucht</h2>
+<div class="paragraph">
+<p>Om de manier waarop Git brancht echt te begrijpen, moeten we een stap terug doen en onderzoeken hoe Git zijn gegevens opslaat.</p>
+</div>
+<div class="paragraph">
+<p>Zoals je je misschien herinnert van <a href="{{< relurl "book/nl/v2/ch00/ch01-getting-started" >}}">Aan de slag</a>, slaat Git zijn gegevens niet op als een reeks van wijzigingen of delta’s, maar in plaats daarvan als een serie <em>snapshots</em>.</p>
+</div>
+<div class="paragraph">
+<p>Als je in Git commit, dan slaat Git een commit object op dat een verwijzing bevat naar het snapshot van de inhoud die je gestaged hebt.
+Dit object bevat ook de naam en mailadres van de auteur, het merge bericht dat ingetypt was, verwijzingen naar de commit of commits die de directe ouders van deze commit waren: nul ouders voor de eerste commit, één ouder voor een normale commit, en meerdere ouders voor een commit die het resultaat is van een merge van twee of meer branches.</p>
+</div>
+<div class="paragraph">
+<p>Om dit te visualiseren, gaan we aannemen dat je een directory hebt met drie bestanden, en je staget en commit ze allemaal.
+Door de bestanden te stagen krijgen ze allemaal een checksum (de SHA-1 hash waar we het in <a href="{{< relurl "book/nl/v2/ch00/ch01-getting-started" >}}">Aan de slag</a> over hadden), worden die versies de bestanden in het Git repository (Git noemt ze <em>blobs</em>) opgeslagen, en worden die checksums aan de staging area toegevoegd:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add README test.rb LICENSE
+$ git commit -m 'initial commit of my project'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je de commit aanmaakt door <code>git commit</code> uit te voeren zal Git iedere directory in het project (in dit geval alleen de root) van een checksum voorzien en slaat ze als boomstructuur (<code>tree</code>) objecten in de Git repository op.
+Daarna creëert Git een <code>commit</code> object dat de metagegevens bevat en een verwijzing naar de hoofd-<code>tree</code>-object van het project zodat Git deze snapshot opnieuw kan oproepen als dat nodig is.</p>
+</div>
+<div class="paragraph">
+<p>Je Git repository bevat nu vijf objecten: drie <em>blobs</em> (een blob voor de inhoud van ieder van de drie bestanden), een <em>tree</em> die de inhoud van de directory weergeeft en specificeert welke bestandsnamen opgeslagen zijn als welke blob, en een <em>commit</em> met de verwijzing naar die hoofd-tree en alle commit-metagegevens.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/commit-and-tree.png" >}}" alt="Een commit en zijn tree.">
+</div>
+<div class="title">Figuur 9. Een commit en zijn tree</div>
+</div>
+<div class="paragraph">
+<p>Als je wat wijzigingen maakt en nogmaals commit, dan slaat de volgende commit een verwijzing op naar de commit die er direct aan vooraf ging.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/commits-and-parents.png" >}}" alt="Commits en hun ouders.">
+</div>
+<div class="title">Figuur 10. Commits en hun ouders</div>
+</div>
+<div class="paragraph">
+<p>Een branch in Git is simpelweg een lichtgewicht verplaatsbare verwijzing naar een van deze commits.
+De standaard branch-naam in Git is <code>master</code>.
+Als je commits begint te maken, krijg je een <code>master</code>-branch die wijst naar de laatste commit die je gemaakt hebt.
+Iedere keer als je commit, beweegt de pointer van de <code>master</code>-branch automatisch vooruit.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>De “master” branch in Git is geen speciale branch.
+Het is gelijk aan elke andere branch.
+De enige reden waarom vrijwel elke repository er een heeft is dat de <code>git init</code> commando er standaard een maakt en de meeste mensen geen moeite doen om deze te wijzigen.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/branch-and-history.png" >}}" alt="Een branch en zijn commit-historie.">
+</div>
+<div class="title">Figuur 11. Een branch en zijn commit-historie</div>
+</div>
+<div class="sect3">
+<h3 id="_create_new_branch">Een nieuwe branch maken</h3>
+<div class="paragraph">
+<p>
+Wat gebeurt er als je een nieuwe branch maakt?
+Nou, het aanmaken zorgt ervoor dat er een nieuwe verwijzing (pointer) voor je wordt gemaakt die je heen en weer kan bewegen.
+Stel dat je een nieuwe branch maakt en die <code>testing</code> noemt.
+Je doet dit met het <code>git branch</code> commando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch testing</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit maakt een nieuwe pointer op dezelfde commit als waar je nu op staat.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/two-branches.png" >}}" alt="Twee branches die naar de zelfde reeks van commits verwijzen.">
+</div>
+<div class="title">Figuur 12. Twee branches die naar de zelfde reeks van commits verwijzen</div>
+</div>
+<div class="paragraph">
+<p>Hoe weet Git op welke branch je nu zit?
+Het houdt een speciale verwijzing bij genaamd <code>HEAD</code>.
+Let op dat dit heel anders is dan het concept van <code>HEAD</code> in andere  VCS’s waar je misschien gewend aan bent, zoals Subversion of CVS.
+In Git is dit een verwijzing naar de lokale branch waar je nu op zit.
+In dit geval zit je nog steeds op <code>master</code>.
+Het <code>git branch</code>-commando heeft alleen een nieuwe branch <em>aangemaakt</em> - we zijn nog niet overgeschakeld naar die branch.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/head-to-master.png" >}}" alt="HEAD verwijzend naar een branch.">
+</div>
+<div class="title">Figuur 13. HEAD verwijzend naar een branch</div>
+</div>
+<div class="paragraph">
+<p>Je kunt dit simpelweg zien door een eenvoudige <code>git log</code> commando uit te voeren wat je laat zien waar de branch pointers naar verwijzen.
+Deze optie heet <code>--decorate</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --decorate
+f30ab (HEAD -&gt; master, testing) add feature #32 - ability to add new formats to the central interface
+34ac2 Fixed bug #1328 - stack overflow under certain conditions
+98ca9 The initial commit of my project</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt de “master” en “testing” branches zien die direct naast de <code>f30ab</code> commit staan.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_switching_branches">Tussen branches schakelen (switching)</h3>
+<div class="paragraph">
+<p>
+Om te schakelen (switch) naar een bestaande branch, kan je het <code>git checkout</code> commando gebruiken.
+Laten we eens switchen naar de nieuwe <code>testing</code>-branch:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout testing</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit vertelt <code>HEAD</code> om te verwijzen naar de <code>testing</code>-branch.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/head-to-testing.png" >}}" alt="HEAD verwijst naar de huidige branch.">
+</div>
+<div class="title">Figuur 14. HEAD verwijst naar de huidige branch</div>
+</div>
+<div class="paragraph">
+<p>Wat is daar nu belangrijk aan?
+Nou, laten we nog eens een commit doen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ vim test.rb
+$ git commit -a -m 'made a change'</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/advance-testing.png" >}}" alt="De HEAD branch beweegt voorwaarts als een commit wordt gedaan.">
+</div>
+<div class="title">Figuur 15. De HEAD branch beweegt voorwaarts als een commit wordt gedaan</div>
+</div>
+<div class="paragraph">
+<p>Dit is interessant: omdat je <code>testing</code>-branch nu naar voren is bewogen, maar je master branch nog steeds op het punt staat waar je was toen je <code>git checkout</code> uitvoerde om van branch te switchen.
+Laten we eens terug switchen naar de <code>master</code>-branch:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/checkout-master.png" >}}" alt="HEAD verplaatst als je checkout uitvoert.">
+</div>
+<div class="title">Figuur 16. HEAD verplaatst als je checkout uitvoert</div>
+</div>
+<div class="paragraph">
+<p>Dat commando deed twee dingen.
+Het verplaatste de HEAD pointer terug om te verwijzen naar de <code>master</code>-branch, en het draaide de bestanden terug in je werk directory naar de stand van de snapshot waar <code>master</code> naar verwijst.
+Dit betekent ook dat de wijzigingen die je vanaf nu maakt zullen afwijken van een oudere versie van het project.
+In essentie draait dit het werk terug dat je in je <code>testing</code>-branch gedaan hebt zodat je in een andere richting kunt bewegen.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="title">Branches switchen wijzigt bestanden in je directory</div>
+<div class="paragraph">
+<p>Het is belangrijk op te merken dat wanneer je tussen branches switcht in Git, bestanden in je werk directory zullen wijzigen.
+Als je naar een oudere branch switcht, zal je werk directory teruggedraaid worden zodat de inhoud gelijk is aan hoehet eruit zag toen je voor het laatst committe op die branch.
+Als Git dat niet op een nette manier kan doen, zal het je niet laten switchen.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Laten we een paar wijzigingen aanbrengen en opnieuw committen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ vim test.rb
+$ git commit -a -m 'made other changes'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu is je project historie uiteengelopen (zie <a href="{{< relurl "book/nl/v2/ch00/divergent_history" >}}">Uiteengelopen histories</a>).
+Je hebt een branch gemaakt en bent er naartoe overgeschakeld, hebt er wat werk op gedaan, en bent toen teruggeschakeld naar je hoofd-branch en hebt nog wat ander werk gedaan.
+Al die veranderingen zijn geïsoleerd van elkaar in aparte branches: je kunt heen en weer schakelen tussen de branches en ze mergen als je klaar bent.
+En je hebt dat alles gedaan met eenvoudige <code>branch</code>, <code>checkout</code> en <code>commit</code> commando’s.</p>
+</div>
+<div id="divergent_history" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/advance-master.png" >}}" alt="Uiteengelopen histories.">
+</div>
+<div class="title">Figuur 17. Uiteengelopen histories</div>
+</div>
+<div class="paragraph">
+<p>Je kunt dit ook eenvoudig zien met het <code>git log</code> commando.
+Als je <code>git log --oneline --decorate --graph --all</code> uitvoert zal het de historie van jouw commits afdrukken, laten zien waar jouw branch pointers zijn en hoe je historie uiteengelopen is.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --decorate --graph --all
+* c2b9e (HEAD, master) made other changes
+| * 87ab2 (testing) made a change
+|/
+* f30ab add feature #32 - ability to add new formats to the
+* 34ac2 fixed bug #1328 - stack overflow under certain conditions
+* 98ca9 initial commit of my project</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Omdat een branch in Git in werkelijkheid een eenvoudig bestand is dat de SHA-1 checksum van 40 karakters bevat van de commit waar het naar verwijst, zijn branches goedkoop om te maken en te verwijderen.
+Een nieuwe branch maken is net zo snel en simpel te maken als 41 bytes naar een bestand te schrijven (40 karakters en een newline).</p>
+</div>
+<div class="paragraph">
+<p>Dit is in schril contrast met de manier waarop de meeste oudere VCS applicaties branchen, wat het kopiëren van alle bestanden van het project in een tweede directory inhoudt.
+Dit kan een aantal seconden of zelfs minuten duren, afhankelijk van de grootte van het project. Dit terwijl bij Git het proces altijd onmiddelijk gereed is.
+Daarbij komt dat, omdat we de ouders bijhouden als we een commit maken, het vinden van een goede merge basis voor het merge proces automatisch voor ons gedaan is en dit doorgaans eenvoudig te doen is.
+Deze kenmerken helpen ontwikkelaars aan te moedigen om vaak en veel branches aan te maken.</p>
+</div>
+<div class="paragraph">
+<p>Laten we eens kijken waarom je dat zou moeten doen.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="title">Het maken van een nieuwe branch en tegelijkertijd ernaar switchen</div>
+<div class="paragraph">
+<p>Het is vrij normaal om een nieuwe branch te maken en dan meteen naar die nieuwe branch te switchen. Dit kan worden gedaan in een operatie met <code>git checkout -b &lt;newbranchname&gt;</code>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
