@@ -1,0 +1,104 @@
+git-send-pack(1)
+================
+
+名称
+--
+git-send-pack - 通过 Git 协议将对象推送到另一个仓库
+
+
+概述
+--
+[verse]
+'git send-pack' [--mirror] [--dry-run] [--force]
+		[--receive-pack=<git-receive-pack>]
+		[--verbose] [--thin] [--atomic]
+		[--[no-]signed | --signed=(true|false|if-asked)]
+		[<主机地址>:]<目录> (--all | <引用>...)
+
+描述
+--
+通常情况下，您需要使用 'git push'，它是该命令的高级封装。参见 linkgit:git-push[1]。
+
+在可能的远程仓库上调用 'git-receive-pack'，并从当前仓库更新，同时发送命名的引用。
+
+
+选项
+--
+--receive-pack=<git-receive-pack>::
+	Path to the 'git-receive-pack' program on the remote end. Sometimes useful when pushing to a remote repository over ssh, and you do not have the program in a directory on the default $PATH.
+
+--exec=<git-receive-pack>::
+	与 --receive-pack=<git-receive-pack> 相同。
+
+--all::
+	无需明确指定要更新的索引，而是更新本地存在的所有索引头。
+
+--stdin::
+	从标准输入流获取各个引用列表，每行一个。如果命令行中除此选项外还指定了其他引用，则会在处理命令行中的引用后再处理来自标准输入流的多个引用。
++
+如果与此选项一起指定了 `--stateless-rpc`，那么引用列表必须是数据包格式（pkt-line）。每个引用必须在一个单独的数据包中，并且列表必须以清除数据包结束。
+
+--dry-run::
+	做除了实际发送更新外的所有事。
+
+--force::
+	Usually, the command refuses to update a remote ref that is not an ancestor of the local ref used to overwrite it. This flag disables the check. This means that the remote repository can lose commits; use it with care.
+
+--verbose::
+	详细运行。
+
+--thin::
+	发送 “瘦” 数据包，根据未包含在数据包中的对象，以简化形式记录对象，以减少网络流量。
+
+--atomic::
+	使用原子事务更新一些引用。如果任何一个引用更新失败，那么整个推送都将失败，而不会更改任何引用。
+
+--[no-]signed::
+--signed=(true|false|if-asked)::
+	GPG-sign the push request to update refs on the receiving side, to allow it to be checked by the hooks and/or be logged. If `false` or `--no-signed`, no signing will be attempted. If `true` or `--signed`, the push will fail if the server does not support signed pushes. If set to `if-asked`, sign if and only if the server supports signed pushes. The push will also fail if the actual call to `gpg --sign` fails. See linkgit:git-receive-pack[1] for the details on the receiving end.
+
+--push-option=<字符串>::
+	Pass the specified string as a push option for consumption by hooks on the server side. If the server doesn't support push options, error out. See linkgit:git-push[1] and linkgit:githooks[5] for details.
+
+<主机>::
+	A remote host to house the repository. When this part is specified, 'git-receive-pack' is invoked via ssh.
+
+<目录>::
+	要更新的仓库。
+
+<引用>...::
+	要更新的远程引用。
+
+
+指定引用
+----
+
+有三种方法可以指定在远程端更新哪些参考文件。
+
+With the `--all` flag, all refs that exist locally are transferred to the remote side. You cannot specify any '<ref>' if you use this flag.
+
+如果不使用 `--all`，也不使用任何 `<引用>`，本地和远程都存在的磁头都会被更新。
+
+When one or more '<ref>' are specified explicitly (whether on the command line or via `--stdin`), it can be either a single pattern, or a pair of such patterns separated by a colon ":" (this means that a ref name cannot have a colon in it). A single pattern '<name>' is just shorthand for '<name>:<name>'.
+
+Each pattern pair consists of the source side (before the colon) and the destination side (after the colon). The ref to be pushed is determined by finding a match that matches the source side, and where it is pushed is determined by using the destination side. The rules used to match a ref are the same rules used by 'git rev-parse' to resolve a symbolic ref name. See linkgit:git-rev-parse[1].
+
+ - 如果 <源端> 与一个本地引用不完全匹配，则会出错。
+
+ - 如果 <目标> 匹配多个远程引用，则会出错。
+
+ - 如果 <目的端> 与任何远程引用不匹配，或者
+
+   * 它必须以 "refs/" 开头；在这种情况下，<dst> 被用作目标字面。
+
+   * <src> == <dst>，并且与 <src> 相匹配的引用必须不存在于远程引用集合中；本地匹配的 <src>引用被用作目的地的名称。
+
+Without `--force`, the <src> ref is stored at the remote only if <dst> does not exist, or <dst> is a proper subset (i.e. an ancestor) of <src>. This check, known as the "fast-forward check", is performed to avoid accidentally overwriting the remote ref and losing other people's commits from there.
+
+使用 `--force`，所有裁判的快进检查都被禁用。
+
+可以选择在 <ref> 参数前加上一个加号 '+' 号，以便仅在该引用上禁用快进检查。
+
+GIT
+---
+属于 linkgit:git[1] 文档

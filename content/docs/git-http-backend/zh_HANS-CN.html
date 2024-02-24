@@ -1,0 +1,322 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - git-http-backend Documentation
+docname: git-http-backend
+lang: zh_HANS-CN
+aliases:
+- "/docs/git-http-backend/zh_HANS-CN/index.html"
+
+---
+<div class="sect1">
+<h2 id="_名称"><a class="anchor" href="#_名称"></a>名称</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-http-backend - Git 在 HTTP 上的服务器端实现</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_概述"><a class="anchor" href="#_概述"></a>概述</h2>
+<div class="sectionbody">
+<div class="verseblock">
+<pre class="content"><em>git http-backend</em></pre>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_描述"><a class="anchor" href="#_描述"></a>描述</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A simple CGI program to serve the contents of a Git repository to Git clients accessing the repository over http:// and https:// protocols. The program supports clients fetching using both the smart HTTP protocol and the backwards-compatible dumb HTTP protocol, as well as clients pushing using the smart HTTP protocol. It also supports Git&#8217;s more-efficient "v2" protocol if properly configured; see the discussion of <code>GIT_PROTOCOL</code> in the ENVIRONMENT section below.</p>
+</div>
+<div class="paragraph">
+<p>它验证该目录是否有魔术文件 "git-daemon-export-ok"，它将拒绝导出任何没有明确标记为这种方式导出的 Git 目录（除非设置了 <code>GIT_HTTP_EXPORT_ALL</code> 环境变量）。</p>
+</div>
+<div class="paragraph">
+<p>By default, only the <code>upload-pack</code> service is enabled, which serves <em>git fetch-pack</em> and <em>git ls-remote</em> clients, which are invoked from <em>git fetch</em>, <em>git pull</em>, and <em>git clone</em>. If the client is authenticated, the <code>receive-pack</code> service is enabled, which serves <em>git send-pack</em> clients, which is invoked from <em>git push</em>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_服务"><a class="anchor" href="#_服务"></a>服务</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>这些服务可以使用每个库的配置文件来启用/禁用：</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="git-http-backend-httpgetanyfile"> <a class="anchor" href="#git-http-backend-httpgetanyfile"></a>http.getanyfile </dt>
+<dd>
+<p>This serves Git clients older than version 1.6.6 that are unable to use the upload pack service. When enabled, clients are able to read any file within the repository, including objects that are no longer reachable from a branch but are still present. It is enabled by default, but a repository can disable it by setting this configuration value to <code>false</code>.</p>
+</dd>
+<dt class="hdlist1" id="git-http-backend-httpuploadpack"> <a class="anchor" href="#git-http-backend-httpuploadpack"></a>http.uploadpack </dt>
+<dd>
+<p>This serves <em>git fetch-pack</em> and <em>git ls-remote</em> clients. It is enabled by default, but a repository can disable it by setting this configuration value to <code>false</code>.</p>
+</dd>
+<dt class="hdlist1" id="git-http-backend-httpreceivepack"> <a class="anchor" href="#git-http-backend-httpreceivepack"></a>http.receivepack </dt>
+<dd>
+<p>This serves <em>git send-pack</em> clients, allowing push. It is disabled by default for anonymous users, and enabled by default for users authenticated by the web server. It can be disabled by setting this item to <code>false</code>, or enabled for all users, including anonymous users, by setting it to <code>true</code>.</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_地址翻译"><a class="anchor" href="#_地址翻译"></a>地址翻译</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To determine the location of the repository on disk, <em>git http-backend</em> concatenates the environment variables PATH_INFO, which is set automatically by the web server, and GIT_PROJECT_ROOT, which must be set manually in the web server configuration. If GIT_PROJECT_ROOT is not set, <em>git http-backend</em> reads PATH_TRANSLATED, which is also set automatically by the web server.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_实例"><a class="anchor" href="#_实例"></a>实例</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>下面所有的例子都把 <code>http://$hostname/git/foo/bar.git</code> 映射到 <code>/var/www/git/foo/bar.git</code>。</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="git-http-backend-Apache2x"> <a class="anchor" href="#git-http-backend-Apache2x"></a>Apache 2.x </dt>
+<dd>
+<p>确保 mod_cgi、mod_alias 和 mod_env被 启用，适当地设置 GIT_PROJECT_ROOT（或 DocumentRoot），并为 CGI 创建一个 ScriptAlias：</p>
+<div class="listingblock">
+<div class="content">
+<pre>SetEnv GIT_PROJECT_ROOT /var/www/git
+SetEnv GIT_HTTP_EXPORT_ALL
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+
+# 这在使用 Apache 和现代版本的
+# git-http-backend，因为网络服务器会把头信息在
+# 环境中作为 HTTP_GIT_PROTOCOL 传递，而 http-backend 会将其复制到
+# git_protocol。但你可能需要这一行（或类似的东西，如果你
+# 使用不同的 webserver），或者如果你想支持旧的 Git
+# 版本没有做这样的复制。
+#
+# 让 webserver 设置 GIT_PROTOCOL 是完全可以的，即使在
+# 现代版本也是如此（并且优先于 HTTP_GIT_PROTOCOL，
+# 这意味着它可以被用来覆盖客户端的请求）。
+SetEnvIf Git-Protocol ".*"GIT_PROTOCOL=$0</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>为了实现匿名的读取访问，但要有认证的写入访问，需要对最初的引用广播（我们通过查询字符串中的服务参数检测为推送）和接收包调用本身进行授权：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>RewriteCond %{QUERY_STRING} service=git-receive-pack [OR]
+RewriteCond %{REQUEST_URI} /git-receive-pack$
+RewriteRule ^/git/ - [E=AUTHREQUIRED:yes]
+
+&lt;LocationMatch "^/git/"&gt;
+	Order Deny,Allow
+	Deny from env=AUTHREQUIRED
+
+	AuthType Basic
+	AuthName "Git Access"
+	Require group committers
+	Satisfy Any
+	...
+&lt;/LocationMatch&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>如果你没有 <code>mod_rewrite</code> 可用来匹配查询字符串，只需保护 <code>git-receive-pack</code> 本身即可，比如：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>&lt;LocationMatch "^/git/.*/git-receive-pack$"&gt;
+	AuthType Basic
+	AuthName "Git Access"
+	Require group committers
+	...
+&lt;/LocationMatch&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this mode, the server will not request authentication until the client actually starts the object negotiation phase of the push, rather than during the initial contact. For this reason, you must also enable the <code>http.receivepack</code> config option in any repositories that should accept a push. The default behavior, if <code>http.receivepack</code> is not set, is to reject any pushes by unauthenticated users; the initial request will therefore report <code>403 Forbidden</code> to the client, without even giving an opportunity for authentication.</p>
+</div>
+<div class="paragraph">
+<p>要对读和写都要求认证，可以在仓库或它的一个父目录周围使用 Location 指令：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>&lt;Location /git/private&gt;
+	AuthType Basic
+	AuthName "Private Git Access"
+	Require group committers
+	...
+&lt;/Location&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>要在同一个网址上为 gitweb 提供服务，使用 ScriptAliasMatch，只对那些 <em>git http-backend</em> 可以处理的网址进行匹配，其余的转发给 gitweb：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>ScriptAliasMatch \
+	"(?x)^/git/(.*/(HEAD | \
+			info/refs | \
+			objects/(info/[^/]+ | \
+				 [0-9a-f]{2}/[0-9a-f]{38} | \
+				 pack/pack-[0-9a-f]{40}\.(pack|idx)) | \
+			git-(upload|receive)-pack))$" \
+	/usr/libexec/git-core/git-http-backend/$1
+
+ScriptAlias /git/ /var/www/cgi-bin/gitweb.cgi/</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>在一个仓库中为来自不同 <a href='{{< relurl "docs/gitnamespaces/zh_HANS-CN" >}}'>gitnamespaces[7]</a> 的多个仓库提供服务：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>SetEnvIf Request_URI "^/git/([^/]*)" GIT_NAMESPACE=$1
+ScriptAliasMatch ^/git/[^/]*(.*) /usr/libexec/git-core/git-http-backend/storage.git$1</pre>
+</div>
+</div>
+</dd>
+<dt class="hdlist1" id="git-http-backend-Apache2x-1"> <a class="anchor" href="#git-http-backend-Apache2x-1"></a>加速静态 Apache 2.x </dt>
+<dd>
+<p>Similar to the above, but Apache can be used to return static files that are stored on disk. On many systems this may be more efficient as Apache can ask the kernel to copy the file contents from the file system directly to the network:</p>
+<div class="listingblock">
+<div class="content">
+<pre>SetEnv GIT_PROJECT_ROOT /var/www/git
+
+AliasMatch ^/git/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$          /var/www/git/$1
+AliasMatch ^/git/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$ /var/www/git/$1
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>这可以与 gitweb 的配置相结合：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>SetEnv GIT_PROJECT_ROOT /var/www/git
+
+AliasMatch ^/git/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$          /var/www/git/$1
+AliasMatch ^/git/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$ /var/www/git/$1
+ScriptAliasMatch \
+	"(?x)^/git/(.*/(HEAD | \
+			info/refs | \
+			objects/info/[^/]+ | \
+			git-(upload|receive)-pack))$" \
+	/usr/libexec/git-core/git-http-backend/$1
+ScriptAlias /git/ /var/www/cgi-bin/gitweb.cgi/</pre>
+</div>
+</div>
+</dd>
+<dt class="hdlist1" id="git-http-backend-Lighttpd"> <a class="anchor" href="#git-http-backend-Lighttpd"></a>Lighttpd </dt>
+<dd>
+<p>确保 <code>mod_cgi</code>、<code>mod_alias</code>、<code>mod_auth</code>、<code>mod_setenv</code> 已经加载，然后适当设置 <code>GIT_PROJECT_ROOT</code>，并将所有请求重定向到 CGI：</p>
+<div class="listingblock">
+<div class="content">
+<pre>alias.url += ( "/git" =&gt; "/usr/lib/git-core/git-http-backend" )
+$HTTP["url"] =~ "^/git" {
+	cgi.assign = ("" =&gt; "")
+	setenv.add-environment = (
+		"GIT_PROJECT_ROOT" =&gt; "/var/www/git",
+		"GIT_HTTP_EXPORT_ALL" =&gt; ""
+	)
+}</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>要启用匿名的读取访问，但要有认证的写入访问：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$HTTP["querystring"] =~ "service=git-receive-pack" {
+	include "git-auth.conf"
+}
+$HTTP["url"] =~ "^/git/.*/git-receive-pack$" {
+	include "git-auth.conf"
+}</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>其中 <code>git-auth.conf</code> 看起来像：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>auth.require = (
+	"/" =&gt; (
+		"method" =&gt; "basic",
+		"realm" =&gt; "Git Access",
+		"require" =&gt; "valid-user"
+	       )
+)
+# ...并在此设置auth.backend</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>要求对读和写都进行认证：</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$HTTP["url"] =~ "^/git/private" {
+	include "git-auth.conf"
+}</pre>
+</div>
+</div>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_环境变量"><a class="anchor" href="#_环境变量"></a>环境变量</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><em>git http-backend</em> 依赖于调用网络服务器设置的 <code>CGI</code> 环境变量，包括：</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>PATH_INFO（如果设置了 GIT_PROJECT_ROOT，否则为 PATH_TRANSLATED）</p>
+</li>
+<li>
+<p>REMOTE_USER</p>
+</li>
+<li>
+<p>REMOTE_ADDR</p>
+</li>
+<li>
+<p>CONTENT_TYPE</p>
+</li>
+<li>
+<p>QUERY_STRING</p>
+</li>
+<li>
+<p>REQUEST_METHOD</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><code>GIT_HTTP_EXPORT_ALL</code> 环境变量可以传递给 <em>git-http-backend</em>，以绕过在允许导出每个仓库前对 "git-daemon-export-ok" 文件的检查。</p>
+</div>
+<div class="paragraph">
+<p>The <code>GIT_HTTP_MAX_REQUEST_BUFFER</code> environment variable (or the <code>http.maxRequestBuffer</code> config option) may be set to change the largest ref negotiation request that git will handle during a fetch; any fetch requiring a larger buffer will not succeed. This value should not normally need to be changed, but may be helpful if you are fetching from a repository with an extremely large number of refs. The value can be specified with a unit (e.g., <code>100M</code> for 100 megabytes). The default is 10 megabytes.</p>
+</div>
+<div class="paragraph">
+<p>客户端可以使用 <code>Git-Protocol</code> HTTP 头来探测可选的协议能力（如 v2 协议）。为了支持这些，该标头的内容必须出现在 <code>GIT_PROTOCOL</code> 环境变量中。大多数网络服务器将通过 <code>HTTP_GIT_PROTOCOL</code> 变量把这个头传递给 CGI，<code>git-http-backend</code> 将自动把它复制到 <code>GIT_PROTOCOL</code>。然而，一些网络服务器可能对他们要传递的头信息更有选择性，在这种情况下，他们需要明确配置（见前面例子部分的 Apache 配置中对 <code>Git-Protocol</code> 的提及）。</p>
+</div>
+<div class="paragraph">
+<p>后台进程将 GIT_COMMITTER_NAME 设置为 <em>$REMOTE_USER</em>，将 GIT_COMMITTER_EMAIL 设置为 <em>${REMOTE_USER}\@http.${REMOTE_ADDR}</em>，确保任何由 <em>git-receive-pack</em> 创建的引用日志包含执行推送的远程用户的一些识别信息。</p>
+</div>
+<div class="paragraph">
+<p>所有 <code>CGI</code> 环境变量对 <em>git-receive-pack</em> 调用的每个钩子都是可用的。</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>属于 <a href='{{< relurl "docs/git/zh_HANS-CN" >}}'>git[1]</a> 文档</p>
+</div>
+</div>
+</div>

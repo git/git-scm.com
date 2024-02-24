@@ -1,0 +1,564 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - git-filter-branch Documentation
+docname: git-filter-branch
+lang: pt_BR
+aliases:
+- "/docs/git-filter-branch/pt_BR/index.html"
+
+---
+<div class="sect1">
+<h2 id="_nome"><a class="anchor" href="#_nome"></a>NOME</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-filter-branch - Reescreve os ramos</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_resumo"><a class="anchor" href="#_resumo"></a>RESUMO</h2>
+<div class="sectionbody">
+<div class="verseblock">
+<pre class="content"><em>git filter-branch</em> [--setup &lt;comando&gt;] [--subdirectory-filter &lt;diretório&gt;]
+	[--env-filter &lt;comando&gt;] [--tree-filter &lt;comando&gt;]
+	[--index-filter &lt;comando&gt;] [--parent-filter &lt;comando&gt;]
+	[--msg-filter &lt;comando&gt;] [--commit-filter &lt;comando&gt;]
+	[--tag-name-filter &lt;comando&gt;] [--prune-empty]
+	[--original &lt;espaço-de-nomes&gt;] [-d &lt;diretório&gt;] [-f | --force]
+	[--state-branch &lt;ramo&gt;] [--] [&lt;opções da rev-list&gt;&#8230;&#8203;]</pre>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_atenção"><a class="anchor" href="#_atenção"></a>ATENÇÃO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>O <em>git filter-branch</em> possui uma infinidade de armadilhas que podem produzir não tão óbvios da reescrita pretendida no histórico (e podem deixar pouco tempo para investigar esses problemas já que o desemprenho é terrível). Esses problemas de segurança e desempenho não podem ser corrigidos de forma compatível com as versões anteriores e como tal o seu uso não é recomendado. Utilize uma ferramenta alternativa de filtragem de histórico como <a href="https://github.com/newren/git-filter-repo/">git filter-repo</a>. Caso ainda precise usar o <em>git filter-branch</em> leia com cuidado <a href="#SAFETY">SEGURANÇA</a> (e <a href="#PERFORMANCE">DESEMPENHO</a>) para aprender os perigos do "filter-branch" e em seguida, com muita atenção evite o maior número possível de perigos listados lá.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_descrição"><a class="anchor" href="#_descrição"></a>DESCRIÇÃO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Permite reescrever o histórico de revisões do Git, reescrevendo as ramificações mencionadas em <code>&lt;opções da rev-list&gt;</code> aplicando os filtros personalizados em cada revisão. Esses filtros podem modificar cada árvore (por exemplo, remover um arquivo ou executar uma reescrita perl em todos os arquivos) ou informações sobre cada commit. Caso contrário, todas as informações (incluindo a quantidade de commits originais ou as informações de mesclagem) serão preservadas.</p>
+</div>
+<div class="paragraph">
+<p>O comando reescreverá apenas as "refs <em>positivas</em> mencionados na linha de comando (caso passer <em>a..b</em>, apenas <em>b</em> será reescrito por exemplo). Caso você não defina nenhum filtro, os commits serão refeitos sem qualquer alteração, o que normalmente não teria nenhum efeito. No entanto, isso pode ser útil no futuro para compensar alguns bugs do Git ou algo assim, portanto, este uso é permitido.</p>
+</div>
+<div class="paragraph">
+<p><strong>OBSERVAÇÃO</strong>: Este comando honra o arquivo <code>.git/info/grafts</code> e as
+refs no <code>refs/replace/</code> namespace.
+Caso você tenha quaisquer enxertos ou referências de reposição definidos,
+executando este comando os fará permanente.</p>
+</div>
+<div class="paragraph">
+<p><strong>ATENÇÃO</strong>! O histórico de reescrita terá nomes de objetos diferentes para todos
+os objetos e não convergirá com a ramificação original.  Você não conseguirá
+fazer um impulsionamento (push) de forma fácil e redistribuir o ramo alterado no cume do
+ramo original.  Não utilize este comando se você não souber todas as implicações do seu uso e
+ainda assim evite usá-lo, caso um único commit simples seja suficiente para resolver o seu problema.
+(Consulte a seção "RECUPERANDO DO UPSTREAM REBASE"
+na seção em <a href='{{< relurl "docs/git-rebase/pt_BR" >}}'>git-rebase[1]</a> para obter mais informações
+sobre reescrever no histórico de publicado.)</p>
+</div>
+<div class="paragraph">
+<p>Sempre verifique se a versão reescrita está correta: As refs originais, caso sejam diferentes das que foram reescritas, serão armazenadas no espaço de nomes <code>refs/original/</code>.</p>
+</div>
+<div class="paragraph">
+<p>Observe que como essa operação é muito intenso logicamente, pode ser uma boa idéia redirecionar o diretório temporário para fora do disco com a opção <code>-d</code> no tmpfs por exemplo. Alegadamente, a melhora de desempenho é muito perceptível.</p>
+</div>
+<div class="sect2">
+<h3 id="_filtros"><a class="anchor" href="#_filtros"></a>Filtros</h3>
+<div class="paragraph">
+<p>Os filtros são aplicados na ordem listada abaixo. O argumento &lt;comando&gt; é sempre avaliado no shell utilizando o comando <em>eval</em> como contexto (exceto o filtro do commit, devido a uma mera tecnicalidade). Antes disso, a variável do ambiente <code>$GIT_COMMIT</code> será configurada para conter o ID do commit que está sendo reescrito. Além disso as variáveis <code>GIT_AUTHOR_NAME</code>, <code>GIT_AUTHOR_EMAIL</code>, <code>GIT_AUTHOR_DATE</code>, <code>GIT_COMMITTER_NAME</code>, <code>GIT_COMMITTER_EMAIL</code> e <code>GIT_COMMITTER_DATE</code> são retirados do commit atual e exportados para o ambiente, a fim de afetar as identidades autor e de quem fez o commit do commit que está sendo criado por <a href='{{< relurl "docs/git-commit-tree/pt_BR" >}}'>git-commit-tree[1]</a> após a execução dos filtros.</p>
+</div>
+<div class="paragraph">
+<p>Caso qualquer avaliação do &lt;comando&gt; retorne uma condição diferente de zero na saída, toda a operação será abortada.</p>
+</div>
+<div class="paragraph">
+<p>Está disponível uma função chamada <em>map</em> que pega um argumento "id do sha1 original" e gera um "id do sha1 reescrito" caso o commit seja reescrito e caso contrário "sha1 id original"; a função <em>map</em> pode retornar vários IDs em linhas separadas caso o filtro do commit emita vários commits.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_opções"><a class="anchor" href="#_opções"></a>OPÇÕES</h2>
+<div class="sectionbody">
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="git-filter-branch---setupltcomandogt"> <a class="anchor" href="#git-filter-branch---setupltcomandogt"></a>--setup &lt;comando&gt; </dt>
+<dd>
+<p>Este não é um filtro real executado para cada commit, porém uma configuração única antes do loop. Portanto, nenhuma variável específica do commit será definida ainda. As funções ou variáveis definidas aqui, podem ser utilizadas ou modificadas nas seguintes etapas do filtro, exceto o filtro do commit por uma mera tecnicalidade.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---subdirectory-filterltdiretriogt"> <a class="anchor" href="#git-filter-branch---subdirectory-filterltdiretriogt"></a>--subdirectory-filter &lt;diretório&gt; </dt>
+<dd>
+<p>Veja apenas a história que toca o subdiretório especificado. O resultado contemplar este diretório (e somente isso) como a raiz do projeto. Implica no uso de <a href="#Remap_to_ancestor">Remapear para o ancestral</a>.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---env-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---env-filterltcomandogt"></a>--env-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este filtro pode ser utilizado apenas quando precisar alterar o ambiente onde o commit foi realizado. Especificamente, você pode reescrever as variáveis de ambiente do autor/nome responsável pelo commit/email/data na variável do ambiente (para mais detalhes consulte <a href='{{< relurl "docs/git-commit-tree/pt_BR" >}}'>git-commit-tree[1]</a>.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---tree-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---tree-filterltcomandogt"></a>--tree-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este filtro serve para reescrever a árvore e o seu conteúdo. O argumento é avaliado no shell com o diretório de trabalho definido como a raiz da árvore verificada. A nova árvore é então utilizada como está (os novos arquivos serão adicionados automaticamente, os arquivos desaparecidos serão removidos automaticamente - nem os arquivos <code>.gitignore</code> nem nenhuma outra regra de ignorar <strong>TEM QUALQUER EFEITO</strong>!).</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---index-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---index-filterltcomandogt"></a>--index-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este é o filtro utilizado para reescrever o índice. É semelhante ao filtro da árvore, no entanto não realiza o check out da árvore, o que a torna muito mais rápida. É Frequentemente utilizado com <code>git rm --cached --ignore-unmatch ...</code>, consulte os EXEMPLOS abaixo. Para os casos mais cabeludos consulte <a href='{{< relurl "docs/git-update-index/pt_BR" >}}'>git-update-index[1]</a>.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---parent-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---parent-filterltcomandogt"></a>--parent-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este filtro serve para reescrever a lista das origens de quem fez o commit. Ele receberá um texto da origem no stdin e produzirá a um novo texto de origem no stdout. O texto de origem está no formato descrito em <a href='{{< relurl "docs/git-commit-tree/pt_BR" >}}'>git-commit-tree[1]</a>: o commit inicial é vazio, "-p parent" para um commit normal e "-p parent1 -p parent2 -p parent3 &#8230;&#8203;" para os commits consolidados.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---msg-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---msg-filterltcomandogt"></a>--msg-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este filtro serve para reescrever as mensagens dos commits. O argumento é avaliado no shell com a mensagem original do commit em sua entrada padrão; já a sua saída padrão é utilizada como uma nova mensagem do commit.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---commit-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---commit-filterltcomandogt"></a>--commit-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este filtro serve para apresentar o commit. Caso este filtro seja utilizado, ele será chamado em vez do comando <em>git commit-tree</em>, com os argumentos no formato "&lt;TREE_ID&gt; [(-p &lt;PARENT_COMMIT_ID&gt;)&#8230;&#8203;]" e a mensagem do registro log no stdin. O ID do commit é esperado no stdout.</p>
+<div class="paragraph">
+<p>Como uma extensão especial, o filtro do commit pode emitir vários IDs para estes commits; nesse caso, os herdeiros do commit original que foram reescritos, todos terão eles como origem.</p>
+</div>
+<div class="paragraph">
+<p>Você pode utilizar a função <em>map</em> como uma conveniência neste filtro assim como nas outras funções também. Ao chamar <em>skip_commit "$@"</em> por exemplo, deixará de fora o commit atual (mas as alterações não! Caso queira usar dessa maneira, utilize então o comando <em>git rebase</em>).</p>
+</div>
+<div class="paragraph">
+<p>É possível também utilizar <code>git_commit_non_empty_tree "$@"</code> em vez de <code>git commit-tree "$@"</code> caso não queira mais manter os commit com uma única origem, isso não faz qualquer alteração na árvore.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---tag-name-filterltcomandogt"> <a class="anchor" href="#git-filter-branch---tag-name-filterltcomandogt"></a>--tag-name-filter &lt;comando&gt; </dt>
+<dd>
+<p>Este filtro serve para reescrever os nomes das tags. Quando aprovada, será chamada para cada tag de referência que aponte para um objeto reescrito (ou para um objeto tag que aponte para um objeto reescrito). O nome da tag original é passado através da entrada padrão e seu novo nome é esperado na saída padrão.</p>
+<div class="paragraph">
+<p>As tags originais não são excluídas, mas podem ser substituídas; utilize a opção "--tag-name-filter cat" para atualizar as tags. Nesse caso, tenha muito cuidado e certifique-se de fazer o backup das tags antigas, caso ocorra algum problema durante a conversão.</p>
+</div>
+<div class="paragraph">
+<p>A reescrita quase apropriada dos objetos tag são suportados. Caso a tag tenha uma mensagem anexada, um novo objeto tag será criado com a mesma mensagem, autor e registro de data e hora. Caso a tag tenha uma assinatura anexada, a assinatura será removida. Devido a predefinição retorna para impossível preservar as assinaturas. O motivo do "quase" apropriado, significa que idealmente caso uma tag não mude (aponta para o mesmo objeto, tem o mesmo nome etc.), ela deve manter qualquer assinatura. Não é este o caso, as assinaturas sempre serão removidas, portanto cuidado. Também não há compatibilidade para alterar o autor ou o registro de data e hora (ou a mensagem da tag). As tags que apontem para as outras tags, serão reescritas para apontar para o commit subjacente.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---prune-empty"> <a class="anchor" href="#git-filter-branch---prune-empty"></a>--prune-empty </dt>
+<dd>
+<p>Alguns filtros geram commits vazios que deixam a árvore intocada. Essa opção instrui o comando <code>git-filter-branch</code> para remover tais commits caso elas tenham exatamente um ou zero origens sem poda; os commits mesclados permanecerão intactos. Esta opção não pode ser utilizada em conjunto com <code>--commit-filter</code>, embora o mesmo efeito possa ser alcançado utilizando a função <code>git_commit_non_empty_tree</code> num filtro do commit.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---originalltespao-de-nomesgt"> <a class="anchor" href="#git-filter-branch---originalltespao-de-nomesgt"></a>--original &lt;espaço-de-nomes&gt; </dt>
+<dd>
+<p>Utilize esta opção para definir o espaço de nomes onde os commits originais serão armazenados. O valor predefinido é <em>refs/original</em>.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch--dltdiretriogt"> <a class="anchor" href="#git-filter-branch--dltdiretriogt"></a>-d &lt;diretório&gt; </dt>
+<dd>
+<p>Use esta opção para definir o caminho para o diretório temporário usado para a reescrita. Ao aplicar um filtro na árvore, o comando precisa fazer a averiguação da árvore em algum diretório, o que pode consumir um espaço considerável no caso dos grandes projetos. É predefinido que ele faça isso no diretório <code>.git-rewrite/</code>, porém é possível substituir esta opção por este parâmetro.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch--f"> <a class="anchor" href="#git-filter-branch--f"></a>-f </dt>
+<dt class="hdlist1" id="git-filter-branch---force"> <a class="anchor" href="#git-filter-branch---force"></a>--force </dt>
+<dd>
+<p>O comando <em>git filter-branch</em> não será iniciado caso um diretório temporário existenta ou quando já existem referências começando com <em>refs/original/</em> ou a menos que seja imposto.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch---state-branchltramogt"> <a class="anchor" href="#git-filter-branch---state-branchltramogt"></a>--state-branch &lt;ramo&gt; </dt>
+<dd>
+<p>Esta opção fará com que o mapeamento dos objetos antigos para os novos sejam carregados do ramo chamado na inicialização e salvo como um novo commit até a sua conclusão, permitindo o incremento das grandes árvores. Se o <em>&lt;ramo&gt;</em> não existir, ele será criado.</p>
+</dd>
+<dt class="hdlist1" id="git-filter-branch-ltopesdarev-listgt82308203"> <a class="anchor" href="#git-filter-branch-ltopesdarev-listgt82308203"></a>&lt;opções da rev-list&gt;&#8230;&#8203; </dt>
+<dd>
+<p>Argumentos para o <em>git rev-list</em>. Todas as referências positivas incluídas por estas opções serão reescritas. Você também pode usar as opções como <code>--all</code>, porém deve utilizar <code>--</code> para separá-las das opções <em>git filter-branch</em>. Implica no uso de <a href="#Remap_to_ancestor">Remapear para o ancestral</a>.</p>
+</dd>
+</dl>
+</div>
+<div class="sect2">
+<h3 id="Remap_to_ancestor"><a class="anchor" href="#Remap_to_ancestor"></a>Remapear para o ancestral</h3>
+<div class="paragraph">
+<p>Ao usar argumentos <a href='{{< relurl "docs/git-rev-list/pt_BR" >}}'>git-rev-list[1]</a> como limitadores de caminho por exemplo, você pode limitar o conjunto das revisões que serão reescritas. No entanto, referências positivas na linha de comando são diferenciadas: nós não permitimos que sejam excluídas através destes limitadores. Para esse fim, eles são reescritos para apontar para o ancestral mais próximo que não tenha sido excluído.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_condição_de_encerramento"><a class="anchor" href="#_condição_de_encerramento"></a>CONDIÇÃO DE ENCERRAMENTO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Se bem sucedido, a condição da saída se encerra com <code>0</code>. Caso o o filtro não encontre nenhum commit para reescrever, a condição da saída se encerra com <code>2</code>. Em qualquer outro erro, a condição da saída saída pode ser qualquer outro valor diferente de zero.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_exemplos"><a class="anchor" href="#_exemplos"></a>EXEMPLOS</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Suponha que você queira remover um arquivo (contendo informações confidenciais ou de violação de direitos autorais) de todos os commit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --tree-filter 'rm filename' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>No entanto, caso o arquivo do commit esteja ausente da árvore, um simples <code>rm filename</code> falhará para aquela árvore e o commit. Portanto, pode ser interessante usar <code>rm -f filename</code> como script.</p>
+</div>
+<div class="paragraph">
+<p>Usar a opção <code>--index-filter</code> com <em>git rm</em> gera uma versão significativamente mais rápida. Assim como o <code>rm filename</code> o <code>git rm --cached filename</code> falhará caso o arquivo do commit esteja ausente da árvore. Caso queira "esquecer completamente" um arquivo, não se importando quando ele entrou no histórico, então também adicionamos a opção <code>--ignore-unmatch</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --index-filter 'git rm --cached --ignore-unmatch filename' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Agora, você salvará o histórico reescrito no <code>HEAD</code>.</p>
+</div>
+<div class="paragraph">
+<p>Para reescrever o repositório para fazer de conta que <code>foodir/</code> tenha sido a raiz do projeto e descarte todos os outros históricos:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --subdirectory-filter foodir -- --all</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Assim, você pode, transformar um subdiretório da biblioteca num repositório próprio por exemplo. Observe o <code>--</code> que separa as opções <em>filter-branch</em> das opções de revisão e o` --all` para reescrever todos os ramos e as tags.</p>
+</div>
+<div class="paragraph">
+<p>Para definir um commit (que normalmente esteja na ponta de outro histórico) para ser a atual origem inicial do commit e para colar o outro histórico atrás do histórico atual:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --parent-filter 'sed "s/^\$/-p &lt;graft-id&gt;/"' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>(caso o texto da origem esteja vazio - o mesmo que acontece quando estamos lidando com o commit inicial - <code>add graftcommit</code> como origem). Observe que isso assume o histórico com uma única raiz (ou seja, sem nenhuma mesclagem com ancestrais comuns). Se não for esse o caso, utilize:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --parent-filter \
+	'test $GIT_COMMIT = &lt;commit-id&gt; &amp;&amp; echo "-p &lt;graft-id&gt;" || cat' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>ou mais simples ainda:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git replace --graft $commit-id $graft-id
+git filter-branch $graft-id..HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para remover os commits criados por "Darl McBribe" do histórico:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --commit-filter '
+	if [ "$GIT_AUTHOR_NAME" = "Darl McBribe" ];
+	then
+		skip_commit "$@";
+	else
+		git commit-tree "$@";
+	fi' HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A função <em>skip_commit</em> é definida da seguinte maneira:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>skip_commit()
+{
+	shift;
+	while [ -n "$1" ];
+	do
+		shift;
+		map "$1";
+		shift;
+	done;
+}</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A mágica do deslocamento primeiro joga fora o ID da árvore e depois os parâmetros <code>-p</code>. Observe que isso manipula a mesclagem de forma adequada! No caso de Darl ter feito um commit mesclando entre P1 e P2, ela será propagada corretamente e todos os herdeiros desta mesclagem se tornarão commits P1,P2 como as suas origens em vez do commit de mesclagem.</p>
+</div>
+<div class="paragraph">
+<p><strong>NOTA</strong> as alterações introduzidas pelos commits que não sejam revertidos
+por commits subsequentes, ainda estarão na ramificação que foi reescrita. Caso queira
+descartar as <em>alterações</em> junto com os commits, você deve usar o
+modo interativo do comando <em>git rebase</em>.</p>
+</div>
+<div class="paragraph">
+<p>Você pode re-escrever as mensagens do registro log dos commits com <code>--msg-filter</code>. A cadeia de caracteres <em>git svn-id</em> num repositório criado por <em>git svn</em> por exemplo, podem ser removidos desta maneira:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --msg-filter '
+	sed -e "/^git-svn-id:/d"
+'</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Caso precise adicionar as linhas <em>Acked-by</em> (Reinformado por) aos últimos 10 commits por exemplo (nenhum dos quais seja uma mesclagem), utilize este comando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --msg-filter '
+	cat &amp;&amp;
+	echo "Reconhecido por: Pernalonga &lt;coelho@bugzilla.org&gt;"
+' HEAD~10..HEAD</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A opção <code>--env-filter</code> pode ser utilizada para modificar a identidade do autor de quem fez o commit. Caso descubra que os seus commits têm a identidade errada devido a um <code>user.email</code> configurado de forma errada por exemplo, é possível fazer uma correção antes de publicar o projeto, assim:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --env-filter '
+	if test "$GIT_AUTHOR_EMAIL" = "root@localhost"
+	then
+		GIT_AUTHOR_EMAIL=john@example.com
+	fi
+	if test "$GIT_COMMITTER_EMAIL" = "root@localhost"
+	then
+		GIT_COMMITTER_EMAIL=john@example.com
+	fi
+' -- --all</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para restringir a reescrita a apenas na parte do histórico, determine um intervalo da revisão além do novo nome do ramo. O novo nome do ramo apontará para o topo da revisão mais recente deste intervalo que um <em>git rev-list</em> dessa faixa imprimirá.</p>
+</div>
+<div class="paragraph">
+<p>Considere este histórico:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>     D--E--F--G--H
+    /     /
+A--B-----C</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para reescrever apenas os commits D, E, F, G, H, mas deixe A, B e C intactos, utilize:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch ... C..H</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para reescrever os commits E, F, G, H, utilize um destes:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch ... C..H --not D
+git filter-branch ... D..H --not C</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para mover toda a árvore para um subdiretório ou removê-la de lá:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git filter-branch --index-filter \
+	'git ls-files -s | sed "s-\t\"*-&amp;novosubdir/-" |
+		GIT_INDEX_FILE=$GIT_INDEX_FILE.new \
+			git update-index --index-info &amp;&amp;
+	 mv "$GIT_INDEX_FILE.new" "$GIT_INDEX_FILE"' HEAD</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_lista_de_verificação_para_reduzir_de_um_repositório"><a class="anchor" href="#_lista_de_verificação_para_reduzir_de_um_repositório"></a>LISTA DE VERIFICAÇÃO PARA REDUZIR DE UM REPOSITÓRIO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>O comando <code>git-filter-branch</code> pode ser utilizado para se livrar de um subconjunto de arquivos, geralmente com alguma combinação das opções <code>--index-filter</code> e <code>--subdirectory-filter</code>. As pessoas esperam que o repositório resultante seja menor que o original, porém são necessários mais algumas etapas para torná-lo menor porque o Git se esforça para não perder os seus objetos até que você assim o solicite. Primeiro, verifique se:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Você realmente removeu todas as variantes de um nome do arquivo, se um bolha foi movida durante a sua vida útil. O comando <code>git log --name-only --follow --all - nome_do_arquivo</code> pode ajudá-lo a encontrar os arquivos renomeados.</p>
+</li>
+<li>
+<p>Você realmente filtrou todas as referências: utilize as opções <code>--tag-name-filter cat -- --all</code> ao invocar o comando <em>git-filter-branch</em>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Depois, existem duas outras maneiras de se obter um repositório ainda menor. A maneira mais segura seria clonar, mantendo o original intacto.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Clone-o com o comando <code>git clone file:///path/to/repo</code>. O clone não terá os objetos que foram removidos. Consulte <a href='{{< relurl "docs/git-clone/pt_BR" >}}'>git-clone[1]</a>. (Observe que ao realizar a clonagem com um caminho simples, isso faz com que tudo seja vinculado!)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Caso realmente não queira cloná-lo, independente do motivo, verifique os seguintes pontos (nesta ordem). Essa é uma abordagem muito destrutiva, logo, <strong>faça um backup</strong> ou volte para a clonagem. Você foi avisado.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Remova os refs originais com o backup do git-filter-branch utilizando: <code>git for-each-ref --format="%(refname)" refs/original/ | xargs -n 1 git update-ref -d</code>.</p>
+</li>
+<li>
+<p>Expire todos os <code>reflogs</code> utilizando o comando <code>git reflog expire --expire=now --all</code>.</p>
+</li>
+<li>
+<p>O lixo é coletado de todos os objetos sem referências utilizando o comando <code>git gc --prune=now</code> (ou caso o seu <code>git-gc</code> não seja novo o suficiente para suportar os argumentos para a opção <code>--prune</code>, utilize <code>git repack -ad; git prune</code>).</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="PERFORMANCE"><a class="anchor" href="#PERFORMANCE"></a>DESEMPENHO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>O desempenho do ramo do <em>git-filter-branch</em> é bem lento; o seu design torna impossível a implementação de retrocompatibilidade rápida com versões anteriores:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Na edição dos arquivos, o <code>git-filter-branch</code> por design faz a averiguação de todos os commits conforme existiam no repositório original. Caso o seu repositório tenha <code>10^5</code> arquivos e <code>10^5</code> commits, porém cada commit altere apenas cinco arquivos, o <code>git-filter-branch</code> fará com que você faça <code>10^10</code> alterações, apesar de ter apenas (no máximo) <code>5*10^5</code> bolhas únicas.</p>
+</li>
+<li>
+<p>Caso tente trapacear e tente fazer com que o <em>git-filter-branch</em> funcione apenas nos arquivos modificados de um commit, ocorrerão duas coisas</p>
+<div class="ulist">
+<ul>
+<li>
+<p>você enfrenta problemas com exclusões sempre que o usuário está simplesmente tentando renomear os arquivos (porque tentar excluir os que não existem parece um no-op; é preciso alguma trapaça para remapear as exclusões entre as renomeações dos arquivos quando as renomeações acontecem por meio de usuários com o seu próprio shell)</p>
+</li>
+<li>
+<p>mesmo caso consiga excluir a zombaria do <em>map-deletes-for-renames</em> (renomeações para mapas excluídos), ainda assim violará tecnicamente a compatibilidade com as versões anteriores, porque os usuários podem filtrar os arquivos de maneiras que dependem da topologia dos commits, em vez de filtrar apenas com base no conteúdo ou nos nomes dos arquivos (embora isso não tenha sido observado ainda).</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>Mesmo que você não precise editar os arquivos, porém apenas queira, por exemplo, renomear ou remover alguns e assim, evitar a averiguação de cada arquivo (por exemplo, você pode utilizar a opção <code>--index-filter</code>), você ainda está passando trechos do shell para os seus filtros. Isso significa que, para cada commit, é necessário ter um repositório git preparado onde estes filtros possam ser executados. Esta é uma configuração significativa.</p>
+</li>
+<li>
+<p>Além disso, os vários arquivos adicionais são criados ou são atualizados por commits através do comando git-filter-branch. Alguns deles são para apoiar as funções de conveniência fornecidas pelo <em>git-filter-branch</em> (como map()), enquanto outros são para acompanhar a condição interna (mas também podem ter sido acessados através dos filtros do usuário; com um dos testes de regressão <em>git-filter-branch</em> do ramo fazem). Basicamente significa utilizar o sistema dos arquivos como um mecanismo IPC entre o <em>git-filter-branch</em> e os filtros fornecidos pelo usuário. Os discos tendem a ser um mecanismo IPC lento e a gravação destes arquivos também representa efetivamente um ponto de sincronização imposto entre os processos separados que atingimos com cada commit.</p>
+</li>
+<li>
+<p>Os comandos do usuário informados pelo shell provavelmente envolverão um pipeline de comandos, resultando na criação de muitos processos por commit. Criar e executar um outro processo leva uma certa quantidade bastante de tempo entre os sistemas operacionais, porém em qualquer outra plataforma é muito lento em relação à chamada de uma função.</p>
+</li>
+<li>
+<p>O próprio <em>git-filter-branch</em> é escrito em shell, o que o torna um pouco lento. Esse é o único problema de desempenho que pode ser corrigido de forma compatível com as versões anteriores, porém se comparado aos problemas acima, intrínsecos ao design do <em>git-filter-branch</em>, o idioma usado pela própria ferramenta é um problema relativamente menor.</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Nota: Infelizmente, as pessoas tendem a se fixar no aspecto "escrito em shell" e periodicamente perguntam se o <em>git-filter-branch</em> pode ser reescrito em outra linguagem para corrigir os problemas com o desempenho. Isso não apenas ignora os maiores problemas intrínsecos na questão do design, como também ajuda menos do que você espera: se o ramo do <em>git-filter-branch</em> em si não fosse em shell, as funções de conveniência (map(), skip_commit(), etc) e a opção <code>--setup</code> não poderiam mais ser executadas uma vez durante o início do programa, porém precisariam ser anexadas em todo o filtro do usuário (e portanto, ser executado com cada commit).</p>
+</li>
+</ul>
+</div>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>A ferramenta <a href="https://github.com/newren/git-filter-repo/">git filter-repo</a> é uma alternativa ao <em>git-filter-branch</em> que não sofre com estes problemas de desempenho ou problemas com segurança (mencionados abaixo). Para aqueles com ferramentas já existentes que dependam do <em>git-filter-branch</em>, o comando <em>git filter-repo</em> também oferece <a href="https://github.com/newren/git-filter-repo/blob/master/contrib/filter-repo-demos/filter-lamely">filter-lamely</a>, um substituto do <em>git-filter-branch</em> (com algumas ressalvas). Embora o filtro sofra dos mesmos problemas de segurança que o <em>git-filter-branch</em>, ele pelo menos melhora um pouco as questões de desempenho.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="SAFETY"><a class="anchor" href="#SAFETY"></a>SEGURANÇA</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>O <em>git-filter-branch</em> está cheio de pegadinhas, em várias maneiras o resultando pode corromper facilmente os repositórios ou acabar com uma bagunça pior do que a que você começou:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Alguém pode ter um conjunto de "filtros testados e que funcionam" que eles documentam ou provê a um colega de trabalho, que os executa em um SO diferente onde os mesmos comandos não estão funcionando ou foram testados (alguns exemplos na página do manual do <em>git-filter-branch</em> também são afetados por este). Os usuários do BSD vs. GNU podem sentir grandes diferenças. Se tiver sorte, algumas mensagens de erros serão exibidas. Mas, com a mesma probabilidade, os comandos não fazem a filtragem solicitada ou silenciosamente, corrompem ao fazer algumas alterações indesejadas. A alteração indesejada pode afetar apenas alguns commits, portanto também não é necessariamente óbvia. (O fato onde os problemas não serão necessariamente óbvios significa que eles provavelmente passarão despercebidos até que o histórico reescrito esteja em uso por um bom tempo, quando for realmente difícil justificar outro alerta para outra reescrita.)</p>
+</li>
+<li>
+<p>Os nomes dos arquivos com espaços geralmente não são tratados de forma correta pelos trechos em shell scripts, pois causam problemas nas pipelines. Nem todo mundo está familiarizado com <em>find -print0</em>, <em>xargs -0</em>, <em>git-ls-files -z</em>, etc. Mesmo as pessoas familiarizadas com isso podem assumir que tais opções não sejam relevantes porque alguém renomeou esses arquivos no seu repositório antes da pessoa que fez a filtragem entrar no projeto. E muitas vezes, mesmo aqueles familiarizados com o tratamento dos argumentos com espaços podem não fazê-lo apenas porque não estão com a mentalidade de pensar em tudo o que poderia dar errado.</p>
+</li>
+<li>
+<p>Os nomes de arquivos não ascii podem ser removidos silenciosamente, apesar de estarem no diretório desejado. Manter apenas os caminhos desejados geralmente é feito utilizando pipelines como <code>git ls-files | grep -v ^WANTED_DIR/ | xargs git rm</code>. O ls-files só citará os nomes dos arquivos caso seja necessário, portanto, as pessoas podem não perceber que um dos arquivos não coincide com o regex (pelo menos não até que seja tarde demais). Sim, alguém que conhece a opção de configuração <code>core.quotePath</code> pode evitar isso (a menos que tenha outros caracteres especiais como <em>\t</em>, <em>\n</em> ou <em>"</em>), e as pessoas que utilizam <code>ls-files -z</code> com algo diferente de <em>grep</em> podem evitar isso, porém não significa que eles irão.</p>
+</li>
+<li>
+<p>Da mesma forma, ao mover os arquivos, pode-se descobrir que os nomes dos arquivos com caracteres não ASCII ou especiais, acabam em um diretório diferente, um que inclua um caractere com aspas duplas. (Tecnicamente, este é o mesmo problema acima, com citações, porém talvez seja uma maneira interessante e diferente de se manifestar como um problema.)</p>
+</li>
+<li>
+<p>É muito fácil misturar acidentalmente o histórico antigo e com o novo. Com qualquer ferramenta ainda é possível, mas o comando git-filter-branch é quase um convite pra isso. Caso tenha sorte, a única desvantagem é que os usuários fiquem frustrados por não saberem como encolher o seu repositório e remover as coisas antigas. Caso tenha azar, eles mesclam o histórico antigo e o novo e acabam com várias "cópias" de cada commit, algumas das quais com arquivos confidenciais ou indesejados e outras que não. Isso ocorre de várias maneiras diferentes:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>a predefinição para reescrever apenas um histórico parcial (<em>--all</em> não é a predefinição e poucos exemplos o mostram)</p>
+</li>
+<li>
+<p>o fato de não haver limpeza automática após a execução</p>
+</li>
+<li>
+<p>o fato da opção <code>--tag-name-filter</code> (quando usado para renomear as tags) não remover as tags antigas, mas apenas adicionar novas com um novo nome</p>
+</li>
+<li>
+<p>o fato de poucas informações educacionais serem fornecidas aos usuários das ramificações de uma reescrita e como evitar misturar o histórico antigo e o novo. Por exemplo, esta página do manual discute como os usuários precisam entender que precisam refazer as suas alterações para todas as suas ramificações no topo do novo histórico (ou excluir ou refazer a clonagem), porém essa é apenas uma das várias preocupações a serem consideradas. Para mais detalhes, consulte a seção "DISCUSSÃO" da página do manual do git filter-repo.</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>As tags anotadas podem ser convertidas acidentalmente em tags leves, devido a um de dois problemas:</p>
+<div class="ulist">
+<ul>
+<li>
+<p>Alguém pode reescrever o histórico, perceber que errou, restaurar a partir de um dos backups no <em>refs/original/</em> e depois refazer o comando <em>git-filter-branch</em>. (O backup no <em>refs/original/</em> não é um backup real; ele primeiro remove a referência das tags.)</p>
+</li>
+<li>
+<p>Execute o comando <em>git-filter-branch</em> com <em>--tags</em> ou <em>--all</em> mas suas <code>&lt;opções da rev-list&gt;</code>. Para manter as tags que já estejam anotadas como anotadas, utilize <em>--tag-name-filter</em> (não deve ter sido restaurado a partir de um <em>refs/original/</em> vindo anteriormente de uma reescrita danificada).</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p>Qualquer mensagem dos commits que defina uma codificação, se tornará corrompida pela reescrita; O <em>git-filter-branch</em> ignora a codificação, pega os bytes originais e o alimenta para a árvore do commit sem informar a codificação adequada. (Isso ocorre caso o filtro <code>--msg-filter</code> seja utilizado ou não.)</p>
+</li>
+<li>
+<p>É predefinido que as mensagens dos commits (mesmo que todas sejam UTF-8) fiquem corrompidas por não serem atualizadas&#8201;&#8212;&#8201;quaisquer referências a outros hashes dos commits, nas mensagens dos commits, agora se referem a commits que não existem mais.</p>
+</li>
+<li>
+<p>Não há facilidades para ajudar os usuários a encontrarem os itens indesejados que devem ser excluídos, o que significa que são muito mais propensos a fazer limpezas incompletas ou parciais que às vezes resultam em confusão e pessoas perdendo tempo tentando compreender. (Como, por exemplo, as pessoas tendem a procurar excluir apenas os arquivos grandes, em vez dos grandes diretórios ou extensões, e uma vez que o fazem algum tempo depois, as pessoas que usam o novo repositório que estão passando pelo histórico notarão alguns artefatos de construção onde alguns arquivos existem e outros não, ou um cache com dependências (node_modules ou similar) que nunca poderiam estar funcionais, pois alguns arquivos estão faltando.)</p>
+</li>
+<li>
+<p>Caso a opção <code>--prune-empty</code> não seja utilizado, o processo de filtragem poderá criar hordas confusas com commits vazios</p>
+</li>
+<li>
+<p>Caso a opção <code>--prune-empty</code> seja utilizado, os commits vazios que foram intencionalmente colocados antes da operação de filtragem também serão removidos, em vez de apenas os commits removidos que ficaram vazios devido às regras de filtragem.</p>
+</li>
+<li>
+<p>Caso a opção <code>--prune-empty</code> seja utilizado, algumas vezes os commits vazios são perdidos e deixados de qualquer maneira (um bug um tanto raro, mas acontece&#8230;&#8203;)</p>
+</li>
+<li>
+<p>Um problema menor, porém os usuários que têm o objetivo de atualizar todos os nomes e os e-mails em um repositório podem ser levados ao <em>--env-filter</em>, que atualizará apenas os autores e que fez os commits, sem as tags.</p>
+</li>
+<li>
+<p>Caso o usuário utilize um comando <code>--tag-name-filter</code> que mapeie várias tags para o mesmo nome, nenhum aviso ou erro será exibido; O comando <code>git-filter-branch</code> simplesmente sobrescreve cada tag em uma ordem predefinida não documentada, resultando em apenas uma tag no final. (Um teste de regressão <code>git-filter-branch</code> requer este comportamento.)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Além disso, o baixo desempenho do comando <em>git-filter-branch</em> geralmente leva a problemas de segurança:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Chegar com o trecho shell correto para fazer a filtragem desejada algumas vezes é difícil, a menos que você não esteja fazendo uma alteração trivial como a exclusão de alguns arquivos. Infelizmente, as pessoas geralmente aprendem se o trecho está certo ou errado ao testá-lo, porém o certo ou errado pode variar dependendo de circunstâncias especiais (espaços nos nomes dos arquivos, dos nomes dos arquivos não-ascii, nomes ou e-mails engraçados dos autores, fusos horários inválidos, a presença de enxertos ou a reposição dos objetos, etc.), o que significa que eles podem ter que esperar muito tempo, encontrar um erro e reiniciar. O desempenho do comando <em>git-filter-branch</em> é tão ruim que este ciclo é doloroso, reduzindo o tempo disponível para uma nova verificação mais cuidadosa (isso sem falar sobre o que isso faz com a paciência da pessoa que está reescrevendo, ainda que tecnicamente tenham mais recursos e tempo disponível). Este problema é mais complexo porque os erros vindos dos filtros quebrados podem não ser exibidos por um longo período de tempo e/ou estarem perdidos uma imensidão do que for gerado. Pior ainda, os filtros quebrados geralmente resultam em reescritas incorretas e silenciosas.</p>
+</li>
+<li>
+<p>E acima de tudo, mesmo quando os usuários finalmente encontram os comandos que funcionam, eles naturalmente querem compartilhá-los. Porém eles podem não estar cientes que o repositório deles não teve algumas questões especiais que outros tiveram. Portanto, quando alguém com um repositório diferente executa os mesmos comandos, é atingido pelos problemas acima. Ou então, o usuário apenas executa os comandos que foram realmente examinados para questões especiais, mas eles o executam em um sistema operacional diferente, onde não funciona, conforme observado acima.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Parte do conjunto <a href='{{< relurl "docs/git/pt_BR" >}}'>git[1]</a></p>
+</div>
+</div>
+</div>

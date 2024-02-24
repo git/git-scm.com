@@ -1,0 +1,126 @@
+git-cherry(1)
+=============
+
+名称
+--
+git-cherry - 查找尚未应用于上游的提交内容
+
+概述
+--
+[verse]
+'git cherry' [-v] [<上游仓库> [<头> [<限制>]]]
+
+描述
+--
+确定 `<head>...<upstream>` 中是否有与 `<limit>...<head>` 范围内的提交相等。
+
+The equivalence test is based on the diff, after removing whitespace and line numbers. git-cherry therefore detects when commits have been "copied" by means of linkgit:git-cherry-pick[1], linkgit:git-am[1] or linkgit:git-rebase[1].
+
+输出 `<limit>...<head>` 中每个提交的 SHA1，对于在 <upstream> 中有对应的提交，以 `-` 为前缀，对于没有对应的提交，以 `+` 为前缀。
+
+选项
+--
+-v::
+	在 SHA1 旁边显示提交主题。
+
+<上游仓库>::
+	Upstream branch to search for equivalent commits. Defaults to the upstream branch of HEAD.
+
+<head>::
+	工作分支；默认为 HEAD。
+
+<limit>::
+	不报告达到（和包括）极限的提交。
+
+实例
+--
+
+补丁工作流程
+~~~~~~
+
+git-cherry is frequently used in patch-based workflows (see linkgit:gitworkflows[7]) to determine if a series of patches has been applied by the upstream maintainer. In such a workflow you might create and send a topic branch like this:
+
+------------
+$ git checkout -b topic origin/master
+# 工作，并创建一些提交
+$ git format-patch origin/master
+$ git send-email ... 00*
+------------
+
+后来，你可以通过说（仍然是在 `topic`上）看到你的修改是否被应用：
+
+------------
+$ git fetch  # 更新您的 origin/master
+$ git cherry -v
+------------
+
+具体实例
+~~~~
+
+如果话题由三个提交组成，而维护者应用了其中的两个提交，情况可能是这样的：
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...topic
+* 7654321 (origin/master) upstream tip commit
+[... 摘录其他一些提交 ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... 摘录更多发生的事情...]
+| * cccc000 (topic) commit C
+| * bbbb000 commit B
+| * aaaa000 commit A
+|/
+o 1234567 branch point
+------------
+
+在这种情况下，git-cherry 会显示一个简明的摘要，说明还有哪些地方需要应用：
+
+------------
+$ git cherry origin/master topic
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+在这里，我们看到，当你在 `origin/master` 之上重新建立分支时，可以从 `topic` 分支中删除 A 和 C（标有 `-`），而 B（标有 `+`）仍然需要保留，这样它就会被发送到 `origin/master `上应用。
+
+
+使用一个限制
+~~~~~~
+
+The optional <limit> is useful in cases where your topic is based on other work that is not in upstream. Expanding on the previous example, this might look like:
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...topic
+* 7654321 (origin/master) upstream tip commit
+[... 摘录其他一些提交 ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... 摘录更多发生的事情 ...]
+| * cccc000 (topic) commit C
+| * bbbb000 commit B
+| * aaaa000 commit A
+| * 0000fff (base) unpublished stuff F
+[... snip ...]
+| * 0000aaa unpublished stuff A
+|/
+o 1234567 merge-base between upstream and topic
+------------
+
+通过指定 `base` 作为限制，你可以避免列出 `base` 和 `topic` 之间的提交：
+
+------------
+$ git cherry origin/master topic base
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+
+参见
+--
+linkgit:git-patch-id[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

@@ -1,0 +1,191 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - git-credential Documentation
+docname: git-credential
+lang: fr
+aliases:
+- "/docs/git-credential/fr/index.html"
+
+---
+<div class="sect1">
+<h2 id="_nom"><a class="anchor" href="#_nom"></a>NOM</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-credential - Récupère et stocke les informations d&#8217;identification de l&#8217;utilisateur</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_synopsis"><a class="anchor" href="#_synopsis"></a>SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="listingblock">
+<div class="content">
+<pre>'git credential' (fill|approve|reject)</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description"><a class="anchor" href="#_description"></a>DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Git possède une interface interne pour stocker et récupérer les informations d&#8217;identification à partir d&#8217;assistants spécifiques au système, ainsi que pour demander à l&#8217;utilisateur des noms d&#8217;utilisateur et des mots de passe. La commande git-credential expose cette interface aux scripts qui peuvent vouloir récupérer, stocker ou demander des informations d&#8217;identification de la même manière que Git. La conception de cette interface scriptable modélise l&#8217;API C interne ; voir credential.h pour plus de détails sur les concepts.</p>
+</div>
+<div class="paragraph">
+<p>git-credential prend une option "action" sur la ligne de commande (une parmi <code>fill</code>, <code>approve</code>, ou <code>reject</code>) et lit une description de credential sur stdin (voir <a href="#IOFMT">FORMAT D&#8217;ENTRÉE/SORTIE</a>).</p>
+</div>
+<div class="paragraph">
+<p>Si l&#8217;action est <code>fill</code>, git-credential tentera d&#8217;ajouter les attributs "username" et "password" à la description en lisant les fichiers de configuration, en contactant les assistants d&#8217;authentification configurés, ou en demandant à l&#8217;utilisateur. Les attributs "username" et "password" de la description de l&#8217;authentification sont ensuite imprimés sur stdout avec les attributs déjà fournis.</p>
+</div>
+<div class="paragraph">
+<p>Si l&#8217;action est <code>approve</code>, git-credential enverra la description à tout assistant d&#8217;accréditation configuré, qui peut stocker l&#8217;accréditation pour une utilisation ultérieure.</p>
+</div>
+<div class="paragraph">
+<p>Si l&#8217;action est <code>reject</code>, git-credential enverra la description à tous les assistants d&#8217;authentification configurés, qui peuvent effacer toutes les authentifications stockées correspondant à la description.</p>
+</div>
+<div class="paragraph">
+<p>Si l&#8217;action est <code>approve</code> ou <code>reject</code>, aucune sortie ne doit être émise.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_utilisation_typique_de_lauthentification_git"><a class="anchor" href="#_utilisation_typique_de_lauthentification_git"></a>UTILISATION TYPIQUE DE L&#8217;AUTHENTIFICATION GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Une application utilisant git-credential utilisera typiquement <code>git credential</code> en suivant ces étapes :</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Générer une description d&#8217;authentification basée sur le contexte.</p>
+<div class="paragraph">
+<p>Par exemple, si nous voulons un mot de passe pour <code>https://example.com/foo.git</code>, nous pourrions générer la description d&#8217;authentification suivante (n&#8217;oubliez pas la ligne blanche à la fin ; elle indique à <code>git credential</code> que l&#8217;application a fini de fournir toutes les informations dont elle dispose) :</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>protocol=https
+host=example.com
+path=foo.git</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Demander à git-credential de nous donner un nom d&#8217;utilisateur et un mot de passe pour cette description. Ceci est fait en exécutant <code>git credential fill</code>, en fournissant la description de l&#8217;étape (1) à son entrée standard. La description complète des identifiants (incluant l&#8217;identification elle-même, c&#8217;est-à-dire le nom d&#8217;utilisateur et le mot de passe) sera produite sur la sortie standard, comme :</p>
+<div class="literalblock">
+<div class="content">
+<pre>protocol=https
+host=example.com
+username=bob
+password=secr3t</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dans la plupart des cas, cela signifie que les attributs donnés en entrée seront répétés en sortie, mais Git peut aussi modifier la description des identifiants, par exemple en supprimant l&#8217;attribut <code>path</code> lorsque le protocole est HTTP(s) et que <code>credential.useHttpPath</code> est faux.</p>
+</div>
+<div class="paragraph">
+<p>Si le <code>git credential</code> connaissait le mot de passe, cette étape peut ne pas avoir impliqué que l&#8217;utilisateur tape réellement ce mot de passe (l&#8217;utilisateur peut avoir tapé un mot de passe pour déverrouiller le trousseau à la place, ou aucune interaction de l&#8217;utilisateur n&#8217;a été faite si le trousseau était déjà déverrouillé) avant de retourner <code>password=secr3t</code>.</p>
+</div>
+</li>
+<li>
+<p>Utiliser le justificatif d&#8217;identité (par exemple, accéder à l&#8217;URL avec le nom d&#8217;utilisateur et le mot de passe de l&#8217;étape (2)), et voir s&#8217;il est accepté.</p>
+</li>
+<li>
+<p>Rapporter sur le succès ou l&#8217;échec du mot de passe. Si l&#8217;identifiant a permis à l&#8217;opération de se terminer avec succès, il peut être marqué avec une action "approve" pour dire à <code>git credential</code> de le réutiliser dans sa prochaine invocation. Si l&#8217;identifiant a été rejeté pendant l&#8217;opération, utiliser l&#8217;action "reject" pour que <code>git credential</code> demande un nouveau mot de passe lors de sa prochaine invocation. Dans les deux cas, <code>git credential</code> doit être alimenté avec la description de l&#8217;identifiant obtenue à l&#8217;étape (2) (qui contient également les champs fournis à l&#8217;étape (1)).</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="IOFMT"><a class="anchor" href="#IOFMT"></a>FORMAT D&#8217;ENTRÉE/SORTIE</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><code>git credential</code> lit et/ou écrit (en fonction de l&#8217;action utilisée) des informations d&#8217;identification dans son entrée/sortie standard. Ces informations peuvent correspondre soit à des clés pour lesquelles <code>git credential</code> obtiendra les informations de connexion (par exemple, hôte, protocole, chemin), soit aux données d&#8217;identification réelles à obtenir (nom d&#8217;utilisateur/mot de passe).</p>
+</div>
+<div class="paragraph">
+<p>L&#8217;identifiant est divisé en un ensemble d&#8217;attributs nommés, avec un attribut par ligne. Chaque attribut est spécifié par une paire clé-valeur, séparée par un signe <code>=</code> (égal), suivi d&#8217;une nouvelle ligne.</p>
+</div>
+<div class="paragraph">
+<p>La clé peut contenir n&#8217;importe quel octet sauf <code>=</code>, newline ou NUL. La valeur peut contenir n&#8217;importe quel octet, à l&#8217;exception de newline ou NUL.</p>
+</div>
+<div class="paragraph">
+<p>Les attributs dont les clés se terminent par des parenthèses de style tableau C <code>[]</code> peuvent avoir plusieurs valeurs. Chaque instance d&#8217;un attribut multi-valué forme une liste ordonnée de valeurs - l&#8217;ordre des attributs répétés définit l&#8217;ordre des valeurs. Un attribut multivalué vide (<code>clé[]=\n</code>) efface toutes les entrées précédentes et réinitialise la liste.</p>
+</div>
+<div class="paragraph">
+<p>Dans tous les cas, tous les octets sont traités tels quels (c&#8217;est-à-dire qu&#8217;il n&#8217;y a pas de guillemets et qu&#8217;on ne peut pas transmettre une valeur contenant une nouvelle ligne ou NUL). La liste des attributs se termine par une ligne blanche ou une fin de fichier.</p>
+</div>
+<div class="paragraph">
+<p>Git comprend les attributs suivants :</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="git-credential-codeprotocolcode"> <a class="anchor" href="#git-credential-codeprotocolcode"></a><code>protocol</code> </dt>
+<dd>
+<p>Le protocole sur lequel l&#8217;identifiant sera utilisé (par exemple, <code>https</code>).</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codehostcode"> <a class="anchor" href="#git-credential-codehostcode"></a><code>host</code> </dt>
+<dd>
+<p>Le nom d&#8217;hôte distant pour un identifiant réseau. Cela inclut le numéro de port s&#8217;il a été spécifié (par exemple, "exemple.com:8088").</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codepathcode"> <a class="anchor" href="#git-credential-codepathcode"></a><code>path</code> </dt>
+<dd>
+<p>Le chemin avec lequel l&#8217;identifiant sera utilisé. Par exemple, pour accéder à un dépôt https distant, ce sera le chemin du dépôt sur le serveur.</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codeusernamecode"> <a class="anchor" href="#git-credential-codeusernamecode"></a><code>username</code> </dt>
+<dd>
+<p>Le nom d&#8217;utilisateur de l&#8217;identifiant, si nous en avons déjà un (par exemple, à partir d&#8217;une URL, de la configuration, de l&#8217;utilisateur ou d&#8217;une aide précédemment exécutée).</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codepasswordcode"> <a class="anchor" href="#git-credential-codepasswordcode"></a><code>password</code> </dt>
+<dd>
+<p>Le mot de passe de l&#8217;identifiant, si nous demandons qu&#8217;il soit stocké.</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codepasswordexpiryutccode"> <a class="anchor" href="#git-credential-codepasswordexpiryutccode"></a><code>password_expiry_utc</code> </dt>
+<dd>
+<p>Les mots de passe générés tels que les jetons d&#8217;accès OAuth peuvent avoir une date d&#8217;expiration. Lors de la lecture des informations d&#8217;identification depuis les assistants, <code>git credential fill</code> ignore les mots de passe expirés. Représenté en temps Unix UTC, en secondes depuis 1970.</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codeoauthrefreshtokencode"> <a class="anchor" href="#git-credential-codeoauthrefreshtokencode"></a><code>oauth_refresh_token</code> </dt>
+<dd>
+<p>Un jeton de rafraîchissement OAuth peut accompagner un mot de passe qui est un jeton d&#8217;accès OAuth. Les assistants doivent traiter cet attribut comme confidentiel, au même titre que l&#8217;attribut password. Git lui-même n&#8217;a pas de comportement particulier pour cet attribut.</p>
+</dd>
+<dt class="hdlist1" id="git-credential-codeurlcode"> <a class="anchor" href="#git-credential-codeurlcode"></a><code>url</code> </dt>
+<dd>
+<p>Lorsque cet attribut spécial est lu par <code>git credential</code>, la valeur est analysée comme une URL et traitée comme si ses parties constitutives étaient lues (par exemple, <code>url=https://example.com</code> se comporterait comme si <code>protocol=https</code> et <code>host=example.com</code> avaient été fournis). Cela peut aider les appelants à éviter d&#8217;analyser eux-mêmes les URL.</p>
+<div class="paragraph">
+<p>Notez que la spécification d&#8217;un protocole est obligatoire et que si l&#8217;URL ne spécifie pas de nom d&#8217;hôte (par exemple, "cert:///chemin/vers/un/fichier"), l&#8217;identifiant contiendra un attribut de nom d&#8217;hôte dont la valeur est une chaîne vide.</p>
+</div>
+<div class="paragraph">
+<p>Les composants qui manquent dans l&#8217;URL (par exemple, il n&#8217;y a pas de nom d&#8217;utilisateur dans l&#8217;exemple ci-dessus) ne seront pas définis.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="git-credential-codewwwauthcode"> <a class="anchor" href="#git-credential-codewwwauthcode"></a><code>wwwauth[]</code> </dt>
+<dd>
+<p>Lorsque Git reçoit une réponse HTTP contenant un ou plusieurs en-têtes d&#8217;authentification "WWW-Authenticate", ceux-ci sont transmis par Git aux assistants d&#8217;authentification.</p>
+<div class="paragraph">
+<p>Chaque valeur de l&#8217;en-tête "WWW-Authenticate" est transmise sous la forme d&#8217;un attribut à valeurs multiples "wwwauth[]", l&#8217;ordre des attributs étant le même que celui dans lequel ils apparaissent dans la réponse HTTP. Cet attribut est "à sens unique" à partir de Git pour transmettre des informations supplémentaires aux assistants d&#8217;authentification.</p>
+</div>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>Les attributs non reconnus sont ignorés en silence.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Fait partie de la suite <a href='{{< relurl "docs/git/fr" >}}'>git[1]</a></p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_traduction"><a class="anchor" href="#_traduction"></a>TRADUCTION</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Cette  page de manuel a été traduite par Jean-Noël Avila &lt;jn.avila AT free DOT fr&gt; et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site <a href="https://github.com/jnavila/git-manpages-l10n" class="bare">https://github.com/jnavila/git-manpages-l10n</a> .</p>
+</div>
+</div>
+</div>

@@ -1,0 +1,159 @@
+git-archive(1)
+==============
+
+名称
+--
+git-archive - 从命名的目录树中创建一个归档文件
+
+
+概述
+--
+[verse]
+'git archive' [--format=<fmt>] [--list] [--prefix=<前缀>/] [<extra>]
+	      [-o <文件> | --output=<文件>] [--worktree-attributes]
+	      [--remote=<仓库> [--exec=<Git 上传归档>]] <树状对象>
+	      [<路径>...]
+
+描述
+--
+Creates an archive of the specified format containing the tree structure for the named tree, and writes it out to the standard output. If <prefix> is specified it is prepended to the filenames in the archive.
+
+'git archive' behaves differently when given a tree ID as opposed to a commit ID or tag ID. When a tree ID is provided, the current time is used as the modification time of each file in the archive. On the other hand, when a commit ID or tag ID is provided, the commit time as recorded in the referenced commit object is used instead. Additionally the commit ID is stored in a global extended pax header if the tar format is used; it can be extracted using 'git get-tar-commit-id'. In ZIP files it is stored as a file comment.
+
+选项
+--
+
+--format=<格式>::
+	归档文件的格式。可能的值是 `tar`, `zip`, `tar.gz`, `tgz`, 以及使用配置选项 `tar.<格式>.command` 定义的任何格式。如果没有给出 `--format`，并且指定了输出文件，如果可能的话，将从文件名中推断出格式（例如，写入`foo.zip` 会使输出为`zip`格式）。否则，输出格式为`tar`。
+
+-l::
+--list::
+	显示所有可用的格式。
+
+-v::
+--verbose::
+	向标准错误流报告进度。
+
+--prefix=<前缀>/::
+	Prepend <prefix>/ to paths in the archive. Can be repeated; its rightmost value is used for all tracked files. See below which value gets used by `--add-file` and `--add-virtual-file`.
+
+-o <文件>::
+--output=<文件>::
+	将存档写入 <文件> 而不是标准输出流。
+
+--add-file=<文件>::
+	Add a non-tracked file to the archive. Can be repeated to add multiple files. The path of the file in the archive is built by concatenating the value of the last `--prefix` option (if any) before this `--add-file` and the basename of <file>.
+
+--add-virtual-file=<路径>:<内容>::
+	Add the specified contents to the archive. Can be repeated to add multiple files. The path of the file in the archive is built by concatenating the value of the last `--prefix` option (if any) before this `--add-virtual-file` and `<path>`.
++
+`<路径>` 参数可以以字面的双引号字符开始和结束；包含的文件名被解释为 C 风格的字符串，即反斜杠被解释为转义字符。如果路径包含一个冒号，则必须加引号，以避免冒号被误解为路径和内容之间的分隔符，或者如果路径以双引号字符开始或结束。
++
+文件模式被限制为普通文件，该选项可能会受到依赖平台的命令行的限制。对于非复杂的情况，写一个非跟踪的文件并使用 `--add-file` 代替。
+
+--worktree-attributes::
+	也可以在工作区中的 .gitattributes 文件中寻找属性（见 <<ATTRIBUTES>>）。
+
+--mtime=<时间>::
+	Set modification time of archive entries. Without this option the committer time is used if `<tree-ish>` is a commit or tag, and the current time if it is a tree.
+
+<extra>::
+	This can be any options that the archiver backend understands. See next section.
+
+--remote=<仓库>::
+	与其从本地版本库制作一个 tar 归档，不如从远程版本库检索一个 tar 归档。注意，远程仓库可能会对 `<树状对象>` 中允许的 sha1 表达式进行限制。详情见 linkgit:git-upload-archive[1]。
+
+--exec=<git-upload-archive>::
+	与 --remote 一起使用，指定远程端的 "git-upload-archive" 的路径。
+
+<tree-ish>::
+	要制作存档的树目录或提交。
+
+<路径>::
+	Without an optional path parameter, all files and subdirectories of the current working directory are included in the archive. If one or more paths are specified, only these are included.
+
+后台额外选项
+------
+
+zip
+~~~
+-<数字 0-9>::
+	Specify compression level. Larger values allow the command to spend more time to compress to smaller size. Supported values are from `-0` (store-only) to `-9` (best ratio). Default is `-6` if not given.
+
+tar
+~~~
+-<数>::
+	指定压缩级别。该值将被传递给 `tar.<格式>.command` 中配置的压缩命令。如果没有指定这个选项，请参阅配置的命令的手册页，了解支持的级别和默认级别。
+
+配置
+--
+
+tar.umask::
+	This variable can be used to restrict the permission bits of tar archive entries. The default is 0002, which turns off the world write bit. The special value "user" indicates that the archiving user's umask will be used instead. See umask(2) for details. If `--remote` is used then only the configuration of the remote repository takes effect.
+
+tar.<格式>.command::
+	这个变量指定了一个 shel l命令，由 `git archive` 产生的 tar 输出应该通过管道。该命令使用 shell 执行，在其标准输入中生成 tar 文件，并应在其标准输出中产生最终输出。任何压缩级别的选项将被传递给该命令（例如，`-9'）。
++
+`tar.gz` 和 `tgz` 格式是自动定义的，默认使用神奇的命令 `git archive gzip`，它调用了 gzip 的内部实现。
+
+tar.<格式>.remote::
+	如果为真，则通过 linkgit:git-upload-archive[1] 启用该格式供远程客户端使用。对于用户定义的格式，默认为 false，但对于 `tar.gz` 和 `tgz` 格式为 true。
+
+[[ATTRIBUTES]]
+属性
+--
+
+export-ignore::
+	Files and directories with the attribute export-ignore won't be added to archive files. See linkgit:gitattributes[5] for details.
+
+export-subst::
+	If the attribute export-subst is set for a file then Git will expand several placeholders when adding this file to an archive. See linkgit:gitattributes[5] for details.
+
+Note that attributes are by default taken from the `.gitattributes` files in the tree that is being archived. If you want to tweak the way the output is generated after the fact (e.g. you committed without adding an appropriate export-ignore in its `.gitattributes`), adjust the checked out `.gitattributes` file as necessary and use `--worktree-attributes` option. Alternatively you can keep necessary attributes that should apply while archiving any tree in your `$GIT_DIR/info/attributes` file.
+
+实例
+--
+`git archive --format=tar --prefix=junk/ HEAD | (cd /var/tmp/ && tar xf -)`::
+
+	创建一个包含当前分支上最新提交内容的 tar 归档文件，并将其解压到 `/var/tmp/junk` 目录中。
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0 | gzip >git-1.4.0.tar.gz`::
+
+	为 v1.4.0 版本创建一个压缩的压缩包。
+
+`git archive --format=tar.gz --prefix=git-1.4.0/ v1.4.0 >git-1.4.0.tar.gz`::
+
+	和上面一样，但使用内置的 tar.gz 处理。
+
+`git archive --prefix=git-1.4.0/ -o git-1.4.0.tar.gz v1.4.0`::
+
+	与上述相同，但格式是从输出文件中推断出来的。
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0^{tree} | gzip >git-1.4.0.tar.gz`::
+
+	为 v1.4.0 版本创建一个压缩的 tarball，但没有全局扩展的 pax 头。
+
+`git archive --format=zip --prefix=git-docs/ HEAD:Documentation/ > git-1.4.0-docs.zip`::
+
+	将当前头文件或目录下的所有内容放入 'git-1.4.0-docs.zip'，前缀为 'git-docs/'。
+
+`git archive -o latest.zip HEAD`::
+
+	创建一个包含当前分支上最新提交内容的 Zip 档案。注意，输出格式是由输出文件的扩展名推断出来的。
+
+`git archive -o latest.tar --prefix=build/ --add-file=configure --prefix= HEAD`::
+
+	创建一个 tar 归档文件，其中包含当前分支上的最新提交内容，无前缀，以及无跟踪的文件 'configure'，前缀为 'build/'。
+
+`git config tar.tar.xz.command "xz -c"`::
+
+	Configure a "tar.xz" format for making LZMA-compressed tarfiles. You can use it specifying `--format=tar.xz`, or by creating an output file like `-o foo.tar.xz`.
+
+
+参见
+--
+linkgit:gitattributes[5]
+
+GIT
+---
+属于 linkgit:git[1] 文档

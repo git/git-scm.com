@@ -1,0 +1,235 @@
+git-submodule(1)
+================
+
+名称
+--
+git-submodule - Initialize, update or inspect submodules
+
+
+概述
+--
+[verse]
+'git submodule' [--quiet] [--cached]
+'git submodule' [--quiet] add [<单/多个选项>] [--] <仓库> [<路径>]
+'git submodule' [--quiet] status [--cached] [--recursive] [--] [<路径>...]
+'git submodule' [--quiet] init [--] [<路径>...]
+'git submodule' [--quiet] deinit [-f|--force] (--all|[--] <路径>...)
+'git submodule' [--quiet] update [<单/多个选项>] [--] [<路径>...]
+'git submodule' [--quiet] set-branch [<单/多个选项>] [--] <路径>
+'git submodule' [--quiet] set-url [--] <路径> <newurl>
+'git submodule' [--quiet] summary [<单/多个选项>] [--] [<路径>...]
+'git submodule' [--quiet] foreach [--recursive] <命令>
+'git submodule' [--quiet] sync [--recursive] [--] [<路径>...]
+'git submodule' [--quiet] absorbgitdirs [--] [<路径>...]
+
+
+描述
+--
+检查、更新和管理子模块。
+
+关于子模块的更多信息，见 linkgit:gitsubmodules[7]。
+
+命令
+--
+没有参数，显示现有子模块的状态。 有几个子命令可用于对子模块进行操作。
+
+add [-b <分支>] [-f|--force] [--name <名称>] [--reference <仓库>] [--depth <深度>] [--] <仓库> [<路径>]::
+	将给定的版本库作为子模块在给定的路径上添加到当前项目旁边要提交的变更集：当前项目被称为 "父项目"。
++
+<仓库> 是新子模块仓库的 URL。 这可以是一个绝对 URL，或者（如果它以 ./ 或 ../ 开头），相对于父项目的默认远程仓库的位置（请注意，要指定一个紧挨着父项目 'bar.git' 的仓库 'foo.git'，你必须使用 `../foo.git` 而不是 `./foo.git` 正如人们在遵循相对 URL 的规则时可能期望的那样，因为 Git 中相对 URLs 的解释与相对目录是一样的）。
++
+默认的远程是当前分支的远程跟踪分支的远程。如果没有这样的远程跟踪分支，或者 HEAD 被分离了，"origin" 就会被假定为默认远程。 如果父项目没有配置默认的远程，那么父项目就是它自己的权威上游，并使用当前工作目录代替。
++
+可选参数 <路径> 是克隆的子模块在父项目中存在的相对位置。如果没有给出 <路径>，则使用源仓库的规范部分（"repo" 表示 "/path/to/repo.git"，"foo" 表示 "host.xz:foo/.git"）。如果 <路径> 存在并且已经是一个有效的 Git 仓库，那么它将被暂存提交，而无需克隆。<路径> 也被用作子模块在其配置项中的逻辑名称，除非用 `--name` 来指定一个逻辑名称。
++
+给定的 URL 被记录到 `.gitmodules` 中，供后续用户克隆父项目时使用。如果 URL 是相对于父项目的仓库给出的，则假定父项目和子模块仓库将被保存在同一相对位置，只需要提供父项目的URL。git-submodule 将使用 `.gitmodules` 中的相对 URL 正确定位子模块。
+
+status [--cached] [--recursive] [--] [<路径>...]::
+	显示子模块的状态。这将打印每个子模块当前检出提交的 SHA-1，以及子模块的路径和 SHA-1 的 'git describe' 的输出。如果子模块没有被初始化，每个SHA-1 的前缀可能是 `-`；如果当前签出的子模块提交与包含仓库的索引中发现的 SHA-1 不匹配，则是 `+`；如果子模块有合并冲突，则是 `U`。
++
+如果指定了 `--cached`，这个命令将代替打印每个子模块父项目中记录的 SHA-1。
++
+如果指定了 `--recursive`，该命令将递归到嵌套的子模块，并显示它们的状态。
++
+如果你只对当前初始化的子模块相对于索引或 HEAD 中记录的提交的变化感兴趣，linkgit:git-status[1] 和 linkgit:git-diff[1] 也会提供这些信息（也可以报告一个子模块工作目录的变化）。
+
+init [--] [<路径>...]::
+	Initialize the submodules recorded in the index (which were added and committed elsewhere) by setting `submodule.$name.url` in `.git/config`, using the same setting from `.gitmodules` as a template. If the URL is relative, it will be resolved using the default remote. If there is no default remote, the current repository will be assumed to be upstream.
++
+可选的 <路径> 参数限制哪些子模块将被初始化。 如果没有指定路径，并且已经配置了 submodule.active，配置为激活的子模块将被初始化，否则所有的子模块都被初始化。
++
+如果 `.gitmodules` 文件中存在 `submodule.$name.update`，它也会将其值复制到 `.git/config`，但 (1) 该命令不会更改 `.git/config` 中的现有信息，(2) 出于安全考虑，设置为自定义命令的 `submodule.$name.update` 不会被复制。
++
+You can then customize the submodule clone URLs in `.git/config` for your local setup and proceed to `git submodule update`; you can also just use `git submodule update --init` without the explicit 'init' step if you do not intend to customize any submodule locations.
++
+关于默认远程的定义，请参见 add 的子命令。
+
+deinit [-f|--force] (--all|[--] <路径>...)::
+	取消注册给定的子模块，即从 .git/config 中删除整个 `submodule.$name` 部分以及它们的工作目录。进一步调用 `git submodule update`，`git submodule foreach` 和 `git submodule sync` 将跳过任何未注册的子模块，直到它们再次被初始化，所以如果你不想在你的工作区上有一个本地的子模块检出，请使用这个命令。
++
+当命令在没有路径规范的情况下运行时，它会出错，而不是删除所有内容，以防错误。
++
+如果指定了 `--force`，子模块的工作目录将被删除，即使它包含了本地的修改。
++
+如果你真的想从仓库中删除一个子模块并提交，请使用 linkgit:git-rm[1] 代替。参见 linkgit:gitsubmodules[7] 的删除选项。
+
+update [--init] [--remote] [-N|--no-fetch] [--[no-]recommend-shallow] [-f|--force] [--checkout|--rebase|--merge] [--reference <仓库>] [--depth <深度>] [--recursive] [--jobs <数量>] [--[no-]single-branch] [--filter <过滤规范>] [--] [<路径>...]::
++
+--
+Update the registered submodules to match what the superproject expects by cloning missing submodules, fetching missing commits in submodules and updating the working tree of the submodules. The "updating" can be done in several ways depending on command line options and the value of `submodule.<name>.update` configuration variable. The command line option takes precedence over the configuration variable. If neither is given, a 'checkout' is performed. (note: what is in `.gitmodules` file is irrelevant at this point; see `git submodule init` above for how `.gitmodules` is used). The 'update' procedures supported both from the command line as well as through the `submodule.<name>.update` configuration are:
+
+	checkout;; 在父项目中记录的提交将在分离的 HEAD 上的子模块中检出。
++
+如果指定了 `--force` ，子模块将被检出（使用 `git checkout --force`），即使在包含仓库的索引中指定的提交已经与子模块中检出的提交匹配。
+
+	rebase;; 子模块的当前分支将被变基到父项目中记录的提交上。
+
+	merge;; 父项目中记录的提交将被合并到子模块中的当前分支。
+
+以下更新程序有其他限制：
+
+	自定义命令;; 以提交 ID 作为参数运行任意命令的机制。具体来说，如果 `submodule.<name>.update` 配置变量被设置为 `!custom command`，子模块的超级项目中记录的提交对象名称就会被附加到 `custom command` 字符串中并被执行。请注意，`.gitmodules` 文件或命令行均不支持该机制。
+
+	none;; 子模块不会更新。命令行中不允许使用此更新程序。
+
+如果子模块还没有被初始化，而你只是想使用存储在 `.gitmodules` 中的设置，你可以用 `--init` 选项自动初始化子模块。
+
+如果指定了`--recursive`，该命令将递归到已注册的子模块中，并更新其中的任何嵌套子模块。
+
+如果指定了 `--filter <过滤规范>`，给定的部分克隆过滤器将被应用于子模块。关于过滤器规格细节，见 linkgit:git-rev-list[1]。
+--
+set-branch (-b|--branch) <分支> [--] <路径>::
+set-branch (-d|--default) [--] <路径>::
+	设置子模块的默认远程跟踪分支。`--branch` 选项允许指定远程分支。`--default` 选项删除 submodule.<名称>.branch 配置键，使跟踪分支默认为远程 'HEAD'。
+
+set-url [--] <路径> <新url>::
+	将指定子模块的 URL 设置为 <新url>。然后，它将自动同步子模块的新远程 URL 配置。
+
+summary [--cached|--files] [(-n|--summary-limit) <数量>] [commit] [--] [<路径>...]::
+	显示指定的提交（默认为 HEAD）和工作区/索引之间的提交摘要。对于一个相关的子模块，显示该子模块在给定的父项目提交和索引或工作区（由 `--cached` 切换）之间的一系列提交。如果给出选项 `--files`，则显示父项目的索引和子模块的工作区之间的一系列提交（这个选项不允许使用 `--cached` 选项或提供明确的提交）。
++
+使用 linkgit:git-diff[1] 的 `--submodule=log` 选项也会提供这些信息。
+
+foreach [--recursive] <命令>::
+	在每个签出的子模块中评估一个任意的 shell 命令。 该命令可以访问变量 $name、$sm_path、$displaypath、$sha1 和 $toplevel：$name 是 `.gitmodules` 中相关子模块部分的名称，$sm_path 是即时父项目中记录的子模块的路径，$displaypath 包含从当前工作目录到子模块根目录的相对路径，$sha1 是即时父项目中记录的提交，而$toplevel 是即时父项目的顶级的绝对路径。 注意，为了避免与 Windows 上的 '$PATH' 冲突，'$path' 变量现在是 '$sm_path' 变量的一个废弃的同义词。 任何在父项目中定义但没有检查出来的子模块都会被这个命令忽略。除非给出 `--quiet`，否则 foreach 在评估命令前会打印出每个子模块的名字。 如果给定 `--recursive`，子模块将被递归遍历（即给定的 shel l命令在嵌套的子模块中也被评估）。 在任何子模块中，命令的非零返回将导致处理的终止。这可以通过在命令的末尾添加 '||:' 来覆盖。
++
+作为一个例子，下面的命令将显示每个子模块的路径和当前检出的提交：
++
+--------------
+git submodule foreach 'echo $sm_path `git rev-parse HEAD`'
+--------------
+
+sync [--recursive] [--] [<路径>...]::
+	将子模块的远程 URL 配置设置同步到 `.gitmodules` 中指定的值。它只会影响那些在 .git/config 中已经有一个 URL 条目的子模块（也就是当它们被初始化或新添加时的情况）。当子模块的 URL 在上游发生变化，你需要相应地更新你的本地仓库时，这很有用。
++
+`git submodule sync` 同步所有子模块，而 `git submodule sync -- A` 只同步子模块 "A"。
++
+如果指定了 `--recursive`，该命令将递归到已注册的子模块中，并同步其中的任何嵌套子模块。
+
+吸附 gitdirs::
+	如果一个子模块的 git 目录在子模块内部，将子模块的 git 目录移入其父项目的 `$GIT_DIR/modules` 路径，然后通过设置 `core.worktree` 连接 git 目录和其工作目录，并添加一个指向嵌入父项目 git 目录的 .git 文件。
++
+一个独立克隆的仓库，后来被添加为子模块或旧的设置，其子模块的 git 目录在子模块内，而不是嵌入到父项目的 git 目录。
++
+这个命令默认是递归的。
+
+选项
+--
+-q::
+--quiet::
+	只打印出错误信息。
+
+--progress::
+	这个选项只对添加和更新命令有效。 当标准错误流连接到终端时，除非指定了 -q，否则默认情况下进度状态会在标准错误流中报告。即使标准错误流没有指向终端，这个标志也会强制显示进度状态。
+
+--all::
+	这个选项只对 deinit 命令有效。取消工作区中所有子模块的注册。
+
+-b <分支>::
+--branch <branch>::
+	仓库的分支，作为子模块添加。 分支的名称在 `.gitmodules` 中记录为 `submodule.<名称>.branch`，用于 `update --remote`。 一个特殊的值 `.` 用来表示子模块中的分支名称应该与当前版本库中的当前分支名称相同。 如果没有指定该选项，则默认为远程 'HEAD'。
+
+-f::
+--force::
+	这个选项只对 add、deinit 和 update 命令有效。 当运行 add 时，允许添加一个原本被忽略的子模块路径。 当运行 deinit 时，子模块的工作目录将被删除，即使它们包含本地的变化。 当运行 update（仅对 checkout 程序有效）时，当切换到不同的提交时，丢弃子模块中的本地修改；并且总是在子模块中运行 checkout 操作，即使在包含仓库的索引中列出的提交与子模块中签出的提交相匹配。
+
+--cached::
+	这个选项只对状态和摘要命令有效。 这些命令通常使用在子模块 HEAD 中找到的提交，但有了这个选项，就会使用存储在索引中的提交。
+
+--files::
+	这个选项只对 summary 命令有效。当使用这个选项时，该命令将索引中的提交与子模块 HEAD 中的提交进行比较。
+
+-n::
+--summary-limit::
+	这个选项只对 summary 命令有效。 限制摘要的大小（总共显示的提交数量）。 给予 0 将禁用摘要；负数意味着无限（默认）。这个限制只适用于修改过的子模块。对于新增/删除/类型改变的子模块，其大小总是限制为 1。
+
+--remote::
+	这个选项只对更新命令有效。 不使用超级项目记录的 SHA-1 来更新子模块，而使用子模块的远程跟踪分支的状态。 使用的远程是分支的远程（`branch.<名称>.remote`），默认为 `origin`。 使用的远程分支默认为远程的 `HEAD`，但分支的名称可以通过在 `.gitmodules` 或 `.git/config` 中设置 `submodule.<名称>.branch` 选项来覆盖（以`.git/config`为先）。
++
+这适用于任何支持的更新程序（`--checkout`，`--rebase`，等等）。 唯一的变化是目标 SHA-1 的来源。 例如，`submodule update --remote --merge` 将把上游子模块的变化合并到子模块中，而 `submodule update --merge` 将把父项目的 gitlink 变化合并到子模块。
++
+为了确保当前的跟踪分支状态，`update --remote` 在计算 SHA-1 之前会获取子模块的远程仓库。 如果你不想获取，你应该使用`submodule update --remote --no-fetch`。
++
+使用这个选项可以将上游子项目的变化与你的子模块的当前 HEAD 集成。 或者，你可以从子模块运行 `git pull`，除了远程分支名称外，其他都是一样的：`update --remote` 使用默认的上游仓库和 `submodule.<名称>.branch`，而 `git pull` 使用子模块的 `branch.<名称>.merge`。 如果你想和父项目一起发布默认的上游分支，那么首选 `submodule.<名称>.branch`，如果你想在子模块本身工作时有更多的本地感觉，那么首选 `branch.<名称>.merge`。
+
+-N::
+--no-fetch::
+	这个选项只对 update 命令有效。 不要从远程站点获取新对象。
+
+--checkout::
+	这个选项只对 update 命令有效。 检出父项目中记录在子模块中的分离 HEAD 上的提交。这是默认行为，这个选项的主要用途是在设置为 `checkout` 以外的值时覆盖 `submodule.$name.update`。 如果键 `submodule.$name.update` 没有明确设置或设置为 `checkout`，这个选项是隐含的。
+
+--merge::
+	这个选项只对更新命令有效。 将父项目中记录的提交合并到子模块的当前分支中。如果给出这个选项，子模块的 HEAD 将不会被分离。如果合并失败阻止了这个过程，你将不得不用通常的冲突解决工具来解决子模块内产生的冲突。 如果键 `submodule.$name.update` 被设置为 `merge`，这个选项是隐含的。
+
+--rebase::
+	这个选项只对 update 命令有效。 将当前分支重新归入超级项目中记录的提交。如果给了这个选项，子模块的 HEAD 将不会被分离。如果合并失败阻止了这个过程，你将不得不用 linkgit:git-rebase[1] 解决这些失败。 如果键 `submodule.$name.update` 被设置为 `rebase`，这个选项是隐含的。
+
+--init::
+	这个选项只对 update 命令有效。 在更新前初始化所有到目前为止还没有调用过 "git submodule init " 的子模块。
+
+--name::
+	这个选项只对 add 命令有效。它将子模块的名称设置为给定的字符串，而不是默认为其路径。这个名字必须是有效的目录名，并且不能以 '/' 结尾。
+
+--reference <repository>::
+	这个选项只对添加和更新命令有效。 这些命令有时需要克隆一个远程版本库。在这种情况下，这个选项将被传递给 linkgit:git-clone[1] 命令。
++
+*注意*： 请*不要*使用这个选项，除非你已经阅读了
+linkgit:git-clone[1] 的 `--reference`, `--shared`, 和 `--dissociate` 选项前
+谨慎使用这个选项。
+
+--dissociate::
+	这个选项只对添加和更新命令有效。 这些命令有时需要克隆一个远程版本库。在这种情况下，这个选项将被传递给 linkgit:git-clone[1] 命令。
++
+*注意*：参见 `--reference` 选项的说明。
+
+--recursive::
+	这个选项只对 foreach、update、status 和 sync 命令有效。 递归地遍历子模块。该操作不仅在当前仓库的子模块中执行，而且在这些子模块内部的任何嵌套子模块中也执行（以此类推）。
+
+--depth::
+	这个选项对 update 和 add 命令有效。创建一个 'shallow' 克隆，其历史被截断到指定的修订次数。 参见 linkgit:git-clone[1]
+
+--[no-]recommend-shallow::
+	这个选项只对更新命令有效。 一个子模块的初始克隆将默认使用 `.gitmodules` 文件提供的推荐的 `submodule.<名称>.shallow`。要忽略这些建议，请使用 `--no-recommend-shallow`。
+
+-j <n>::
+--jobs <n>::
+	这个选项只对更新命令有效。 克隆新的子模块与尽可能多的作业并行。 默认为 `submodule.fetchJobs` 选项。
+
+--[no-]single-branch::
+	这个选项只对 update 命令有效。 在更新过程中只克隆一个分支：HEAD 或由 --branch 指定的一个分支。
+
+<路径>...::
+	子模块的路径。当指定时，这将限制该命令只对在指定路径上发现的子模块进行操作。 (这个参数在添加时是必需的）。
+
+文件
+--
+当初始化子模块时，在包含仓库的顶级目录中的 `.gitmodules` 文件被用来寻找每个子模块的 URL。 这个文件的格式应该与 `$GIT_DIR/config` 相同。每个子模块网址的键是 "submodule.$name.url"。 详情见 linkgit:gitmodules[5]。
+
+参见
+--
+linkgit:gitsubmodules[7], linkgit:gitmodules[5].
+
+GIT
+---
+属于 linkgit:git[1] 文档

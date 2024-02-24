@@ -1,0 +1,537 @@
+git-p4(1)
+=========
+
+名称
+--
+git-p4 - 从 Perforce 仓库导入和提交
+
+
+概述
+--
+[verse]
+'git p4 clone' [<sync-options>] [<clone-options>] <p4-depot-path>...
+'git p4 sync' [<sync-options>] [<p4-depot-path>...]
+'git p4 rebase'
+'git p4 submit' [<submit-options>] [<master-branch-name>]
+
+
+描述
+--
+该命令提供了一种使用 Git 与 p4 仓库交互的方法。
+
+使用 'git p4 clone' 从现有的 p4 仓库创建一个新的 Git 仓库，并赋予它一个或多个 p4 仓库路径。 使用 'git p4 sync' 从 p4 变更中纳入新提交。 'sync' 命令也可用于纳入来自其他 p4 仓库路径的新分支。 使用 'git p4 submit' 将 Git 变动提交回 p4。 'git p4 rebase' 命令在同步的基础上，将当前分支重定向到更新后的 p4 远程分支上。
+
+
+实例
+--
+* 克隆仓库
++
+------------
+$ git p4 clone //depot/path/project
+------------
+
+* 在新创建的 Git 仓库中做一些工作：
++
+------------
+$ cd project
+$ vi foo.h
+$ git commit -a -m "edited foo.h"
+------------
+
+* 用 p4 的最新改动更新 Git 仓库，并将你的工作重新加载到上面：
++
+------------
+$ git p4 rebase
+------------
+
+* 将您的提交提交回 p4：
++
+------------
+$ git p4 submit
+------------
+
+
+命令
+--
+
+Clone
+~~~~~
+一般来说，'git p4 clone' 用于从现有的 p4 仓库创建一个新的 Git 目录：
+------------
+$ git p4 clone //depot/path/project
+------------
+This:
+
+1. 在名为 'project' 的子目录下创建一个空的 Git 仓库。
++
+2. 从给定的 p4 仓库路径导入头修订版的全部内容到 Git 分支 'refs/remotes/p4/master' 中的一次提交。
++
+3. 从远程分支创建本地分支 'master'，并对其进行检查。
+
+要在 Git 中重现整个 p4 历史，请在仓库路径上使用 '@all' 修饰符：
+------------
+$ git p4 clone //depot/path/project@all
+------------
+
+
+Sync
+~~~~
+随着 p4 仓库开发的继续，这些变更也会被纳入 Git 仓库：
+------------
+$ git p4 sync
+------------
+该命令在 p4 中查找新的改动，并将其导入 Git 提交。
+
+也可以使用 'git p4 sync' 将 P4 仓库添加到现有的 Git 仓库中：
+------------
+$ mkdir repo-git
+$ cd repo-git
+$ git init
+$ git p4 sync //path/in/your/perforce/depot
+------------
+将指定的仓库导入现有 Git 仓库中的 'refs/remotes/p4/master'。 可以使用 `--branch` 选项为 p4 内容指定不同的分支。
+
+如果 Git 仓库包含分支 'refs/remotes/origin/p4'，那么在 'git p4 sync' 过程中，这些分支将首先被获取和查阅。 由于直接从 p4 导入要比从 Git 远端拉取更改慢得多，这在多开发人员环境中非常有用。
+
+如果有多个分支，'git p4 sync' 会自动使用 “分支检测” 算法将新的改动分到正确的分支。 可以用 `--branch` 选项覆盖该算法，只指定更新一个分支。
+
+
+Rebase
+~~~~~~
+常见的工作模式是从 p4 仓库获取最新的修改，然后与本地未提交的修改合并。 通常情况下，p4 仓库是所有代码的最终位置，因此使用 rebase 工作流程是合理的。 该命令先执行 'git p4 sync'，然后再执行 'git rebase'，将本地提交移至 p4 更新的改动之上。
+------------
+$ git p4 rebase
+------------
+
+
+Submit
+~~~~~~
+将 Git 仓库中的更改提交回 p4 仓库需要一个单独的 p4 客户端工作区。 这需要使用 `P4CLIENT` 环境变量或 Git 配置变量 'git-p4.client' 来指定。 p4 客户端必须存在，但如果客户端根目录不存在，则会创建并填充客户端根目录。
+
+要提交当前 Git 分支中但不在 'p4/master' 分支中的所有更改，请使用：
+------------
+$ git p4 submit
+------------
+
+要指定当前分支以外的分支，请使用：
+------------
+$ git p4 submit topicbranch
+------------
+
+要指定一次提交或一系列提交，请使用：
+------------
+$ git p4 submit --commit <sha1>
+$ git p4 submit --commit <sha1..sha1>
+------------
+
+上游引用通常是 'refs/remotes/p4/master'，但可以使用 `--origin=` 命令行选项来覆盖。
+
+p4 变更将以调用 'git p4 submit' 的用户身份创建。`--preserve-user` 选项会根据 Git 提交的作者修改所有权。 该选项需要 p4 的管理员权限，可以使用 'p4 protect' 授予。
+
+要搁置更改而不是提交，请使用 `--shelve` 和 `--update-shelve`：
+
+----
+$ git p4 submit --shelve
+$ git p4 submit --update-shelve 1234 --update-shelve 2345
+----
+
+
+Unshelve
+~~~~~~~~
+取消上架会获取已上架的 P4 更新列表，并在 refs/remotes/p4-unshelved/<变更列表> 分支中产生等价的 git 提交。
+
+git 提交是相对于当前的源版本（默认为 HEAD）创建的。 根据起源创建父提交，然后根据父提交创建解保存提交。
+
+可以使用 "--origin" 选项更改原点版本。
+
+如果 refs/remotes/p4-unshelved 中的目标分支已经存在，旧分支将被重命名。
+
+----
+$ git p4 sync
+$ git p4 unshelve 12345
+$ git show p4-unshelved/12345
+<submit more changes via p4 to the same files>
+$ git p4 unshelve 12345
+<refuses to unshelve until git is in sync with p4 again>
+
+----
+
+选项
+--
+
+General options
+~~~~~~~~~~~~~~~
+除克隆外，所有命令都接受这些选项。
+
+--git-dir <dir>::
+	设置 `GIT_DIR` 环境变量。 参见 linkgit:git[1]。
+
+-v::
+--verbose::
+	提供更多进度信息。
+
+Sync options
+~~~~~~~~~~~~
+这些选项可用于初始 'clone' 和后续 'sync' 操作。
+
+--branch <ref>::
+	将更改导入 <引入> 而不是 refs/remotes/p4/master。 如果 <引用> 以 refs/ 开头，则按原样使用。 否则，如果不是以 p4/ 开头，则会添加该前缀。
++
+默认情况下，不以 refs/ 开头的 <引用> 会被视为远程跟踪分支的名称（位于 refs/remotes/ 下）。 可以使用 --import-local 选项修改这一行为。
++
+默认 <引用> 为 "master"。
++
+本示例将一个新的远程 "p4/proj2" 导入现有的 Git 仓库：
++
+----
+    $ git init
+    $ git p4 sync --branch=refs/remotes/p4/proj2 //depot/proj2
+----
+
+--detect-branches::
+	使用分支检测算法在 p4 中查找新路径。 下面的 “分支检测” 将介绍这种算法。
+
+--changesfile <文件>::
+	精确导入 'file' 中列出的 p4 变更编号，每行一个。 通常，’git p4‘ 会检查当前的 p4 仓库状态，并检测出它应该导入的变更。
+
+--silent::
+	不要打印任何进度信息。
+
+--detect-labels::
+	查询 p4 中与仓库路径相关的标签，并在 Git 中将其添加为标签。作用有限，因为只能导入与新变更列表相关的标签所以弃用。
+
+--import-labels::
+	将标签从 p4 导入 Git。
+
+--import-local::
+	默认情况下，p4 分支存储在 'refs/remotes/p4/' 中，linkgit:git-branch[1] 和其他命令会将其视为远程跟踪分支。 该选项会把 p4 分支放到 'refs/heads/p4/' 中。 需要注意的是，今后的同步操作也必须指定 `--import-local`，这样才能在 refs/heads 中找到 p4 分支。
+
+--max-changes <n>::
+	最多导入'n' 次修改，而不是导入给定版本说明符中包含的全部修改。一个典型的用法是使用 '@all' 作为版本说明符，然后使用 '--max-changes 1000' 只导入最后 1000 个版本，而不是整个修订历史。
+
+--changes-block-size <n>::
+	在将版本说明符（如 '@all'）转换为具体的变更编号列表时使用的内部块大小。在转换过程中，不需要调用一次 'p4 changes' 就能找到完整的修改列表，而是需要调用一系列 'p4 changes -m'，每次调用都会请求一个给定大小的修改块。默认的块大小是 500，这通常是合适的。
+
+--keep-path::
+	默认情况下，从 p4 仓库路径到 Git 的文件名映射涉及删除整个仓库路径。 有了这个选项，Git 会保留完整的 p4 仓库路径。 例如，路径 '//depot/main/foo/bar.c ' 从 '//depot/main/' 导入时，会变成 'foo/bar.c'。 如果使用 `--keep-path`，Git 路径就会变成 'depot/main/foo/bar.c'。
+
+--use-client-spec::
+	使用客户端规范在 p4 中查找感兴趣的文件列表。 请参阅下面的 “客户端规范” 部分。
+
+-/ <路径>::
+	克隆或同步时排除选定的仓库路径。
+
+克隆选项
+~~~~
+这些选项可与上述 'sync' 选项一起用于初始 'clone'。
+
+--destination <目录>::
+	创建 Git 仓库的位置。 如果未提供，则使用 p4 仓库路径中的最后一个组件来创建新目录。
+
+--bare::
+	执行裸克隆。 参见 linkgit:git-clone[1]。
+
+提交选项
+~~~~
+这些选项可用于修改 'git p4 sumit' 行为。
+
+--origin <commit>::
+	提交到 p4 的上游位置。 默认情况下，这是可以从 `HEAD` 到达的最新 p4 提交。
+
+-M::
+	检测重命名。 参见 linkgit:git-diff[1]。 重命名将在 p4 中使用明确的 'move' 操作来表示。 没有相应的选项来检测副本，但移动和副本都有变量。
+
+--preserve-user::
+	在提交到 p4 之前重新授权 p4 更改。 此选项需要 p4 管理员权限。
+
+--export-labels::
+	将 Git 中的标签导出为 p4 标签。在 Git 中找到的标签会应用到 perforce 工作目录。
+
+-n::
+--dry-run::
+	只显示将提交到 p4 的提交内容；不改变 Git 或 p4 的状态。
+
+--prepare-p4-only::
+	将提交应用到 p4 工作区，像正常提交操作一样在 p4 中打开、添加和删除文件。 不发出最终的 "p4 submit"，而是打印一条关于如何手动提交或还原的信息。 该选项总是在第一次（最旧的）提交后停止。 Git 标签不会导出到 p4。
+
+--shelve::
+	不提交，而是创建一系列搁置的变更列表。 创建每个书架后，相关文件将被还原/删除。 如果有多个提交待处理，则会创建多个书架。
+
+--update-shelve CHANGELIST（变更列表）::
+	使用此提交更新现有的已上架更新列表。意味着 --shelve。对多个已上架更新列表重复此操作。
+
+--conflict=(ask|skip|quit)::
+	将提交应用到 p4 时可能会发生冲突。 当发生这种情况时，默认行为（"ask"）是提示是否跳过该提交并继续，或者退出。 该选项可用于绕过提示，自动跳过冲突提交，或在不提示的情况下放弃尝试应用提交。
+
+--branch <branch>::
+	提交后，同步这个已命名的分支，而不是默认的 p4/master。 更多信息，请参阅上文 “同步选项” 部分。
+
+--commit (<sha1>|<sha1>..<sha1>)::
+    只提交指定的提交或提交范围，而不是当前 Git 分支中的全部变更列表。
+
+--disable-rebase::
+    在成功提交所有提交后禁用自动回溯。也可以用 git-p4.disableRebase 设置。
+
+--disable-p4sync::
+    提交后，禁用从 Perforce 自动同步 p4/master 的功能。意味着 --disable-rebase。也可通过 git-p4.disableP4Sync 设置。如果可能的话，与 origin/master 的同步仍会继续。
+
+提交钩子
+----
+
+p4-pre-submit
+~~~~~~~~~~~~~
+
+如果存在 `p4-pre-submit` 钩子且可执行，则执行该钩子。 钩子不需要参数，也不需要标准输入。以非零状态退出该脚本会阻止 `git-p4 submit` 启动。 可以使用 `--no-verify`命令行选项绕过它。
+
+一种使用场景是在钩子中运行单元测试。
+
+p4-prepare-changelist
+~~~~~~~~~~~~~~~~~~~~~
+
+`p4-prepare-changelist` 钩子会在准备好默认更改列表信息后，编辑器启动前立即执行。 它需要一个参数，即包含更新列表文本的文件名。以非零状态退出脚本将中止进程。
+
+该钩子的目的是就地编辑消息文件，它不会被 `--no-verify`（不验证）选项抑制。即使设置了 `--prepare-p4-only`，也会调用该钩子。
+
+p4-changelist
+~~~~~~~~~~~~~
+
+`p4-changelist` 钩子会在用户编辑更新列表信息后执行。可以使用 `--no-verify` 选项绕过该钩子。该钩子只接受一个参数，即保存更改列表文本的文件名。以非零状态退出会导致命令中止。
+
+该钩子允许编辑更改列表文件，并可用于将文本规范化为某种项目标准格式。还可以在检查信息文件后拒绝提交。
+
+p4-post-changelist
+~~~~~~~~~~~~~~~~~~
+
+`p4-post-changelist` 钩子会在 P4 提交成功后被调用。它不需要参数，主要用于通知，不会影响 git p4 提交操作的结果。
+
+
+
+重置选项
+~~~~
+这些选项可用于修改 'git p4 rebase' 行为。
+
+--import-labels::
+	导入 p4 标签。
+
+卸载选项
+~~~~
+
+--origin::
+    设置用于比较 P4 更新列表的 git refspec。 默认为 p4/master。
+
+仓库路径语法
+------
+'git p4 sync' 和 'git p4 clone' 的 p4 仓库路径参数可以是一个或多个空格分隔的 p4 仓库路径，末尾还可以加上一个可选的 p4 版本说明符：
+
+"//depot/my/project"::
+    导入一次提交，并在该树下导入 '#head' 变更中的所有文件。
+
+"//depot/my/project@all"::
+    为该仓库路径历史上的每次更改导入一个提交。
+
+"//depot/my/project@1,6"::
+    只导入更改 1 至 6。
+
+"//depot/proj1@all //depot/proj2@all"::
+    将两个已命名仓库路径中的所有更改导入一个版本库。 只包含这些目录下的文件。 在 Git 中，每个 "proj1" 和 "proj2" 都没有子目录。 指定多个仓库路径时，必须使用 `--destination` 选项。 每个仓库路径上的修订说明必须完全相同。 如果仓库路径中存在同名文件，则 Git 会显示该文件最新更新版本的路径。
+
+See 'p4 help revisions' for the full syntax of p4 revision specifiers.
+
+
+CLIENT SPEC
+-----------
+p4 客户端规范由 'p4 client' 命令维护，除其他字段外，它还包含一个 View，用于指定如何将仓库映射到客户端仓库。 如果给定 `--use-client-spec` 选项，或者 useClientSpec 变量为 true，'clone' 和 'sync' 命令就能查阅客户端规范。 'git p4 clone' 后，useClientSpec 变量会自动在版本库配置文件中设置。 这样，以后的 'git p4 submit' 命令就能正常工作了；提交命令只查看变量，而没有命令行选项。
+
+p4 视图的完整语法记录在 'p4 help views' 中。 'git p4' 只知道视图语法的一部分。 它能理解多行映射、用 '+' 覆盖、用 '-' 排除，以及在空白处加双引号。 在可能的通配符中，'git p4' 只处理 '...'，而且只在路径末尾才处理。 如果遇到未处理的通配符，'git p4' 会抱怨。
+
+重叠映射的实现存在错误。 如果多个仓库路径通过重叠映射到仓库中的同一位置，'git p4' 可能会选择错误的路径。 如果不专门为 'git p4' 制定客户端规范，这个问题很难解决。
+
+'git p4' 可以通过多种方式指定客户端名称。 如果存在变量 'git-p4.client'，则优先使用。 否则，将使用正常的 p4 机制来确定客户端：环境变量 `P4CLIENT`、`P4CONFIG` 引用的文件或本地主机名。
+
+
+分支检测
+----
+P4 并不像 Git 那样有分支的概念。 相反，P4 以目录树的形式组织内容，按照惯例，不同的逻辑分支位于目录树的不同位置。 'p4 branch' 命令用于维护目录树中不同区域之间的映射关系，并指示相关内容。 'git p4' 可以使用这些映射来确定分支关系。
+
+如果你有一个仓库，其中所有感兴趣的分支都作为单个仓库路径的子目录存在，你可以在克隆或同步时使用 `--detect-branches`，让 'git p4' 在 p4 中自动查找子目录，并在 Git 中生成这些分支。
+
+例如，如果 P4 仓库结构为
+----
+//depot/main/...
+//depot/branch1/...
+----
+
+而 "p4 branch -o branch1" 显示的 View 行看起来就像这样：
+----
+//depot/main/... //depot/branch1/...
+----
+
+然后执行 'git p4 clone' 命令：
+----
+git p4 clone --detect-branches //depot@all
+----
+在 'refs/remotes/p4/' 中为 //depot/main 生成一个单独的分支，称为 'master'，为 //depot/branch1 生成一个分支，称为 'depot/branch1'。
+
+不过，要像使用分支那样使用分支，并不需要在 p4 中创建分支。 因为很难自动推断分支关系，所以可以使用 Git 配置设置 'git-p4.branchList' 来明确标识分支关系。 这是一个 'source:destination' （源：目的）对列表，就像一个简单的 p4 分支规范，其中 “源” 和 “目的” 是 p4 仓库中的路径元素。 上面的例子依赖于 p4 分支的存在。 如果没有 p4 分支，也会出现同样的结果：
+----
+git init depot
+cd depot
+git config git-p4.branchList main:branch1
+git p4 clone --detect-branches //depot@all .
+----
+
+
+PERFORMANCE
+-----------
+The fast-import mechanism used by 'git p4' creates one pack file for each invocation of 'git p4 sync'. Normally, Git garbage compression (linkgit:git-gc[1]) automatically compresses these to fewer pack files, but explicit invocation of 'git repack -adf' may improve performance.
+
+
+配置变量
+----
+以下配置设置可用于修改 'git p4' 行为。 它们都在 'git-p4' 部分。
+
+General variables
+~~~~~~~~~~~~~~~~~
+git-p4.user::
+	作为所有 p4 命令的一个选项，用 '-u <用户>' 指定用户。 可以使用环境变量 `P4USER` 代替。
+
+git-p4.password::
+	作为所有 p4 命令的选项，用 '-P <密码>' 指定密码。 可以使用环境变量 `P4PASS` 代替。
+
+git-p4.port::
+	作为所有 p4 命令的选项，用 '-p <端口>' 指定端口。 可以使用环境变量 `P4PORT` 代替。
+
+git-p4.host::
+	主机作为所有 p4 命令的选项，用 '-h <主机>' 指定。 可以使用环境变量 `P4HOST` 代替。
+
+git-p4.client::
+	作为所有 p4 命令的选项，用 '-c <客户端>' 指定客户端，包括客户端规范。
+
+git-p4.retries::
+	指定网络超时时重试 p4 命令（特别是 'p4 sync' ）的次数，默认值为 3。默认值为 3，如果 p4 版本不支持重试（2012.2 之前），则将该值设为 0 以禁用重试。
+
+克隆和同步变量
+~~~~~~~
+git-p4.syncFromOrigin::
+	由于从其他 Git 仓库导入提交比从 p4 导入要快得多，因此有一种机制可以在 Git 远端中首先找到 p4 的变更。 如果在 'refs/remote/origin/p4' 下存在分支，从 p4 同步时就会使用这些分支。 可以将此变量设为 'false' 以禁用此行为。
+
+git-p4.branchUser::
+	分支检测的一个阶段是查看 p4 分支，以找到要导入的新分支。 默认情况下，会检查所有分支。 该选项将搜索范围限制为变量中指定的单个用户所拥有的分支。
+
+git-p4.branchList::
+	启用分支检测时要导入的分支列表。 每个条目都是一对分支名称，中间用冒号（:）隔开。 本示例声明 branchA 和 branchB 都是从 main 创建的：
++
+-------------
+git config       git-p4.branchList main:branchA
+git config --add git-p4.branchList main:branchB
+-------------
+
+git-p4.ignoredP4Labels::
+	要忽略的 p4 标签列表。当发现不可导入的标签时，该列表会自动生成。
+
+git-p4.importLabels::
+	根据 --import-labels 将 p4 标签导入 git。
+
+git-p4.labelImportRegexp::
+	只有匹配此正则表达式的 p4 标签才会被导入。默认值为 '[a-zA-Z0-9_\-.]+$'。
+
+git-p4.useClientSpec::
+	指定使用 p4 客户端规范来识别感兴趣的 p4 仓库路径。 这等同于指定选项 `--use-client-spec`。 参见上文的 "CLIENT SPEC"（指定客户端） 章节。 此变量是一个布尔值，而不是 p4 客户端的名称。
+
+git-p4.pathEncoding::
+	Perforce 会保留原始操作系统提供的路径编码。 Git 希望路径编码为 UTF-8。使用此配置，可以告诉 git-p4 Perforce 对路径使用的编码。该编码会被用于将路径转码为 UTF-8。例如，Windows 上的 Perforce 通常使用 "cp1252 "来编码路径名。如果在 p4 clone 请求中传递了这个选项，它就会在生成的新 Git 仓库中持续存在。
+
+git-p4.metadataDecodingStrategy::
+	Perforce 会保留特定操作系统上客户端存储的更新列表描述和用户全名的编码。而 p4v 客户端使用的是操作系统本地编码，因此不同用户可能会在同一个仓库中以不同编码存储不同的更新列表描述或用户全名。 git-p4 可以使用三种不同的解码策略来处理 Perforce 编码的不确定性：'passthrough'（直通）只是将原始字节从 Perforce 传到 git，当 Perforce 数据的编码不是 utf-8 时，就会产生可用但编码不正确的数据。'strict' （严格）要求 Perforce 数据以 utf-8 编码，否则导入失败。 'fallback' （回退）会尝试将数据解释为 utf-8，否则会退回到使用二级编码（默认情况下是常用的 windows 编码 'cp-1252'），如果使用回退编码解码也失败，则会转义上层字节。 在 python2 下，由于历史原因，默认策略是 'passthrough'，而在 python3 下，默认策略是 'fallback'。 如果选择了 'strict'，但解码失败，则错误信息会建议更改此配置参数作为解决方法。如果在 p4 克隆请求中传递此选项，则会将其持久化到生成的新 Git 仓库中。
+
+git-p4.metadataFallbackEncoding::
+	使用 'fallback' 策略（参见 git-p4.metadataDecodingStrategy）解码 Perforce 作者姓名和 changelists 描述时，指定要使用的后备编码。只有在解码为 utf-8 失败时，才会使用后备编码。该选项默认为 cp1252，这是一种常用的 windows 编码。如果在 p4 克隆请求中传递了该选项，则会将其持久化到生成的新 git 仓库中。
+
+git-p4.largeFileSystem::
+	指定大型（二进制）文件使用的系统。请注意，大文件系统不支持 'git p4 submit' 命令。 目前只支持 Git LFS（详情请见 https://git-lfs.github.com/）。下载并安装 Git LFS 命令行扩展来使用该选项，并像这样配置：
++
+-------------
+git config       git-p4.largeFileSystem GitLFS
+-------------
+
+git-p4.largeFileExtensions::
+	大文件系统将处理列表中与文件扩展名匹配的所有文件。扩展名前不要加 '.'。
+
+git-p4.largeFileThreshold::
+	所有未压缩大小超过阈值的文件都将由大文件系统处理。默认情况下，阈值以字节为单位。添加后缀 k、m 或 g 可更改单位。
+
+git-p4.largeFileCompressedThreshold::
+	所有压缩大小超过阈值的文件都将由大文件系统处理。该选项可能会减慢克隆/同步进程。默认情况下，阈值以字节为单位。添加后缀 k、m 或 g 可更改单位。
+
+git-p4.largeFilePush::
+	布尔变量，用于定义是否将大文件自动推送到服务器。布尔变量，用于定义是否将大文件自动推送到服务器。
+
+git-p4.keepEmptyCommits::
+	如果该布尔选项设置为 'true'，则仅包含排除文件的更新列表将作为空提交导入。
+
+git-p4.mapUser::
+	将 P4 用户映射到 Git 中的名称和电子邮件地址。使用格式如下的字符串创建映射：
++
+-------------
+git config --add git-p4.mapUser "p4user = First Last <mail@address.com>"
+-------------
++
+映射将覆盖 P4 中的任何用户信息。可以为多个 P4 用户定义映射。
+
+提交变量
+~~~~
+git-p4.detectRenames::
+	检测重命名。 参见 linkgit:git-diff[1]。 可以是 true、false，也可以是 'git diff -M' 所期望的分数。
+
+git-p4.detectCopies::
+	检测副本。 参见 linkgit:git-diff[1]。 可以是 true、false，也可以是 'git diff -C' 所期望的分数。
+
+git-p4.detectCopiesHarder::
+	更难检测副本。 参见 linkgit:git-diff[1]。 布尔值。
+
+git-p4.preserveUser::
+	提交时，无论谁调用了 'git p4 submit'，都会重新授权以反映 Git 作者。
+
+git-p4.allowMissingP4Users::
+	当 'preserveUser' 为真时，'git p4' 如果在 p4 用户映射中找不到作者，通常就会挂掉。 无论如何，该设置都会提交修改。
+
+git-p4.skipSubmitEdit::
+	在每次提交 p4 更改之前，提交流程都会调用编辑器。 如果该设置为 true，编辑步骤将被跳过。
+
+git-p4.skipSubmitEditCheck::
+	在编辑 p4 的改动信息之后，'git p4' 通过审查文件修改时间确保真正改变描述。 这一选项禁用了上述的测试。
+
+git-p4.allowSubmit::
+	默认情况下，任何分支都可以作为 'git p4 submit' 操作的来源。如果设置了这个配置变量，仅允许特定名称的分支作为提交的来源。该分支名必须是短名称（没有 "refs/heads/"），并且应当用没有空白的逗号（","）分割。
+
+git-p4.skipUserNameCheck::
+	如果运行 'git p4 submit' 的用户并不存在 p4 的用户图中，但存在 'git p4' 的用户图中。这个选项用来强制提交。
+
+git-p4.attemptRCSCleanup::
+	如果启用这个选项，'git p4 submit' 将试图清理 RCS 关键字（例如 $Header$）。否则会导致合并冲突并防止提交。这个选项是当前的实验功能。
+
+git-p4.exportLabels::
+	根据每个 --export-labels 将 Git tags 导出到 p4 标签。
+
+git-p4.labelExportRegexp::
+	只有匹配这个正则表达式的 p4 标签才会被导出。默认值是 '[a-zA-Z0-9_\-.]+$'。
+
+git-p4.conflict::
+	根据每个 --conflict，当有 p4 冲突出现的时候，指定提交行为。默认行为是 'ask'。
+
+git-p4.disableRebase::
+    在一个提交之后不将目录树变基到 p4/master。
+
+git-p4.disableP4Sync::
+    提交后不与 Perforce 同步 p4/master。隐含 git-p4.disableRebase。
+
+执行细节
+----
+* 使用 Git fast-import 导入 p4 中的更改集。
+* 克隆或同步不需要 p4 客户端；使用 'p4 print' 即可收集文件内容。
+* 提交补丁需要一个 p4 客户端，该客户端与 Git 仓库不在同一位置。 补丁一次一个地应用到 p4 客户端，然后从那里提交。
+* 'git p4' 导入的每个提交的日志信息末尾都有一行，标明 p4 仓库位置和变更编号。 后面的 'git p4 sync' 操作会使用这一行来了解哪些 p4 变动是新的。
+
+GIT
+---
+属于 linkgit:git[1] 文档
