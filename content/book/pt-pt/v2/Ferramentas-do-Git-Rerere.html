@@ -1,0 +1,305 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: pt-pt
+  chapter:
+    title: Ferramentas do Git
+    number: 7
+  section:
+    title: Rerere
+    number: 9
+    cs_number: '7.9'
+    previous: book/pt-pt/v2/Ferramentas-do-Git-Advanced-Merging
+    next: book/pt-pt/v2/Ferramentas-do-Git-Debugging-with-Git
+title: Git - Rerere
+
+---
+<h2 id="ref_rerere">Rerere</h2>
+<div class="paragraph">
+<p>The <code>git rerere</code> functionality is a bit of a hidden feature.
+The name stands for “reuse recorded resolution” and, as the name implies, it allows you to ask Git to remember how you’ve resolved a hunk conflict so that the next time it sees the same conflict, Git can resolve it for you automatically.</p>
+</div>
+<div class="paragraph">
+<p>There are a number of scenarios in which this functionality might be really handy.
+One of the examples that is mentioned in the documentation is when you want to make sure a long-lived topic branch will ultimately merge cleanly, but you don’t want to have a bunch of intermediate merge commits cluttering up your commit history.
+With <code>rerere</code> enabled, you can attempt the occasional merge, resolve the conflicts, then back out of the merge.
+If you do this continuously, then the final merge should be easy because <code>rerere</code> can just do everything for you automatically.</p>
+</div>
+<div class="paragraph">
+<p>This same tactic can be used if you want to keep a branch rebased so you don’t have to deal with the same rebasing conflicts each time you do it.
+Or if you want to take a branch that you merged and fixed a bunch of conflicts and then decide to rebase it instead — you likely won’t have to do all the same conflicts again.</p>
+</div>
+<div class="paragraph">
+<p>Another application of <code>rerere</code> is where you merge a bunch of evolving topic branches together into a testable head occasionally, as the Git project itself often does.
+If the tests fail, you can rewind the merges and re-do them without the topic branch that made the tests fail without having to re-resolve the conflicts again.</p>
+</div>
+<div class="paragraph">
+<p>To enable <code>rerere</code> functionality, you simply have to run this config setting:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global rerere.enabled true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also turn it on by creating the <code>.git/rr-cache</code> directory in a specific repository, but the config setting is clearer and enables that feature globally for you.</p>
+</div>
+<div class="paragraph">
+<p>Now let’s see a simple example, similar to our previous one.
+Let’s say we have a file named <code>hello.rb</code> that looks like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hello world'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In one branch we change the word “hello” to “hola”, then in another branch we change the “world” to “mundo”, just like before.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/pt-pt/v2/images/rerere1.png" >}}" alt="rerere1">
+</div>
+</div>
+<div class="paragraph">
+<p>When we merge the two branches together, we’ll get a merge conflict:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge i18n-world
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Recorded preimage for 'hello.rb'
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You should notice the new line <code>Recorded preimage for FILE</code> in there.
+Otherwise it should look exactly like a normal merge conflict.
+At this point, <code>rerere</code> can tell us a few things.
+Normally, you might run <code>git status</code> at this point to see what all conflicted:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status
+# On branch master
+# Unmerged paths:
+#   (use "git reset HEAD &lt;file&gt;..." to unstage)
+#   (use "git add &lt;file&gt;..." to mark resolution)
+#
+#	both modified:      hello.rb
+#</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>However, <code>git rerere</code> will also tell you what it has recorded the pre-merge state for with <code>git rerere status</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere status
+hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>And <code>git rerere diff</code> will show the current state of the resolution — what you started with to resolve and what you’ve resolved it to.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,11 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
++&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+   puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++=======
++  puts 'hello mundo'
++&gt;&gt;&gt;&gt;&gt;&gt;&gt; i18n-world
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Also (and this isn’t really related to <code>rerere</code>), you can use <code>git ls-files -u</code> to see the conflicted files and the before, left and right versions:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -u
+100644 39804c942a9c1f2c03dc7c5ebcd7f3e3a6b97519 1	hello.rb
+100644 a440db6e8d1fd76ad438a49025a9ad9ce746f581 2	hello.rb
+100644 54336ba847c3758ab604876419607e9443848474 3	hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now you can resolve it to just be <code>puts 'hola mundo'</code> and you can run <code>git rerere diff</code> again to see what rerere will remember:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,7 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
+-  puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++  puts 'hola mundo'
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So that basically says, when Git sees a hunk conflict in a <code>hello.rb</code> file that has “hello mundo” on one side and “hola world” on the other, it will resolve it to “hola mundo”.</p>
+</div>
+<div class="paragraph">
+<p>Now we can mark it as resolved and commit it:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git commit
+Recorded resolution for 'hello.rb'.
+[master 68e16e5] Merge branch 'i18n'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can see that it "Recorded resolution for FILE".</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/pt-pt/v2/images/rerere2.png" >}}" alt="rerere2">
+</div>
+</div>
+<div class="paragraph">
+<p>Now, let’s undo that merge and then rebase it on top of our master branch instead.
+We can move our branch back by using <code>git reset</code> as we saw in <a href="{{< relurl "book/pt-pt/v2/ch00/_git_reset" >}}">Reset Demystified</a>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard HEAD^
+HEAD is now at ad63f15 i18n the hello</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Our merge is undone.
+Now let’s rebase the topic branch.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout i18n-world
+Switched to branch 'i18n-world'
+
+$ git rebase master
+First, rewinding head to replay your work on top of it...
+Applying: i18n one word
+Using index info to reconstruct a base tree...
+Falling back to patching base and 3-way merge...
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Resolved 'hello.rb' using previous resolution.
+Failed to merge in the changes.
+Patch failed at 0001 i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, we got the same merge conflict like we expected, but take a look at the <code>Resolved FILE using previous resolution</code> line.
+If we look at the file, we’ll see that it’s already been resolved, there are no merge conflict markers in it.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Also, <code>git diff</code> will show you how it was automatically re-resolved:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc hello.rb
+index a440db6,54336ba..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/pt-pt/v2/images/rerere3.png" >}}" alt="rerere3">
+</div>
+</div>
+<div class="paragraph">
+<p>You can also recreate the conflicted file state with <code>git checkout</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout --conflict=merge hello.rb
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours
+  puts 'hola world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We saw an example of this in <a href="{{< relurl "book/pt-pt/v2/ch00/_advanced_merging" >}}">Advanced Merging</a>.
+For now though, let’s re-resolve it by just running <code>git rerere</code> again:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere
+Resolved 'hello.rb' using previous resolution.
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We have re-resolved the file automatically using the <code>rerere</code> cached resolution.
+You can now add and continue the rebase to complete it.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git rebase --continue
+Applying: i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So, if you do a lot of re-merges, or want to keep a topic branch up to date with your master branch without a ton of merges, or you rebase often, you can turn on <code>rerere</code> to help your life out a bit.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
