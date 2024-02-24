@@ -1,0 +1,365 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: sl
+  chapter:
+    title: Notranjost Gita
+    number: 10
+  section:
+    title: Protokoli prenosa
+    number: 6
+    cs_number: '10.6'
+    previous: book/sl/v2/Notranjost-Gita-Refspec
+    next: book/sl/v2/Notranjost-Gita-Vzdrževanje-in-obnovitev-podatkov
+title: Git - Protokoli prenosa
+
+---
+<h2 id="_protokoli_prenosa">Protokoli prenosa</h2>
+<div class="paragraph">
+<p>Git lahko prenaša podatke med dvema repozitorijema na dva glavna načina: »neumni« (angl. <em>dumb</em>) in »pametni« (angl. <em>smart</em>) protokol.
+V tem razdelku bomo hitro predstavili, kako ta dva glavna protokola delujeta.</p>
+</div>
+<div class="sect3">
+<h3 id="_neumni_protokol">Neumni protokol</h3>
+<div class="paragraph">
+<p>Če nastavljate repozitorij za strežbo samo za branje prek protokola HTTP, je verjetno, da bo uporabljen »neumni« protokol.
+Ta protokol se imenuje »neumen«, ker med prenosnim postopkom na strežniški strani ne zahteva nobene Git-specifične kode; postopek pridobivanja je sestavljen iz serije zahtev HTTP <code>GET</code>, pri čemer lahko odjemalec predpostavi postavitev repozitorija Git na strežniku.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Opomba</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Neumni protokol se danes precej redko uporablja.
+Težko ga je zaščititi ali ohraniti zasebnega, zato ga večina gostiteljev Git (tako tisti na osnovi oblaka kot tisti na osnovi uporabe) zavrača.
+Navadno je priporočljivo uporabljati pametni protokol, o katerem bomo pisali več kasneje.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Sledimo postopku <code>http-fetch</code> za knjižnico simplegit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone http://server/simplegit-progit.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Prva stvar, ki jo ta ukaz naredi, je, da prenese datoteko <code>info/refs</code>.
+To datoteko napiše ukaz <code>update-server-info</code>, zato ga morate omogočiti kot kljuko <code>post-receive</code>, da prenos HTTP pravilno deluje:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET info/refs
+ca82a6dff817ec66f44342007202690a93763949     refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zdaj imate seznam oddaljenih referenc in SHA-1.
+Nato poiščete, katera referenca je HEAD, da veste, kaj izvleči, ko končate:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ko ste končali postopek, morate izvleči vejo <code>master</code>.
+Sedaj ste pripravljeni na začetek sprehoda.
+Ker je vaša začetna točka objekt s potrditvijo <code>ca82a6</code>, ki ste jo videli v datoteki <code>info/refs</code>, začnete s pridobitvijo tega objekta:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/ca/82a6dff817ec66f44342007202690a93763949
+(179 bytes of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nazaj ste dobili objekt — ta objekt je na strežniku v šibki obliki, in pridobili ste ga z običajnim zahtevkom HTTP GET.
+Objekt lahko razpakirate z zlib, odstranite glavo in si ogledate vsebino potrditve:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p ca82a6dff817ec66f44342007202690a93763949
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+Change version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Naslednje, imate dva dodatna objekta za pridobitev — <code>cfda3b</code>, ki je drevo vsebine, na katero kaže pravkar pridobljena potrditev; in <code>085bb3</code>, ki je predhodna potrditev:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/08/5bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+(179 bytes of data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To vam da naslednji objekt potrditve.
+Zagrabite objekt drevesa:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/cf/da3bf379e4f8dba8717dee55aab78aef7f4daf
+(404 - Not Found)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ups — zdi se, da tega objekta drevesa ni na strežniku v šibki obliki, zato dobite odgovor 404.
+Za to obstaja nekaj razlogov — objekt bi lahko bil v alternativnem repozitoriju, ali pa bi bil v tem repozitoriju v pakirani obliki.
+Git najprej preveri, ali obstajajo navedene alternative:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/http-alternates
+(empty file)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Če se vrne seznam alternativnih URL-jev, Git preveri, ali tam obstajajo šibke datoteke in paketne datoteke — to je lep mehanizem za projekte, ki so razvejitve eden od drugega, da si delijo objekte na disku.
+Vendar pa, ker v tem primeru ni našteta nobena alternativa, mora biti vaš objekt v paketni datoteki.
+Da vidite, katere paketne datoteke so na voljo na tem strežniku, morate pridobiti datoteko <code>objects/info/packs</code>, ki vsebuje seznam (tudi generiran z <code>update-server-info</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/packs
+P pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Na strežniku je samo en paket datotek, zato je vaš objekt očitno tam, vendar preverili boste vseeno indeksno datoteko, da boste prepričani.
+To je tudi uporabno, če imate na strežniku več paketnih datotek, tako da lahko vidite, katera paketna datoteka vsebuje objekt, ki ga potrebujete:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.idx
+(4k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zdaj, ko imate indeks paketne datoteke, lahko preverite, ali je vaš objekt v njej — ker indeks izpiše seznam SHA-1 objektov, ki so vsebovani v paketni datoteki, in njihove odmike.
+Vaš objekt je tam, zato nadaljujte in dobite celotno paketno datoteko:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack
+(13k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Imate svoj objekt drevesa, zato nadaljujete hojo po svojih potrditvah.
+Vse potrditve so prav tako v paketni datoteki, ki ste jo pravkar prenesli, zato vam ni treba več pošiljati zahtevkov na strežnik.
+Git izvleče delovno kopijo veje <code>master</code>, na katero kaže sklic HEAD, ki ste ga prenesli na začetku.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_pametni_protokol">Pametni protokol</h3>
+<div class="paragraph">
+<p>Neumni protokol je preprost, vendar malo neučinkovit in ne more obravnavati pisanja podatkov s strani odjemalca na strežnik.
+Pametni protokol je bolj pogosta metoda prenosa podatkov, vendar zahteva proces na oddaljenem koncu, ki je inteligenten glede Gita — lahko bere lokalne podatke, ugotovi, kaj ima in kaj potrebuje odjemalec in za to generira prilagojeno paketno datoteko.
+Obstajata dve vrsti procesov za prenos podatkov: par za nalaganje podatkov in par za prejemanje podatkov.</p>
+</div>
+<div class="sect4">
+<h4 id="_nalaganje_podatkov">Nalaganje podatkov</h4>
+<div class="paragraph">
+<p>
+Za nalaganje podatkov na oddaljeni proces Git uporablja procesa <code>send-pack</code> in <code>receive-pack</code>.
+Proces <code>send-pack</code> se izvaja na odjemalcu in se poveže s procesom <code>receive-pack</code> na oddaljeni strani.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh">SSH</h6>
+<div class="paragraph">
+<p>Na primer, recimo, da v vašem projektu zaženete <code>git push origin master</code> in je <code>origin</code> definiran kot URL, ki uporablja protokol SSH.
+Git bo zagnal proces <code>send-pack</code>, ki sproži povezavo prek SSH na vaš strežnik.
+Na oddaljenem strežniku poskuša zagnati ukaz prek klica SSH, ki je videti nekako takole:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-receive-pack 'simplegit-progit.git'"
+00a5ca82a6dff817ec66f4437202690a93763949 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1+github-607-gfba4028 delete-refs
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ukaz <code>git-receive-pack</code> takoj odgovori z eno vrstico za vsako referenco, ki jo trenutno ima — v tem primeru le vejo <code>master</code> in njen SHA-1.
+Prva vrstica ima tudi seznam zmogljivosti strežnika (tukaj <code>report-status</code>, <code>delete-refs</code> in nekaj drugih, vključno z identifikatorjem odjemalca).</p>
+</div>
+<div class="paragraph">
+<p>Podatki se prenašajo v kosih.
+Vsak kos se začne s 4-znakovno šestnajstiško vrednostjo, ki določa, kako dolg je kos (vključno s 4 bajti dolžine).
+Koščki običajno vsebujejo eno vrstico podatkov in zaključno novo vrstico.
+Prvi kos se začne z 00a5, kar je šestnajstiško število za 165, kar pomeni, da je kos dolg 165 bajtov.
+Naslednji kos je 0000, kar pomeni, da je strežnik končal z naštevanjem referenc.</p>
+</div>
+<div class="paragraph">
+<p>Ko pozna strežnikovo stanje, proces <code>send-pack</code> določi, katere potrditve ima odjemalec, strežnik pa ne.
+Za vsako vejo, ki jo bo ta potisk posodobil, proces <code>send-pack</code> pove procesu <code>receive-pack</code> te informacije.
+Na primer, če posodabljate vejo <code>master</code> in dodajate vejo <code>experiment</code>, bo odgovor <code>send-pack</code> nekaj podobnega temu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0076ca82a6dff817ec66f44342007202690a93763949 15027957951b64cf874c3557a0f3547bd83b3ff6 \
+	refs/heads/master report-status
+006c0000000000000000000000000000000000000000 cdfdb42577e2506715f8cfeacdbabc092bf63e8d \
+	refs/heads/experiment
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git pošlje vrstico za vsako referenco, ki jo posodabljate, s podatki o dolžini vrstice, starem SHA-1, novem SHA-1 in referenci, ki jo posodabljate.
+Prva vrstica ima tudi zmogljivosti odjemalca.
+Vrednost SHA-1, ki je sestavljena iz samih <code>0</code>, pomeni, da ničesar ni bilo tam prej — ker dodajate referenco <code>experiment</code>.
+Če bi brisali referenco, bi videli nasprotno: same <code>0</code> na desni strani.</p>
+</div>
+<div class="paragraph">
+<p>Nato odjemalec pošlje paket z vsemi objekti, ki jih strežnik še nima.
+Na koncu strežnik odgovori z indikacijo uspeha (ali neuspeha):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>000eunpack ok</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https">HTTP(S)</h6>
+<div class="paragraph">
+<p>Ta postopek je večinoma enak prek protokola HTTP, čeprav je rokovanje (angl. <em>handshaking</em>) nekoliko drugačno.
+Povezava se začne s tem zahtevkom:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET http://server/simplegit-progit.git/info/refs?service=git-receive-pack
+001f# service=git-receive-pack
+00ab6c5f0e45abd7832bf23074a333f739977c9e8188 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1~vmg-bitmaps-bugaloo-608-g116744e
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To je konec prve izmenjave med odjemalcem in strežnikom.
+Nato odjemalec pošlje še en zahtevek, tokrat POST, s podatki, ki jih ponuja <code>send-pack</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST http://server/simplegit-progit.git/git-receive-pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zahtevek <code>POST</code> vključuje izhod <code>send-pack</code> in paketno datoteko kot svoj tovor.
+Strežnik nato s svojim odzivom HTTP označi uspeh ali neuspeh.</p>
+</div>
+<div class="paragraph">
+<p>Upoštevajte, da lahko protokol HTTP te podatke dodatno ovije v kosovno prenosno kodiranje.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_prenos_podatkov">Prenos podatkov</h4>
+<div class="paragraph">
+<p>
+Ko prenašate podatke, so vključeni procesi <code>fetch-pack</code> in <code>upload-pack</code>.
+Naročnik sproži postopek <code>fetch-pack</code>, ki se poveže s postopkom <code>upload-pack</code> na oddaljeni strani, da se dogovorita, kateri podatki se bodo prenesli navzdol.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh_2">SSH</h6>
+<div class="paragraph">
+<p>Če izvajate pridobivanje prek SSH, <code>fetch-pack</code> deluje nekako takole:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-upload-pack 'simplegit-progit.git'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ko se <code>fetch-pack</code> poveže, <code>upload-pack</code> pošlje nekaj podobnega temu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>00dfca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fe2409a098dc3e53539a9028a94b6224db9d6a6b6 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To je zelo podobno temu, s čimer <code>receive-pack</code> odgovarja, vendar so zmožnosti drugačne.
+Poleg tega pošlje nazaj, kam kaže HEAD (<code>symref=HEAD:refs/heads/master</code>), tako da ve, kaj naj preveri, ali gre za klon.</p>
+</div>
+<div class="paragraph">
+<p>V tem trenutku proces <code>fetch-pack</code> pogleda, katere objekte ima, in odgovori z objekti, ki jih potrebuje, tako da pošlje »want« in nato SHA-1, ki ga želi.
+Pošlje vse objekte, ki jih že ima, s »have« in nato SHA-1.
+Na koncu seznama zapiše »done«, da sproži proces <code>upload-pack</code>, ki začne pošiljati paketno datoteko podatkov, ki jih potrebuje:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>003cwant ca82a6dff817ec66f44342007202690a93763949 ofs-delta
+0032have 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+0009done
+0000</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https_2">HTTP(S)</h6>
+<div class="paragraph">
+<p>Rokovanje za pridobivanje podatkov zahteva dva zahtevka HTTP.
+Prvi je <code>GET</code> na enako končno točko, ki se uporablja v neumnem protokolu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET $GIT_URL/info/refs?service=git-upload-pack
+001e# service=git-upload-pack
+00e7ca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed no-done symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To je zelo podobno klicanju <code>git-upload-pack</code> prek povezave SSH, vendar se druga izmenjava izvede kot ločen zahtevek:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST $GIT_URL/git-upload-pack HTTP/1.0
+0032want 0a53e9ddeaddad63ad106860237bbf53411d11a7
+0032have 441b40d833fdfa93eb2908e52742248faf0ee993
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Tudi to je enak format kot zgoraj.
+Odziv na to zahtevo označuje uspeh ali neuspeh ter vključuje paketno datoteko.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_povzetek_protokolov">Povzetek protokolov</h3>
+<div class="paragraph">
+<p>Ta razdelek vsebuje zelo osnovni pregled prenosnih protokolov.
+Protokol vključuje veliko drugih funkcij, kot sta sposobnosti <code>multi_ack</code> ali <code>side-band</code>, vendar njihovo obdelovanje presega obseg te knjige.
+Poskušali smo vam dati občutek o splošnem dvosmernem pretoku med odjemalcem in strežnikom; če potrebujete več znanja kot to, boste verjetno želeli pogledati izvorno kodo Gita.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
