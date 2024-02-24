@@ -1,0 +1,980 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: id
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Submodules
+    number: 11
+    cs_number: '7.11'
+    previous: book/id/v2/Git-Tools-Debugging-with-Git
+    next: book/id/v2/Git-Tools-Bundling
+title: Git - Submodules
+
+---
+<h2 id="_git_submodules">Submodules</h2>
+<div class="paragraph">
+<p>It often happens that while working on one project, you need to use another project from within it.
+Perhaps it’s a library that a third party developed or that you’re developing separately and using in multiple parent projects.
+A common issue arises in these scenarios: you want to be able to treat the two projects as separate yet still be able to use one from within the other.</p>
+</div>
+<div class="paragraph">
+<p>Here’s an example.
+Suppose you’re developing a web site and creating Atom feeds.
+Instead of writing your own Atom-generating code, you decide to use a library.
+You’re likely to have to either include this code from a shared library like a CPAN install or Ruby gem, or copy the source code into your own project tree.
+The issue with including the library is that it’s difficult to customize the library in any way and often more difficult to deploy it, because you need to make sure every client has that library available.
+The issue with vendoring the code into your own project is that any custom changes you make are difficult to merge when upstream changes become available.</p>
+</div>
+<div class="paragraph">
+<p>Git addresses this issue using submodules.
+Submodules allow you to keep a Git repository as a subdirectory of another Git repository.
+This lets you clone another repository into your project and keep your commits separate.</p>
+</div>
+<div class="sect3">
+<h3 id="_starting_submodules">Starting with Submodules</h3>
+<div class="paragraph">
+<p>We’ll walk through developing a simple project that has been split up into a main project and a few sub-projects.</p>
+</div>
+<div class="paragraph">
+<p>Let’s start by adding an existing Git repository as a submodule of the repository that we’re working on. To add a new submodule you use the <code>git submodule add</code> command with the URL of the project you would like to start tracking. In this example, we’ll add a library called “DbConnector”.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule add https://github.com/chaconinc/DbConnector
+Cloning into 'DbConnector'...
+remote: Counting objects: 11, done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 11 (delta 0), reused 11 (delta 0)
+Unpacking objects: 100% (11/11), done.
+Checking connectivity... done.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By default, submodules will add the subproject into a directory named the same as the repository, in this case “DbConnector”. You can add a different path at the end of the command if you want it to go elsewhere.</p>
+</div>
+<div class="paragraph">
+<p>If you run <code>git status</code> at this point, you’ll notice a few things.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+
+Changes to be committed:
+  (use "git reset HEAD &lt;file&gt;..." to unstage)
+
+	new file:   .gitmodules
+	new file:   DbConnector</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>First you should notice the new <code>.gitmodules</code> file.
+This is a configuration file that stores the mapping between the project’s URL and the local subdirectory you’ve pulled it into:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .gitmodules
+[submodule "DbConnector"]
+	path = DbConnector
+	url = https://github.com/chaconinc/DbConnector</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you have multiple submodules, you’ll have multiple entries in this file.
+It’s important to note that this file is version-controlled with your other files, like your <code>.gitignore</code> file.
+It’s pushed and pulled with the rest of your project.
+This is how other people who clone this project know where to get the submodule projects from.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Since the URL in the .gitmodules file is what other people will first try to clone/fetch from, make sure to use a URL that they can access if possible. For example, if you use a different URL to push to than others would to pull from, use the one that others have access to. You can overwrite this value locally with <code>git config submodule.DbConnector.url PRIVATE_URL</code> for your own use.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The other listing in the <code>git status</code> output is the project folder entry.
+If you run <code>git diff</code> on that, you see something interesting:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --cached DbConnector
+diff --git a/DbConnector b/DbConnector
+new file mode 160000
+index 0000000..c3f01dc
+--- /dev/null
++++ b/DbConnector
+@@ -0,0 +1 @@
++Subproject commit c3f01dc8862123d317dd46284b05b6892c7b29bc</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Although <code>DbConnector</code> is a subdirectory in your working directory, Git sees it as a submodule and doesn’t track its contents when you’re not in that directory.
+Instead, Git sees it as a particular commit from that repository.</p>
+</div>
+<div class="paragraph">
+<p>If you want a little nicer diff output, you can pass the <code>--submodule</code> option to <code>git diff</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --cached --submodule
+diff --git a/.gitmodules b/.gitmodules
+new file mode 100644
+index 0000000..71fc376
+--- /dev/null
++++ b/.gitmodules
+@@ -0,0 +1,3 @@
++[submodule "DbConnector"]
++       path = DbConnector
++       url = https://github.com/chaconinc/DbConnector
+Submodule DbConnector 0000000...c3f01dc (new submodule)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When you commit, you see something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git commit -am 'added DbConnector module'
+[master fb9093c] added DbConnector module
+ 2 files changed, 4 insertions(+)
+ create mode 100644 .gitmodules
+ create mode 160000 DbConnector</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Notice the <code>160000</code> mode for the rack entry.
+That is a special mode in Git that basically means you’re recording a commit as a directory entry rather than a subdirectory or a file.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_cloning_submodules">Cloning a Project with Submodules</h3>
+<div class="paragraph">
+<p>Here we’ll clone a project with a submodule in it.
+When you clone such a project, by default you get the directories that contain submodules, but none of the files within them yet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://github.com/chaconinc/MainProject
+Cloning into 'MainProject'...
+remote: Counting objects: 14, done.
+remote: Compressing objects: 100% (13/13), done.
+remote: Total 14 (delta 1), reused 13 (delta 0)
+Unpacking objects: 100% (14/14), done.
+Checking connectivity... done.
+$ cd MainProject
+$ ls -la
+total 16
+drwxr-xr-x   9 schacon  staff  306 Sep 17 15:21 .
+drwxr-xr-x   7 schacon  staff  238 Sep 17 15:21 ..
+drwxr-xr-x  13 schacon  staff  442 Sep 17 15:21 .git
+-rw-r--r--   1 schacon  staff   92 Sep 17 15:21 .gitmodules
+drwxr-xr-x   2 schacon  staff   68 Sep 17 15:21 DbConnector
+-rw-r--r--   1 schacon  staff  756 Sep 17 15:21 Makefile
+drwxr-xr-x   3 schacon  staff  102 Sep 17 15:21 includes
+drwxr-xr-x   4 schacon  staff  136 Sep 17 15:21 scripts
+drwxr-xr-x   4 schacon  staff  136 Sep 17 15:21 src
+$ cd DbConnector/
+$ ls
+$</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>DbConnector</code> directory is there, but empty.
+You must run two commands: <code>git submodule init</code> to initialize your local configuration file, and <code>git submodule update</code> to fetch all the data from that project and check out the appropriate commit listed in your superproject:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule init
+Submodule 'DbConnector' (https://github.com/chaconinc/DbConnector) registered for path 'DbConnector'
+$ git submodule update
+Cloning into 'DbConnector'...
+remote: Counting objects: 11, done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 11 (delta 0), reused 11 (delta 0)
+Unpacking objects: 100% (11/11), done.
+Checking connectivity... done.
+Submodule path 'DbConnector': checked out 'c3f01dc8862123d317dd46284b05b6892c7b29bc'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now your <code>DbConnector</code> subdirectory is at the exact state it was in when you committed earlier.</p>
+</div>
+<div class="paragraph">
+<p>There is another way to do this which is a little simpler, however. If you pass <code>--recursive</code> to the <code>git clone</code> command, it will automatically initialize and update each submodule in the repository.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone --recursive https://github.com/chaconinc/MainProject
+Cloning into 'MainProject'...
+remote: Counting objects: 14, done.
+remote: Compressing objects: 100% (13/13), done.
+remote: Total 14 (delta 1), reused 13 (delta 0)
+Unpacking objects: 100% (14/14), done.
+Checking connectivity... done.
+Submodule 'DbConnector' (https://github.com/chaconinc/DbConnector) registered for path 'DbConnector'
+Cloning into 'DbConnector'...
+remote: Counting objects: 11, done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 11 (delta 0), reused 11 (delta 0)
+Unpacking objects: 100% (11/11), done.
+Checking connectivity... done.
+Submodule path 'DbConnector': checked out 'c3f01dc8862123d317dd46284b05b6892c7b29bc'</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_working_on_a_project_with_submodules">Working on a Project with Submodules</h3>
+<div class="paragraph">
+<p>Now we have a copy of a project with submodules in it and will collaborate with our teammates on both the main project and the submodule project.</p>
+</div>
+<div class="sect4">
+<h4 id="_pulling_in_upstream_changes">Pulling in Upstream Changes</h4>
+<div class="paragraph">
+<p>The simplest model of using submodules in a project would be if you were simply consuming a subproject and wanted to get updates from it from time to time but were not actually modifying anything in your checkout. Let’s walk though a simple example there.</p>
+</div>
+<div class="paragraph">
+<p>If you want to check for new work in a submodule, you can go into the directory and run <code>git fetch</code> and <code>git merge</code> the upstream branch to update the local code.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git fetch
+From https://github.com/chaconinc/DbConnector
+   c3f01dc..d0354fc  master     -&gt; origin/master
+Scotts-MacBook-Pro-3:DbConnector schacon$ git merge origin/master
+Updating c3f01dc..d0354fc
+Fast-forward
+ scripts/connect.sh | 1 +
+ src/db.c           | 1 +
+ 2 files changed, 2 insertions(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now if you go back into the main project and run <code>git diff --submodule</code> you can see that the submodule was updated and get a list of commits that were added to it. If you don’t want to type <code>--submodule</code> every time you run <code>git diff</code>, you can set it as the default format by setting the <code>diff.submodule</code> config value to “log”.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global diff.submodule log
+$ git diff
+Submodule DbConnector c3f01dc..d0354fc:
+  &gt; more efficient db routine
+  &gt; better connection routine</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you commit at this point then you will lock the submodule into having the new code when other people update.</p>
+</div>
+<div class="paragraph">
+<p>There is an easier way to do this as well, if you prefer to not manually fetch and merge in the subdirectory. If you run <code>git submodule update --remote</code>, Git will go into your submodules and fetch and update for you.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule update --remote DbConnector
+remote: Counting objects: 4, done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 4 (delta 2), reused 4 (delta 2)
+Unpacking objects: 100% (4/4), done.
+From https://github.com/chaconinc/DbConnector
+   3f19983..d0354fc  master     -&gt; origin/master
+Submodule path 'DbConnector': checked out 'd0354fc054692d3906c85c3af05ddce39a1c0644'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This command will by default assume that you want to update the checkout to the <code>master</code> branch of the submodule repository. You can, however, set this to something different if you want. For example, if you want to have the DbConnector submodule track that repository’s “stable” branch, you can set it in either your <code>.gitmodules</code> file (so everyone else also tracks it), or just in your local <code>.git/config</code> file.  Let’s set it in the <code>.gitmodules</code> file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config -f .gitmodules submodule.DbConnector.branch stable
+
+$ git submodule update --remote
+remote: Counting objects: 4, done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 4 (delta 2), reused 4 (delta 2)
+Unpacking objects: 100% (4/4), done.
+From https://github.com/chaconinc/DbConnector
+   27cf5d3..c87d55d  stable -&gt; origin/stable
+Submodule path 'DbConnector': checked out 'c87d55d4c6d4b05ee34fbc8cb6f7bf4585ae6687'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you leave off the <code>-f .gitmodules</code> it will only make the change for you, but it probably makes more sense to track that information with the repository so everyone else does as well.</p>
+</div>
+<div class="paragraph">
+<p>When we run <code>git status</code> at this point, Git will show us that we have “new commits” on the submodule.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git checkout -- &lt;file&gt;..." to discard changes in working directory)
+
+  modified:   .gitmodules
+  modified:   DbConnector (new commits)
+
+no changes added to commit (use "git add" and/or "git commit -a")</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you set the configuration setting <code>status.submodulesummary</code>, Git will also show you a short summary of changes to your submodules:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config status.submodulesummary 1
+
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git checkout -- &lt;file&gt;..." to discard changes in working directory)
+
+	modified:   .gitmodules
+	modified:   DbConnector (new commits)
+
+Submodules changed but not updated:
+
+* DbConnector c3f01dc...c87d55d (4):
+  &gt; catch non-null terminated lines</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>At this point if you run <code>git diff</code> we can see both that we have modified our <code>.gitmodules</code> file and also that there are a number of commits that we’ve pulled down and are ready to commit to our submodule project.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --git a/.gitmodules b/.gitmodules
+index 6fc0b3d..fd1cc29 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -1,3 +1,4 @@
+ [submodule "DbConnector"]
+        path = DbConnector
+        url = https://github.com/chaconinc/DbConnector
++       branch = stable
+ Submodule DbConnector c3f01dc..c87d55d:
+  &gt; catch non-null terminated lines
+  &gt; more robust error handling
+  &gt; more efficient db routine
+  &gt; better connection routine</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This is pretty cool as we can actually see the log of commits that we’re about to commit to in our submodule. Once committed, you can see this information after the fact as well when you run <code>git log -p</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -p --submodule
+commit 0a24cfc121a8a3c118e0105ae4ae4c00281cf7ae
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Wed Sep 17 16:37:02 2014 +0200
+
+    updating DbConnector for bug fixes
+
+diff --git a/.gitmodules b/.gitmodules
+index 6fc0b3d..fd1cc29 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -1,3 +1,4 @@
+ [submodule "DbConnector"]
+        path = DbConnector
+        url = https://github.com/chaconinc/DbConnector
++       branch = stable
+Submodule DbConnector c3f01dc..c87d55d:
+  &gt; catch non-null terminated lines
+  &gt; more robust error handling
+  &gt; more efficient db routine
+  &gt; better connection routine</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git will by default try to update <strong>all</strong> of your submodules when you run <code>git submodule update --remote</code> so if you have a lot of them, you may want to pass the name of just the submodule you want to try to update.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_working_on_a_submodule">Working on a Submodule</h4>
+<div class="paragraph">
+<p>It’s quite likely that if you’re using submodules, you’re doing so because you really want to work on the code in the submodule at the same time as you’re working on the code in the main project (or across several submodules). Otherwise you would probably instead be using a simpler dependency managment system (such as Maven or Rubygems).</p>
+</div>
+<div class="paragraph">
+<p>So now let’s go through an example of making changes to the submodule at the same time as the main project and committing and publishing those changes at the same time.</p>
+</div>
+<div class="paragraph">
+<p>So far, when we’ve run the <code>git submodule update</code> command to fetch changes from the submodule repositories, Git would get the changes and update the files in the subdirectory but will leave the sub-repository in what’s called a “detached HEAD” state. This means that there is no local working branch (like “master”, for example) tracking changes. So any changes you make aren’t being tracked well.</p>
+</div>
+<div class="paragraph">
+<p>In order to set up your submodule to be easier to go in and hack on, you need do two things. You need to go into each submodule and check out a branch to work on. Then you need to tell Git what to do if you have made changes and then <code>git submodule update --remote</code> pulls in new work from upstream. The options are that you can merge them into your local work, or you can try to rebase your local work on top of the new changes.</p>
+</div>
+<div class="paragraph">
+<p>First of all, let’s go into our submodule directory and check out a branch.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout stable
+Switched to branch 'stable'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let’s try it with the “merge” option. To specify it manually, we can just add the <code>--merge</code> option to our <code>update</code> call. Here we’ll see that there was a change on the server for this submodule and it gets merged in.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule update --remote --merge
+remote: Counting objects: 4, done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 4 (delta 2), reused 4 (delta 2)
+Unpacking objects: 100% (4/4), done.
+From https://github.com/chaconinc/DbConnector
+   c87d55d..92c7337  stable     -&gt; origin/stable
+Updating c87d55d..92c7337
+Fast-forward
+ src/main.c | 1 +
+ 1 file changed, 1 insertion(+)
+Submodule path 'DbConnector': merged in '92c7337b30ef9e0893e758dac2459d07362ab5ea'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If we go into the DbConnector directory, we have the new changes already merged into our local <code>stable</code> branch. Now let’s see what happens when we make our own local change to the library and someone else pushes another change upstream at the same time.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd DbConnector/
+$ vim src/db.c
+$ git commit -am 'unicode support'
+[stable f906e16] unicode support
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now if we update our submodule we can see what happens when we have made a local change and upstream also has a change we need to incorporate.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule update --remote --rebase
+First, rewinding head to replay your work on top of it...
+Applying: unicode support
+Submodule path 'DbConnector': rebased into '5d60ef9bbebf5a0c1c1050f242ceeb54ad58da94'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you forget the <code>--rebase</code> or <code>--merge</code>, Git will just update the submodule to whatever is on the server and reset your project to a detached HEAD state.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule update --remote
+Submodule path 'DbConnector': checked out '5d60ef9bbebf5a0c1c1050f242ceeb54ad58da94'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If this happens, don’t worry, you can simply go back into the directory and check out your branch again (which will still contain your work) and merge or rebase <code>origin/stable</code> (or whatever remote branch you want) manually.</p>
+</div>
+<div class="paragraph">
+<p>If you haven’t committed your changes in your submodule and you run a submodule update that would cause issues, Git will fetch the changes but not overwrite unsaved work in your submodule directory.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule update --remote
+remote: Counting objects: 4, done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 4 (delta 0), reused 4 (delta 0)
+Unpacking objects: 100% (4/4), done.
+From https://github.com/chaconinc/DbConnector
+   5d60ef9..c75e92a  stable     -&gt; origin/stable
+error: Your local changes to the following files would be overwritten by checkout:
+	scripts/setup.sh
+Please, commit your changes or stash them before you can switch branches.
+Aborting
+Unable to checkout 'c75e92a2b3855c9e5b66f915308390d9db204aca' in submodule path 'DbConnector'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you made changes that conflict with something changed upstream, Git will let you know when you run the update.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule update --remote --merge
+Auto-merging scripts/setup.sh
+CONFLICT (content): Merge conflict in scripts/setup.sh
+Recorded preimage for 'scripts/setup.sh'
+Automatic merge failed; fix conflicts and then commit the result.
+Unable to merge 'c75e92a2b3855c9e5b66f915308390d9db204aca' in submodule path 'DbConnector'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can go into the submodule directory and fix the conflict just as you normally would.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_publishing_submodules">Publishing Submodule Changes</h4>
+<div class="paragraph">
+<p>Now we have some changes in our submodule directory. Some of these were brought in from upstream by our updates and others were made locally and aren’t available to anyone else yet as we haven’t pushed them yet.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+Submodule DbConnector c87d55d..82d2ad3:
+  &gt; Merge from origin/stable
+  &gt; updated setup script
+  &gt; unicode support
+  &gt; remove unnessesary method
+  &gt; add new option for conn pooling</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If we commit in the main project and push it up without pushing the submodule changes up as well, other people who try to check out our changes are going to be in trouble since they will have no way to get the submodule changes that are depended on. Those changes will only exist on our local copy.</p>
+</div>
+<div class="paragraph">
+<p>In order to make sure this doesn’t happen, you can ask Git to check that all your submodules have been pushed properly before pushing the main project. The <code>git push</code> command takes the <code>--recurse-submodules</code> argument which can be set to either “check” or “on-demand”. The “check” option will make <code>push</code> simply fail if any of the committed submodule changes haven’t been pushed.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git push --recurse-submodules=check
+The following submodule paths contain changes that can
+not be found on any remote:
+  DbConnector
+
+Please try
+
+	git push --recurse-submodules=on-demand
+
+or cd to the path and use
+
+	git push
+
+to push them to a remote.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>As you can see, it also gives us some helpful advice on what we might want to do next. The simple option is to go into each submodule and manually push to the remotes to make sure they’re externally available and then try this push again.</p>
+</div>
+<div class="paragraph">
+<p>The other option is to use the “on-demand” value, which will try to do this for you.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git push --recurse-submodules=on-demand
+Pushing submodule 'DbConnector'
+Counting objects: 9, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (8/8), done.
+Writing objects: 100% (9/9), 917 bytes | 0 bytes/s, done.
+Total 9 (delta 3), reused 0 (delta 0)
+To https://github.com/chaconinc/DbConnector
+   c75e92a..82d2ad3  stable -&gt; stable
+Counting objects: 2, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (2/2), 266 bytes | 0 bytes/s, done.
+Total 2 (delta 1), reused 0 (delta 0)
+To https://github.com/chaconinc/MainProject
+   3d6d338..9a377d1  master -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>As you can see there, Git went into the DbConnector module and pushed it before pushing the main project. If that submodule push fails for some reason, the main project push will also fail.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_merging_submodule_changes">Merging Submodule Changes</h4>
+<div class="paragraph">
+<p>If you change a submodule reference at the same time as someone else, you may run into some problems. That is, if the submodule histories have diverged and are committed to diverging branches in a superproject, it may take a bit of work for you to fix.</p>
+</div>
+<div class="paragraph">
+<p>If one of the commits is a direct ancestor of the other (a fast-forward merge), then Git will simply choose the latter for the merge, so that works fine.</p>
+</div>
+<div class="paragraph">
+<p>Git will not attempt even a trivial merge for you, however. If the submodule commits diverge and need to be merged, you will get something that looks like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git pull
+remote: Counting objects: 2, done.
+remote: Compressing objects: 100% (1/1), done.
+remote: Total 2 (delta 1), reused 2 (delta 1)
+Unpacking objects: 100% (2/2), done.
+From https://github.com/chaconinc/MainProject
+   9a377d1..eb974f8  master     -&gt; origin/master
+Fetching submodule DbConnector
+warning: Failed to merge submodule DbConnector (merge following commits not found)
+Auto-merging DbConnector
+CONFLICT (submodule): Merge conflict in DbConnector
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So basically what has happened here is that Git has figured out that the two branches record points in the submodule’s history that are divergent and need to be merged. It explains it as “merge following commits not found”, which is confusing but we’ll explain why that is in a bit.</p>
+</div>
+<div class="paragraph">
+<p>To solve the problem, you need to figure out what state the submodule should be in. Strangely, Git doesn’t really give you much information to help out here, not even the SHAs of the commits of both sides of the history. Fortunately, it’s simple to figure out.  If you run <code>git diff</code> you can get the SHAs of the commits recorded in both branches you were trying to merge.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc DbConnector
+index eb41d76,c771610..0000000
+--- a/DbConnector
++++ b/DbConnector</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So, in this case, <code>eb41d76</code> is the commit in our submodule that <strong>we</strong> had and <code>c771610</code> is the commit that upstream had. If we go into our submodule directory, it should already be on <code>eb41d76</code> as the merge would not have touched it. If for whatever reason it’s not, you can simply create and checkout a branch pointing to it.</p>
+</div>
+<div class="paragraph">
+<p>What is important is the SHA of the commit from the other side. This is what you’ll have to merge in and resolve. You can either just try the merge with the SHA directly, or you can create a branch for it and then try to merge that in. We would suggest the latter, even if only to make a nicer merge commit message.</p>
+</div>
+<div class="paragraph">
+<p>So, we will go into our submodule directory, create a branch based on that second SHA from <code>git diff</code> and manually merge.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd DbConnector
+
+$ git rev-parse HEAD
+eb41d764bccf88be77aced643c13a7fa86714135
+
+$ git branch try-merge c771610
+(DbConnector) $ git merge try-merge
+Auto-merging src/main.c
+CONFLICT (content): Merge conflict in src/main.c
+Recorded preimage for 'src/main.c'
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We got an actual merge conflict here, so if we resolve that and commit it, then we can simply update the main project with the result.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ vim src/main.c <b class="conum">(1)</b>
+$ git add src/main.c
+$ git commit -am 'merged our changes'
+Recorded resolution for 'src/main.c'.
+[master 9fd905e] merged our changes
+
+$ cd .. <b class="conum">(2)</b>
+$ git diff <b class="conum">(3)</b>
+diff --cc DbConnector
+index eb41d76,c771610..0000000
+--- a/DbConnector
++++ b/DbConnector
+@@@ -1,1 -1,1 +1,1 @@@
+- Subproject commit eb41d764bccf88be77aced643c13a7fa86714135
+ -Subproject commit c77161012afbbe1f58b5053316ead08f4b7e6d1d
+++Subproject commit 9fd905e5d7f45a0d4cbc43d1ee550f16a30e825a
+$ git add DbConnector <b class="conum">(4)</b>
+
+$ git commit -m "Merge Tom's Changes" <b class="conum">(5)</b>
+[master 10d2c60] Merge Tom's Changes</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>First we resolve the conflict</p>
+</li>
+<li>
+<p>Then we go back to the main project directory</p>
+</li>
+<li>
+<p>We can check the SHAs again</p>
+</li>
+<li>
+<p>Resolve the conflicted submodule entry</p>
+</li>
+<li>
+<p>Commit our merge</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>It can be a bit confusing, but it’s really not very hard.</p>
+</div>
+<div class="paragraph">
+<p>Interestingly, there is another case that Git handles.
+If a merge commit exists in the submodule directory that contains <strong>both</strong> commits in it’s history, Git will suggest it to you as a possible solution. It sees that at some point in the submodule project, someone merged branches containing these two commits, so maybe you’ll want that one.</p>
+</div>
+<div class="paragraph">
+<p>This is why the error message from before was “merge following commits not found”, because it could not do <strong>this</strong>. It’s confusing because who would expect it to <strong>try</strong> to do this?</p>
+</div>
+<div class="paragraph">
+<p>If it does find a single acceptable merge commit, you’ll see something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge origin/master
+warning: Failed to merge submodule DbConnector (not fast-forward)
+Found a possible merge resolution for the submodule:
+ 9fd905e5d7f45a0d4cbc43d1ee550f16a30e825a: &gt; merged our changes
+If this is correct simply add it to the index for example
+by using:
+
+  git update-index --cacheinfo 160000 9fd905e5d7f45a0d4cbc43d1ee550f16a30e825a "DbConnector"
+
+which will accept this suggestion.
+Auto-merging DbConnector
+CONFLICT (submodule): Merge conflict in DbConnector
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>What it’s suggesting that you do is to update the index like you had run <code>git add</code>, which clears the conflict, then commit. You probably shouldn’t do this though. You can just as easily go into the submodule directory, see what the difference is, fast-forward to this commit, test it properly, and then commit it.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd DbConnector/
+$ git merge 9fd905e
+Updating eb41d76..9fd905e
+Fast-forward
+
+$ cd ..
+$ git add DbConnector
+$ git commit -am 'Fast forwarded to a common submodule child'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This accomplishes the same thing, but at least this way you can verify that it works and you have the code in your submodule directory when you’re done.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_submodule_tips">Submodule Tips</h3>
+<div class="paragraph">
+<p>There are a few things you can do to make working with submodules a little easier.</p>
+</div>
+<div class="sect4">
+<h4 id="_submodule_foreach">Submodule Foreach</h4>
+<div class="paragraph">
+<p>There is a <code>foreach</code> submodule command to run some arbitrary command in each submodule. This can be really helpful if you have a number of submodules in the same project.</p>
+</div>
+<div class="paragraph">
+<p>For example, let’s say we want to start a new feature or do a bugfix and we have work going on in several submodules. We can easily stash all the work in all our submodules.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule foreach 'git stash'
+Entering 'CryptoLibrary'
+No local changes to save
+Entering 'DbConnector'
+Saved working directory and index state WIP on stable: 82d2ad3 Merge from origin/stable
+HEAD is now at 82d2ad3 Merge from origin/stable</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then we can create a new branch and switch to it in all our submodules.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git submodule foreach 'git checkout -b featureA'
+Entering 'CryptoLibrary'
+Switched to a new branch 'featureA'
+Entering 'DbConnector'
+Switched to a new branch 'featureA'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You get the idea. One really useful thing you can do is produce a nice unified diff of what is changed in your main project and all your subprojects as well.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff; git submodule foreach 'git diff'
+Submodule DbConnector contains modified content
+diff --git a/src/main.c b/src/main.c
+index 210f1ae..1f0acdc 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -245,6 +245,8 @@ static int handle_alias(int *argcp, const char ***argv)
+
+      commit_pager_choice();
+
++     url = url_decode(url_orig);
++
+      /* build alias_argv */
+      alias_argv = xmalloc(sizeof(*alias_argv) * (argc + 1));
+      alias_argv[0] = alias_string + 1;
+Entering 'DbConnector'
+diff --git a/src/db.c b/src/db.c
+index 1aaefb6..5297645 100644
+--- a/src/db.c
++++ b/src/db.c
+@@ -93,6 +93,11 @@ char *url_decode_mem(const char *url, int len)
+        return url_decode_internal(&amp;url, len, NULL, &amp;out, 0);
+ }
+
++char *url_decode(const char *url)
++{
++       return url_decode_mem(url, strlen(url));
++}
++
+ char *url_decode_parameter_name(const char **query)
+ {
+        struct strbuf out = STRBUF_INIT;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Here we can see that we’re defining a function in a submodule and calling it in the main project. This is obviously a simplified example, but hopefully it gives you an idea of how this may be useful.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_useful_aliases">Useful Aliases</h4>
+<div class="paragraph">
+<p>You may want to set up some aliases for some of these commands as they can be quite long and you can’t set configuration options for most of them to make them defaults. We covered setting up Git aliases in <a id="_git_aliases"></a>, but here is an example of what you may want to set up if you plan on working with submodules in Git a lot.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config alias.sdiff '!'"git diff &amp;&amp; git submodule foreach 'git diff'"
+$ git config alias.spush 'push --recurse-submodules=on-demand'
+$ git config alias.supdate 'submodule update --remote --merge'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This way you can simply run <code>git supdate</code> when you want to update your submodules, or <code>git spush</code> to push with submodule dependency checking.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_issues_with_submodules">Issues with Submodules</h3>
+<div class="paragraph">
+<p>Using submodules isn’t without hiccups, however.</p>
+</div>
+<div class="paragraph">
+<p>For instance switching branches with submodules in them can also be tricky.
+If you create a new branch, add a submodule there, and then switch back to a branch without that submodule, you still have the submodule directory as an untracked directory:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -b add-crypto
+Switched to a new branch 'add-crypto'
+
+$ git submodule add https://github.com/chaconinc/CryptoLibrary
+Cloning into 'CryptoLibrary'...
+...
+
+$ git commit -am 'adding crypto library'
+[add-crypto 4445836] adding crypto library
+ 2 files changed, 4 insertions(+)
+ create mode 160000 CryptoLibrary
+
+$ git checkout master
+warning: unable to rmdir CryptoLibrary: Directory not empty
+Switched to branch 'master'
+Your branch is up-to-date with 'origin/master'.
+
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+
+	CryptoLibrary/
+
+nothing added to commit but untracked files present (use "git add" to track)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Removing the directory isn’t difficult, but it can be a bit confusing to have that in there. If you do remove it and then switch back to the branch that has that submodule, you will need to run <code>submodule update --init</code> to repopulate it.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clean -ffdx
+Removing CryptoLibrary/
+
+$ git checkout add-crypto
+Switched to branch 'add-crypto'
+
+$ ls CryptoLibrary/
+
+$ git submodule update --init
+Submodule path 'CryptoLibrary': checked out 'b8dda6aa182ea4464f3f3264b11e0268545172af'
+
+$ ls CryptoLibrary/
+Makefile	includes	scripts		src</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Again, not really very difficult, but it can be a little confusing.</p>
+</div>
+<div class="paragraph">
+<p>The other main caveat that many people run into involves switching from subdirectories to submodules.
+If you’ve been tracking files in your project and you want to move them out into a submodule, you must be careful or Git will get angry at you.
+Assume that you have files in a subdirectory of your project, and you want to switch it to a submodule.
+If you delete the subdirectory and then run <code>submodule add</code>, Git yells at you:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ rm -Rf CryptoLibrary/
+$ git submodule add https://github.com/chaconinc/CryptoLibrary
+'CryptoLibrary' already exists in the index</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You have to unstage the <code>CryptoLibrary</code> directory first.
+Then you can add the submodule:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rm -r CryptoLibrary
+$ git submodule add https://github.com/chaconinc/CryptoLibrary
+Cloning into 'CryptoLibrary'...
+remote: Counting objects: 11, done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 11 (delta 0), reused 11 (delta 0)
+Unpacking objects: 100% (11/11), done.
+Checking connectivity... done.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now suppose you did that in a branch.
+If you try to switch back to a branch where those files are still in the actual tree rather than a submodule – you get this error:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+error: The following untracked working tree files would be overwritten by checkout:
+  CryptoLibrary/Makefile
+  CryptoLibrary/includes/crypto.h
+  ...
+Please move or remove them before you can switch branches.
+Aborting</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can force it to switch with <code>checkout -f</code>, but be careful that you don’t have unsaved changes in there as they could be overwritten with that command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -f master
+warning: unable to rmdir CryptoLibrary: Directory not empty
+Switched to branch 'master'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then, when you switch back, you get an empty <code>CryptoLibrary</code> directory for some reason and <code>git submodule update</code> may not fix it either. You may need to go into your submodule directory and run a <code>git checkout .</code> to get all your files back. You could run this in a <code>submodule foreach</code> script to run it for multiple submodules.</p>
+</div>
+<div class="paragraph">
+<p>It’s important to note that submodules these days keep all their Git data in the top project’s <code>.git</code> directory, so unlike much older versions of Git, destorying a submodule directory won’t lose any commits or branches that you had.</p>
+</div>
+<div class="paragraph">
+<p>With these tools, submodules can be a fairly simple and effective method for developing on several related but still separate projects simultaneously.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
