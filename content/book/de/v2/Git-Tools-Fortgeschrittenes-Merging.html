@@ -1,0 +1,927 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Fortgeschrittenes Merging
+    number: 8
+    cs_number: '7.8'
+    previous: book/de/v2/Git-Tools-Reset-entzaubert
+    next: book/de/v2/Git-Tools-Rerere
+title: Git - Fortgeschrittenes Merging
+
+---
+<h2 id="_advanced_merging">Fortgeschrittenes Merging</h2>
+<div class="paragraph">
+<p>Das Mergen ist mit Git in der Regel ziemlich einfach.
+Da es in Git leicht ist, einen anderen Branch mehrfach zu verschmelzen, bedeutet das, dass Sie einen sehr langlebigen Branch haben können. Sie sollten ihn aber während des Arbeitens immer wieder aktualisieren und dabei kleine Konflikte lösen, anstatt am Ende der Arbeit von einer langen Reihe von Konflikten überrascht zu werden.</p>
+</div>
+<div class="paragraph">
+<p>Manchmal kommt es jedoch zu heiklen Konflikten.
+Im Gegensatz zu einigen anderen Versionskontrollsystemen versucht Git nicht, bei der Lösung von Merge-Konflikten eigenständig vorzugehen.
+Die Philosophie von Git ist es, intelligent zu erkennen, wann eine Merge-Lösung eindeutig ist, doch wenn es einen Konflikt gibt, versucht es nicht, automatisch eine Lösung zu finden.
+Wenn Sie also zu lange mit dem Zusammenführen zweier Branches warten, die sich schnell auseinander entwickeln, können Sie auf einige Probleme stoßen.</p>
+</div>
+<div class="paragraph">
+<p>In diesem Abschnitt stellen wir Ihnen vor, welche Probleme sich daraus ergeben könnten und welche Werkzeuge Git Ihnen zur Verfügung stellt, um diese heikleren Situationen zu bewältigen.
+Wir werden auch einige der verschiedenen, atypischen Merges vorstellen, die Ihnen zur Verfügung stehen. Außerdem werden wir Ihnen zeigen, wie Sie Merges wieder rückgängig machen können, die bereits durchgeführt wurden.</p>
+</div>
+<div class="sect3">
+<h3 id="_merge_konflikte">Merge-Konflikte</h3>
+<div class="paragraph">
+<p>Während wir einige Grundlagen zur Lösung von Merge-Konflikten in Kapitel 3, <a href="{{< relurl "book/de/v2/ch00/_basic_merge_conflicts" >}}">Einfache Merge-Konflikte</a>, behandelt haben, bietet Git für komplexere Konflikte einige Werkzeuge, die Ihnen helfen, herauszufinden, was passiert ist und wie Sie den Konflikt am besten lösen können.</p>
+</div>
+<div class="paragraph">
+<p>Versuchen Sie, wenn möglich, zunächst einmal zu vergewissern, dass Ihr Arbeitsverzeichnis sauber ist, bevor Sie einen Merge starten, bei dem Konflikte auftreten können.
+Falls Sie laufende Arbeiten haben, committen Sie sie entweder zu einem temporären Branch oder stashen Sie sie.
+Auf diese Weise können Sie <strong>alles</strong>, was Sie hier ausprobieren, wieder rückgängig machen.
+Sollten nicht gespeicherte Änderungen in Ihrem Arbeitsverzeichnis vorhanden sein, während Sie einen Merge ausführen, können Ihnen einige dieser Tipps helfen, diese Arbeit zu retten.</p>
+</div>
+<div class="paragraph">
+<p>Lassen Sie uns ein sehr einfaches Beispiel betrachten.
+Hier haben wir eine extrem einfache Ruby-Datei, die „hello world“ ausgibt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hello world'
+end
+
+hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In unserem Repository erstellen wir einen neuen Branch mit der Bezeichnung <code>whitespace</code>. Dann ändern wir alle Unix-Zeilenendungen in DOS-Zeilenendungen für jede Zeile der Datei, aber nur mit whitespace.
+Dann ändern wir die Zeile „hello world“ in „hello mundo“.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -b whitespace
+Switched to a new branch 'whitespace'
+
+$ unix2dos hello.rb
+unix2dos: converting file hello.rb to DOS format ...
+$ git commit -am 'Convert hello.rb to DOS'
+[whitespace 3270f76] Convert hello.rb to DOS
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+$ vim hello.rb
+$ git diff -b
+diff --git a/hello.rb b/hello.rb
+index ac51efd..e85207e 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,7 +1,7 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-  puts 'hello world'
++  puts 'hello mundo'^M
+ end
+
+ hello()
+
+ $ git commit -am 'Use Spanish instead of English'
+ [whitespace 6d338d2] Use Spanish instead of English
+ 1 file changed, 1 insertion(+), 1 deletion(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt wechseln wir wieder zu unserem Branch <code>master</code> und fügen einige Kommentare für die Funktion hinzu.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+Switched to branch 'master'
+
+$ vim hello.rb
+$ git diff
+diff --git a/hello.rb b/hello.rb
+index ac51efd..36c06c8 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,5 +1,6 @@
+ #! /usr/bin/env ruby
+
++# prints out a greeting
+ def hello
+   puts 'hello world'
+ end
+
+ $ git commit -am 'Add comment documenting the function'
+ [master bec6336] Add comment documenting the function
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt versuchen wir unseren <code>whitespace</code> branch zu mergen, es kommt zu einem Konflikt wegen der Änderungen an den Whitespaces (dt. Leerzeichen).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge whitespace
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_abort_merge">Einen Merge abbrechen</h4>
+<div class="paragraph">
+<p>Wir haben jetzt einige Optionen.
+Zunächst einmal sollten wir uns überlegen, wie wir aus dieser Situation herauskommen können.
+Vielleicht haben Sie nicht mit Konflikten gerechnet und wollen sich noch nicht ganz mit der Situation auseinandersetzen, dann können Sie einfach mit <code>git merge --abort</code> den Merge abbrechen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status -sb
+## master
+UU hello.rb
+
+$ git merge --abort
+
+$ git status -sb
+## master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die Option <code>git merge --abort</code> versucht, zu dem Zustand zurückzukehren, der vor dem Merge bestand.
+Die einzigen Ausnahmen, in denen diese Funktion nicht perfekt funktioniert, wären nicht gestashte, nicht committete Einträge in Ihrem Arbeitsverzeichnis. Wenn das nicht der Fall ist, sollte sie einwandfrei funktionieren.</p>
+</div>
+<div class="paragraph">
+<p>Wenn Sie aus irgendeinem Grund noch einmal von vorne anfangen wollen, können Sie auch <code>git reset --hard HEAD</code> ausführen. Ihr Repository wird dann wieder in den Zustand direkt nach dem letzten Commit versetzt.
+Denken Sie daran, dass jede nicht committete Bearbeitung verloren geht. Stellen Sie also sicher, dass Sie keinerlei Modifikation erhalten möchten.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_leerzeichen_ignorieren">Leerzeichen ignorieren</h4>
+<div class="paragraph">
+<p>In diesem speziellen Fall sind die Konflikte durch Leerzeichen verursacht.
+Wir erkennen das, da der Konflikt relativ eindeutig ist, wobei es aber auch in realen Fällen ziemlich leicht zu erkennen ist, da jede Zeile auf der einen Seite gelöscht und auf der anderen Seite wieder hinzugefügt wird.
+Standardmäßig sieht Git alle diese Zeilen als geändert an, weshalb es die Dateien nicht miteinander verschmelzen kann.</p>
+</div>
+<div class="paragraph">
+<p>Die voreingestellte Merge-Strategie kann allerdings Argumente akzeptieren. Einige wenige beziehen sich auf die richtige Nichtbeachtung von Änderungen der Leerzeichen.
+Wenn Sie sehen, dass Sie viele Probleme mit Leerzeichen bei einem Merge haben, können Sie ihn einfach abbrechen und erneut durchführen, diesmal mit den Optionen <code>-Xignore-all-space</code> oder <code>-Xignore-space-change</code>.
+Die erste Option ignoriert Leerzeichen beim Vergleich von Zeilen <strong>komplett</strong>, die zweite betrachtet Folgen von einem oder mehreren Leerzeichen als identisch.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge -Xignore-space-change whitespace
+Auto-merging hello.rb
+Merge made by the 'recursive' strategy.
+ hello.rb | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Da in diesem Fall die tatsächlichen Dateiänderungen keinen Konflikt darstellen, verschmelzen die einzelnen Dateien problemlos miteinander, wenn wir die Änderungen der Leerzeichen ignorieren.</p>
+</div>
+<div class="paragraph">
+<p>Das ist ein entscheidender Faktor, falls Sie jemand in Ihrem Team haben, der gerne alles von Leerzeichen auf Tabulatoren oder umgekehrt formatiert.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_manual_remerge">Manuelles Re-Mergen von Dateien</h4>
+<div class="paragraph">
+<p>Obwohl Git die Behandlung von Leerzeichen vorab relativ gut verarbeitet, gibt es andere, skriptfähige Änderungen, die Git nicht automatisch übernehmen kann.
+Nehmen wir beispielsweise an, dass Git nicht mit der Änderung der Leerzeichen umgehen konnte und wir es von Hand machen müssten.</p>
+</div>
+<div class="paragraph">
+<p>Was wir unbedingt machen müssen, ist die Datei, die wir mergen wollen, durch das Programms <code>dos2unix</code> laufen zu lassen, noch vor dem eigentlichen Mergen der Datei.
+Also, wie sollten wir das realisieren?</p>
+</div>
+<div class="paragraph">
+<p>Als Erstes geraten wir in einen Merge-Konflikt beim Aufruf des Befehls.
+Anschließend wollen wir Kopien von meiner Version der Datei, sowie deren Version (aus dem Branch, in den wir mergen wollen) und der gemeinsamen Version (von der beide Seiten abstammen) einsehen.
+Danach sollten wir entweder deren oder unsere Seite korrigieren und den Merge für diese einzelne Datei noch ein zweites Mal versuchen.</p>
+</div>
+<div class="paragraph">
+<p>Es ist eigentlich ganz einfach, die drei Dateiversionen zu erhalten.
+Git speichert alle diese Versionen im Index unter „stages“ (dt. Stufe), die jeweils mit Ziffern versehen sind.
+Stage 1 ist der gemeinsame Vorgänger, Stage 2 ist Ihre Version und Stage 3 stammt aus dem MERGE_HEAD, „deren“ Version, zu der die Datei(en) gemergt werden.</p>
+</div>
+<div class="paragraph">
+<p>Sie können eine Kopie jeder dieser Versionen der Konfliktdatei mit dem Befehl <code>git show</code> mit einer speziellen Syntax extrahieren.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git show :1:hello.rb &gt; hello.common.rb
+$ git show :2:hello.rb &gt; hello.ours.rb
+$ git show :3:hello.rb &gt; hello.theirs.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie etwas mehr Hard-Core wollen, können Sie auch den Basisbefehl <code>ls-files -u</code> verwenden, um die aktuellen SHA-1s der Git-Blobs für jede dieser Dateien zu erhalten.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -u
+100755 ac51efdc3df4f4fd328d1a02ad05331d8e2c9111 1	hello.rb
+100755 36c06c8752c78d2aff89571132f3bf7841a7b5c3 2	hello.rb
+100755 e85207e04dfdd5eb0a1e9febbc67fd837c44a1cd 3	hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das <code>:1:hello.rb</code> ist nur eine Kurzform für die Suche nach dem Blob SHA-1.</p>
+</div>
+<div class="paragraph">
+<p>Nachdem wir jetzt den Inhalt von allen drei Stufen in unserem Arbeitsverzeichnis haben, können wir deren Inhalt manuell korrigieren, um das Problem mit den Leerzeichen zu beheben und die Datei mit dem dafür vorgesehenen, kaum bekannten Befehl <code>git merge-file</code> neu zu verschmelzen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ dos2unix hello.theirs.rb
+dos2unix: converting file hello.theirs.rb to Unix format ...
+
+$ git merge-file -p \
+    hello.ours.rb hello.common.rb hello.theirs.rb &gt; hello.rb
+
+$ git diff -b
+diff --cc hello.rb
+index 36c06c8,e85207e..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,8 -1,7 +1,8 @@@
+  #! /usr/bin/env ruby
+
+ +# prints out a greeting
+  def hello
+-   puts 'hello world'
++   puts 'hello mundo'
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>An dieser Stelle haben wir die Datei geschickt miteinander verschmolzen.
+Das funktioniert sogar besser als die Option <code>ignore-space-change</code>, weil dadurch die Änderungen an den Leerzeichen vor dem Zusammenführen korrigiert werden, statt sie einfach zu ignorieren.
+Beim Merge mit <code>ignore-space-change</code> haben wir sogar ein paar Zeilen mit DOS-Zeilenenden erhalten, wodurch die Sache uneinheitlich wurde.</p>
+</div>
+<div class="paragraph">
+<p>Wenn Sie sich vor dem Abschluss dieses Commits ein Bild davon machen wollen, was tatsächlich auf der einen oder anderen Stufe geändert wurde, können Sie mit <code>git diff</code> vergleichen, was sich in Ihrem Arbeitsverzeichnis befindet, das Sie als Ergebnis der Zusammenführung in einer dieser Stufen übergeben wollen.
+Wir können sie alle nacheinander durchspielen.</p>
+</div>
+<div class="paragraph">
+<p>Um das Resultat mit dem zu vergleichen, was Sie vor dem Merge in Ihrem Branch hatten oder anders gesagt, um herauszufinden, was durch den Merge entstanden ist, können Sie <code>git diff --ours</code> folgendermaßen ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --ours
+* Unmerged path hello.rb
+diff --git a/hello.rb b/hello.rb
+index 36c06c8..44d0a25 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -2,7 +2,7 @@
+
+ # prints out a greeting
+ def hello
+-  puts 'hello world'
++  puts 'hello mundo'
+ end
+
+ hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier können wir leicht erkennen, dass das, was in unserem Branch entstanden ist, was wir mit diesem Merge eigentlich in diese Datei aufnehmen, diese einzelne Zeile ändert.</p>
+</div>
+<div class="paragraph">
+<p>Wenn man sehen will, wie sich das Ergebnis der Verschmelzung von dem unterscheidet, was in der Remote-Version war, können Sie <code>git diff --theirs</code> laufen lassen.
+In diesem und dem folgenden Beispiel müssen wir <code>-b</code> verwenden, um die Leerzeichen zu löschen, denn wir vergleichen das Ergebnis mit dem, was in Git enthalten ist, nicht mit der bereinigten Datei <code>hello.theirs.rb</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --theirs -b
+* Unmerged path hello.rb
+diff --git a/hello.rb b/hello.rb
+index e85207e..44d0a25 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,5 +1,6 @@
+ #! /usr/bin/env ruby
+
++# prints out a greeting
+ def hello
+   puts 'hello mundo'
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Schließlich können Sie mit <code>git diff --base</code> sehen, wie sich die Datei beiderseits geändert hat.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff --base -b
+* Unmerged path hello.rb
+diff --git a/hello.rb b/hello.rb
+index ac51efd..44d0a25 100755
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,7 +1,8 @@
+ #! /usr/bin/env ruby
+
++# prints out a greeting
+ def hello
+-  puts 'hello world'
++  puts 'hello mundo'
+ end
+
+ hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>An diesem Punkt können wir mit dem Befehl <code>git clean</code> die zusätzlichen Dateien löschen, die wir für den manuellen Merge angelegt haben und nicht mehr benötigen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clean -f
+Removing hello.common.rb
+Removing hello.ours.rb
+Removing hello.theirs.rb</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_checking_out_conflicts">Die Konflikte austesten</h4>
+<div class="paragraph">
+<p>Womöglich sind wir aus irgendeinem Grund nicht zufrieden mit der vorliegenden Lösung oder die manuelle Korrektur einer oder beider Seiten hat noch immer nicht gut funktioniert und wir benötigen weitere Informationen.</p>
+</div>
+<div class="paragraph">
+<p>Lassen Sie uns das Beispiel etwas verändern.
+Hier haben wir zwei schon länger existierende Branches, die jeweils einige Commits enthalten, aber bei einer Verschmelzung einen begründeten inhaltlichen Konflikt erzeugen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --graph --oneline --decorate --all
+* f1270f7 (HEAD, master) Update README
+* 9af9d3b Create README
+* 694971d Update phrase to 'hola world'
+| * e3eb223 (mundo) Add more tests
+| * 7cff591 Create initial testing script
+| * c3ffff1 Change text to 'hello mundo'
+|/
+* b7dcc89 Initial hello world code</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wir haben jetzt drei individuelle Commits, die nur auf dem Branch <code>master</code> existieren und drei weitere, die auf dem Branch <code>mundo</code> liegen.
+Wenn wir nun versuchen, den <code>mundo</code> Zweig zu integrieren, bekommen wir einen Konflikt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge mundo
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wir möchten jetzt wissen, was den Merge-Konflikt verursacht.
+Beim Öffnen der Datei sehen wir etwas wie das hier:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+  puts 'hola world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; mundo
+end
+
+hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beide Seiten des Merges haben dieser Datei inhaltlich etwas verändert. Manche der Commits haben die Datei jedoch an gleicher Stelle verändert, wodurch dieser Konflikt entstanden ist.</p>
+</div>
+<div class="paragraph">
+<p>Lassen Sie uns einige Tools näher betrachten, die Ihnen zur Verfügung stehen, um herauszufinden, wie es zu diesem Konflikt gekommen ist.
+Vielleicht ist es nicht ganz eindeutig, wie genau Sie diesen Konflikt lösen könnten.
+Sie brauchen weitere Informationen.</p>
+</div>
+<div class="paragraph">
+<p>Ein hilfreiches Werkzeug ist die Funktion <code>git checkout</code> mit der Option <code>--conflict</code>.
+Dadurch wird die Datei erneut ausgecheckt und die Konfliktmarkierungen für den Merge-Prozess ersetzt.
+Das kann praktisch sein, wenn Sie die Markierungen zurücksetzen und erneut versuchen wollen, sie aufzulösen.</p>
+</div>
+<div class="paragraph">
+<p>Sie können mit <code>--conflict</code> die Werte <code>diff3</code> oder <code>merge</code> (die Vorgabe) übergeben.
+Wenn Sie <code>diff3</code> übergeben, wird Git eine etwas andere Variante von Konfliktmarkern verwenden und Ihnen nicht nur die „ours“ and „theirs“ Version, sondern auch die „base“-Version mit zur Verfügung stellen, um Ihnen mehr Kontext zu geben.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout --conflict=diff3 hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Danach wird die Datei wie folgt aussehen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours
+  puts 'hola world'
+||||||| base
+  puts 'hello world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs
+end
+
+hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Ihnen dieses Format gefällt, können Sie es als Standard für zukünftige Merge-Konflikte festlegen, indem Sie die Einstellung <code>merge.conflictstyle</code> auf <code>diff3</code> setzen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global merge.conflictstyle diff3</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der Befehl <code>git checkout</code> kann auch die Optionen <code>--ours</code> und <code>--theirs</code> nutzen, wodurch man sehr schnell entweder nur die eine oder die andere Seite wählen kann, ohne die beiden Seiten zu vermischen.</p>
+</div>
+<div class="paragraph">
+<p>Das kann speziell bei Konflikten mit Binärdateien nützlich sein, bei denen Sie einfach die eine Seite wählen können oder bei denen Sie nur bestimmte Dateien aus einem anderen Branch einbinden wollen – Sie können den Merge starten und dann bestimmte Dateien von der einen oder anderen Seite auschecken, bevor Sie sie committen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_merge_log">Merge-Protokoll</h4>
+<div class="paragraph">
+<p>Ein weiteres nützliches Werkzeug bei der Lösung von Merge-Konflikten ist <code>git log</code>.
+So können Sie den Bezug zu dem herstellen, was zu den Konflikten beigetragen haben könnte.
+Es ist manchmal sehr nützlich, die Historie ein wenig Revue passieren zu lassen, um sich zu erinnern, warum zwei Entwicklungslinien den gleichen Bereich des Quellcodes tangieren.</p>
+</div>
+<div class="paragraph">
+<p>Um eine vollständige Liste aller eindeutigen Commits zu erhalten, die in den beiden an dieser Zusammenführung beteiligten Branches enthalten waren, können wir die „triple dot“-Syntax verwenden, die wir in <a href="{{< relurl "book/de/v2/ch00/_triple_dot" >}}">Dreifacher  Punkt</a> kennengelernt haben.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --left-right HEAD...MERGE_HEAD
+&lt; f1270f7 Update README
+&lt; 9af9d3b Create README
+&lt; 694971d Update phrase to 'hola world'
+&gt; e3eb223 Add more tests
+&gt; 7cff591 Create initial testing script
+&gt; c3ffff1 Change text to 'hello mundo'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist eine detaillierte Liste der insgesamt sechs beteiligten Commits und der Entwicklungslinie, in der jeder Commit erfolgte.</p>
+</div>
+<div class="paragraph">
+<p>Wir können das aber noch weiter vereinfachen, um uns einen viel spezifischeren Hintergrund zu geben.
+Fügen wir die Option <code>--merge</code> zu <code>git log</code> hinzu, zeigt sie nur die Commits auf beiden Seiten des Merges an, die eine Datei betreffen, bei der ein Konflikt vorliegt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --left-right --merge
+&lt; 694971d Update phrase to 'hola world'
+&gt; c3ffff1 Change text to 'hello mundo'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie diesen Befehl stattdessen mit der Option <code>-p</code> ausführen, erhalten Sie nur die Diffs zu der Datei, die in Konflikt steht.
+Das kann <strong>äußerst</strong> wertvoll sein, um Ihnen schnell den notwendigen Kontext zu liefern, damit Sie verstehen, warum sich etwas in Widerspruch befindet und wie Sie es auf intelligentere Weise auflösen können.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_kombiniertes_diff_format">Kombiniertes Diff-Format</h4>
+<div class="paragraph">
+<p>Da Git alle Ergebnisse der erfolgreichen Merges zwischenspeichert (engl. to stage), wenn Sie <code>git diff</code> ausführen, solange Sie sich in einem Merge-Konflikt-Zustand befinden, wird nur das angezeigt, was derzeit noch in Konflikt steht.
+Das hilft Ihnen beim Erkennen der noch zu lösenden Fehler.</p>
+</div>
+<div class="paragraph">
+<p>Wenn Sie <code>git diff</code> direkt nach einem Merge-Konflikt ausführen, erhalten Sie Informationen in einem ziemlich eindeutigen diff-Ausgabeformat.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc hello.rb
+index 0399cd5,59727f0..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,11 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+++&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+ +  puts 'hola world'
+++=======
++   puts 'hello mundo'
+++&gt;&gt;&gt;&gt;&gt;&gt;&gt; mundo
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Format wird „Combined Diff“ genannt und liefert Ihnen zwei Datenspalten neben jeder Zeile.
+Die erste Spalte zeigt Ihnen an, ob diese Zeile zwischen dem Branch „ours“ und der Datei in Ihrem Arbeitsverzeichnis unterschiedlich (hinzugefügt oder gelöscht) ist. Die zweite Spalte macht das Gleiche zwischen dem Branch „theirs“ und Ihrer Kopie des Arbeitsverzeichnisses.</p>
+</div>
+<div class="paragraph">
+<p>In diesem Beispiel können Sie sehen, dass die Zeilen <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>  und <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> in der Arbeitskopie sind, aber nicht auf beiden Seiten des Merges stehen.
+Das macht Sinn, weil das Merge-Tool sie für unseren Kontext dort eingefügt hat, es wird aber von uns erwartet, dass wir sie wieder entfernen.</p>
+</div>
+<div class="paragraph">
+<p>Wenn der Konflikt gelöst wird und wir wieder <code>git diff</code> laufen lassen, werden wir dasselbe sehen, allerdings etwas nützlicher.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ vim hello.rb
+$ git diff
+diff --cc hello.rb
+index 0399cd5,59727f0..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das zeigt uns, dass „hola world“ auf unserer Seite enthalten war, aber nicht in der Arbeitskopie, dass „hello mundo“ auf deren Seite, aber nicht in der Arbeitskopie war, und schließlich, dass „hola mundo“ auf keiner Seite existierte, aber jetzt in der Arbeitskopie ist.
+Es kann sinnvoll sein, dieses vor dem Committen der Lösung zu überprüfen.</p>
+</div>
+<div class="paragraph">
+<p>Das können Sie auch aus dem <code>git log</code> für jeden Merge entnehmen, um zu verfolgen, wie etwas im Anschluss daran gelöst wurde.
+Git wird dieses Format dann ausgeben, wenn Sie <code>git show</code> bei einem Merge-Commit ausführen oder wenn Sie die Option <code>--cc</code> zu einem <code>git log -p</code> hinzufügen (welches standardmäßig nur Patches für Non-Merge-Commits anzeigt).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --cc -p -1
+commit 14f41939956d80b9e17bb8721354c33f8d5b5a79
+Merge: f1270f7 e3eb223
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri Sep 19 18:14:49 2014 +0200
+
+    Merge branch 'mundo'
+
+    Conflicts:
+        hello.rb
+
+diff --cc hello.rb
+index 0399cd5,59727f0..e1d0799
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end
+
+  hello()</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_undoing_merges">Merges annullieren</h3>
+<div class="paragraph">
+<p>Nachdem Sie jetzt wissen, wie man einen Merge-Commit erstellt, werden Sie vermutlich ein paar davon versehentlich machen.
+Eine der besten Eigenschaften von Git ist, dass es völlig in Ordnung ist, Fehler zu machen, weil es möglich ist, sie rückgängig zu machen (und in vielen Fällen ist das auch sehr leicht).</p>
+</div>
+<div class="paragraph">
+<p>Merge-Commits sind da nicht anders.
+Angenommen, Sie haben mit der Arbeit an einem Topic-Branch begonnen, ihn versehentlich in <code>master</code> gemergt und jetzt sieht Ihre Commit-Historie so aus:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/undomerge-start.png" >}}" alt="Versehentlicher Merge-Commit">
+</div>
+<div class="title">Abbildung 137. Versehentlicher Merge-Commit</div>
+</div>
+<div class="paragraph">
+<p>Es gibt zwei Möglichkeiten, dieses Problem zu lösen, je nachdem, welches Ergebnis Sie sich vorstellen.</p>
+</div>
+<div class="sect4">
+<h4 id="_reparieren_der_referenzen">Reparieren der Referenzen</h4>
+<div class="paragraph">
+<p>Wenn der unerwünschte Merge-Commit nur auf Ihrem lokalen Repository existiert, ist die einfachste und beste Lösung, die Branches so zu verschieben, dass sie dorthin zeigen, wo Sie sie haben wollen.
+Meistens, wenn dem irrtümlichen <code>git merge</code> ein <code>git reset --hard HEAD~</code> folgt, wird das die Branch-Pointer zurücksetzen, so dass sie wie folgt aussehen:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/undomerge-reset.png" >}}" alt="Verlauf nach `git reset --hard HEAD~`">
+</div>
+<div class="title">Abbildung 138. Verlauf nach <code>git reset --hard HEAD~</code>
+</div>
+</div>
+<div class="paragraph">
+<p>Wir haben bereits in <a href="{{< relurl "book/de/v2/ch00/_git_reset" >}}">Reset entzaubert</a> über <code>reset</code> geschrieben, also sollte es nicht allzu schwer sein, zu verstehen, was hier passiert.
+Hier nur zur Erinnerung: <code>reset --hard</code> durchläuft normalerweise drei Phasen:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Verschieben, wohin der Branch HEAD zeigt.
+Hier wollen wir <code>master</code> dorthin verschieben, wo er vor dem Merge-Commit stand (<code>C6</code>).</p>
+</li>
+<li>
+<p>Den Index wie HEAD aussehen lassen.</p>
+</li>
+<li>
+<p>Das Arbeitsverzeichnis an den Index anpassen.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Der Nachteil dieser Vorgehensweise ist, dass der Verlauf umgeschrieben wird, was mit einem gemeinsam genutzten Repository problematisch sein kann.
+Sehen Sie sich <a href="{{< relurl "book/de/v2/ch00/_rebase_peril" >}}">Die Gefahren des Rebasing</a> an, um Näheres zu erfahren, was passieren kann. Die Kurzfassung ist, dass, wenn andere Benutzer Commits vorliegen haben, die Sie gerade umschreiben wollen, dann sollten Sie besser ein <code>reset</code> vermeiden.
+Dieser Vorgang wird auch dann nicht funktionieren, wenn seit dem Merge weitere Commits erstellt wurden. Ein Verschieben der Refs würde diese Änderungen faktisch verlieren.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_reverse_commit">Den Commit umkehren</h4>
+<div class="paragraph">
+<p>Falls das Verschieben der Branch-Pointer für Sie nicht in Frage kommt, bietet Ihnen Git die Option, einen neuen Commit durchzuführen, der alle Änderungen eines bestehenden rückgängig macht.
+Git nennt diese Operation „revert“. In diesem konkreten Szenario würden Sie sie wie folgt aufrufen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git revert -m 1 HEAD
+[master b1d8379] Revert "Merge branch 'topic'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der <code>-m 1</code> Flag gibt an, welches Elternteil auf der „Hauptlinie“ ist und beibehalten werden sollte.
+Wenn Sie einen Merge zu <code>HEAD</code> (<code>git merge topic</code>) starten, hat der neue Commit zwei Elternteile: der erste ist <code>HEAD</code> (<code>C6</code>), und der zweite ist die Spitze des Branchs, der gemergt wird (<code>C4</code>).
+Hier wollen wir alle Änderungen rückgängig machen, die durch das Mergen im übergeordneten Teil #2 (<code>C4</code>) vorgenommen wurden, wobei der gesamte Inhalt des übergeordneten Teils #1 (<code>C6</code>) beibehalten wird.</p>
+</div>
+<div class="paragraph">
+<p>Der Verlauf mit dem Revert-Commit sieht so aus:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/undomerge-revert.png" >}}" alt="Verlauf nach `git revert -m 1`">
+</div>
+<div class="title">Abbildung 139. Verlauf nach <code>git revert -m 1</code>
+</div>
+</div>
+<div class="paragraph">
+<p>Der neue Commit <code>^M</code> hat genau den gleichen Inhalt wie <code>C6</code>, so dass es von hier an so aussieht, als ob der Merge nie stattgefunden hätte, außer dass die jetzt nicht mehr verschmolzenen Commits noch in dem Verlauf von <code>HEAD</code> stehen.
+Git würde verwirrt werden, wenn Sie erneut versuchen sollten, <code>topic</code> in <code>master</code> zu mergen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge topic
+Already up-to-date.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es gibt nichts in <code>topic</code>, was nicht schon von <code>master</code> aus erreichbar wäre.
+Was viel schlimmer wäre, wenn Sie Arbeiten zu <code>topic</code> beitragen und erneut mergen sollten, dann wird Git nur die Änderungen <em>seit</em> dem rückgängig gemachten Merge vornehmen:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/undomerge-revert2.png" >}}" alt="Verlauf mit einem fehlerhaften Merge">
+</div>
+<div class="title">Abbildung 140. Verlauf mit einem fehlerhaften Merge</div>
+</div>
+<div class="paragraph">
+<p>Der optimale Weg, dies zu umgehen, besteht darin, den ursprüngliche Merge rückgängig zu machen, da Sie jetzt die Änderungen übernehmen möchten, die annulliert wurden und <strong>dann</strong> einen neuen Merge-Commit zu erstellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git revert ^M
+[master 09f0126] Revert "Revert "Merge branch 'topic'""
+$ git merge topic</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/undomerge-revert3.png" >}}" alt="Verlauf nach erneutem Merge eines rückgängig gemachten merges">
+</div>
+<div class="title">Abbildung 141. Verlauf nach erneutem Merge einer rückgängig gemachten Verschmelzung</div>
+</div>
+<div class="paragraph">
+<p>In diesem Beispiel heben sich <code>M</code> und <code>^M</code> gegenseitig auf.
+Der Commit <code>^^M</code> verschmilzt wirksam mit den Änderungen von <code>C3</code> und <code>C4</code>, und <code>C8</code> verschmilzt mit den Änderungen von <code>C7</code>, so dass jetzt das <code>topic</code> vollständig gemergt ist.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_andere_arten_von_merges">Andere Arten von Merges</h3>
+<div class="paragraph">
+<p>Bisher haben wir den normalen Merge von zwei Branches behandelt, der normalerweise mit der so genannten "rekursiven" Strategie der Verschmelzung bearbeitet wird.
+Es gibt jedoch auch andere Möglichkeiten, um Branches miteinander zu verschmelzen.
+Lassen Sie uns kurz einige davon untersuchen.</p>
+</div>
+<div class="sect4">
+<h4 id="_unsere_oder_deren_präferenz">Unsere oder deren Präferenz</h4>
+<div class="paragraph">
+<p>Erstens, es gibt noch eine weitere praktische Funktion, die wir mit dem normalen „rekursiven“ Modus des Merging anwenden können.
+Wir haben uns bereits die Optionen <code>ignore-all-space</code> und <code>ignore-space-change</code> angesehen, die mit <code>-X</code> übergeben werden. Wir können Git aber auch anweisen, die eine oder die andere Seite zu bevorzugen, falls ein Konflikt auftritt.</p>
+</div>
+<div class="paragraph">
+<p>Wenn Git einen Konflikt zwischen zwei zu verschmelzenden Branches feststellt, fügt es standardmäßig Konfliktmarkierungen in Ihren Code ein und markiert die Datei als im Konflikt stehend und ermöglicht Ihnen, den Konflikt zu beheben.
+Sollten Sie es vorziehen, dass Git einfach eine bestimmte Version auswählen und die andere ignorieren soll, anstatt Sie den Konflikt manuell auflösen zu lassen, können Sie den <code>merge</code> Befehl entweder mit <code>-Xours</code> oder <code>-Xtheirs</code> übergeben.</p>
+</div>
+<div class="paragraph">
+<p>Erkennt Git diese Einstellung, wird es keine Konfliktmarkierungen hinzufügen.
+Alle miteinander in Einklang zu bringenden Abweichungen werden gemergt.
+Bei allen sich widersprechenden Änderungen wird einfach die von Ihnen angegebene Version ausgewählt, einschließlich binärer Dateien.</p>
+</div>
+<div class="paragraph">
+<p>Wenn wir auf das „hello world“-Beispiel zurückkommen, das wir zuvor benutzt haben, können wir erkennen, dass der Merge in unserem Branch Konflikte verursacht.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge mundo
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Resolved 'hello.rb' using previous resolution.
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn wir das Beispiel aber mit <code>-Xours</code> oder <code>-Xtheirs</code> ausführen, dann funktioniert das Merging.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge -Xours mundo
+Auto-merging hello.rb
+Merge made by the 'recursive' strategy.
+ hello.rb | 2 +-
+ test.sh  | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+ create mode 100644 test.sh</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dann würden keine Konfliktmarkierungen bei „hello mundo“ auf der einen Seite und „hola world“ auf der anderen in die Datei eingefügt, sondern einfach „hola world“ übernommen.
+Alle anderen, konfliktfreien Änderungen auf dieser Branch werden jedoch korrekt in die Version aufgenommen.</p>
+</div>
+<div class="paragraph">
+<p>Diese Option kann auch an den Befehl <code>git merge-file</code> übergeben werden, den wir weiter oben beschrieben haben, als wir <code>git merge-file --ours</code> für individuelle Datei-Merges ausgeführt haben.</p>
+</div>
+<div class="paragraph">
+<p>Wenn man so etwas machen will, aber Git nicht einmal versucht, Änderungen von der anderen Seite einzubinden, gibt es eine drastischere Option, nämlich die „ours“ Merge-<em>Strategie</em>.
+Die unterscheidet sich von der rekursiven, „ours“ Merge-<em>Option</em>.</p>
+</div>
+<div class="paragraph">
+<p>Dadurch wird eigentlich ein Schein-Merge ausgeführt.
+Es wird ein neuer Merge-Commit mit beiden Branches als Elternteil protokolliert, aber es wird noch nicht einmal der betreffende Branch angesehen.
+Als Ergebnis der Verschmelzung wird einfach der exakte Code in Ihrem aktuellen Branch gespeichert.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge -s ours mundo
+Merge made by the 'ours' strategy.
+$ git diff HEAD HEAD~
+$</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können erkennen, dass es keinen Unterschied zwischen dem Branch, auf dem wir uns befanden und dem Resultat des Merges gibt.</p>
+</div>
+<div class="paragraph">
+<p>Oft kann das nützlich sein, um Git bei einem späteren Merge im Grunde zu täuschen, dass ein Zweig bereits verschmolzen ist.
+Nehmen wir zum Beispiel an, Sie haben einen Branch <code>release</code> abgespalten und dort einige Änderungen vorgenommen, die Sie irgendwann wieder in Ihren Branch <code>master</code> integrieren möchten.
+Zwischenzeitlich müssen einige Bugfixes auf <code>master</code> in Ihren Branch <code>release</code> zurückportiert werden.
+Sie können den Bugfix-Branch in den Branch <code>release</code> mergen und ebenso den gleichen Branch mit <code>merge -s ours</code> in Ihrem <code>master</code> Branch verschmelzen (auch wenn der Fix bereits vorhanden ist). Wenn Sie später den <code>release</code> Branch wieder mergen, gibt es keine Konflikte durch den Bugfix.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_subtree_merge">Subtree Merging</h4>
+<div class="paragraph">
+<p>Der Grundgedanke des Teilbaum-Merge besteht darin, dass Sie zwei Projekte haben und eines der Projekte auf ein Unterverzeichnis des anderen Projekts verweist.
+Wenn Sie einen Teilbaum-Merge durchführen, ist Git so versiert zu erkennen, dass das ein Unterverzeichnis ein Teilbaum des anderen ist und es entsprechend mergen.</p>
+</div>
+<div class="paragraph">
+<p>Wir werden ein Beispiel durcharbeiten, bei dem ein separates Projekt in ein bestehendes Projekt eingefügt und dann der Code des zweiten Projekts in ein Unterverzeichnis des ersten Projekts gemergt wird.</p>
+</div>
+<div class="paragraph">
+<p>Zunächst werden wir die Anwendung „Rack“ zu unserem Projekt hinzufügen.
+Wir werden das Rack-Projekt in unserem eigenen Projekt als Remote-Referenz einbinden und es dann in einem eigenen Branch auschecken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add rack_remote https://github.com/rack/rack
+$ git fetch rack_remote --no-tags
+warning: no common commits
+remote: Counting objects: 3184, done.
+remote: Compressing objects: 100% (1465/1465), done.
+remote: Total 3184 (delta 1952), reused 2770 (delta 1675)
+Receiving objects: 100% (3184/3184), 677.42 KiB | 4 KiB/s, done.
+Resolving deltas: 100% (1952/1952), done.
+From https://github.com/rack/rack
+ * [new branch]      build      -&gt; rack_remote/build
+ * [new branch]      master     -&gt; rack_remote/master
+ * [new branch]      rack-0.4   -&gt; rack_remote/rack-0.4
+ * [new branch]      rack-0.9   -&gt; rack_remote/rack-0.9
+$ git checkout -b rack_branch rack_remote/master
+Branch rack_branch set up to track remote branch refs/remotes/rack_remote/master.
+Switched to a new branch "rack_branch"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt haben wir das Root-Verzeichnis des Rack-Projekts in unserem <code>rack_branch</code> und unser eigenes Projekt im <code>master</code> Branch.
+Wenn Sie die beiden Branches prüfen, können Sie sehen, dass sie unterschiedliche Projekt-Roots haben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ls
+AUTHORS         KNOWN-ISSUES   Rakefile      contrib         lib
+COPYING         README         bin           example         test
+$ git checkout master
+Switched to branch "master"
+$ ls
+README</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist ein irgendwie merkwürdiges Konzept.
+Nicht alle Branches in Ihrem Repository müssen unbedingt Branches desselben Projektes sein.
+Es ist nicht allgemein üblich, weil es selten hilfreich ist. Allerdings ist es ziemlich wahrscheinlich, dass die Branches völlig unterschiedliche Verläufe enthalten.</p>
+</div>
+<div class="paragraph">
+<p>In unserem Fall wollen wir das Rack-Projekt als Unterverzeichnis in unser Projekt <code>master</code> einbringen.
+Das können wir in Git mit <code>git read-tree</code> tun.
+Mehr über den Befehl <code>read-tree</code> und seiner Verwandten erfahren Sie in <a href="{{< relurl "book/de/v2/ch00/ch10-git-internals" >}}">Git Interna</a>. Vorab sollen Sie erfahren, dass er den Root-Tree eines Branchs in Ihre aktuelle Staging-Area und Ihr aktuelles Arbeitsverzeichnis einliest.
+Wir sind gerade zu Ihrem Branch <code>master</code> zurückgewechselt und ziehen den Zweig <code>rack_branch</code> in das Unterverzeichnis <code>rack</code> unseres <code>master</code> Branchs des Hauptprojektes:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git read-tree --prefix=rack/ -u rack_branch</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Bei einem Commit sieht es so aus, als befänden sich alle Rack-Dateien unterhalb dieses Unterverzeichnisses — als ob wir sie aus einem Tarball hineinkopiert hätten.
+Interessant ist, dass wir Änderungen in einem der Branches relativ leicht mit anderen Branches mergen können.
+Falls das Rack-Projekt aktualisiert wird, können wir die Änderungen einbinden, indem wir zu diesem Branch wechseln und pullen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout rack_branch
+$ git pull</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dann können wir diese Änderungen wieder in unserem Branch <code>master</code> zusammenführen.
+Um die Änderungen zu pullen und die Commit-Nachricht vorzubereiten, verwendet man die Option <code>--squash</code> sowie die Option <code>-Xsubtree</code> der rekursiven Merge-Strategie.
+Die rekursive Strategie ist hier die Voreinstellung, aber wir fügen sie der Klarheit halber ein.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout master
+$ git merge --squash -s recursive -Xsubtree=rack rack_branch
+Squash commit -- not updating HEAD
+Automatic merge went well; stopped before committing as requested</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alle Änderungen aus dem Rack-Projekt werden in das Projekt gemergt und können lokal committet werden.
+Sie können auch das Gegenteil tun — Änderungen im Unterverzeichnis <code>rack</code> Ihres <code>master</code> Branchs vornehmen und sie dann später in Ihren Branch <code>rack_branch</code> mergen, um sie den Autoren zu übermitteln oder sie zum Upstream zu pushen.</p>
+</div>
+<div class="paragraph">
+<p>Dadurch haben wir einen Workflow, der dem Submodul-Workflow ähnelt, ohne Submodule zu verwenden (das wir in <a href="{{< relurl "book/de/v2/ch00/_git_submodules" >}}">Submodule</a> behandeln werden).
+Wir können Branches mit anderen verwandten Projekten in unserem Repository vorhalten und sie gelegentlich in unserem Projekt verschmelzen.
+In gewisser Weise ist das nützlich. Beispielsweise kann der gesamte Code an einen einzigen Ort übermittelt werden.
+Allerdings gibt es auch Nachteile. Es ist etwas komplizierter und somit leichter, Fehler bei der Re-Integration von Änderungen zu machen oder versehentlich einen Branch in ein nicht relevantes Repository zu pushen.</p>
+</div>
+<div class="paragraph">
+<p>Eine weitere etwas eigenartige Eigenschaft ist, dass Sie den Unterschied zwischen dem, was in Ihrem Unterverzeichnis <code>rack</code> steht, und dem Code in Ihrem Branch <code>rack_branch</code> nicht mit dem normalen <code>diff</code> Befehl erhalten können ( um zu prüfen, ob Sie sie mergen müssen).
+Stattdessen müssen Sie <code>git diff-tree</code> auf dem Branch, mit dem Sie vergleichen wollen, ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff-tree -p rack_branch</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Um den Inhalt Ihres <code>rack</code> Unterverzeichnisses mit dem Branch <code>master</code> auf dem Remote-Server zu vergleichen, können Sie auch folgendes ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff-tree -p rack_remote/master</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

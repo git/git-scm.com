@@ -1,0 +1,1979 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git und andere Systeme
+    number: 9
+  section:
+    title: Git als Client
+    number: 1
+    cs_number: '9.1'
+    previous: book/de/v2/Git-einrichten-Zusammenfassung
+    next: book/de/v2/Git-und-andere-Systeme-Migration-zu-Git
+title: Git - Git als Client
+
+---
+<p>Die Welt ist nicht perfekt.
+Normalerweise können Sie nicht jedes Projekt, mit dem Sie in Berührung kommen, sofort auf Git umstellen.
+Manchmal steckt man in einem Projekt mit einem anderen VCS fest und wünscht sich, man könnte zu Git wechseln.
+Wir werden im ersten Teil dieses Kapitels die Möglichkeiten kennenlernen, Git als Client zu verwenden, falls das Projekt, an dem Sie gerade arbeiten, in einem anderen System läuft.</p><p>Irgendwann werden Sie vielleicht Ihr bestehendes Projekt in Git umwandeln wollen.
+Der zweite Teil dieses Kapitels behandelt die Migration Ihres Projekts zu Git aus verschiedenen Systemen sowie eine funktionierende Methode, wenn kein vorgefertigtes Import-Tool vorhanden ist.</p>
+<h2 id="_git_als_client">Git als Client</h2>
+<div class="paragraph">
+<p>
+Git bietet Entwicklern eine so reizvolle Umgebung, dass viele Anwender schon herausgefunden haben, wie man es auf den Arbeitsplätzen nutzen kann, auch wenn der Rest des Teams ein völlig anderes VCS einsetzt.
+Es gibt eine Vielzahl dieser Schnittstellen, die sogenannten „Brücken“.
+Hier werden wir die vorstellen, denen Sie am ehesten in der „freien Wildbahn“ begegnen werden.</p>
+</div>
+<div class="sect3">
+<h3 id="_git_svn">Git und Subversion</h3>
+<div class="paragraph">
+<p>
+Ein großer Teil der Open-Source-Entwicklungsprojekte und eine ganze Reihe von Unternehmensprojekten nutzen Subversion zur Verwaltung ihres Quellcodes.
+Es gibt Subversion seit mehr als einem Jahrzehnt, und die meiste Zeit war es <em>erste Wahl</em> für ein VCS im Bereich Open-Source-Projekte.
+Es ist auch in vielen Aspekten sehr ähnlich zu CVS, das vorher der wichtigste Vertreter der Versionsverwaltung war.</p>
+</div>
+<div class="paragraph">
+<p>
+Eines der herausragenden Merkmale von Git ist die bidirektionale Brücke zu Subversion, genannt <code>git svn</code>.
+Mit diesem Tool können Sie Git als geeigneter Client für einen Subversion-Server verwenden, so dass Sie alle lokalen Funktionen von Git nutzen und dann auf einen Subversion-Server pushen können, als ob Sie Subversion lokal einsetzen würden.
+Das bedeutet, dass Sie lokale Branching- und Merging-Aktivitäten vornehmen, die Staging-Area nutzen, Rebasing- und Cherry-Picking-Aktivitäten durchführen können, während Ihre Mitstreiter weiterhin in ihrer dunklen und altertümlichen Umgebung tätig sind.
+Es ist eine gute Möglichkeit, Git in die Unternehmensumgebung einzuschleusen, Ihren Entwicklerkollegen zu helfen, effizienter zu werden und gleichzeitig die Infrastruktur so zu ändern, um Git vollständig zu unterstützen.
+Die Subversion-Brücke ist das Portal zur DVCS-Welt.</p>
+</div>
+<div class="sect4">
+<h4 id="_git_svn_2"><code>git svn</code></h4>
+<div class="paragraph">
+<p>Der Hauptbefehl in Git für sämtliches Subversion-Bridging ist <code>git svn</code>.
+Es sind ziemlich wenige Befehle erforderlich, so dass wir die gängigsten aufzeigen und dabei einige einfache Workflows durchgehen werden.</p>
+</div>
+<div class="paragraph">
+<p>Es ist wichtig zu beachten, dass Sie bei der Verwendung von <code>git svn</code> mit Subversion interagieren, einem System, das ganz anders funktioniert als Git.
+Obwohl Sie lokales Branching und Merging durchführen <strong>können</strong>, ist es im Allgemeinen ratsam, Ihren Verlauf so linear wie möglich zu gestalten, indem Sie Ihre Arbeiten rebasen. Vermeiden Sie dabei auch die gleichzeitige Interaktion mit einem Git Remote-Repository.</p>
+</div>
+<div class="paragraph">
+<p>Schreiben Sie Ihren Verlauf nicht um und versuchen Sie nicht, erneut zu pushen. Pushen Sie nicht in ein paralleles Git-Repository, um gleichzeitig mit anderen Git-Entwicklern zusammenzuarbeiten.
+Subversion kann nur einen einzigen linearen Verlauf haben und es ist sehr leicht zu verwirren.
+Wenn Sie mit einem Team arbeiten und einige verwenden SVN und andere Git, stellen Sie sicher, dass alle den SVN-Server für die gemeinsame Arbeit verwenden – das erleichtert Ihnen den Alltag.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_einrichtung">Einrichtung</h4>
+<div class="paragraph">
+<p>Um diese Funktionalität zu demonstrieren, benötigen Sie ein typisches SVN-Repository, auf das Sie Schreibzugriff haben.
+Wenn Sie die Beispiele kopieren möchten, müssen Sie eine beschreibbare Kopie eines SVN-Test Repository erstellen.
+Um das einfach zu realisieren, können Sie das Tool <code>svnsync</code> verwenden, das in Subversion enthalten ist.</p>
+</div>
+<div class="paragraph">
+<p>Um weiter zu machen, müssen Sie zunächst ein neues lokales Subversion-Repository erstellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ mkdir /tmp/test-svn
+$ svnadmin create /tmp/test-svn</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Aktivieren Sie dann alle Benutzer, um revprops zu ändern – der einfachste Weg ist, ein <code>pre-revprop-change</code> Skript hinzuzufügen, das immer den exit-Wert 0 hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat /tmp/test-svn/hooks/pre-revprop-change
+#!/bin/sh
+exit 0;
+$ chmod +x /tmp/test-svn/hooks/pre-revprop-change</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können dieses Projekt nun auf Ihrem lokalen Rechner synchronisieren, indem Sie <code>svnsync init</code> mit den Repositorys to und from aufrufen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ svnsync init file:///tmp/test-svn \
+  http://your-svn-server.example.org/svn/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dadurch werden die Eigenschaften für die Ausführung der Synchronisierung festgelegt.
+Sie können den Code dann klonen, indem Sie Folgendes ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ svnsync sync file:///tmp/test-svn
+Committed revision 1.
+Copied properties for revision 1.
+Transmitting file data .............................[...]
+Committed revision 2.
+Copied properties for revision 2.
+[…]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Obwohl dieser Vorgang nur wenige Minuten in Anspruch nehmen könnte, dauert der Prozess fast eine Stunde, wenn Sie versuchen, das ursprüngliche Repository in ein anderes Remote-Repository anstelle eines lokalen zu kopieren, obwohl es weniger als 100 Commits gibt.
+Subversion muss eine Revision nach der anderen klonen und sie dann wieder in ein anderes Repository verschieben – es ist unvorstellbar ineffizient, aber es ist der einzige einfache Weg, das zu erreichen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_erste_schritte">Erste Schritte</h4>
+<div class="paragraph">
+<p>Jetzt, da Sie ein Subversion-Repository haben, auf das Sie Schreibrechte haben, können Sie einen typischen Work-Flow absolvieren.
+Beginnen Sie mit dem Befehl <code>git svn clone</code>, der ein ganzes Subversion-Repository in ein lokales Git-Repository importiert.
+Beachten Sie, dass Sie beim Import aus einem echten Subversion-Repository hier <code>file:///tmp/test-svn</code> durch die URL Ihres Subversion-Repository ersetzen sollten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn clone file:///tmp/test-svn -T trunk -b branches -t tags
+Initialized empty Git repository in /private/tmp/progit/test-svn/.git/
+r1 = dcbfb5891860124cc2e8cc616cded42624897125 (refs/remotes/origin/trunk)
+    A	m4/acx_pthread.m4
+    A	m4/stl_hash.m4
+    A	java/src/test/java/com/google/protobuf/UnknownFieldSetTest.java
+    A	java/src/test/java/com/google/protobuf/WireFormatTest.java
+…
+r75 = 556a3e1e7ad1fde0a32823fc7e4d046bcfd86dae (refs/remotes/origin/trunk)
+Found possible branch point: file:///tmp/test-svn/trunk =&gt; file:///tmp/test-svn/branches/my-calc-branch, 75
+Found branch parent: (refs/remotes/origin/my-calc-branch) 556a3e1e7ad1fde0a32823fc7e4d046bcfd86dae
+Following parent with do_switch
+Successfully followed parent
+r76 = 0fb585761df569eaecd8146c71e58d70147460a2 (refs/remotes/origin/my-calc-branch)
+Checked out HEAD:
+  file:///tmp/test-svn/trunk r75</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das entspricht zwei Befehlen – <code>git svn init</code> gefolgt von <code>git svn fetch</code> – auf der von Ihnen angegebenen URL.
+Dieser Vorgang kann einige Zeit dauern.
+Wenn beispielsweise das Testprojekt nur etwa 75 Commits hat und die Code-Basis nicht so groß ist, muss Git dennoch jede Version einzeln auschecken und einzeln committen.
+Bei einem Projekt mit Hunderten oder Tausenden von Commits kann es buchstäblich Stunden oder gar Tage dauern, das zu vollenden.</p>
+</div>
+<div class="paragraph">
+<p>Der Teil <code>-T trunk -b branches -t tags</code> teilt Git mit, dass dieses Subversion-Repository den grundlegenden Branching- und Tagging-Konventionen folgt.
+Wenn Sie Ihren Trunk, Ihre Branches oder Tags anders benennen, können sich diese Optionen ändern.
+Da dies so häufig vorkommt, können Sie den gesamten Teil durch <code>-s</code> ersetzen, was Standardlayout bedeutet und all diese Optionen beinhaltet.
+Das folgende Kommando ist dabei gleichwertig:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn clone file:///tmp/test-svn -s</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>An dieser Stelle sollten Sie über ein gültiges Git-Repository verfügen, das Ihre Branches und Tags importiert hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch -a
+* master
+  remotes/origin/my-calc-branch
+  remotes/origin/tags/2.0.2
+  remotes/origin/tags/release-2.0.1
+  remotes/origin/tags/release-2.0.2
+  remotes/origin/tags/release-2.0.2rc1
+  remotes/origin/trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beachten Sie, dass dieses Tool Subversion-Tags als Remote-Referenzen (engl. refs) verwaltet.
+
+Werfen wir einen genaueren Blick auf den Git Low-Level-Befehl <code>show-ref</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git show-ref
+556a3e1e7ad1fde0a32823fc7e4d046bcfd86dae refs/heads/master
+0fb585761df569eaecd8146c71e58d70147460a2 refs/remotes/origin/my-calc-branch
+bfd2d79303166789fc73af4046651a4b35c12f0b refs/remotes/origin/tags/2.0.2
+285c2b2e36e467dd4d91c8e3c0c0e1750b3fe8ca refs/remotes/origin/tags/release-2.0.1
+cbda99cb45d9abcb9793db1d4f70ae562a969f1e refs/remotes/origin/tags/release-2.0.2
+a9f074aa89e826d6f9d30808ce5ae3ffe711feda refs/remotes/origin/tags/release-2.0.2rc1
+556a3e1e7ad1fde0a32823fc7e4d046bcfd86dae refs/remotes/origin/trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git macht das nicht, wenn es von einem Git-Server klont, So sieht ein Repository mit Tags nach einem frischen Klon aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git show-ref
+c3dcbe8488c6240392e8a5d7553bbffcb0f94ef0 refs/remotes/origin/master
+32ef1d1c7cc8c603ab78416262cc421b80a8c2df refs/remotes/origin/branch-1
+75f703a3580a9b81ead89fe1138e6da858c5ba18 refs/remotes/origin/branch-2
+23f8588dde934e8f33c263c6d8359b2ae095f863 refs/tags/v0.1.0
+7064938bd5e7ef47bfd79a685a62c1e2649e2ce7 refs/tags/v0.2.0
+6dcb09b5b57875f334f61aebed695e2e4193db5e refs/tags/v1.0.0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git fetcht die Tags direkt in <code>refs/tags</code>, anstatt sie mit entfernten Branches zu verknüpfen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_zurück_zu_subversion_committen">Zurück zu Subversion committen</h4>
+<div class="paragraph">
+<p>Jetzt, da Sie ein Arbeitsverzeichnis haben, können Sie etwas an dem Projekt arbeiten und Ihre Commits wieder zum Upstream pushen, indem Sie Git als SVN-Client verwenden.
+Wenn Sie eine der Dateien bearbeiten und übertragen, haben Sie einen Commit, der in Git lokal existiert aber nicht auf dem Subversion-Server vorhanden ist:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git commit -am 'Adding git-svn instructions to the README'
+[master 4af61fd] Adding git-svn instructions to the README
+ 1 file changed, 5 insertions(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als nächstes müssen Sie Ihre Änderung zum Upstream pushen.
+Beachten Sie, wie sich dies auf Ihre Arbeitsweise mit Subversion auswirkt – Sie können mehrere Commits offline durchführen und diese dann alle auf einmal auf den Subversion-Server übertragen.
+Um zu einem Subversion-Server zu pushen, führen Sie den Befehl <code>git svn dcommit</code> aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn dcommit
+Committing to file:///tmp/test-svn/trunk ...
+    M	README.txt
+Committed r77
+    M	README.txt
+r77 = 95e0222ba6399739834380eb10afcd73e0670bc5 (refs/remotes/origin/trunk)
+No changes between 4af61fd05045e07598c553167e0f31c84fd6ffe1 and refs/remotes/origin/trunk
+Resetting to the latest refs/remotes/origin/trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dabei werden alle Commits ausgeführt, die Sie oberhalb des Subversion Server-Codes gemacht haben, dafür jeweils einen eigenen Subversion-Commit und dann Ihren lokaler Git-Commit umgeschrieben, um einen eindeutigen Identifier einzufügen.
+Das ist wichtig, weil es bedeutet, dass sich alle SHA-1-Prüfsummen für Ihre Commits ändern.
+Aus diesem Grund ist es keine gute Idee, gleichzeitig mit Git-basierten Remotes Ihrer Projekte und einem Subversion-Server zu arbeiten.
+Wenn Sie sich den letzten Commit ansehen, sehen Sie die neu hinzugefügte <code>git-svn-id</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -1
+commit 95e0222ba6399739834380eb10afcd73e0670bc5
+Author: ben &lt;ben@0b684db3-b064-4277-89d1-21af03df0a68&gt;
+Date:   Thu Jul 24 03:08:36 2014 +0000
+
+    Adding git-svn instructions to the README
+
+    git-svn-id: file:///tmp/test-svn/trunk@77 0b684db3-b064-4277-89d1-21af03df0a68</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es ist zu beachten, dass die SHA-1-Prüfsumme, die ursprünglich mit <code>4af61fd</code> begann, als Sie die Daten übertragen haben, nun mit <code>95e0222</code> beginnt.
+Wenn Sie sowohl auf einen Git-Server als auch auf einen Subversion-Server pushen möchten, müssen Sie zuerst auf den Subversion-Server pushen (<code>dcommit</code>), da diese Aktion Ihre Commit-Daten ändert.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_neue_änderungen_pullen">Neue Änderungen pullen</h4>
+<div class="paragraph">
+<p>Wenn Sie mit anderen Entwicklern zusammenarbeiten, dann wird irgendwann einer von Ihnen pushen, und andere versuchen, eine Änderung voranzutreiben, die Konflikte verursacht.
+Diese Änderung wird abgelehnt, bis Sie deren Arbeit mergen.
+In <code>git svn</code> sieht das so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn dcommit
+Committing to file:///tmp/test-svn/trunk ...
+
+ERROR from SVN:
+Transaction is out of date: File '/trunk/README.txt' is out of date
+W: d5837c4b461b7c0e018b49d12398769d2bfc240a and refs/remotes/origin/trunk differ, using rebase:
+:100644 100644 f414c433af0fd6734428cf9d2a9fd8ba00ada145 c80b6127dd04f5fcda218730ddf3a2da4eb39138 M	README.txt
+Current branch master is up to date.
+ERROR: Not all changes have been committed into SVN, however the committed
+ones (if any) seem to be successfully integrated into the working tree.
+Please see the above messages for details.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Um diese Situation zu lösen, können Sie die <code>git svn rebase</code> ausführen, das alle Änderungen auf dem Server, die Sie noch nicht haben, pullt und alle ihre lokalen Arbeiten an die Spitze zum Server neu überträgt (engl. rebase):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn rebase
+Committing to file:///tmp/test-svn/trunk ...
+
+ERROR from SVN:
+Transaction is out of date: File '/trunk/README.txt' is out of date
+W: eaa029d99f87c5c822c5c29039d19111ff32ef46 and refs/remotes/origin/trunk differ, using rebase:
+:100644 100644 65536c6e30d263495c17d781962cfff12422693a b34372b25ccf4945fe5658fa381b075045e7702a M	README.txt
+First, rewinding head to replay your work on top of it...
+Applying: update foo
+Using index info to reconstruct a base tree...
+M	README.txt
+Falling back to patching base and 3-way merge...
+Auto-merging README.txt
+ERROR: Not all changes have been committed into SVN, however the committed
+ones (if any) seem to be successfully integrated into the working tree.
+Please see the above messages for details.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt ist Ihre gesamte Arbeit an der Spitze des Subversion-Servers, so dass Sie <code>dcommit</code> erfolgreich einsetzen können:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn dcommit
+Committing to file:///tmp/test-svn/trunk ...
+    M	README.txt
+Committed r85
+    M	README.txt
+r85 = 9c29704cc0bbbed7bd58160cfb66cb9191835cd8 (refs/remotes/origin/trunk)
+No changes between 5762f56732a958d6cfda681b661d2a239cc53ef5 and refs/remotes/origin/trunk
+Resetting to the latest refs/remotes/origin/trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Im Unterschied zu Git, das voraussetzt, dass Sie Upstream-Arbeiten, die Sie noch nicht lokal haben, zuerst mergen, bevor Sie pushen können, zwingt Sie <code>git svn</code> dazu nur dann, wenn die Änderungen im Konflikt stehen (ähnlich wie bei Subversion).
+Wenn jemand anderes eine Änderung an einer Datei vorantreibt und Sie eine Änderung an einer anderen Datei vorantreiben, funktioniert Ihr <code>dcommit</code> gut:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn dcommit
+Committing to file:///tmp/test-svn/trunk ...
+    M	configure.ac
+Committed r87
+    M	autogen.sh
+r86 = d8450bab8a77228a644b7dc0e95977ffc61adff7 (refs/remotes/origin/trunk)
+    M	configure.ac
+r87 = f3653ea40cb4e26b6281cec102e35dcba1fe17c4 (refs/remotes/origin/trunk)
+W: a0253d06732169107aa020390d9fefd2b1d92806 and refs/remotes/origin/trunk differ, using rebase:
+:100755 100755 efa5a59965fbbb5b2b0a12890f1b351bb5493c18 e757b59a9439312d80d5d43bb65d4a7d0389ed6d M	autogen.sh
+First, rewinding head to replay your work on top of it...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es ist sehr wichtig, sich daran zu halten, denn das Ergebnis ist ein Projektstatus, der beim Push auf keinem Ihrer Computer vorhanden war.
+Wenn die Änderungen inkompatibel sind, aber keine Konflikte verursachen, können Probleme auftreten, die schwer zu diagnostizieren sind.
+Das ist ein Unterschied gegenüber der Nutzung eines Git-Servers – in Git können Sie den Zustand auf Ihrem Client-System vor der Veröffentlichung vollständig testen, während Sie in SVN nie sicher sein können, dass die Zustände unmittelbar vor dem Commit und nach dem Commit identisch sind.</p>
+</div>
+<div class="paragraph">
+<p>Sie sollten diesen Befehl auch ausführen, um Änderungen vom Subversion-Server einzubinden, auch wenn Sie nicht bereit sind, selbst zu committen.
+Es ist ratsam, <code>git svn fetch</code> auszuführen, um die neuen Daten zu holen, aber <code>git svn rebase</code> übernimmt den Fetch und aktualisiert dann Ihre lokalen Commits.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn rebase
+    M	autogen.sh
+r88 = c9c5f83c64bd755368784b444bc7a0216cc1e17b (refs/remotes/origin/trunk)
+First, rewinding head to replay your work on top of it...
+Fast-forwarded master to refs/remotes/origin/trunk.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie ab und zu git svn rebase laufen lassen, stellen Sie sicher, dass Ihr Code immer auf dem neuesten Stand ist.
+Sie sollten jedoch überprüfen, ob Ihr Arbeitsverzeichnis sauber ist, wenn Sie diese Funktion auslösen.
+Wenn Sie lokale Änderungen haben, müssen Sie Ihre Arbeit entweder verstecken (engl. stash) oder temporär committen, bevor Sie <code>git svn rebase</code> ausführen – andernfalls wird der Befehl angehalten, wenn er erkennt, dass das Rebase zu einem Merge-Konflikt führen wird.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_git_branching_probleme">Git Branching Probleme</h4>
+<div class="paragraph">
+<p>Sobald Sie sich mit einem Git-Workflow vertraut gemacht haben, werden Sie wahrscheinlich Topic-Branches erstellen, an ihnen arbeiten und sie dann verschmelzen (mergen).
+Wenn Sie über <code>git svn</code> auf einen Subversion-Server pushen, können Sie Ihre Arbeit jedes Mal auf einen einzigen Branch rebasieren, anstatt Branches zu mergen.
+Die Begründung für ein Rebasing ist, dass Subversion eine lineare Historie hat und sich nicht wie Git mit Merges beschäftigt. So folgt <code>git svn</code> bei der Konvertierung der Snapshots in Subversion Commits nur dem ersten Elternteil.</p>
+</div>
+<div class="paragraph">
+<p>Nehmen wir an, Ihr Verlauf sieht wie folgt aus: Sie haben einen <code>experiment</code> Branch erstellt, zwei Commits durchgeführt und diese dann wieder mit dem <code>master</code> zusammengeführt.
+Wenn Sie <code>dcommit</code> aufrufen, erscheint folgende Anzeige:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn dcommit
+Committing to file:///tmp/test-svn/trunk ...
+    M	CHANGES.txt
+Committed r89
+    M	CHANGES.txt
+r89 = 89d492c884ea7c834353563d5d913c6adf933981 (refs/remotes/origin/trunk)
+    M	COPYING.txt
+    M	INSTALL.txt
+Committed r90
+    M	INSTALL.txt
+    M	COPYING.txt
+r90 = cb522197870e61467473391799148f6721bcf9a0 (refs/remotes/origin/trunk)
+No changes between 71af502c214ba13123992338569f4669877f55fd and refs/remotes/origin/trunk
+Resetting to the latest refs/remotes/origin/trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Ausführen von <code>dcommit</code> auf einem Branch mit zusammengeführtem Verlauf funktioniert gut, außer wenn Sie sich Ihre Git-Projekt-Historie ansehen, er hat keinen der Commits, die Sie auf dem <code>experiment</code> Branch gemacht haben, neu geschrieben – statt dessen erscheinen alle diese Änderungen in der SVN-Version eines einzelnen Merge-Commits.</p>
+</div>
+<div class="paragraph">
+<p>Wenn jemand anderes diese Arbeit klont, sieht man nur den Merge-Commit mit der gesamten Arbeit, die in ihn hineingedrückt wurde, als ob Sie <code>git merge --squash</code> ausgeführt hätten; man sieht die Commit-Daten nicht, woher sie stammen oder wann sie committed wurden.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_subversion_branching">Subversion Branching</h4>
+<div class="paragraph">
+<p>Branching in Subversion ist nicht dasselbe wie Branching in Git. Es ist wahrscheinlich das Beste, wenn Sie es so oft vermeiden wie möglich.
+Sie können aber mit <code>git svn</code> in Subversion Branches anlegen und dorthin committen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_erstellen_eines_neuen_svn_branches">Erstellen eines neuen SVN Branches</h4>
+<div class="paragraph">
+<p>Um einen neuen Branch in Subversion zu erstellen, führen Sie <code>git svn branch [new-branch]</code> aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn branch opera
+Copying file:///tmp/test-svn/trunk at r90 to file:///tmp/test-svn/branches/opera...
+Found possible branch point: file:///tmp/test-svn/trunk =&gt; file:///tmp/test-svn/branches/opera, 90
+Found branch parent: (refs/remotes/origin/opera) cb522197870e61467473391799148f6721bcf9a0
+Following parent with do_switch
+Successfully followed parent
+r91 = f1b64a3855d3c8dd84ee0ef10fa89d27f1584302 (refs/remotes/origin/opera)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dadurch wird das Äquivalent des Befehls <code>svn copy trunk branches/opera</code> in Subversion ausgeführt und auf dem Subversion-Server angewendet.
+Es ist wichtig zu beachten, dass Sie nicht in diesen Zweig ausgecheckt werden; wenn Sie an diesem Punkt einen Commit durchführen, geht dieser Commit in den <code>trunk</code> auf dem Server, nicht in <code>opera</code>.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_aktive_branches_wechseln">Aktive Branches wechseln</h4>
+<div class="paragraph">
+<p>Git findet heraus, in welchen Branch Ihre dcommits gehen, indem es nach der Spitze eines Ihrer Subversion Branches in Ihrem Verlauf sucht – Sie sollten nur einen haben, und es sollte der Letzte sein, der eine <code>git-svn-id</code> in Ihrem aktuellen Branchverlauf hat.</p>
+</div>
+<div class="paragraph">
+<p>Falls Sie an mehr als einem Branch gleichzeitig arbeiten möchten, können Sie lokale Branches einrichten, um <code>dcommit</code> auf bestimmte Subversion Branches zu beschränken, indem Sie diese beim importierten Subversion Commit für diesen Branch starten.
+Einen <code>opera</code> Branch, in dem Sie separat bearbeiten können, können Sie starten mit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch opera remotes/origin/opera</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Um Ihren <code>opera</code> Branch in <code>trunk</code> (Ihren <code>master</code> Branch) zu mergen, können Sie das mit einem normalen <code>git merge</code> machen.
+Aber Sie sollten unbedingt eine beschreibende Commit-Meldung (via <code>-m</code>) angeben, sonst wird beim Merge anstelle von etwas Vernünftigem „Merge branch opera“ angezeigt.</p>
+</div>
+<div class="paragraph">
+<p>Obwohl Sie für diese Operation <code>git merge</code> verwenden und der Merge wahrscheinlich viel einfacher ist als in Subversion (da Git automatisch die entsprechende Merge-Basis für Sie erkennt), ist es kein normaler Git Merge-Commit.
+Sie müssen diese Daten an einen Subversion-Server zurück pushen, der keinen Commit mit mehr als einem Elternteil verarbeiten kann; nachdem Sie ihn zum Server gepusht haben, sieht er also aus wie ein einzelner Commit, der die gesamte Arbeit eines anderen Branchs unter einem einzigen Commit zusammenfasst.
+Nachdem Sie einen Branch in einem anderen zusammengeführt haben, können Sie nicht einfach zurückgehen und an diesem Branch weiterarbeiten, wie Sie es normalerweise in Git tun.
+Das <code>dcommit</code> Kommando, das Sie ausführen, löscht alle Informationen, die zeigen, in welchen Branch zusammengeführt wurde, so dass nachfolgende Berechnungen der Merge-Basis falsch sind – <code>dcommit</code> lässt Ihr <code>git merge</code> Ergebnis aussehen, als ob Sie <code>git merge --squash</code> ausgeführt hätten.
+Leider gibt es keine gute Methode, diese Situation zu vermeiden – Subversion kann diese Informationen nicht speichern, daher werden Sie immer von den Einschränkungen des Systems behindert, während Sie es als Ihren Server verwenden.
+Um Fehler zu vermeiden, sollten Sie den lokalen Branch (in diesem Fall <code>opera</code>) löschen, nachdem Sie ihn in <code>trunk</code> eingefügt haben.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_subversion_kommandos">Subversion Kommandos</h4>
+<div class="paragraph">
+<p>Das <code>git svn</code> Toolset bietet eine Reihe von Befehlen, die den Übergang zu Git erleichtern, indem es einige Funktionen bereitstellt, die denen ähneln, die Sie von Subversion aus kennen.
+Wir haben hier ein paar Befehle, mit denen Sie das bekommen, was Subversion vorher konnte.</p>
+</div>
+<div class="sect5">
+<h6 id="_verlauf_im_svn_format">Verlauf im SVN-Format</h6>
+<div class="paragraph">
+<p>Wenn Sie an Subversion gewöhnt sind und Ihren Verlauf im SVN-Stil sehen möchten, können Sie <code>git svn log</code> ausführen, um Ihren Commit-Verlauf in SVN-Formatierung anzuzeigen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn log
+------------------------------------------------------------------------
+r87 | schacon | 2014-05-02 16:07:37 -0700 (Sat, 02 May 2014) | 2 lines
+
+autogen change
+
+------------------------------------------------------------------------
+r86 | schacon | 2014-05-02 16:00:21 -0700 (Sat, 02 May 2014) | 2 lines
+
+Merge branch 'experiment'
+
+------------------------------------------------------------------------
+r85 | schacon | 2014-05-02 16:00:09 -0700 (Sat, 02 May 2014) | 2 lines
+
+updated the changelog</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie sollten zwei wichtige Dinge über <code>git svn log</code> wissen.
+Erstens funktioniert es offline, im Unterschied zum echten <code>svn log</code> Befehl, der den Subversion-Server nach den Daten fragt.
+Zweitens zeigt es Ihnen nur Commits an, die zum Subversion-Server übertragen wurden.
+Lokale Git-Commits, die Sie noch nicht mit <code>dcommit</code> bestätigt haben, werden nicht angezeigt; ebenso wenig wie Commits, die von Leuten in der Zwischenzeit auf dem Subversion-Server gemacht wurden.
+Es ist mehr wie der letzte bekannte Zustand der Commits auf dem Subversion-Server.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_svn_annotation">SVN Annotation</h6>
+<div class="paragraph">
+<p>So wie der Befehl <code>git svn log</code> den Befehl <code>svn log</code> offline simuliert, können Sie das Äquivalent von <code>svn annotate</code> abrufen, indem Sie <code>git svn blame [FILE]</code> ausführen.
+Die Ausgabe sieht wie folgt aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn blame README.txt
+ 2   temporal Protocol Buffers - Google's data interchange format
+ 2   temporal Copyright 2008 Google Inc.
+ 2   temporal http://code.google.com/apis/protocolbuffers/
+ 2   temporal
+22   temporal C++ Installation - Unix
+22   temporal =======================
+ 2   temporal
+79    schacon Committing in git-svn.
+78    schacon
+ 2   temporal To build and install the C++ Protocol Buffer runtime and the Protocol
+ 2   temporal Buffer compiler (protoc) execute the following:
+ 2   temporal</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Noch einmal, zur Wiederholung! Auch hier werden keine Commits angezeigt, die Sie lokal in Git gemacht haben oder die in der Zwischenzeit in Subversion verschoben wurden.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_svn_server_information">SVN Server-Information</h6>
+<div class="paragraph">
+<p>Wenn Sie <code>git svn info</code> ausführen, können Sie die gleiche Art von Informationen erhalten, die Ihnen <code>svn info</code> liefert:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn info
+Path: .
+URL: https://schacon-test.googlecode.com/svn/trunk
+Repository Root: https://schacon-test.googlecode.com/svn
+Repository UUID: 4c93b258-373f-11de-be05-5f7a86268029
+Revision: 87
+Node Kind: directory
+Schedule: normal
+Last Changed Author: schacon
+Last Changed Rev: 87
+Last Changed Date: 2009-05-02 16:07:37 -0700 (Sat, 02 May 2009)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist wie bei <code>blame</code> und <code>log</code>, denn es läuft offline und ist nur ab der letzten Kommunikation mit dem Subversion-Server auf dem neuesten Stand.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_ignorieren_was_subversion_ignoriert">Ignorieren, was Subversion ignoriert</h6>
+<div class="paragraph">
+<p>Wenn Sie ein Subversion-Repository klonen, in dem irgendwo <code>svn:ignore</code> Eigenschaften gesetzt sind, werden Sie wahrscheinlich entsprechende <code>.gitignore</code> Dateien setzen wollen, damit Sie nicht versehentlich Dateien übertragen, die Sie nicht sollten.
+<code>git svn</code> verfügt über zwei Befehle, um bei diesem Problem zu helfen.
+Der Erste ist <code>git svn create-ignore</code>, der automatisch entsprechende <code>.gitignore</code> Dateien für Sie erstellt, damit sie bei Ihrem nächsten Commit berücksichtigt werden.</p>
+</div>
+<div class="paragraph">
+<p>Der zweite Befehl ist <code>git svn show-ignore</code>, der die Zeilen nach stdout ausgibt, die Sie in eine <code>.gitignore</code> Datei einfügen müssen, damit Sie die Ausgabe in die Ausschlussdatei Ihres Projekts umleiten können:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git svn show-ignore &gt; .git/info/exclude</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Auf diese Weise überhäufen Sie das Projekt nicht mit <code>.gitignore</code> Dateien.
+Das ist eine gute Option, wenn Sie der einzige Git-Benutzer in einem Subversion-Team sind und Ihre Teamkollegen keine <code>.gitignore</code> Dateien im Projekt haben wollen.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_git_svn_zusammenfassung">git svn Zusammenfassung</h4>
+<div class="paragraph">
+<p>Die <code>git svn</code> Tools sind nützlich, wenn Sie mit dem Subversion-Server feststecken oder sich anderweitig in einer Entwicklungsumgebung befinden, die den Betrieb eines Subversion-Servers erfordert.
+Sie sollten es jedoch als verkümmertes Git betrachten, oder Sie werden Probleme in der Umsetzung haben, die Sie und Ihre Mitwirkenden verwirren könnten.
+Um keine Schwierigkeiten zu bekommen, versuchen Sie sich an diese Hinweise zu halten:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Führen Sie einen linearen Git-Verlauf, der keine Merge-Commits von <code>git merge</code> enthält.
+Rebasieren Sie alle Arbeiten, die Sie außerhalb Ihres Haupt-Branchs durchführen, wieder in diesen ein; mergen Sie sie nicht.</p>
+</li>
+<li>
+<p>Richten Sie keinen separaten Git-Server ein und arbeiten Sie nicht mit einem zusammen.
+Möglicherweise haben Sie einen, um Klone für neue Entwickler zu starten, aber pushen Sie nichts, was nicht über einen <code>git-svn-id</code> Eintrag verfügt.
+Sie können eventuell einen <code>pre-receive</code> Hook hinzufügen, der jede Commit-Nachricht auf einen <code>git-svn-id</code> überprüft und Pushes, die Commits ohne ihn enthalten, ablehnt.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Wenn Sie diese Leitlinien befolgen, kann die Arbeit mit einem Subversion-Server leichter umsetzbar sein.
+Mit einem Umstieg auf einen echten Git-Server kann Ihr Team erheblich mehr an Effizienz gewinnen.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_und_mercurial">Git und Mercurial</h3>
+<div class="paragraph">
+<p>
+
+Das DVCS-Universum besteht nicht nur aus nur Git.
+In diesem Bereich gibt es viele andere Systeme, jedes hat seinen eigenen Ansatz, wie eine verteilte Versionskontrolle zu funktionieren hat.
+Neben Git ist Mercurial am populärsten und die beiden sind sich in vielerlei Hinsicht sehr ähnlich.</p>
+</div>
+<div class="paragraph">
+<p>Die gute Nachricht, wenn Sie Gits clientseitiges Verhalten bevorzugen, aber mit einem Projekt arbeiten, dessen Quellcode mit Mercurial verwaltet wird, dann ist es möglich, Git als Client für ein von Mercurial gehostetes Repository zu verwenden.
+Da die Art und Weise, wie Git über Remotes mit Server-Repositorys kommuniziert, sollte es nicht überraschen, dass diese Bridge als Remote-Helfer implementiert ist.
+Der Name des Projekts lautet git-remote-hg und ist unter <a href="https://github.com/felipec/git-remote-hg" class="bare" target="_blank" rel="noopener">https://github.com/felipec/git-remote-hg</a> zu finden.</p>
+</div>
+<div class="sect4">
+<h4 id="_git_remote_hg">git-remote-hg</h4>
+<div class="paragraph">
+<p>Zuerst müssen Sie git-remote-hg installieren.
+Im Wesentlichen geht es darum, die Datei irgendwo in Ihrem Pfad abzulegen, so wie hier:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ curl -o ~/bin/git-remote-hg \
+  https://raw.githubusercontent.com/felipec/git-remote-hg/master/git-remote-hg
+$ chmod +x ~/bin/git-remote-hg</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>…vorausgesetzt (in einer Linux-Umgebung), <code>~/bin</code> ist in Ihrem <code>$PATH</code>.
+Git-remote-hg hat noch eine weitere Abhängigkeit: die <code>mercurial</code> Library für Python.
+Wenn Sie Python installiert schon  haben, ist das einfach:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ pip install mercurial</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie Python noch nicht installiert haben, besuchen Sie <a href="https://www.python.org/" class="bare" target="_blank" rel="noopener">https://www.python.org/</a> und besorgen Sie es sich zuerst.</p>
+</div>
+<div class="paragraph">
+<p>Als Letztes brauchen Sie den Mercurial-Client.
+Gehen Sie zu <a href="https://www.mercurial-scm.org/" class="bare" target="_blank" rel="noopener">https://www.mercurial-scm.org/</a> und installieren Sie ihn, falls Sie es noch nicht getan haben.</p>
+</div>
+<div class="paragraph">
+<p>Jetzt sind Sie bereit zu abrocken.
+Alles, was Sie benötigen, ist ein Mercurial-Repository, auf das Sie zugreifen können.
+Glücklicherweise kann sich jedes Mercurial-Repository so verhalten, also verwenden wir einfach das „hello world“-Repository, das jeder benutzt, um Mercurial zu lernen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg clone http://selenic.com/repo/hello /tmp/hello</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_erste_schritte_2">Erste Schritte</h4>
+<div class="paragraph">
+<p>Nun, da wir über ein geeignetes „serverseitiges“ Repository verfügen, können wir einen typischen Workflow durchlaufen.
+Wie Sie sehen werden, sind diese beiden Systeme ähnlich genug, dass es keine große Überschneidungen gibt.</p>
+</div>
+<div class="paragraph">
+<p>Wie immer mit Git, wir klonen zuerst:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone hg::/tmp/hello /tmp/hello-git
+$ cd /tmp/hello-git
+$ git log --oneline --graph --decorate
+* ac7955c (HEAD, origin/master, origin/branches/default, origin/HEAD, refs/hg/origin/branches/default, refs/hg/origin/bookmarks/master, master) Create a makefile
+* 65bb417 Create a standard 'hello, world' program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wie Sie sehen, verwendet man bei der Arbeit mit einem Mercurial-Repository den Standardbefehl <code>git clone</code>.
+Das liegt daran, dass git-remote-hg auf einem relativ niedrigen Level arbeitet und einen ähnlichen Mechanismus verwendet, wie es die Implementierung des HTTP/S-Protokolls in Git ist (Remote-Helfer).
+Da Git und Mercurial beide so konzipiert sind, dass jeder Client eine vollständige Kopie der Repository-Historie hat, erstellt dieser Befehl relativ schnell einen vollständigen Klon, einschließlich der gesamten Projekthistorie.</p>
+</div>
+<div class="paragraph">
+<p>Der log-Befehl zeigt zwei Commits, von denen der letzte von einer ganzen Reihe von Refs angeführt wird.
+Wie sich herausstellt, sind einige davon nicht wirklich da.
+Werfen wir einen Blick darauf, was sich wirklich im <code>.git</code> Verzeichnis befindet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ tree .git/refs
+.git/refs
+├── heads
+│   └── master
+├── hg
+│   └── origin
+│       ├── bookmarks
+│       │   └── master
+│       └── branches
+│           └── default
+├── notes
+│   └── hg
+├── remotes
+│   └── origin
+│       └── HEAD
+└── tags
+
+9 directories, 5 files</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git-remote-hg versucht sich idiomatisch (begrifflich) an Git anzunähern, aber im Hintergrund verwaltet es die konzeptionelle Zuordnung zwischen zwei leicht unterschiedlichen Systemen.
+Im Verzeichnis <code>refs/hg</code> werden die aktuellen Remote-Referenzen gespeichert.
+Zum Beispiel ist die <code>refs/hg/origin/branches/default</code> eine Git ref-Datei, die das SHA-1 enthält und mit „ac7955c“ beginnt. Das ist der Commit, auf den <code>master</code> zeigt.
+Das Verzeichnis <code>refs/hg</code> ist also eine Art gefälschtes <code>refs/remotes/origin</code>, aber es unterscheidet zusätzlich zwischen Lesezeichen und Zweigen.</p>
+</div>
+<div class="paragraph">
+<p>Die Datei <code>notes/hg</code> ist der Ausgangspunkt dafür, wie git-remote-hg Git-Commit-Hashes auf Mercurial-Changeset-IDs abbildet.
+Lassen Sie uns ein wenig experimentieren:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat notes/hg
+d4c10386...
+
+$ git cat-file -p d4c10386...
+tree 1781c96...
+author remote-hg &lt;&gt; 1408066400 -0800
+committer remote-hg &lt;&gt; 1408066400 -0800
+
+Notes for master
+
+$ git ls-tree 1781c96...
+100644 blob ac9117f...	65bb417...
+100644 blob 485e178...	ac7955c...
+
+$ git cat-file -p ac9117f
+0a04b987be5ae354b710cefeba0e2d9de7ad41a9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So zeigt refs/notes/hg auf einen Verzeichnisbaum, der in der Git-Objektdatenbank eine Liste anderer Objekte mit Namen ist.
+<code>git ls-tree</code> gibt Modus, Typ, Objekt-Hash und Dateiname für Elemente innerhalb eines Baums aus.
+Sobald wir uns auf eines der Baumelemente festgelegt haben, stellen wir fest, dass sich darin ein „ac9117f“ Blob (der SHA-1-Hash des Commit, auf den <code>master</code> zeigt) befindet. Inhaltlich ist er identisch mit „0a04b98“ (das ist die ID des Mercurial-Changesets an der Spitze der <code>default</code> Branch).</p>
+</div>
+<div class="paragraph">
+<p>Die gute Nachricht ist, dass wir uns darüber meistens keine Sorgen machen müssen.
+Der typische Arbeitsablauf unterscheidet sich nicht wesentlich von der Arbeit mit einem Git-Remote.</p>
+</div>
+<div class="paragraph">
+<p>Noch eine Besonderheit, um die wir uns kümmern sollten, bevor wir fortfahren: Die Auslassungen.
+Mercurial und Git verwenden dafür einen sehr ähnlichen Mechanismus, aber es ist durchaus möglich, dass Sie eine <code>.gitignore</code> Datei nicht wirklich in ein Mercurial Repository übertragen wollen.
+Glücklicherweise hat Git eine Möglichkeit, Dateien zu ignorieren, die lokal in einem On-Disk-Repository liegen. Das Mercurial-Format ist kompatibel mit Git, so dass Sie es nur kopieren müssen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cp .hgignore .git/info/exclude</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die Datei <code>.git/info/exclude</code> verhält sich wie eine <code>.gitignore</code>, wird aber nicht in den Commits aufgenommen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_workflow">Workflow</h4>
+<div class="paragraph">
+<p>Nehmen wir an, wir haben einige Arbeiten erledigt und einige Commits auf den <code>master</code> Branch gemacht und Sie sind so weit, ihn in das Remote-Repository zu pushen.
+Nun sieht unser Repository momentan so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --graph --decorate
+* ba04a2a (HEAD, master) Update makefile
+* d25d16f Goodbye
+* ac7955c (origin/master, origin/branches/default, origin/HEAD, refs/hg/origin/branches/default, refs/hg/origin/bookmarks/master) Create a makefile
+* 65bb417 Create a standard 'hello, world' program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Unser <code>master</code> Branch ist zwei Commits vor dem <code>origin/master</code>, aber diese beiden Commits existieren nur auf unserem lokalen Rechner.
+Schauen wir mal nach, ob jemand anderes zur gleichen Zeit wichtige Arbeit geleistet hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git fetch
+From hg::/tmp/hello
+   ac7955c..df85e87  master     -&gt; origin/master
+   ac7955c..df85e87  branches/default -&gt; origin/branches/default
+$ git log --oneline --graph --decorate --all
+* 7b07969 (refs/notes/hg) Notes for default
+* d4c1038 Notes for master
+* df85e87 (origin/master, origin/branches/default, origin/HEAD, refs/hg/origin/branches/default, refs/hg/origin/bookmarks/master) Add some documentation
+| * ba04a2a (HEAD, master) Update makefile
+| * d25d16f Goodbye
+|/
+* ac7955c Create a makefile
+* 65bb417 Create a standard 'hello, world' program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Da wir das <code>--all</code> Flag verwendet haben, sehen wir die „notes“ Refs, die intern von git-remote-hg verwendet werden, die wir aber ignorieren können.
+Den Rest haben wir erwartet. <code>origin/master</code> ist um einen Commit fortgeschritten. Unser Verlauf hat sich dadurch verändert.
+Anders als bei anderen Systemen, mit denen wir in diesem Kapitel arbeiten, ist Mercurial in der Lage, Merges zu verarbeiten, so dass wir nichts Ausgefallenes tun müssen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge origin/master
+Auto-merging hello.c
+Merge made by the 'recursive' strategy.
+ hello.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ git log --oneline --graph --decorate
+*   0c64627 (HEAD, master) Merge remote-tracking branch 'origin/master'
+|\
+| * df85e87 (origin/master, origin/branches/default, origin/HEAD, refs/hg/origin/branches/default, refs/hg/origin/bookmarks/master) Add some documentation
+* | ba04a2a Update makefile
+* | d25d16f Goodbye
+|/
+* ac7955c Create a makefile
+* 65bb417 Create a standard 'hello, world' program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Perfekt.
+Wir führen die Tests durch und alles passt, also sind wir so weit, dass wir unsere Arbeit mit dem Rest des Teams teilen können:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git push
+To hg::/tmp/hello
+   df85e87..0c64627  master -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das wars!
+Wenn Sie einen Blick auf das Mercurial-Repository werfen, werden Sie feststellen, dass genau das getan wurde, was wir erwarten durften:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg log -G --style compact
+o    5[tip]:4,2   dc8fa4f932b8   2014-08-14 19:33 -0700   ben
+|\     Merge remote-tracking branch 'origin/master'
+| |
+| o  4   64f27bcefc35   2014-08-14 19:27 -0700   ben
+| |    Update makefile
+| |
+| o  3:1   4256fc29598f   2014-08-14 19:27 -0700   ben
+| |    Goodbye
+| |
+@ |  2   7db0b4848b3c   2014-08-14 19:30 -0700   ben
+|/     Add some documentation
+|
+o  1   82e55d328c8c   2005-08-26 01:21 -0700   mpm
+|    Create a makefile
+|
+o  0   0a04b987be5a   2005-08-26 01:20 -0700   mpm
+     Create a standard 'hello, world' program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Change-Set mit der Nummer <em>2</em> wurde von Mercurial vorgenommen, und die Change-Sets mit der Nummer <em>3</em> und <em>4</em> wurden von git-remote-hg durchgeführt, indem Commits mit Git gepusht wurden.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_branches_und_bookmarks">Branches und Bookmarks</h4>
+<div class="paragraph">
+<p>Git hat nur eine Art von Branch: eine Referenz, die sich verschiebt, wenn Commits gemacht werden.
+In Mercurial wird diese Art von Referenz als „bookmark“ (dt. Lesezeichen) bezeichnet, und sie verhält sich ähnlich wie ein Git-Branch.</p>
+</div>
+<div class="paragraph">
+<p>Das Konzept von Mercurial eines „Branchs“ ist höher gewichtet.
+Der Branch, auf den ein Changeset durchgeführt wird, wird <em>zusammen mit dem Changeset</em> aufgezeichnet, d.h. er befindet sich immer im Repository-Verlauf.
+Hier ist ein Beispiel für einen Commit, der auf dem <code>develop</code> Branch gemacht wurde:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg log -l 1
+changeset:   6:8f65e5e02793
+branch:      develop
+tag:         tip
+user:        Ben Straub &lt;ben@straub.cc&gt;
+date:        Thu Aug 14 20:06:38 2014 -0700
+summary:     More documentation</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Achten Sie darauf, dass die Zeile mit „branch“ beginnt.
+Git kann das nicht wirklich nachahmen (und muss es auch nicht; beide Arten von Zweigen können als Git ref dargestellt werden), aber git-remote-hg muss den Unterschied erkennen, denn für Mercurial ist er wichtig.</p>
+</div>
+<div class="paragraph">
+<p>Das Anlegen von Mercurial-Lesezeichen ist so einfach wie das Erstellen von Git-Branches.
+Auf der Seite vom Git machen Sie:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -b featureA
+Switched to a new branch 'featureA'
+$ git push origin featureA
+To hg::/tmp/hello
+ * [new branch]      featureA -&gt; featureA</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist alles, was es dazu zu sagen gibt.
+Auf der Mercurial-Seite sieht es dann folgendermaßen aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg bookmarks
+   featureA                  5:bd5ac26f11f9
+$ hg log --style compact -G
+@  6[tip]   8f65e5e02793   2014-08-14 20:06 -0700   ben
+|    More documentation
+|
+o    5[featureA]:4,2   bd5ac26f11f9   2014-08-14 20:02 -0700   ben
+|\     Merge remote-tracking branch 'origin/master'
+| |
+| o  4   0434aaa6b91f   2014-08-14 20:01 -0700   ben
+| |    update makefile
+| |
+| o  3:1   318914536c86   2014-08-14 20:00 -0700   ben
+| |    goodbye
+| |
+o |  2   f098c7f45c4f   2014-08-14 20:01 -0700   ben
+|/     Add some documentation
+|
+o  1   82e55d328c8c   2005-08-26 01:21 -0700   mpm
+|    Create a makefile
+|
+o  0   0a04b987be5a   2005-08-26 01:20 -0700   mpm
+     Create a standard 'hello, world' program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beachten Sie den neuen <code>[featureA]</code> Tag auf Revision 5.
+Die verhalten sich genau wie Git-Branches auf der Git-Seite, mit einer Ausnahme: Sie können ein Lesezeichen auf der Git-Seite nicht löschen (das ist eine Einschränkung des Remote-Helfers).</p>
+</div>
+<div class="paragraph">
+<p>Sie können auch an einem „schwergewichtigen“ Mercurial-Branch arbeiten: Bringen Sie einfach einen Branch in den <code>branches</code> Namensraum:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -b branches/permanent
+Switched to a new branch 'branches/permanent'
+$ vi Makefile
+$ git commit -am 'A permanent change'
+$ git push origin branches/permanent
+To hg::/tmp/hello
+ * [new branch]      branches/permanent -&gt; branches/permanent</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So sieht das dann auf der Mercurial-Seite aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg branches
+permanent                      7:a4529d07aad4
+develop                        6:8f65e5e02793
+default                        5:bd5ac26f11f9 (inactive)
+$ hg log -G
+o  changeset:   7:a4529d07aad4
+|  branch:      permanent
+|  tag:         tip
+|  parent:      5:bd5ac26f11f9
+|  user:        Ben Straub &lt;ben@straub.cc&gt;
+|  date:        Thu Aug 14 20:21:09 2014 -0700
+|  summary:     A permanent change
+|
+| @  changeset:   6:8f65e5e02793
+|/   branch:      develop
+|    user:        Ben Straub &lt;ben@straub.cc&gt;
+|    date:        Thu Aug 14 20:06:38 2014 -0700
+|    summary:     More documentation
+|
+o    changeset:   5:bd5ac26f11f9
+|\   bookmark:    featureA
+| |  parent:      4:0434aaa6b91f
+| |  parent:      2:f098c7f45c4f
+| |  user:        Ben Straub &lt;ben@straub.cc&gt;
+| |  date:        Thu Aug 14 20:02:21 2014 -0700
+| |  summary:     Merge remote-tracking branch 'origin/master'
+[...]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der Branch-Name „permanent“ wurde mit dem Change-Set <em>7</em> eingetragen.</p>
+</div>
+<div class="paragraph">
+<p>Seitens von Git ist die Arbeit mit einem dieser Branch-Stile die gleiche: Einfach auschecken, committen, fetchen, mergen, pullen, und pushen, wie Sie es üblicherweise machen würden.
+Eine Sache, die Sie wissen sollten, ist, dass Mercurial das Überschreiben der Historie nicht unterstützt, sondern nur hinzufügt.
+Das Mercurial-Repository sieht nach einem interaktiven Rebase und einem Force-Push so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ hg log --style compact -G
+o  10[tip]   99611176cbc9   2014-08-14 20:21 -0700   ben
+|    A permanent change
+|
+o  9   f23e12f939c3   2014-08-14 20:01 -0700   ben
+|    Add some documentation
+|
+o  8:1   c16971d33922   2014-08-14 20:00 -0700   ben
+|    goodbye
+|
+| o  7:5   a4529d07aad4   2014-08-14 20:21 -0700   ben
+| |    A permanent change
+| |
+| | @  6   8f65e5e02793   2014-08-14 20:06 -0700   ben
+| |/     More documentation
+| |
+| o    5[featureA]:4,2   bd5ac26f11f9   2014-08-14 20:02 -0700   ben
+| |\     Merge remote-tracking branch 'origin/master'
+| | |
+| | o  4   0434aaa6b91f   2014-08-14 20:01 -0700   ben
+| | |    update makefile
+| | |
++---o  3:1   318914536c86   2014-08-14 20:00 -0700   ben
+| |      goodbye
+| |
+| o  2   f098c7f45c4f   2014-08-14 20:01 -0700   ben
+|/     Add some documentation
+|
+o  1   82e55d328c8c   2005-08-26 01:21 -0700   mpm
+|    Create a makefile
+|
+o  0   0a04b987be5a   2005-08-26 01:20 -0700   mpm
+     Create a standard "hello, world" program</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die Changesets <em>8</em>, <em>9</em> und <em>10</em> wurden angelegt und gehören zum <code>permanent</code> Branch, aber die alten Changesets sind immer noch vorhanden.
+Das kann für Ihre Teamkollegen, die Mercurial verwenden, <strong>sehr verwirrend</strong> sein, also versuchen Sie es zu vermeiden.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_mercurial_zusammenfassung">Mercurial Zusammenfassung</h4>
+<div class="paragraph">
+<p>Git und Mercurial sind sich ähnlich genug, um über die eigene Umgebung hinaus schmerzlos zu arbeiten.
+Wenn Sie vermeiden, den Verlauf zu ändern, der Ihren Computer verlässt (was allgemein empfohlen wird), merken Sie wahrscheinlich nicht einmal, dass am anderen Ende Mercurial verwendet wird.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_und_bazaar">Git und Bazaar</h3>
+<div class="paragraph">
+<p>Unter den DVCSs ist <a href="https://bazaar.canonical.com" target="_blank" rel="noopener">Bazaar</a> ein weiterer bedeutender Vertreter.
+Bazaar ist freie Software, Open-Source und ist Teil des <a href="https://www.gnu.org" target="_blank" rel="noopener">GNU-Projekts</a>.
+Es verhält sich ganz anders als Git.
+Manchmal muss man, um das Gleiche wie bei Git machen zu können, ein anderes Schlüsselwort verwenden. Einige gängige Schlüsselwörter haben nicht die gleiche Bedeutung.
+Insbesondere das Branch-Management ist sehr verschieden und kann zu Verwirrung und Missverständnissen führen, vor allem, wenn jemand aus dem Umfeld von Git kommt.
+Dennoch ist es von Git aus möglich, an einem Bazaar-Repository zu arbeiten.</p>
+</div>
+<div class="paragraph">
+<p>Es gibt viele Projekte, die es Ihnen ermöglichen, Git als Bazaar-Client zu nutzen.
+Hier werden wir das Projekt von Felipe Contreras verwenden, das Sie unter <a href="https://github.com/felipec/git-remote-bzr" class="bare" target="_blank" rel="noopener">https://github.com/felipec/git-remote-bzr</a> finden können.
+Um es zu installieren, müssen Sie nur die Datei git-remote-bzr in einen Ordner herunterladen, der sich in Ihrem Pfad (<code>$PATH</code>) befindet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ wget https://raw.github.com/felipec/git-remote-bzr/master/git-remote-bzr -O ~/bin/git-remote-bzr
+$ chmod +x ~/bin/git-remote-bzr</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Außerdem müssen Sie Bazaar installiert haben.
+Das ist alles!</p>
+</div>
+<div class="sect4">
+<h4 id="_erstellen_eines_git_repository_aus_einem_bazaar_repository">Erstellen eines Git-Repository aus einem Bazaar-Repository</h4>
+<div class="paragraph">
+<p>Die Bedienung ist einfach.
+Es genügt, ein Bazaar-Repository zu klonen, dem <code>bzr::</code> vorangestellt ist.
+Da Git und Bazaar beide Vollklone auf Ihrem Computer erstellen, ist es möglich, einen Git-Klon an Ihren lokalen Bazaar-Klon anzuhängen, es wird aber nicht empfohlen.
+Es ist viel einfacher, Ihren Git-Klon direkt an den gleichen Ort zu hängen, an dem Ihr Bazaar-Klon hängt – das zentrale Repository.</p>
+</div>
+<div class="paragraph">
+<p>Angenommen, Sie haben mit einem Remote-Repository gearbeitet, das sich unter der Adresse <code>bzr+ssh://developer@mybazaarserver:myproject</code> befindet.
+Dann müssen Sie es wie folgt klonen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone bzr::bzr+ssh://developer@mybazaarserver:myproject myProject-Git
+$ cd myProject-Git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>An diesem Punkt wird Ihr Git-Repository erstellt, aber es ist nicht für eine optimale Festplattennutzung komprimiert.
+Deshalb sollten Sie auch Ihr Git-Repository bereinigen und komprimieren, vor allem wenn es ein großes ist:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc --aggressive</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_bazaar_branches">Bazaar Branches</h4>
+<div class="paragraph">
+<p>Bazaar erlaubt es Ihnen nur, Branches zu klonen, aber ein Repository kann mehrere Branches enthalten, und <code>git-remote-bzr</code> kann beides klonen.
+Um zum Beispiel einen Branch zu klonen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone bzr::bzr://bzr.savannah.gnu.org/emacs/trunk emacs-trunk</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Und um das gesamte Repository zu klonen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone bzr::bzr://bzr.savannah.gnu.org/emacs emacs</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der zweite Befehl klont alle Branches, die im emacs-Repository enthalten sind; es ist jedoch möglich einige Branches hervorzuheben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config remote-bzr.branches 'trunk, xwindow'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Einige Remote-Repositorys erlauben es Ihnen nicht, ihre Branches aufzulisten, in diesem Fall müssen Sie sie manuell angeben, und obwohl Sie die Konfiguration im Klon-Befehl angeben könnten, könnten Sie das leichter feststellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init emacs
+$ git remote add origin bzr::bzr://bzr.savannah.gnu.org/emacs
+$ git config remote-bzr.branches 'trunk, xwindow'
+$ git fetch</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_ignorieren_was_mit_bzrignore_ignoriert_wird">Ignorieren, was mit .bzrignore ignoriert wird</h4>
+<div class="paragraph">
+<p>Da Sie an einem mit Bazaar verwalteten Projekt arbeiten, sollten Sie keine <code>.gitignore</code> Datei erstellen, da Sie diese versehentlich unter Versionskontrolle setzen <em>könnten</em> und die anderen mit Bazaar arbeitenden Benutzer dadurch gestört würden.
+Die Lösung besteht darin, die <code>.git/info/exclude</code> Datei entweder als symbolischen Link oder als normale Datei zu erstellen.
+Wir werden später sehen, wie wir dieses Problem lösen können.</p>
+</div>
+<div class="paragraph">
+<p>Bazaar verwendet das gleiche Modell wie Git, um Dateien zu ignorieren, hat aber auch zwei Funktionen, die kein Äquivalent in Git haben.
+Die vollständige Beschreibung finden Sie in der <a href="http://doc.bazaar.canonical.com/bzr.2.7/en/user-reference/ignore-help.html" target="_blank" rel="noopener">Dokumentation</a>.
+Die beiden Merkmale sind:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>„!!“ ermöglicht es Ihnen, bestimmte Dateimuster zu ignorieren, auch wenn sie mit einer „!“-Regel angegeben werden.</p>
+</li>
+<li>
+<p>„RE:“ am Anfang einer Zeile erlaubt es Ihnen, einen <a href="https://docs.python.org/3/library/re.html" target="_blank" rel="noopener">regulären Python-Ausdruck</a> anzugeben (Git erlaubt nur Shell Globs).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Folglich sind zwei verschiedene Situationen zu prüfen:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Wenn die Datei <code>.bzrignore</code> keines dieser beiden spezifischen Präfixe enthält, dann können Sie einfach einen symbolischen Link darauf im Repository setzen: <code>ln -s.bzrignore.git/info/exclude</code>.</p>
+</li>
+<li>
+<p>Ansonsten müssen Sie die Datei <code>.git/info/exclude</code> erstellen und anpassen, um genau die gleichen Dateien in <code>.bzrignore</code> zu ignorieren.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Was auch immer der Fall ist, Sie müssen auf jede Änderung von <code>.bzrignore</code> achten, um sicherzustellen, dass die Datei <code>.git/info/exclude</code> immer <code>.bzrignore</code> widerspiegelt.
+Wenn sich die Datei <code>.bzrignore</code> ändert und eine oder mehrere Zeilen enthält, die mit „!!“ oder „RE:“ beginnen, muss die Datei <code>.git/info/exclude</code> so angepasst werden, dass sie die gleichen Dateien ignoriert, wie die, die mit <code>.bzrignore</code> ignoriert werden.
+Wenn die Datei <code>.git/info/exclude</code> ein symbolischer Link war, müssen Sie außerdem zuerst den symbolischen Link löschen, <code>.bzrignore</code> nach <code>.git/info/exclude</code> kopieren und diese dann anpassen.
+Seien Sie jedoch vorsichtig bei der Erstellung, da es mit Git unmöglich ist, eine Datei wieder einzubinden, wenn ein übergeordnetes Verzeichnis dieser Datei ausgeschlossen ist.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_fetchen_der_änderungen_aus_dem_remote_repository">Fetchen der Änderungen aus dem Remote-Repository</h4>
+<div class="paragraph">
+<p>Um die Änderungen des Remote zu fetchen, pullen Sie die Änderungen wie gewohnt mit Hilfe von Git-Befehlen.
+Angenommen, Ihre Änderungen befinden sich im <code>master</code> Branch, mergen oder rebasieren Sie Ihre Arbeit auf den <code>origin/master</code> Branch:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git pull --rebase origin</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_ihre_arbeit_zum_remote_repository_pushen">Ihre Arbeit zum Remote-Repository pushen</h4>
+<div class="paragraph">
+<p>In Basaar ist das Konzept der Merge-Commits ebenfalls vorhanden, so dass es kein Problem geben wird, wenn Sie einen Merge Commit pushen.
+So können Sie an einem Branch arbeiten, Änderungen in <code>master</code> zusammenführen und Ihre Arbeit pushen.
+Dann erstellen Sie Ihre Branches, testen und committen Ihre Arbeit wie gewohnt.
+Schließlich pushen Sie Ihre Arbeit in das Bazaar-Repository:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git push origin master</code></pre>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_vorbehalteeinschränkungen">Vorbehalte/Einschränkungen</h4>
+<div class="paragraph">
+<p>Das Remote-Helfer-Framework von Git hat einige gültige Beschränkungen.
+Vor allem funktionieren diese Befehle nicht:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>git push origin :branch-to-delete (Bazaar kann auf diese Weise keine Referenzen löschen)</p>
+</li>
+<li>
+<p>git push origin old:new (es wird <code>old</code> pushen)</p>
+</li>
+<li>
+<p>git push --dry-run origin branch (es wird pushen)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_zusammenfassung_13">Zusammenfassung</h4>
+<div class="paragraph">
+<p>Die Modelle von Git und Bazaar sind sehr ähnlich, so dass es beim Arbeiten über die Grenzen keinen großen Aufwand erfordert.
+Solange Sie auf die Einschränkungen achten und sich immer bewusst sind, dass das Remote-Repository nicht nativ Git ist, werden Sie damit umgehen können.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_und_perforce">Git und Perforce</h3>
+<div class="paragraph">
+<p>
+
+Perforce ist ein sehr beliebtes Versionskontrollsystem in Unternehmungen.
+Es existiert seit 1995 und ist damit das älteste in diesem Kapitel behandelte System.
+Altersbedingt hat das Konzept aus heutiger Sicht einige Einschränkungen. Es geht davon aus, dass Sie immer mit einem einzigen zentralen Server verbunden sind und nur eine Version auf der lokalen Festplatte gespeichert ist.
+Sicherlich sind seine Funktionen und Einschränkungen gut für einige spezielle Probleme geeignet, aber es gibt viele Projekte mit Perforce, bei denen Git wirklich besser geeignet ist.</p>
+</div>
+<div class="paragraph">
+<p>Es gibt zwei Möglichkeiten, wenn Sie die Verwendung von Perforce und Git kombinieren möchten.
+Als erstes stellen wir die „Git Fusion“ Bridge des Herstellers von Perforce vor, mit der Sie Teilbäume Ihres Perforce-Depots als Read-Write-Git-Repository freigeben können.
+Bei der zweiten handelt es sich um git-p4, eine client-seitige Bridge, mit der Sie Git als Perforce-Client verwenden können, ohne dass der Perforce-Server neu konfiguriert werden muss.</p>
+</div>
+<div class="sect4">
+<h4 id="_p4_git_fusion">Git Fusion</h4>
+<div class="paragraph">
+<p>
+Preforce bietet mit Git Fusion ein Produkt (verfügbar unter <a href="https://www.perforce.com/git-fusion" class="bare" target="_blank" rel="noopener">https://www.perforce.com/git-fusion</a>), das einen Perforce-Server mit Git-Repositorys auf der Serverseite synchronisiert.</p>
+</div>
+<div class="sect5">
+<h6 id="_git_fusion_einrichten">Git Fusion einrichten</h6>
+<div class="paragraph">
+<p>Für unsere Beispiele verwenden wir die einfachste Installationsmethode für Git Fusion, indem wir eine virtuelle Maschine herunterladen, auf der der Perforce-Daemon und Git Fusion laufen.
+Sie können das Image der virtuellen Maschine von <a href="https://www.perforce.com/downloads/Perforce/20-User" class="bare" target="_blank" rel="noopener">https://www.perforce.com/downloads/Perforce/20-User</a> herunterladen. Wenn der Download abgeschlossen ist, importieren Sie es in Ihre bevorzugte Virtualisierungssoftware (wir verwenden VirtualBox).</p>
+</div>
+<div class="paragraph">
+<p>Beim ersten Start des Rechners werden Sie aufgefordert, das Passwort für drei Linux-Benutzer (<code>root</code>, <code>perforce</code>, <code>git</code>) festzulegen und einen Instanznamen anzugeben, mit dem Sie diese Installation von anderen im selben Netzwerk unterscheiden können.
+Wenn das alles abgeschlossen ist, werden Sie das sehen:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/git-fusion-boot.png" >}}" alt="Boot-Bildschirm der virtuellen Maschine von Git Fusion">
+</div>
+<div class="title">Abbildung 145. Boot-Bildschirm der virtuellen Maschine von Git Fusion</div>
+</div>
+<div class="paragraph">
+<p>Sie sollten die hier angezeigte IP-Adresse notieren, wir werden sie später benutzen.
+Als nächstes erstellen wir einen Perforce-Benutzer.
+Wählen Sie unten die Option „Login“ und drücken Sie die Eingabetaste (oder verbinden Sie sich per SSH mit dem Computer) und melden Sie sich als <code>root</code> an.
+Verwenden Sie dann diese Befehle, um einen Benutzer anzulegen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ p4 -p localhost:1666 -u super user -f john
+$ p4 -p localhost:1666 -u john passwd
+$ exit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der erste öffnet einen VI-Editor, um den Benutzer zu personalisieren, Sie können auch die Vorgaben übernehmen, indem Sie <code>:wq</code> eingeben und auf Enter drücken.
+Der zweite wird Sie auffordern, ein Passwort zweimal einzugeben.
+Das ist alles, was wir mit einem Shell-Prompt zu tun haben werden, also beenden Sie die Sitzung.</p>
+</div>
+<div class="paragraph">
+<p>Als nächstes müssen Sie Git mitteilen, dass es keine SSL-Zertifikate überprüfen soll.
+Das Git Fusion-Image wird mit einem Zertifikat geliefert, aber es bezieht sich auf eine Domäne, die nicht mit der IP-Adresse Ihrer virtuellen Maschine übereinstimmt, weshalb Git die HTTPS-Verbindung abweisen würde.
+Wenn dies eine permanente Installation sein soll, lesen Sie das Handbuch von Perforce Git Fusion, um ein anderes Zertifikat zu installieren. Für unsere Beispielzwecke genügt diese Angabe:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ export GIT_SSL_NO_VERIFY=true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt können wir testen, ob alles funktioniert.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://10.0.1.254/Talkhouse
+Cloning into 'Talkhouse'...
+Username for 'https://10.0.1.254': john
+Password for 'https://john@10.0.1.254':
+remote: Counting objects: 630, done.
+remote: Compressing objects: 100% (581/581), done.
+remote: Total 630 (delta 172), reused 0 (delta 0)
+Receiving objects: 100% (630/630), 1.22 MiB | 0 bytes/s, done.
+Resolving deltas: 100% (172/172), done.
+Checking connectivity... done.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Virtual-Machine-Image ist mit einem Beispielprojekt ausgestattet, das Sie klonen können.
+Hier klonen wir über HTTPS, mit dem Benutzer <code>john</code>, den wir oben erstellt haben. Git fragt nach Anmeldeinformationen für diese Verbindung, aber der Credential-Cache erlaubt es uns, diesen Schritt für alle nachfolgenden Anfragen zu überspringen.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_fusion_konfiguration">Fusion Konfiguration</h6>
+<div class="paragraph">
+<p>Sobald Sie Git Fusion installiert haben, sollten Sie die Konfiguration anpassen.
+Mit Ihrem favorisierten Perforce-Client ist das ganz einfach. Weisen Sie das Verzeichnis <code>//.git-fusion</code> auf dem Perforce-Server einfach Ihrem Arbeitsbereich zu.
+Die Dateistruktur sieht wie folgt aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ tree
+.
+├── objects
+│   ├── repos
+│   │   └── [...]
+│   └── trees
+│       └── [...]
+│
+├── p4gf_config
+├── repos
+│   └── Talkhouse
+│       └── p4gf_config
+└── users
+    └── p4gf_usermap
+
+498 directories, 287 files</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Verzeichnis <code>objects</code> wird intern von Git Fusion verwendet, um Perforce-Objekte auf Git abzubilden und umgekehrt, so dass Sie sich mit nichts darin herumschlagen müssen.
+In diesem Verzeichnis gibt es eine globale <code>p4gf_config</code> Datei sowie eine für jedes Repository – das sind die Konfigurationsdateien, die das Verhalten von Git Fusion bestimmen.
+Werfen wir einen Blick auf die Datei im Root:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">[repo-creation]
+charset = utf8
+
+[git-to-perforce]
+change-owner = author
+enable-git-branch-creation = yes
+enable-swarm-reviews = yes
+enable-git-merge-commits = yes
+enable-git-submodules = yes
+preflight-commit = none
+ignore-author-permissions = no
+read-permission-check = none
+git-merge-avoidance-after-change-num = 12107
+
+[perforce-to-git]
+http-url = none
+ssh-url = none
+
+[@features]
+imports = False
+chunked-push = False
+matrix2 = False
+parallel-push = False
+
+[authentication]
+email-case-sensitivity = no</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wir werden hier nicht auf die Bedeutung dieser Flags eingehen, aber bedenken Sie, dass es sich hierbei nur um eine INI-formatierte Textdatei handelt, ähnlich wie bei der Konfiguration mit Git.
+Diese Datei legt die globalen Optionen fest, die dann von repository-spezifischen Konfigurationsdateien wie <code>repos/Talkhouse/p4gf_config</code> überschrieben werden können.
+Wenn Sie diese Datei öffnen, sehen Sie einen Abschnitt <code>[@repo]</code> mit einigen Einstellungen, die sich von den globalen Standardeinstellungen unterscheiden.
+Sie werden auch Abschnitte sehen, die so aussehen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">[Talkhouse-master]
+git-branch-name = master
+view = //depot/Talkhouse/main-dev/... ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dabei handelt es sich um eine Zuordnung zwischen einem Perforce-Zweig und einem Git-Zweig.
+Der Abschnitt kann beliebig benannt werden, solange der Name eindeutig ist.
+Der <code>git-branch-name</code> ermöglicht Ihnen, einen Depot-Pfad, der unter Git umständlich wäre, in einen benutzerfreundlicheren Namen zu konvertieren.
+Die Anzeige-Einstellung steuert, wie Perforce-Dateien in das Git-Repository mit Hilfe der Standard-Syntax für das View-Mapping abgebildet werden.
+Es kann mehr als ein Mapping angegeben werden, wie in diesem Beispiel:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">[multi-project-mapping]
+git-branch-name = master
+view = //depot/project1/main/... project1/...
+       //depot/project2/mainline/... project2/...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Ihr normales Workspace-Mapping Änderungen in der Struktur der Verzeichnisse enthält, können Sie das auf diese Weise mit einem Git-Repository replizieren.</p>
+</div>
+<div class="paragraph">
+<p>Die letzte Datei, die wir hier behandeln, ist <code>users/p4gf_usermap</code>, die Perforce-Benutzer auf Git-Benutzer abbildet und die Sie möglicherweise nicht einmal benötigen.
+Bei der Konvertierung von eines Perforce Change-Sets in einen Git Commit sucht Git Fusion standardmäßig nach dem Perforce-Benutzer und verwendet die dort gespeicherte E-Mail-Adresse und den vollständigen Namen für das Autor/Committer-Feld in Git.
+Bei der umgekehrten Konvertierung wird standardmäßig der Perforce-Benutzer mit der E-Mail-Adresse gesucht, die im Autorenfeld des Git-Commits gespeichert ist, und das Änderungsset als dieser Benutzer übermittelt (mit entsprechenden Berechtigungen).
+In den meisten Fällen wird dieses Verhalten gut funktionieren, aber beachten Sie die folgende Mapping-Datei:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>john john@example.com "John Doe"
+john johnny@appleseed.net "John Doe"
+bob employeeX@example.com "Anon X. Mouse"
+joe employeeY@example.com "Anon Y. Mouse"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jede Zeile hat das Format <code>&lt;user&gt; &lt;email&gt; "&lt;full name&gt;"</code> und erstellt eine einzige Benutzerzuordnung.
+Die beiden ersten Zeilen ordnen zwei verschiedene E-Mail-Adressen demselben Perforce-Benutzerkonto zu.
+Das ist praktisch, wenn Sie Git-Commits unter mehreren verschiedenen E-Mail-Adressen erstellt haben (oder E-Mail-Adressen ändern), diese aber dem gleichen Perforce-Benutzer zugeordnet werden sollen.
+Beim Erstellen eines Git-Commits aus einem Perforce Change-Set wird die erste Zeile, die dem Perforce-Benutzer entspricht, für die Angaben zur Git-Autorschaft verwendet.</p>
+</div>
+<div class="paragraph">
+<p>Die letzten beiden Zeilen überdecken Bob und Joe’s tatsächliche Namen und E-Mail-Adressen aus den Git-Commits, die erstellt werden.
+Das ist sinnvoll, wenn Sie ein internes Projekt open-source-fähig machen wollen, aber Ihr Mitarbeiterverzeichnis nicht auf der ganzen Welt veröffentlichen wollen.
+Beachten Sie, dass die E-Mail-Adressen und vollständigen Namen eindeutig sein sollten, es sei denn, Sie möchten alle Git-Commits einem einzigen fiktiven Autor zuordnen.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_workflow_arbeitsablauf">Workflow (Arbeitsablauf)</h6>
+<div class="paragraph">
+<p>Perforce Git Fusion ist eine bidirektionale Brücke zwischen der Perforce- und Git-Versionskontrolle.
+Betrachten wir die Arbeit von der Git-Seite aus.
+Wir gehen davon aus, dass wir im Projekt „Jam“ mit einer oben gezeigten Konfigurationsdatei abgebildet sind, die wir so klonen können:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://10.0.1.254/Jam
+Cloning into 'Jam'...
+Username for 'https://10.0.1.254': john
+Password for 'https://john@10.0.1.254':
+remote: Counting objects: 2070, done.
+remote: Compressing objects: 100% (1704/1704), done.
+Receiving objects: 100% (2070/2070), 1.21 MiB | 0 bytes/s, done.
+remote: Total 2070 (delta 1242), reused 0 (delta 0)
+Resolving deltas: 100% (1242/1242), done.
+Checking connectivity... done.
+$ git branch -a
+* master
+  remotes/origin/HEAD -&gt; origin/master
+  remotes/origin/master
+  remotes/origin/rel2.1
+$ git log --oneline --decorate --graph --all
+* 0a38c33 (origin/rel2.1) Create Jam 2.1 release branch.
+| * d254865 (HEAD, origin/master, origin/HEAD, master) Upgrade to latest metrowerks on Beos -- the Intel one.
+| * bd2f54a Put in fix for jam's NT handle leak.
+| * c0f29e7 Fix URL in a jam doc
+| * cc644ac Radstone's lynx port.
+[...]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie das zum ersten Mal vornehmen, kann es einige Zeit in Anspruch nehmen.
+Git Fusion konvertiert alle anwendbaren Changesets in der Perforce-Historie in Git-Commits.
+Das passiert lokal auf dem Server, ist also relativ schnell, aber wenn man einen langen Verlauf hat, kann es trotzdem einige Zeit dauern.
+Nachfolgende Fetches führen eine inkrementelle Konvertierung durch, so dass es sich schon eher wie die native Geschwindigkeit von Git anfühlt.</p>
+</div>
+<div class="paragraph">
+<p>Wie Sie sehen können, sieht unser Repository genauso aus wie jedes andere Git-Repository, mit dem Sie arbeiten könnten.
+Es gibt drei Branches. Git hat einen lokalen <code>master</code> Branch erstellt, der <code>origin/master</code> trackt.
+Wir werden ein wenig arbeiten und ein paar neue Commits erstellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console"># ...
+$ git log --oneline --decorate --graph --all
+* cfd46ab (HEAD, master) Add documentation for new feature
+* a730d77 Whitespace
+* d254865 (origin/master, origin/HEAD) Upgrade to latest metrowerks on Beos -- the Intel one.
+* bd2f54a Put in fix for jam's NT handle leak.
+[...]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wir haben zwei neue Commits.
+Nun lassen Sie uns überprüfen, ob jemand anderes auch daran gearbeitet hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git fetch
+remote: Counting objects: 5, done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 3 (delta 2), reused 0 (delta 0)
+Unpacking objects: 100% (3/3), done.
+From https://10.0.1.254/Jam
+   d254865..6afeb15  master     -&gt; origin/master
+$ git log --oneline --decorate --graph --all
+* 6afeb15 (origin/master, origin/HEAD) Update copyright
+| * cfd46ab (HEAD, master) Add documentation for new feature
+| * a730d77 Whitespace
+|/
+* d254865 Upgrade to latest metrowerks on Beos -- the Intel one.
+* bd2f54a Put in fix for jam's NT handle leak.
+[...]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Anscheinend hat jemand das tatsächlich getan!
+Sie würden es aus dieser Sicht nicht erkennen, aber der <code>6afeb15</code> Commit wurde mit einem Perforce Client erstellt.
+Es sieht aus der Perspektive von Git aus wie ein weiterer Commit aus. Das ist genau der Punkt.
+Betrachten wir, wie der Perforce-Server mit einem Merge-Commit umgeht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge origin/master
+Auto-merging README
+Merge made by the 'recursive' strategy.
+ README | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ git push
+Counting objects: 9, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (9/9), done.
+Writing objects: 100% (9/9), 917 bytes | 0 bytes/s, done.
+Total 9 (delta 6), reused 0 (delta 0)
+remote: Perforce: 100% (3/3) Loading commit tree into memory...
+remote: Perforce: 100% (5/5) Finding child commits...
+remote: Perforce: Running git fast-export...
+remote: Perforce: 100% (3/3) Checking commits...
+remote: Processing will continue even if connection is closed.
+remote: Perforce: 100% (3/3) Copying changelists...
+remote: Perforce: Submitting new Git commit objects to Perforce: 4
+To https://10.0.1.254/Jam
+   6afeb15..89cba2b  master -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git glaubt, dass es funktioniert hat.
+Werfen wir einen Blick auf den Verlauf der <code>README</code> Datei aus der Perspektive von Perforce, indem wir die Revisionsgraphenfunktion von <code>p4v</code> verwenden:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/git-fusion-perforce-graph.png" >}}" alt="Perforce-Revisionsgraph resultierend aus dem Git-Push">
+</div>
+<div class="title">Abbildung 146. Perforce-Revisionsgraph resultierend aus dem Git-Push</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie diese Darstellung noch nie zuvor gesehen haben, mag sie verwirrend erscheinen, aber sie zeigt die gleichen Konzepte wie ein grafischer Viewer für die Git-Historie.
+Wir betrachten die Geschichte der <code>README</code> Datei, so dass der Verzeichnisbaum oben links nur diese Datei anzeigt, wenn sie in verschiedenen Branches auftaucht.
+Oben rechts haben wir ein Diagramm, das veranschaulicht, wie verschiedene Revisionen der Datei zusammenhängen, und die vergrößerte Ansicht dieses Diagramms befindet sich unten rechts.
+Der Rest der Darstellung wird der Detailansicht für die ausgewählte Revision (in diesem Fall <code>2</code>) übergeben.</p>
+</div>
+<div class="paragraph">
+<p>Auffallend ist, dass die Grafik genau so aussieht wie die in dem Verlauf von Git.
+Perforce hatte keinen namentlich benannten Branch, um die Commits <code>1</code> und <code>2</code> zu speichern. Also wurde ein „anonymer“ Branch im <code>.git-fusion</code> Verzeichnis erstellt, um sie zu speichern.
+Das gilt auch für benannte Git-Branches, die keinem benannten Perforce-Branch entsprechen (Sie können sie später über die Konfigurationsdatei einem Perforce-Branch zuordnen).</p>
+</div>
+<div class="paragraph">
+<p>Das meiste geschieht hinter den Kulissen, und das Ergebnis ist, dass eine Person in der Gruppe Git und eine andere Perforce verwenden kann wobei keine von ihnen von der Entscheidung der anderen Person weiß.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_git_fusion_zusammenfassung">Git-Fusion Zusammenfassung</h6>
+<div class="paragraph">
+<p>Wenn Sie Zugang zu Ihrem Perforce-Server haben (oder erhalten können), ist Git Fusion eine gute Möglichkeit, Git und Perforce zum gegenseitigen Austausch zu bewegen.
+Es ist ein wenig Konfiguration erforderlich, aber die Lernkurve ist nicht sehr steil.
+Dieses ist einer der wenigen Abschnitte in diesem Kapitel, in denen Warnungen über die Verwendung von Gits voller Leistung nicht erscheinen.
+Das heißt nicht, dass Perforce mit allem, was Sie ihm zumuten, zufrieden sein wird – wenn Sie versuchen, eine bereits gepushte Historie neu zu schreiben, wird Git Fusion sie ablehnen – aber Git Fusion gibt sich sehr große Mühe, sich nativ anzufühlen.
+Sie können sogar Git-Submodule verwenden (obwohl sie für Perforce-Anwender seltsam aussehen werden) und Branches verschmelzen (das wird als Integration auf der Perforce-Seite erfasst).</p>
+</div>
+<div class="paragraph">
+<p>Wenn Sie den Administrator Ihres Servers nicht davon überzeugen können, Git Fusion einzurichten, gibt es noch eine weitere Möglichkeit, diese Tools gemeinsam zu nutzen.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_git_p4_client">Git-p4</h4>
+<div class="paragraph">
+<p>
+Git-p4 ist eine bidirektionale Brücke zwischen Git und Perforce.
+Es läuft vollständig in Ihrem Git-Repository, so dass Sie keinen Zugriff auf den Perforce-Server benötigen (mit Ausnahme der Benutzer-Anmeldeinformationen).
+Git-p4 ist nicht so flexibel und keine Komplettlösung wie Git Fusion, aber es ermöglicht Ihnen, das meiste von dem zu tun, was Sie tun möchten, ohne die Serverumgebung zu beeinträchtigen.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Anmerkung</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Sie brauchen das <code>p4</code> Tool an einer beliebigen Stelle in Ihrem <code>PATH</code>, um mit git-p4 zu arbeiten.
+Zur Zeit ist es unter <a href="https://www.perforce.com/downloads/Perforce/20-User" class="bare" target="_blank" rel="noopener">https://www.perforce.com/downloads/Perforce/20-User</a> frei verfügbar.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="sect5">
+<h6 id="_einrichtung_2">Einrichtung</h6>
+<div class="paragraph">
+<p>So werden wir beispielsweise den Perforce-Server wie oben gezeigt von der Git Fusion OVA (Open-Virtualization-Archive-Datei) aus verwenden, aber wir umgehen den Git Fusion-Server und gehen direkt zur Perforce-Versionskontrolle.</p>
+</div>
+<div class="paragraph">
+<p>Um den von git-p4 benötigten Befehlszeilen-Client <code>p4</code> verwenden zu können, müssen Sie ein paar Umgebungsvariablen setzen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ export P4PORT=10.0.1.254:1666
+$ export P4USER=john</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_erste_schritte_3">Erste Schritte</h6>
+<div class="paragraph">
+<p>Wie bei allem in Git ist das Klonen der erste Befehl:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 clone //depot/www/live www-shallow
+Importing from //depot/www/live into www-shallow
+Initialized empty Git repository in /private/tmp/www-shallow/.git/
+Doing initial import of //depot/www/live/ from revision #head into refs/remotes/p4/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dadurch entsteht ein Git-technisch „flacher“ Klon. Nur die allerletzte Perforce-Revision wird in Git importiert. Denken Sie daran, Perforce ist nicht dazu gedacht, jedem Benutzer alle Revisionen zu übergeben.
+Das ist ausreichend, um Git als Perforce-Client zu verwenden, ist aber für andere Zwecke ungeeignet.</p>
+</div>
+<div class="paragraph">
+<p>Sobald es abgeschlossen ist, haben wir ein voll funktionsfähiges Git-Repository:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd myproject
+$ git log --oneline --all --graph --decorate
+* 70eaf78 (HEAD, p4/master, p4/HEAD, master) Initial import of //depot/www/live/ from the state at revision #head</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beachten Sie, dass es für den Perforce-Server einen „p4“ Remote gibt, aber alles andere sieht aus wie ein Standardklon.
+Eigentlich ist das etwas irreführend; es gibt dort nicht wirklich einen Remote.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote -v</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In diesem Repository existieren überhaupt keine Remotes.
+Git-p4 hat einige Referenzen erstellt, um den Zustand des Servers darzustellen. Für <code>git log</code> sehen sie aus wie Remote-Referenzen, aber sie werden nicht von Git selbst verwaltet. Man kann <strong>nicht</strong> zu ihnen pushen.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_workflow_2">Workflow</h6>
+<div class="paragraph">
+<p>Okay, lassen Sie uns ein paar Arbeiten erledigen.
+Nehmen wir an, Sie haben einige Fortschritte bei einem sehr wichtigen Feature gemacht und sind bereit, es dem Rest Ihres Teams zu zeigen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --all --graph --decorate
+* 018467c (HEAD, master) Change page title
+* c0fb617 Update link
+* 70eaf78 (p4/master, p4/HEAD) Initial import of //depot/www/live/ from the state at revision #head</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wir haben zwei neue Commits erstellt, die wir an den Perforce-Server übermitteln können.
+Schauen wir mal, ob heute noch jemand anderes gearbeitet hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 sync
+git p4 sync
+Performing incremental import into refs/remotes/p4/master git branch
+Depot paths: //depot/www/live/
+Import destination: refs/remotes/p4/master
+Importing revision 12142 (100%)
+$ git log --oneline --all --graph --decorate
+* 75cd059 (p4/master, p4/HEAD) Update copyright
+| * 018467c (HEAD, master) Change page title
+| * c0fb617 Update link
+|/
+* 70eaf78 Initial import of //depot/www/live/ from the state at revision #head</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es sieht so aus, als ob die Commits vorhanden wären, die sich in <code>master</code> und <code>p4/master</code> aufgeteilt hätten.
+Das Branching-System von Perforce ist <em>nicht</em> wie das von Git, so dass das Übertragen von Merge-Commits keinen Sinn macht.
+Git-p4 empfiehlt, dass Sie Ihre Commits rebasieren und bietet sogar eine Kurzform dafür:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 rebase
+Performing incremental import into refs/remotes/p4/master git branch
+Depot paths: //depot/www/live/
+No changes to import!
+Rebasing the current branch onto remotes/p4/master
+First, rewinding head to replay your work on top of it...
+Applying: Update link
+Applying: Change page title
+ index.html | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vermutlich können Sie das an der Ausgabe erkennen, denn git <code>git p4 rebase</code> ist eine Abkürzung für <code>git p4 sync</code> gefolgt von <code>git rebase p4/master</code>.
+Das ist zwar noch ein bisschen cleverer, besonders bei der Arbeit mit mehreren Branches, ist aber eine gute Annäherung.</p>
+</div>
+<div class="paragraph">
+<p>Jetzt ist unser Verlauf wieder linear und bereit, unsere Änderungen in Perforce wieder einzureichen.
+Der Befehl <code>git p4 submit</code> versucht, für jeden Git-Commit zwischen <code>p4/master</code> und <code>master</code>, eine neue Perforce-Revision zu erstellen.
+Beim Ausführen werden wir in unseren bevorzugten Editor weitergeleitet, der Inhalt der Datei sieht dann ungefähr so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console"># A Perforce Change Specification.
+#
+#  Change:      The change number. 'new' on a new changelist.
+#  Date:        The date this specification was last modified.
+#  Client:      The client on which the changelist was created.  Read-only.
+#  User:        The user who created the changelist.
+#  Status:      Either 'pending' or 'submitted'. Read-only.
+#  Type:        Either 'public' or 'restricted'. Default is 'public'.
+#  Description: Comments about the changelist.  Required.
+#  Jobs:        What opened jobs are to be closed by this changelist.
+#               You may delete jobs from this list.  (New changelists only.)
+#  Files:       What opened files from the default changelist are to be added
+#               to this changelist.  You may delete files from this list.
+#               (New changelists only.)
+
+Change:  new
+
+Client:  john_bens-mbp_8487
+
+User: john
+
+Status:  new
+
+Description:
+   Update link
+
+Files:
+   //depot/www/live/index.html   # edit
+
+
+######## git author ben@straub.cc does not match your p4 account.
+######## Use option --preserve-user to modify authorship.
+######## Variable git-p4.skipUserNameCheck hides this message.
+######## everything below this line is just the diff #######
+--- //depot/www/live/index.html  2014-08-31 18:26:05.000000000 0000
++++ /Users/ben/john_bens-mbp_8487/john_bens-mbp_8487/depot/www/live/index.html   2014-08-31 18:26:05.000000000 0000
+@@ -60,7 +60,7 @@
+ &lt;/td&gt;
+ &lt;td valign=top&gt;
+ Source and documentation for
+-&lt;a href="http://www.perforce.com/jam/jam.html"&gt;
++&lt;a href="jam.html"&gt;
+ Jam/MR&lt;/a&gt;,
+ a software build tool.
+ &lt;/td&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist im Wesentlichen derselbe Inhalt, den Sie bei der Ausführung von <code>p4 submit</code> sehen würden. Ausgenommen sind die Dinge am Ende, die git-p4 sinnvollerweise mit aufgenommen hat.
+Git-p4 versucht, Ihre Git- und Perforce-Einstellungen individuell zu berücksichtigen, wenn es einen Namen für ein Commit- oder Changeset angeben muss. In einigen Fällen wollen Sie ihn jedoch überschreiben.
+Wenn beispielsweise der Git-Commit, den Sie importieren, von einem Mitwirkenden geschrieben wurde, der kein Perforce-Benutzerkonto hat, können Sie trotzdem wollen, dass sich das daraus ergebende Changeset so aussieht, als hätte er es geschrieben (und nicht Sie).</p>
+</div>
+<div class="paragraph">
+<p>Git-p4 hat die Nachricht aus dem Git-Commit zweckmäßigerweise als Inhalt für dieses Perforce Changeset importiert. Alles, was wir tun müssen, ist zweimal speichern (einmal für jeden Commit) und beenden.
+Die resultierende Shell-Ausgabe sieht in etwa so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 submit
+Perforce checkout for depot path //depot/www/live/ located at /Users/ben/john_bens-mbp_8487/john_bens-mbp_8487/depot/www/live/
+Synchronizing p4 checkout...
+... - file(s) up-to-date.
+Applying dbac45b Update link
+//depot/www/live/index.html#4 - opened for edit
+Change 12143 created with 1 open file(s).
+Submitting change 12143.
+Locking 1 files ...
+edit //depot/www/live/index.html#5
+Change 12143 submitted.
+Applying 905ec6a Change page title
+//depot/www/live/index.html#5 - opened for edit
+Change 12144 created with 1 open file(s).
+Submitting change 12144.
+Locking 1 files ...
+edit //depot/www/live/index.html#6
+Change 12144 submitted.
+All commits applied!
+Performing incremental import into refs/remotes/p4/master git branch
+Depot paths: //depot/www/live/
+Import destination: refs/remotes/p4/master
+Importing revision 12144 (100%)
+Rebasing the current branch onto remotes/p4/master
+First, rewinding head to replay your work on top of it...
+$ git log --oneline --all --graph --decorate
+* 775a46f (HEAD, p4/master, p4/HEAD, master) Change page title
+* 05f1ade Update link
+* 75cd059 Update copyright
+* 70eaf78 Initial import of //depot/www/live/ from the state at revision #head</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Ergebnis ist, als ob wir gerade ein <code>git push</code> gemacht hätten, was die nächstliegende Analogie zu dem ist, was tatsächlich passiert ist.</p>
+</div>
+<div class="paragraph">
+<p>Beachten Sie, dass während dieses Prozesses jeder Git-Commit in einen Perforce Changeset umgewandelt wird. Wenn Sie ihn in einen einzelnen Changeset zusammenfassen möchten, können Sie dies mit einem interaktiven Rebase tun, bevor Sie <code>git p4 submit</code> ausführen.
+Bitte bedenken Sie auch, dass die SHA-1-Hashes aller Commits, die als Changesets eingereicht wurden, sich geändert haben. Der Grund dafür ist, dass git-p4 am Ende jedes Commits, den es konvertiert, eine Zeile hinzufügt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -1
+commit 775a46f630d8b46535fc9983cf3ebe6b9aa53145
+Author: John Doe &lt;john@example.com&gt;
+Date:   Sun Aug 31 10:31:44 2014 -0800
+
+    Change page title
+
+    [git-p4: depot-paths = "//depot/www/live/": change = 12144]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Was passiert, wenn Sie versuchen, einen Merge-Commit einzubinden?
+Versuchen wir es einmal.
+Das ist die Situation, in die wir uns selbst gebracht haben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --all --graph --decorate
+* 3be6fd8 (HEAD, master) Correct email address
+*   1dcbf21 Merge remote-tracking branch 'p4/master'
+|\
+| * c4689fc (p4/master, p4/HEAD) Grammar fix
+* | cbacd0a Table borders: yes please
+* | b4959b6 Trademark
+|/
+* 775a46f Change page title
+* 05f1ade Update link
+* 75cd059 Update copyright
+* 70eaf78 Initial import of //depot/www/live/ from the state at revision #head</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der Verlauf von Git und Perforce weicht nach 775a46f voneinander ab.
+Die Git-Seite hat zwei Commits, dann einen Merge-Commit mit dem Perforce Head, dann einen weiteren Commit.
+Wir werden versuchen, diese zusätzlich zu einem einzelnen Changeset auf der Perforce-Seite beizufügen.
+Schauen wir mal, was passieren würde, wenn wir versuchen würden, ihn jetzt einzubringen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 submit -n
+Perforce checkout for depot path //depot/www/live/ located at /Users/ben/john_bens-mbp_8487/john_bens-mbp_8487/depot/www/live/
+Would synchronize p4 checkout in /Users/ben/john_bens-mbp_8487/john_bens-mbp_8487/depot/www/live/
+Would apply
+  b4959b6 Trademark
+  cbacd0a Table borders: yes please
+  3be6fd8 Correct email address</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das <code>-n</code> Flag ist die Abkürzung für <code>--dry-run</code>, mit dem versucht wird, zu beschreiben, was passieren würde, wenn der submit-Befehl wirklich ausgeführt würde.
+Hier sieht es so aus, als hätten wir drei Perforce-Änderungssets erstellt, die den drei Nicht-Merge-Commits entsprechen, die noch nicht auf dem Perforce-Server vorhanden sind.
+Das hört sich nach genau dem an, was wir wollen, mal sehen, wie es ausfällt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 submit
+[…]
+$ git log --oneline --all --graph --decorate
+* dadbd89 (HEAD, p4/master, p4/HEAD, master) Correct email address
+* 1b79a80 Table borders: yes please
+* 0097235 Trademark
+* c4689fc Grammar fix
+* 775a46f Change page title
+* 05f1ade Update link
+* 75cd059 Update copyright
+* 70eaf78 Initial import of //depot/www/live/ from the state at revision #head</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Unsere Historie wurde linearisiert, genau so, als hätten wir vor dem Einreichen rebasiert, was auch tatsächlich passiert ist.
+So können Sie auf der Git-Seite selbst Branches erstellen, darauf arbeiten, verwerfen und mergen, ohne befürchten zu müssen, dass Ihr Verlauf sich mit Perforce nicht mehr verträgt.
+Wenn Sie einen Rebase durchführen können, ist es auch möglich, ihn zu einem Perforce-Server beizusteuern.</p>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_git_p4_branches">Branching</h6>
+<div class="paragraph">
+<p>Wenn Ihr Perforce-Projekt mehrere Branches hat, haben Sie Glück gehabt. git-p4 kann damit so umgehen, dass es sich wie Git anfühlt.
+Angenommen, Ihr Perforce-Depot ist so aufgebaut:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>//depot
+  └── project
+      ├── main
+      └── dev</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nehmen wir weiter an, Sie haben einen <code>dev</code> Branch, der eine View-Spezifikation hat, die so aussieht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>//depot/project/main/... //depot/project/dev/...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git-p4 kann diese Situation automatisch erkennen und das Richtige tun:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git p4 clone --detect-branches //depot/project@all
+Importing from //depot/project@all into project
+Initialized empty Git repository in /private/tmp/project/.git/
+Importing revision 20 (50%)
+    Importing new branch project/dev
+
+    Resuming with change 20
+Importing revision 22 (100%)
+Updated branches: main dev
+$ cd project; git log --oneline --all --graph --decorate
+* eae77ae (HEAD, p4/master, p4/HEAD, master) main
+| * 10d55fb (p4/project/dev) dev
+| * a43cfae Populate //depot/project/main/... //depot/project/dev/....
+|/
+* 2b83451 Project init</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beachten Sie den „@all“ Spezifikator im Depotpfad, der git-p4 anweist, nicht nur das neueste Changeset für diesen Teilbaum, sondern alle Changesets, die jemals diese Pfade beeinflusst haben, zu klonen.
+Das ist näher an Gits Konzept des Klonens, aber wenn Sie an einem Projekt mit einer langen Historie arbeiten, könnte es einige Zeit dauern den Klon zu kopieren.</p>
+</div>
+<div class="paragraph">
+<p>Das <code>--detect-branches</code> Flag weist git-p4 an, die Branch-Spezifikationen von Perforce zu verwenden, um die Branches den Git refs zuzuordnen.
+Sind diese Zuordnungen nicht auf dem Perforce-Server vorhanden (was eine absolut zulässige Methode zur Verwendung von Perforce ist), können Sie git-p4 mitteilen, wie die Zuordnung der Branches zu sein hat. Sie erhalten dann das gleiche Ergebnis:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init project
+Initialized empty Git repository in /tmp/project/.git/
+$ cd project
+$ git config git-p4.branchList main:dev
+$ git clone --detect-branches //depot/project@all .</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Setzen der Konfigurationsvariablen <code>git-p4.branchList</code> auf <code>main:dev</code> teilt git-p4 mit, dass „main“ und „dev“ beides Branches sind, wobei der zweite ein untergeordnetes Element des ersten ist.</p>
+</div>
+<div class="paragraph">
+<p>Machen wir jetzt neben <code>git checkout -b dev p4/project/dev</code> noch einige Commits machen, dann ist git-p4 klug genug, um den richtigen Branch anzusprechen, wenn wir anschließend <code>git p4 submit</code> ausführen.
+Leider kann git-p4 keine flachen Klone mit mehreren Branches mischen. Wenn Sie ein großes Projekt haben und an mehr als einem Branch arbeiten wollen, müssen Sie für jeden Branch, den Sie einreichen möchten, ihn einmal mit <code>git p4 clone</code> erstellen.</p>
+</div>
+<div class="paragraph">
+<p>Für die Erstellung oder Integration von Branches müssen Sie einen Perforce-Client verwenden.
+Git-p4 kann nur synchronisieren und an bestehende Branches senden und es kann nur einen linearen Changeset auf einmal durchführen.
+Bei dem Mergen zweier Branches in Git und dem Versuch, das neue Changeset einzureichen, wird nur ein Bündel von Dateiänderungen aufgezeichnet. Die Metadaten über die an der Integration beteiligten Branches gehen dabei verloren.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_git_und_perforce_zusammenfassung">Git und Perforce, Zusammenfassung</h4>
+<div class="paragraph">
+<p>Git-p4 ermöglicht die Verwendung eines Git-Workflows mit einem Perforce-Server und ist darin ziemlich gut.
+Es ist jedoch wichtig, sich daran zu erinnern, dass Perforce für den Quellcode verantwortlich ist und Sie Git nur für die lokale Arbeit verwenden.
+Seien Sie einfach sehr vorsichtig bei der Weitergabe von Git-Commits. Wenn Sie einen Remote haben, den auch andere Benutzer verwenden, pushen Sie keine Commits, die zuvor noch nicht an den Perforce-Server übertragen wurden.</p>
+</div>
+<div class="paragraph">
+<p>Möchten Sie die Verwendung von Perforce und Git als Clients für die Versionskontrolle frei kombinieren, dann müssen Sie den Server-Administrator davon überzeugen, Git zu installieren. Git Fusion macht die Verwendung von Git zu einem erstklassigen Versionskontroll-Client für einen Perforce-Server.</p>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

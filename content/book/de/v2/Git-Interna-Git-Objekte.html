@@ -1,0 +1,531 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git Interna
+    number: 10
+  section:
+    title: Git Objekte
+    number: 2
+    cs_number: '10.2'
+    previous: book/de/v2/Git-Interna-Basisbefehle-und-Standardbefehle-Plumbing-and-Porcelain
+    next: book/de/v2/Git-Interna-Git-Referenzen
+title: Git - Git Objekte
+
+---
+<h2 id="_objects">Git Objekte</h2>
+<div class="paragraph">
+<p>Git ist ein inhalts-adressierbares Dateisystem.
+Toll.
+Was bedeutet das?
+Dies bedeutet, dass der Kern von Git ein einfacher Schlüssel-Wert-Datenspeicher ist.
+Dies bedeutet, dass Sie jede Art von Inhalt in ein Git-Repository einfügen können. Git gibt Ihnen einen eindeutigen Schlüssel zurück, mit dem Sie den Inhalt später abrufen können.</p>
+</div>
+<div class="paragraph">
+<p>Schauen wir uns als Beispiel den Installationsbefehl <code>git hash-object</code> an, der einige Daten aufnimmt, sie in Ihrem <code>.git/objects</code> Verzeichnis (der <em>object database</em>) speichert und Ihnen den eindeutigen Schlüssel zurückgibt, der nun auf dieses Datenobjekt verweist.</p>
+</div>
+<div class="paragraph">
+<p>Zunächst initialisieren Sie ein neues Git-Repository und stellen sicher, dass sich (vorhersehbar) nichts im <code>objects</code> Verzeichnis befindet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git init test
+Initialized empty Git repository in /tmp/test/.git/
+$ cd test
+$ find .git/objects
+.git/objects
+.git/objects/info
+.git/objects/pack
+$ find .git/objects -type f</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git hat das Verzeichnis <code>objects</code> initialisiert und darin die Unterverzeichnisse <code>pack</code> und <code>info</code> erstellt, aber es gibt darin keine regulären Dateien.
+Jetzt erstellen wir mit <code>git hash-object</code> ein neues Datenobjekt und speichern es manuell in Ihrer neuen Git-Datenbank:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'test content' | git hash-object -w --stdin
+d670460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In seiner einfachsten Form würde <code>git hash-object</code> den Inhalt, den Sie ihm übergeben haben, nehmen und <em>würde</em> lediglich den eindeutigen Schlüssel zurückgeben, der zum Speichern in Ihrer Git-Datenbank verwendet werden soll.
+Die Option -w weist dann den Befehl an, den Schlüssel nicht einfach zurückzugeben, sondern das Objekt in die Datenbank zu schreiben.
+Schließlich weist die Option <code>--stdin</code> <code>git hash-object</code> an, den zu verarbeitenden Inhalt von stdin abzurufen. Andernfalls würde der Befehl ein Dateinamenargument am Ende des Befehls erwarten, das den zu verwendenden Inhalt enthält.</p>
+</div>
+<div class="paragraph">
+<p>Die Ausgabe des obigen Befehls ist ein Prüfsummen-Hash mit 40 Zeichen.
+Dies ist der SHA-1-Hash – eine Prüfsumme des Inhalts, den Sie speichern, sowie eine Kopfzeile, über die Sie in Kürze mehr erfahren werden.
+Jetzt können Sie sehen, wie Git Ihre Daten gespeichert hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie Ihr Verzeichnis <code>objects</code> erneut untersuchen, können Sie feststellen, dass es jetzt eine Datei für diesen neuen Inhalt enthält.
+Auf diese Weise speichert Git den Inhalt initial — als einzelne Datei pro Inhaltselement, benannt mit der SHA-1-Prüfsumme des Inhalts und seiner Kopfzeile.
+Das Unterverzeichnis wird mit den ersten 2 Zeichen des SHA-1 benannt, und der Dateiname enthält die verbleibenden 38 Zeichen.</p>
+</div>
+<div class="paragraph">
+<p>Sobald Sie Inhalt in Ihrer Objektdatenbank haben, können Sie diesen Inhalt mit dem Befehl <code>git cat-file</code> untersuchen.
+Dieser Befehl ist eine Art Schweizer Taschenmesser für die Inspektion von Git-Objekten.
+Wenn Sie <code>-p</code> an <code>cat-file</code> übergeben, wird der Befehl angewiesen, zuerst den Inhaltstyp zu ermitteln und ihn dann entsprechend anzuzeigen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p d670460b4b4aece5915caf5c68d12f560a9fe3e4
+test content</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt können Sie Inhalte zu Git hinzufügen und wieder herausziehen.
+Sie können dies auch mit Inhalten in Dateien tun.
+Sie können beispielsweise eine einfache Versionskontrolle für eine Datei durchführen.
+Erstellen Sie zunächst eine neue Datei und speichern Sie deren Inhalt in Ihrer Datenbank:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'version 1' &gt; test.txt
+$ git hash-object -w test.txt
+83baae61804e65cc73a7201a7252750c76066a30</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Schreiben Sie dann neuen Inhalt in die Datei und speichern Sie ihn erneut:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'version 2' &gt; test.txt
+$ git hash-object -w test.txt
+1f7a7a472abf3dd9643fd615f6da379c4acb3e3a</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ihre Objektdatenbank enthält nun beide Versionen dieser neuen Datei (sowie den ersten Inhalt, den Sie dort gespeichert haben):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zu diesem Zeitpunkt können Sie Ihre lokale Kopie dieser <code>test.txt</code> Datei löschen und dann mit Git entweder die erste gespeicherte Version aus der Objektdatenbank abrufen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 83baae61804e65cc73a7201a7252750c76066a30 &gt; test.txt
+$ cat test.txt
+version 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>oder die zweite Version:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a &gt; test.txt
+$ cat test.txt
+version 2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es ist jedoch nicht sinnvoll, sich den SHA-1-Schlüssel für jede Version Ihrer Datei zu merken. Außerdem speichern Sie den Dateinamen nicht in Ihrem System, sondern nur den Inhalt.
+Dieser Objekttyp wird als <em>blob</em> bezeichnet.
+Git kann Ihnen den Objekttyp jedes Objekts in Git mitteilen, wenn sie den SHA-1-Schlüssel mit <code>git cat-file -t</code> angegeben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -t 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+blob</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_tree_objects">Baum Objekte</h3>
+<div class="paragraph">
+<p>Die nächste Art von Git-Objekte, die wir untersuchen, ist der <em>baum</em>, der das Problem des Speicherns des Dateinamens löst und es Ihnen auch ermöglicht, eine Gruppe von Dateien zusammen zu speichern.
+Git speichert Inhalte auf ähnliche Weise wie ein UNIX-Dateisystem, jedoch etwas vereinfacht.
+Der gesamte Inhalt wird als Baum- und Blob-Objekte gespeichert, wobei Bäume UNIX-Verzeichniseinträgen entsprechen und Blobs mehr oder weniger Inodes oder Dateiinhalten entsprechen.
+Ein einzelnes Baumobjekt enthält einen oder mehrere Einträge, von denen jeder der SHA-1-Hash eines Blobs oder Teilbaums mit dem zugehörigen Modus, Typ und Dateinamen ist.
+Angenommen sie haben ein Projekt, in dem der aktuellste Baum folgendermaßen aussieht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob a906cb2a4a904a152e80877d4088654daad0c859      README
+100644 blob 8f94139338f9404f26296befa88755fc2598c289      Rakefile
+040000 tree 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0      lib</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die <code>master^{tree}</code> Syntax gibt das Baumobjekt an, auf das durch das letzte Commit in Ihrem <code>master</code> Branch verwiesen wird.
+Beachten Sie, dass das Unterverzeichnis <code>lib</code> kein Blob ist, sondern ein Zeiger auf einen anderen Baum:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0
+100644 blob 47c6340d6459e05787f644c2447d2595f5d3a54b      simplegit.rb</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Anmerkung</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Je nachdem, welche Shell Sie verwenden, können bei der Verwendung der <code>master^{tree}</code> Syntax Fehler auftreten.</p>
+</div>
+<div class="paragraph">
+<p>In CMD unter Windows wird das Zeichen <code>^</code> für das Escapezeichen verwendet, daher müssen Sie es verdoppeln, um dies zu vermeiden: <code>git cat-file -p master^^{tree}</code>.
+Bei Verwendung von PowerShell müssen Parameter mit {} Zeichen in Anführungszeichen gesetzt werden, um eine fehlerhafte Syntaxanalyse des Parameters zu vermeiden: <code>git cat-file -p 'master^{tree}'</code>.</p>
+</div>
+<div class="paragraph">
+<p>Wenn Sie ZSH verwenden, wird das Zeichen <code>^</code> zum Verschieben verwendet, daher müssen Sie den gesamten Ausdruck in Anführungszeichen setzen: <code>git cat-file -p "master^{tree}"</code>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Konzeptionell sehen die von Git gespeicherten Daten ungefähr so aus:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/data-model-1.png" >}}" alt="Einfache Version des Git-Datenmodells">
+</div>
+<div class="title">Abbildung 147. Einfache Version des Git-Datenmodells</div>
+</div>
+<div class="paragraph">
+<p>Sie können ziemlich einfach Ihren eigenen Baum erstellen.
+Git erstellt normalerweise einen Baum, indem es den Status Ihres Staging-Bereichs oder Index übernimmt und eine Reihe von Baumobjekten daraus schreibt.
+Um ein Baumobjekt zu erstellen, müssen Sie zunächst einen Index einrichten, indem Sie einige Dateien bereitstellen.
+Um einen Index mit einem einzigen Eintrag zu erstellen — der ersten Version Ihrer <code>test.txt</code> Datei — können Sie den Basisbefehl <code>git update-index</code> verwenden.
+Mit diesem Befehl fügen Sie die frühere Version der Datei <code>test.txt</code> künstlich einem neuen Staging-Bereich hinzu.
+Sie müssen die Option <code>--add</code> übergeben, da die Datei in Ihrem Staging-Bereich noch nicht vorhanden ist (Sie haben noch nicht einmal einen Staging-Bereich eingerichtet). <code>--cacheinfo</code> müssen sie angeben, weil die hinzugefügte Datei sich nicht in Ihrem Verzeichnis, sondern in Ihrer Datenbank befindet.
+Dann geben Sie den Modus, SHA-1 und Dateinamen an:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git update-index --add --cacheinfo 100644 \
+  83baae61804e65cc73a7201a7252750c76066a30 test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In diesem Fall geben Sie den Modus <code>100644</code> an, was bedeutet, dass es sich um eine normale Datei handelt.
+Andere Optionen sind <code>100755</code>, was bedeutet, dass es sich um eine ausführbare Datei handelt und <code>120000</code>, was einen symbolischen Link angibt.
+Der Modus stammt aus normalen UNIX-Modi, ist jedoch viel weniger flexibel — diese drei Modi sind die einzigen, die für Dateien (Blobs) in Git gültig sind (obwohl andere Modi für Verzeichnisse und Submodule verwendet werden).</p>
+</div>
+<div class="paragraph">
+<p>Jetzt können Sie <code>git write-tree</code> verwenden, um den Staging-Bereich in ein Baumobjekt zu schreiben.
+Es ist keine Option <code>-w</code> erforderlich. Durch Aufrufen dieses Befehls wird automatisch ein Baumobjekt aus dem Status des Index erstellt, wenn dieser Baum noch nicht vorhanden ist:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git write-tree
+d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+$ git cat-file -p d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+100644 blob 83baae61804e65cc73a7201a7252750c76066a30      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können auch überprüfen, ob es sich um ein Baumobjekt handelt, indem Sie denselben Befehl <code>git cat-file</code> verwenden, den Sie zuvor gesehen haben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -t d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+tree</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie erstellen jetzt einen neuen Baum mit der zweiten Version von <code>test.txt</code> und einer neuen Datei:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'new file' &gt; new.txt
+$ git update-index --cacheinfo 100644 \
+  1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+$ git update-index --add new.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ihr Staging-Bereich enthält jetzt die neue Version von <code>test.txt</code> sowie die neue Datei <code>new.txt</code>.
+Schreiben Sie diesen Baum aus (zeichnen Sie den Status des Staging-Bereichs oder des Index für ein Baumobjekt auf) und sehen Sie, wie er aussieht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git write-tree
+0155eb4229851634a0f03eb265b69f5a2d56f341
+$ git cat-file -p 0155eb4229851634a0f03eb265b69f5a2d56f341
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Beachten Sie, dass dieser Baum beide Dateieinträge enthält und dass der SHA-1 von <code>test.txt</code> der SHA-1 „Version 2“ von früher (<code>1f7a7a</code>) entspricht.
+Aus Spaß fügen Sie diesem den ersten Baum als Unterverzeichnis hinzu.
+Sie können Bäume in Ihren Staging-Bereich einlesen, indem Sie <code>git read-tree</code> aufrufen.
+In diesem Fall können Sie einen vorhandenen Baum als Teilbaum in Ihren Staging-Bereich einlesen, indem Sie die Option <code>--prefix</code> mit diesem Befehl verwenden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git read-tree --prefix=bak d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+$ git write-tree
+3c4e9cd789d88d8d89c1073707c3585e41b0e614
+$ git cat-file -p 3c4e9cd789d88d8d89c1073707c3585e41b0e614
+040000 tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579      bak
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie aus dem soeben erstellten Baum ein Arbeitsverzeichnis erstellen, erhalten Sie die beiden Dateien in der obersten Ebene des Arbeitsverzeichnisses und ein Unterverzeichnis mit dem Namen <code>bak</code>, das die erste Version der Datei <code>test.txt</code> enthält.
+Sie können sich die Daten, die Git für diese Strukturen enthält, so vorstellen:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/data-model-2.png" >}}" alt="Die Inhaltsstruktur Ihrer aktuellen Git-Daten">
+</div>
+<div class="title">Abbildung 148. Die Inhaltsstruktur Ihrer aktuellen Git-Daten</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_git_commit_objects">Commit Objekte</h3>
+<div class="paragraph">
+<p>Wenn Sie alle oben genannten Schritte ausgeführt haben, verfügen Sie nun über drei Bäume, die die verschiedenen Schnappschüsse Ihres Projekts darstellen, die Sie verfolgen möchten. Das bisherige Problem bleibt jedoch bestehen: Sie müssen sich alle drei SHA-1-Werte merken, um die Schnappschüsse abzurufen.
+Sie haben auch keine Informationen darüber, wer die Schnappschüsse gespeichert hat, wann sie gespeichert wurden oder warum sie gespeichert wurden.
+Dies sind die grundlegenden Informationen, die das Commit Objekt für Sie speichert.</p>
+</div>
+<div class="paragraph">
+<p>Um ein Commit Objekt zu erstellen, rufen Sie <code>commit-tree</code> auf und geben einen einzelnen Baum SHA-1 an. Außerdem geben sie an welche Commit Objekte die direkten Vorgänger sind (falls überhaupt welche vorhanden sind).
+Beginnen Sie mit dem ersten Baum, den Sie geschrieben haben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'First commit' | git commit-tree d8329f
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Anmerkung</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Sie werden vermutlich einen anderen Hash-Wert erhalten, da die Erstellungszeit und die Autorendaten unterschiedlich sind.
+Darüber hinaus kann zwar prinzipiell jedes Commit-Objekt genau reproduziert werden. Allerdings könnten aufgrund der technischen Details beim Erstellen dieses Buches die abgedruckten Commit-Hashes im Vergleich zu den entsprechenden Commits abweichen.
+Ersetzen Sie die Commit- und Tag-Hashes durch Ihre eigenen Prüfsummen in diesem Kapitel.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Nun können Sie sich Ihr neues Commit-Objekt mit <code>git cat-file</code> ansehen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p fdf4fc3
+tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+author Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+
+First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das Format für ein Commit Objekt ist einfach: Es gibt den Baum der obersten Ebene für den Snapshot des Projekts zu diesem Zeitpunkt an; Das übergeordnete Objekt, falls vorhanden, (das oben beschriebene Commit Objekt hat keine übergeordneten Objekte); die Autoren-/Committer-Informationen (genutzt werden Ihre Konfigurationseinstellungen <code>user.name</code> und <code>user.email</code> sowie einen Zeitstempel); eine leere Zeile und dann die Commit-Nachricht.</p>
+</div>
+<div class="paragraph">
+<p>Als Nächstes schreiben Sie die beiden anderen Commit Objekte, die jeweils auf das Commit verweisen, welches direkt davor erfolgte:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'Second commit' | git commit-tree 0155eb -p fdf4fc3
+cac0cab538b970a37ea1e769cbbde608743bc96d
+$ echo 'Third commit'  | git commit-tree 3c4e9c -p cac0cab
+1a410efbd13591db07496601ebc7a059dd55cfe9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jedes der drei Commit-Objekte verweist auf einen der drei von Ihnen erstellten Snapshot-Bäume.
+Seltsamerweise haben Sie jetzt einen echten Git-Verlauf, den Sie mit dem Befehl <code>git log</code> anzeigen können, wenn Sie ihn beim letzten Commit SHA-1 ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --stat 1a410e
+commit 1a410efbd13591db07496601ebc7a059dd55cfe9
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:15:24 2009 -0700
+
+	Third commit
+
+ bak/test.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit cac0cab538b970a37ea1e769cbbde608743bc96d
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:14:29 2009 -0700
+
+	Second commit
+
+ new.txt  | 1 +
+ test.txt | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+commit fdf4fc3344e67ab068f836878b6c4951e3b15f3d
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:09:34 2009 -0700
+
+    First commit
+
+ test.txt | 1 +
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wundervoll.
+Sie haben gerade Basisbefehle der niedrigen Ebene ausgeführt, um einen Git-Verlauf zu erstellen, ohne einen der Standardbefehle zu verwenden.
+Dies ist im Wesentlichen das, was Git tut, wenn Sie die Befehle <code>git add</code> und <code>git commit</code> ausführen — es speichert Blobs für die geänderten Dateien, aktualisiert den Index, schreibt Bäume und schreibt Commit-Objekte, die auf Bäume der oberste Ebene verweisen und die Commits, die unmittelbar vor ihnen aufgetreten sind.
+Diese drei Haupt-Git-Objekte — der Blob, der Baum und das Commit – werden anfänglich als separate Dateien in Ihrem <code>.git/objects</code> Verzeichnis gespeichert.
+Hier sind jetzt alle Objekte im Beispielverzeichnis, kommentiert mit dem, was sie speichern:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/01/55eb4229851634a0f03eb265b69f5a2d56f341 # tree 2
+.git/objects/1a/410efbd13591db07496601ebc7a059dd55cfe9 # commit 3
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a # test.txt v2
+.git/objects/3c/4e9cd789d88d8d89c1073707c3585e41b0e614 # tree 3
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30 # test.txt v1
+.git/objects/ca/c0cab538b970a37ea1e769cbbde608743bc96d # commit 2
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4 # 'test content'
+.git/objects/d8/329fc1cc938780ffdd9f94e0d364e0ea74f579 # tree 1
+.git/objects/fa/49b077972391ad58037050f2a75f74e3671e92 # new.txt
+.git/objects/fd/f4fc3344e67ab068f836878b6c4951e3b15f3d # commit 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie allen internen Zeigern folgen, erhalten Sie eine Objektgrafik in etwa wie folgt:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/data-model-3.png" >}}" alt="Alle erreichbaren Objekte in Ihrem Git-Verzeichnis">
+</div>
+<div class="title">Abbildung 149. Alle erreichbaren Objekte in Ihrem Git-Verzeichnis</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_objektspeicher">Objektspeicher</h3>
+<div class="paragraph">
+<p>Wir haben bereits erwähnt, dass für jedes Objekt, das Sie in Ihre Git-Objektdatenbank übernehmen, ein Header gespeichert ist.
+Nehmen wir uns eine Minute Zeit, um zu sehen, wie Git seine Objekte speichert.
+Sie werden sehen, wie Sie ein Blob-Objekt — in diesem Fall die Zeichenfolge „what is up, doc?“ – interaktiv in der Ruby-Skriptsprache speichern.</p>
+</div>
+<div class="paragraph">
+<p>Sie können den interaktiven Ruby-Modus mit dem Befehl <code>irb</code> starten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ irb
+&gt;&gt; content = "what is up, doc?"
+=&gt; "what is up, doc?"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git erstellt zuerst einen Header, der mit der Identifizierung des Objekttyps beginnt — in diesem Fall ein Blob.
+Zu diesem ersten Teil des Headers fügt Git ein Leerzeichen hinzu, gefolgt von der Größe des Inhalts in Bytes, und fügt ein letztes Nullbyte hinzu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; header = "blob #{content.bytesize}\0"
+=&gt; "blob 16\u0000"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git verkettet den Header und den ursprünglichen Inhalt und berechnet dann die SHA-1-Prüfsumme dieses neuen Inhalts.
+Sie können den SHA-1-Wert einer Zeichenfolge in Ruby berechnen, indem Sie die SHA1-Digest-Bibliothek mit dem Befehl <code>require</code> hinzufügen und dann <code>Digest::SHA1.hexdigest()</code> mit der Zeichenfolge aufrufen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; store = header + content
+=&gt; "blob 16\u0000what is up, doc?"
+&gt;&gt; require 'digest/sha1'
+=&gt; true
+&gt;&gt; sha1 = Digest::SHA1.hexdigest(store)
+=&gt; "bd9dbf5aae1a3862dd1526723246b20206e5fc37"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vergleichen wir dies mit der Ausgabe von <code>git hash-object</code>.
+Hier verwenden wir <code>echo -n</code>, um zu verhindern, dass der Eingabe eine neue Zeile hinzugefügt wird.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo -n "what is up, doc?" | git hash-object --stdin
+bd9dbf5aae1a3862dd1526723246b20206e5fc37</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git komprimiert den neuen Inhalt mit zlib, was Sie in Ruby mit der zlib-Bibliothek tun können.
+Zuerst müssen Sie die Bibliothek hinzufügen und dann <code>Zlib::Deflate.deflate()</code> auf den Inhalt ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; require 'zlib'
+=&gt; true
+&gt;&gt; zlib_content = Zlib::Deflate.deflate(store)
+=&gt; "x\x9CK\xCA\xC9OR04c(\xCFH,Q\xC8,V(-\xD0QH\xC9O\xB6\a\x00_\x1C\a\x9D"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Schließlich schreiben Sie Ihren zlib-entpackten Inhalt auf ein Objekt auf der Festplatte.
+Sie bestimmen den Pfad des Objekts, das Sie ausschreiben möchten (die ersten beiden Zeichen des SHA-1-Werts sind der Name des Unterverzeichnisses und die letzten 38 Zeichen der Dateiname in diesem Verzeichnis).
+In Ruby können Sie die Funktion <code>FileUtils.mkdir_p()</code> verwenden, um das Unterverzeichnis zu erstellen, falls es nicht vorhanden ist.
+Öffnen Sie dann die Datei mit <code>File.open()</code> und schreiben Sie den zuvor mit zlib komprimierten Inhalt mit einem <code>write()</code> -Aufruf auf das resultierende Dateihandle in die Datei:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">&gt;&gt; path = '.git/objects/' + sha1[0,2] + '/' + sha1[2,38]
+=&gt; ".git/objects/bd/9dbf5aae1a3862dd1526723246b20206e5fc37"
+&gt;&gt; require 'fileutils'
+=&gt; true
+&gt;&gt; FileUtils.mkdir_p(File.dirname(path))
+=&gt; ".git/objects/bd"
+&gt;&gt; File.open(path, 'w') { |f| f.write zlib_content }
+=&gt; 32</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Lassen Sie uns den Inhalt des Objekts mit <code>git cat-file</code> überprüfen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">---
+$ git cat-file -p bd9dbf5aae1a3862dd1526723246b20206e5fc37
+what is up, doc?
+---</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das war’s – Sie haben ein gültiges Git-Blob-Objekt erstellt.</p>
+</div>
+<div class="paragraph">
+<p>Alle Git-Objekte werden auf dieselbe Weise gespeichert, nur mit unterschiedlichen Typen. Anstelle des String-Blobs beginnt der Header mit commit oder tree.
+Auch wenn der Blob-Inhalt nahezu beliebig sein kann, sind Commit- und Tree-Inhalt sehr spezifisch formatiert.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

@@ -1,0 +1,558 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Reset entzaubert
+    number: 7
+    cs_number: '7.7'
+    previous: book/de/v2/Git-Tools-Den-Verlauf-umschreiben
+    next: book/de/v2/Git-Tools-Fortgeschrittenes-Merging
+title: Git - Reset entzaubert
+
+---
+<h2 id="_git_reset">Reset entzaubert</h2>
+<div class="paragraph">
+<p>Bevor wir zu spezialisierteren Werkzeugen übergehen, sollten wir über die Befehle <code>reset</code> und <code>checkout</code> sprechen.
+Diese Befehle sind, wenn man ihnen zum ersten Mal begegnet, die beiden verwirrendsten Teile von Git.
+Sie erledigen so viele Aufgaben, dass es aussichtslos erscheint, sie wirklich zu verstehen und richtig anzuwenden.
+Deshalb empfehlen wir eine einfache Metapher.</p>
+</div>
+<div class="sect3">
+<h3 id="_die_drei_bäume">Die drei Bäume</h3>
+<div class="paragraph">
+<p>Eine bessere Methode, um über <code>reset</code> und <code>checkout</code> zu reflektieren, ist der gedankliche Ansatz, dass Git ein Inhaltsmanager von drei verschiedenen Bäumen ist.
+Mit „Baum“ meinen wir hier in Wahrheit eine „Sammlung von Dateien“, nicht speziell die Datenstruktur.
+Es gibt ein paar Fälle, in denen sich der Inhalt nicht genau wie ein Baum verhält, aber für unsere Zwecke ist es vorerst einfacher, auf diese Weise darüber nachzudenken.</p>
+</div>
+<div class="paragraph">
+<p>Als System verwaltet Git im regulären Modus drei Bäume:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 66.6667%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Baum</th>
+<th class="tableblock halign-left valign-top">Rolle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HEAD</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">letzter Commit-Snapshot, nächstes Elternteil</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Index (Staging-Area)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nächster, geplanter Commit-Snapshot</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Arbeitsverzeichnis</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sandbox</p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect4">
+<h4 id="_der_head">Der HEAD</h4>
+<div class="paragraph">
+<p>HEAD ist der Verweis auf die aktuelle Branch-Referenz, die wiederum ein Pointer zu dem letzten Commit auf diesem Branch ist.
+Das bedeutet, dass HEAD das Elternteil des nächsten Commits ist, der erzeugt wird.
+Es ist generell am einfachsten, sich HEAD als den Schnappschuss <strong>Ihres letzten Commits auf diesem Branch</strong> vorzustellen.</p>
+</div>
+<div class="paragraph">
+<p>Es ist ziemlich einfach zu erkennen, wie dieser Schnappschuss aussieht.
+Hier ist ein Beispiel, wie man die aktuelle Verzeichnisliste und die SHA-1-Prüfsummen für jede Datei im HEAD-Snapshot erhält:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p HEAD
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+author Scott Chacon  1301511835 -0700
+committer Scott Chacon  1301511835 -0700
+
+initial commit
+
+$ git ls-tree -r HEAD
+100644 blob a906cb2a4a904a152...   README
+100644 blob 8f94139338f9404f2...   Rakefile
+040000 tree 99f1a6d12cb4b6f19...   lib</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die Befehle Git <code>cat-file</code> und <code>ls-tree</code> sind „Basisbefehle“, die für Aufgaben auf low-level Ebene verwendet werden und nicht wirklich in der täglichen Arbeit eingesetzt werden, aber sie helfen uns zu verstehen, was hier vor sich geht.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_the_index">Der Index</h4>
+<div class="paragraph">
+<p><em>Index</em> ist Ihr <strong>nächster, geplanter Commit</strong>.
+Wir haben diesen Ansatz auch als Git’s „Staging-Area“ bezeichnet, da Git auf dieses Konzept schaut, wenn Sie <code>git commit</code> ausführen.</p>
+</div>
+<div class="paragraph">
+<p>Git füllt den Index mit allen Dateiinhalten, die Sie zuletzt in Ihr Arbeitsverzeichnis ausgecheckt haben und zeigt Ihnen, wie sie beim letzten Auschecken ausgesehen haben.
+Sie tauschen dann einige dieser Dateien mit neueren Versionen aus, und <code>git commit</code> konvertiert diese in den Baum für einen neuen Commit.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -s
+100644 a906cb2a4a904a152e80877d4088654daad0c859 0	README
+100644 8f94139338f9404f26296befa88755fc2598c289 0	Rakefile
+100644 47c6340d6459e05787f644c2447d2595f5d3a54b 0	lib/simplegit.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nochmals, wir verwenden hier <code>git ls-files</code>, ein Kommando, das eher ein Hintergrundbefehl ist, welcher Ihnen anzeigt, wie Ihr Index derzeit aussieht.</p>
+</div>
+<div class="paragraph">
+<p>Der Index ist technisch gesehen keine hierarchische Struktur – er ist eigentlich als abgeflachtes Register umgesetzt – aber für unsere Zwecke ist das ausreichend genau.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_das_working_directory_oder_arbeitsverzeichnis">Das Working Directory oder Arbeitsverzeichnis</h4>
+<div class="paragraph">
+<p>Abschließend gibt es Ihr <em>Arbeitsverzeichnis</em> (engl. „working directory“ oder „working tree“).
+Die beiden anderen Bäume speichern ihren Inhalt auf effiziente, aber unpraktische Weise innerhalb des <code>.git</code> Ordners.
+Das Arbeitsverzeichnis entpackt sie in echte Dateien, was es wesentlich einfacher macht, sie zu bearbeiten.
+Stellen Sie sich das Arbeitsverzeichnis wie einen <strong>Sandkasten</strong> (engl. sandbox) vor, in der Sie Änderungen ausprobieren können, bevor Sie sie in Ihren Bereitstellungsbereich (Index, Staging-Area) und dann in den Verlauf übertragen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ tree
+.
+├── README
+├── Rakefile
+└── lib
+    └── simplegit.rb
+
+1 directory, 3 files</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_der_workflow">Der Workflow</h3>
+<div class="paragraph">
+<p>Der typische Arbeitsablauf von Git sieht vor, dass Sie durch die Bearbeitung dieser drei Bäume nach und nach bessere Momentaufnahmen Ihres Projekts erzeugen.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-workflow.png" >}}" alt="reset workflow">
+</div>
+</div>
+<div class="paragraph">
+<p>Stellen wir uns folgenden Ablauf vor: Angenommen, Sie wechseln in ein neues Verzeichnis, in dem sich eine einzige Datei befindet.
+Wir nennen das die <strong>v1</strong> der Datei und kennzeichnen sie in blau.
+Nun führen wir <code>git init</code> aus, das ein Git-Repository mit einer HEAD-Referenz erzeugt, die auf den noch nicht existierenden <code>master</code> Branch zeigt.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-ex1.png" >}}" alt="reset ex1">
+</div>
+</div>
+<div class="paragraph">
+<p>Zu diesem Zeitpunkt hat nur der Verzeichnisbaum (engl working tree) des Arbeitsverzeichnisses (engl. working directory) irgendeinen Inhalt.</p>
+</div>
+<div class="paragraph">
+<p>Nun wollen wir diese Datei committen, also benutzen wir <code>git add</code>, um den Inhalt im Arbeitsverzeichnis zu übernehmen und in den Index zu kopieren.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-ex2.png" >}}" alt="reset ex2">
+</div>
+</div>
+<div class="paragraph">
+<p>Dann führen wir <code>git commit</code> aus, das den Inhalt der Staging-Area (oder Index) als endgültigen Snapshot speichert, ein Commit-Objekt erzeugt, das auf diesen Snapshot zeigt, und den Branch <code>master</code> aktualisiert, um auf diesen Commit zu zeigen.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-ex3.png" >}}" alt="reset ex3">
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn wir jetzt <code>git status</code> ausführen, werden wir keine Änderungen sehen, weil alle drei Bäume gleich sind.</p>
+</div>
+<div class="paragraph">
+<p>Nun wollen wir eine Änderung an dieser Datei vornehmen und sie übertragen.
+Wir führen den gleichen Vorgang durch. Zuerst ändern wir die Datei in unserem Arbeitsverzeichnis.
+Wir nennen sie <strong>v2</strong> dieser Datei und markieren sie in rot.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-ex4.png" >}}" alt="reset ex4">
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn wir jetzt den Befehl <code>git status</code> aufrufen, sehen wir die Datei in rot als „Changes not staged for commit“ (dt. Änderungen nicht zum Commit vorgemerkt), weil sich dieser Eintrag im Index zu dem im Arbeitsverzeichnis unterscheidet.
+Als nächstes führen wir <code>git add</code> aus, um sie in unseren Index zu übernehmen, d.h zur Staging-Area hinzuzufügen.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-ex5.png" >}}" alt="reset ex5">
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn wir zu diesem Zeitpunkt <code>git status</code> ausführen, sehen wir die Datei in grün unter „Changes to be committed“ (dt. Änderungen zum Commit vorgemerkt), weil sich der Index und der HEAD unterscheiden – d.h. unser geplanter nächster Commit unterscheidet sich nun von unserem letzten Commit.
+Schließlich führen wir <code>git commit</code> aus, um die Daten zu übertragen.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-ex6.png" >}}" alt="reset ex6">
+</div>
+</div>
+<div class="paragraph">
+<p>Nun wird uns <code>git status</code> keine Ergebnisse liefern, weil alle drei Bäume wieder gleich sind.</p>
+</div>
+<div class="paragraph">
+<p>Das Wechseln von Branches oder das Klonen geht ähnlich vor sich.
+Wenn Sie einen Branch auschecken, ändert er <strong>HEAD</strong> so, dass er auf den neuen Branch-Ref zeigt, füllt Ihre <strong>Staging-Area</strong> (bzw. Index) mit dem aktuellen Schnappschuss dieses Commits und kopiert dann den Inhalt des <strong>Index</strong> in Ihr <strong>Arbeitsverzeichnis</strong>.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_die_bedeutung_von_reset">Die Bedeutung von Reset</h3>
+<div class="paragraph">
+<p>Der Befehl <code>reset</code> macht mehr Sinn, wenn wir folgenden Fall betrachten.</p>
+</div>
+<div class="paragraph">
+<p>Für diesen Zweck nehmen wir an, dass wir <code>file.txt</code> erneut modifiziert und ein drittes Mal committed hätten.
+Nun sieht unser Verlauf so aus:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-start.png" >}}" alt="reset start">
+</div>
+</div>
+<div class="paragraph">
+<p>Lassen Sie uns nun genau untersuchen, was <code>reset</code> bewirkt, wenn Sie es aufrufen.
+Es manipuliert die drei Bäume auf einfache und kalkulierbare Weise direkt.
+Es führt bis zu drei einfache Operationen aus.</p>
+</div>
+<div class="sect4">
+<h4 id="_step_1_den_head_verschieben">Step 1: Den HEAD verschieben</h4>
+<div class="paragraph">
+<p>Als erstes wird <code>reset</code> das verschieben, worauf HEAD zeigt.
+Das ist nicht dasselbe wie HEAD selbst zu ändern (was <code>checkout</code> macht). <code>reset</code> verschiebt den Branch, auf den HEAD zeigt.
+Das bedeutet, wenn HEAD auf den Branch <code>master</code> gesetzt ist (d.h. Sie befinden sich gerade auf dem <code>master</code> Branch), wird die Ausführung von <code>git reset 9e5e6a4</code> damit starten, dass <code>master</code> auf <code>9e5e6a4</code> zeigt.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-soft.png" >}}" alt="reset soft">
+</div>
+</div>
+<div class="paragraph">
+<p>Egal, mit welcher Methode Sie <code>reset</code> bei einem Commit aufrufen, das ist immer die erste Aktion, die versucht wird auszuführen.
+Mit <code>reset --soft</code> wird es dort einfach stoppen.</p>
+</div>
+<div class="paragraph">
+<p>Nehmen Sie sich nun eine Minute Zeit, um sich diese Abbildung anzusehen und sich zu fragen, was da passiert ist. Es hat im Wesentlichen den letzten <code>git commit</code> Befehl rückgängig gemacht.
+Wenn Sie <code>git commit</code> ausführen, erzeugt Git einen neuen Commit und verschiebt den Branch, auf den HEAD zeigt, dahin.
+Wenn Sie auf HEAD~ (das Elternteil von HEAD) zurücksetzen, verschieben Sie den Branch wieder an seine ursprüngliche Stelle, ohne den Index oder das Arbeitsverzeichnis zu ändern.
+Sie könnten nun den Index aktualisieren und <code>git commit</code> erneut ausführen, um das zu erreichen, was <code>git commit --amend</code> getan hätte (siehe auch <a href="{{< relurl "book/de/v2/ch00/_git_amend" >}}">Den letzten Commit ändern</a>).</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_step_2_den_index_aktualisieren_mixed">Step 2: Den Index aktualisieren (--mixed)</h4>
+<div class="paragraph">
+<p>Bitte berücksichtigen Sie, dass Sie bei Ausführung von <code>git status</code> in grün den Unterschied zwischen dem Index und dem neuen HEAD sehen werden.</p>
+</div>
+<div class="paragraph">
+<p>Als nächstes wird <code>reset</code> den Index mit dem Inhalt des Schnappschusses aktualisieren, auf den HEAD jetzt zeigt.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-mixed.png" >}}" alt="reset mixed">
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie die Option <code>--mixed</code> angeben, wird <code>reset</code> an dieser Stelle beendet.
+Das ist auch die Voreinstellung, wenn Sie also überhaupt keine Option angeben (in diesem Fall nur <code>git reset HEAD~</code>), wird der Befehl dort enden.</p>
+</div>
+<div class="paragraph">
+<p>Nehmen Sie sich noch eine Minute Zeit, um sich jetzt diese Abbildung anzuschauen und zu erkennen, was passiert ist: Es hat Ihren letzten <code>commit</code> rückgängig gemacht, aber auch alles auf <em>unstaged</em> gesetzt.
+Sie wurden auf den Stand zurück versetzt, bevor Sie alle Ihre <code>git add</code> und <code>git commit</code> Befehle ausgeführt hatten.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_step_3_das_working_directory_arbeitsverzeichnis_aktualisieren_hard">Step 3: Das Working Directory (Arbeitsverzeichnis) aktualisieren (--hard)</h4>
+<div class="paragraph">
+<p>Als Drittes wird das Arbeitsverzeichnis durch <code>reset</code> zurückgesetzt, damit es dem Index entspricht.
+Wenn Sie die Option <code>--hard</code> verwenden, wird es bis zu diesem Schritt fortgesetzt.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-hard.png" >}}" alt="reset hard">
+</div>
+</div>
+<div class="paragraph">
+<p>Denken wir also darüber nach, was gerade passiert ist.
+Sie haben Ihren letzten Commit rückgängig gemacht, die Befehle <code>git add</code> und <code>git commit</code> <strong>und dazu noch</strong> die gesamte Arbeit, die Sie in Ihrem Arbeitsverzeichnis geleistet hatten.</p>
+</div>
+<div class="paragraph">
+<p>Es ist sehr wichtig zu wissen, dass das Flag (<code>--hard</code>) die einzige Möglichkeit ist, den Befehl <code>reset</code> gefährlich zu machen und einer der wenigen Fälle, in denen Git tatsächlich Daten vernichtet.
+Jeder andere Aufruf von <code>reset</code> kann ziemlich leicht rückgängig gemacht werden, aber nicht die Option <code>--hard</code>, da sie Dateien im Arbeitsverzeichnis zwingend überschreibt.
+In diesem speziellen Fall haben wir noch immer die <strong>v3</strong> Version unserer Datei in einem Commit in unserer Git-Datenbank. Wir könnten sie durch einen Blick auf unser <code>reflog</code> zurückholen. Hätten wir sie aber nicht committet, dann hätte Git die Datei überschrieben und sie wäre nicht wiederherstellbar.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_zusammenfassung_9">Zusammenfassung</h4>
+<div class="paragraph">
+<p>Der Befehl <code>reset</code> überschreibt diese drei Bäume in einer bestimmten Reihenfolge und stoppt, wann Sie es wollen:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Verschiebe den Branch-HEAD und <em>(stoppt hier, wenn <code>--soft</code>)</em>.</p>
+</li>
+<li>
+<p>Lasse den Index wie HEAD erscheinen <em>(hier stoppen, wenn nicht <code>--hard</code>)</em>.</p>
+</li>
+<li>
+<p>Lasse das Arbeitsverzeichnis wie den Index erscheinen.</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_zurücksetzen_reset_mit_pfadangabe">Zurücksetzen (reset) mit Pfadangabe</h3>
+<div class="paragraph">
+<p>Das deckt das Verhalten von <code>reset</code> in seiner Basisform ab, aber Sie können ihm auch einen Pfad angeben, auf dem er aktiv werden soll.
+Wenn Sie einen Pfad festlegen, überspringt <code>reset</code>  Step 1 und beschränkt die restlichen Aktionen auf eine bestimmte Datei oder eine Gruppe von Dateien.
+Das macht tatsächlich Sinn – HEAD ist nur ein Pointer. Sie können nicht auf den einen Teil eines Commits und auf einen Teil eines anderen zeigen.
+Der Index und das Arbeitsverzeichnis <em>können</em> jedoch teilweise aktualisiert werden, so dass das Zurücksetzen mit den Schritten 2 und 3 fortgesetzt wird.</p>
+</div>
+<div class="paragraph">
+<p>Nehmen wir also an, wir führen ein <code>git reset file.txt</code> aus.
+Da Sie hier keinen Commit-SHA-1 oder -Branch angegeben haben und auch nicht die Optionen --soft oder --hard verwendet haben, ist das die Kurzform für <code>git reset --mixed HEAD file.txt</code>. Der Befehl wird Folgendes bewirken:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Verschiebt den Branch, HEAD zeigt auf <em>(übersprungen)</em>.</p>
+</li>
+<li>
+<p>Passt den Index an HEAD an <em>(stopt hier)</em>.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Er kopiert also im Endeffekt nur <code>file.txt</code> von HEAD in den Index.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-path1.png" >}}" alt="reset path1">
+</div>
+</div>
+<div class="paragraph">
+<p>Das hat den praktischen Effekt, dass die Datei <em>aus der Staging-Area entfernt</em> wird (engl. unstage).
+Wenn wir uns die Abbildung für diesen Befehl ansehen und überlegen, was <code>git add</code> macht, sind die beiden Befehle genau gegensätzlich.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-path2.png" >}}" alt="reset path2">
+</div>
+</div>
+<div class="paragraph">
+<p>Deshalb schlägt die Anzeige des Befehls <code>git status</code> vor, dass Sie den Befehl <code>git reset</code> ausführen, um eine Datei aus der Staging-Area zu entfernen. Siehe auch Kapitel 2 <a href="{{< relurl "book/de/v2/ch00/_unstaging" >}}">Eine Datei aus der Staging-Area entfernen</a> für weitere Informationen.</p>
+</div>
+<div class="paragraph">
+<p>Wir könnten, ebenso einfach, Git nicht annehmen lassen, dass wir damit meinen, es soll „die Daten aus dem HEAD holen“ (engl. pull), indem wir einen bestimmten Commit angeben, aus dem diese Dateiversion gezogen werden soll.
+Stattdessen würden wir einfach etwas wie <code>git reset eb43bf file.txt</code> ausführen.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-path3.png" >}}" alt="reset path3">
+</div>
+</div>
+<div class="paragraph">
+<p>Das macht effektiv dasselbe, als ob wir den Inhalt der Datei im Arbeitsverzeichnis auf <strong>v1</strong> geändert, <code>git add</code> darauf ausgeführt und dann wieder auf <strong>v3</strong> zurückgewandelt hätten (ohne wirklich alle diese Schritte zu durchlaufen).
+Wenn wir jetzt <code>git commit</code> aufrufen, wird er eine Modifikation registrieren, die diese Datei wieder auf <strong>v1</strong> zurücksetzt, obwohl wir sie nie wieder in unserem Arbeitsverzeichnis hatten.</p>
+</div>
+<div class="paragraph">
+<p>Interessant ist auch, dass der <code>reset</code> Befehl wie auch <code>git add</code> die Option <code>--patch</code> akzeptiert, um Inhalte schrittweise zu entfernen.
+Sie können also selektiv Inhalte aufheben oder zurücksetzen.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_squashing_zusammenfassen">Squashing (Zusammenfassen)</h3>
+<div class="paragraph">
+<p>Schauen wir uns an, was wir mit dieser neu entdeckten Möglichkeit machen können – das Zusammenfassen von Commits.</p>
+</div>
+<div class="paragraph">
+<p>Angenommen, Sie hätten eine Reihe von Commits mit Nachrichten wie „Ups“, „WIP“ und „Diese Datei vergessen“.
+Sie können <code>reset</code> verwenden, um diese schnell und einfach in einem einzigen Commit zusammenzufassen, der Sie wirklich clever aussehen lässt.
+<a href="{{< relurl "book/de/v2/ch00/_squashing" >}}">Commits zusammenfassen</a> zeigt Ihnen eine andere Möglichkeit auf. In diesem Fall ist es einfacher <code>reset</code> zu verwenden.</p>
+</div>
+<div class="paragraph">
+<p>Stellen wir uns vor, Sie hätten ein Projekt, bei dem der erste Commit eine Datei enthält, der zweite Commit eine neue Datei hinzufügt und die erste ändert, und der dritte Commit die erste Datei erneut ändert.
+Der zweite Commit war eine unfertige Arbeit und Sie wollen diesen zusammenschieben.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-squash-r1.png" >}}" alt="reset squash r1">
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können <code>git reset --soft HEAD~2</code> ausführen, um den HEAD-Branch zurück zu einem älteren Commit (dem neuesten Commit, den Sie behalten wollen) zu verschieben:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-squash-r2.png" >}}" alt="reset squash r2">
+</div>
+</div>
+<div class="paragraph">
+<p>Danach einfach erneut <code>git commit</code> starten:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-squash-r3.png" >}}" alt="reset squash r3">
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt können Sie sehen, dass Ihr erwünschter Verlauf, der Verlauf, den Sie pushen würden, jetzt so aussieht, als hätten Sie einen Commit mit <code>file-a.txt</code> v1 gemacht, dann einen zweiten, der sowohl <code>file-a.txt</code> zu v3 modifiziert als auch <code>file-b.txt</code> hinzugefügt hat.
+Der Commit mit der Version v2 der Datei ist nicht mehr im Verlauf enthalten.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_auschecken_checkout">Auschecken (checkout)</h3>
+<div class="paragraph">
+<p>Zum Schluss werden Sie sich vielleicht fragen, was der Unterschied zwischen <code>checkout</code> und <code>reset</code> ist.
+Wie <code>reset</code> manipuliert <code>checkout</code> die drei Bäume. Es ist ein bisschen unterschiedlich, je nachdem, ob Sie dem Befehl einen Dateipfad mitgeben oder nicht.</p>
+</div>
+<div class="sect4">
+<h4 id="_ohne_pfadangabe">Ohne Pfadangabe</h4>
+<div class="paragraph">
+<p>Das Benutzen von <code>git checkout [branch]</code> ist dem Ausführen von <code>git reset --hard [branch]</code> ziemlich ähnlich, da es alle drei Bäume aktualisiert, damit Sie wie <code>[branch]</code> aussehen, aber es gibt zwei wichtige Unterschiede.</p>
+</div>
+<div class="paragraph">
+<p>Erstens, anders als bei <code>reset --hard</code>, ist bei <code>checkout</code> das Arbeitsverzeichnis sicher. Es wird geprüft, ob Dateien, die Änderungen enthalten, nicht weggefegt werden.
+Eigentlich ist es noch etwas intelligenter – es versucht, eine triviale Zusammenführung im Arbeitsverzeichnis durchzuführen, so dass alle Dateien, die Sie <em>nicht</em> geändert haben, aktualisiert werden.
+<code>reset --hard</code> hingegen, wird alles ohne Überprüfung einfach ersetzen.</p>
+</div>
+<div class="paragraph">
+<p>Der zweite wichtige Unterschied ist die Frage, wie <code>checkout</code> den HEAD aktualisiert.
+Während <code>reset</code> den Branch verschiebt, auf den HEAD zeigt, so bewegt <code>checkout</code> den HEAD selbst, um auf einen anderen Branch zu zeigen.</p>
+</div>
+<div class="paragraph">
+<p>Angenommen, wir haben <code>master</code> und <code>develop</code> Branches, die zu verschiedenen Commits zeigen und wir befinden uns gerade in dem <code>develop</code> Branch (also weist HEAD dorthin).
+Sollten wir <code>git reset master</code> ausführen, wird <code>develop</code> selbst nun auf den gleichen Commit zeigen, den <code>master</code> durchführt.
+Wenn wir stattdessen <code>git checkout master</code> ausführen, ändert sich <code>develop</code> nicht, HEAD selbst bewegt sich.
+HEAD zeigt nun auf <code>master</code>.</p>
+</div>
+<div class="paragraph">
+<p>In beiden Fällen verschieben wir also HEAD, um auf Commit A zu zeigen, <em>aber die Methode</em> ist sehr unterschiedlich.
+<code>reset</code> verschiebt den Branch zum HEAD, checkout dagegen verschiebt den HEAD selbst (nicht den Branch).</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/de/v2/images/reset-checkout.png" >}}" alt="reset checkout">
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_mit_pfadangabe">Mit Pfadangabe</h4>
+<div class="paragraph">
+<p>Die andere Möglichkeit, das Auschecken (<code>checkout</code>) auszuführen, ist incl. der Angabe eines Dateipfades, der, wie bei <code>reset</code>, den HEAD nicht verschiebt.
+Es ist genau wie bei <code>git reset [branch] Datei</code>, indem es den Index mit dieser Datei beim Commit aktualisiert, aber es überschreibt auch die Datei im Arbeitsverzeichnis.
+Es wäre genau wie <code>git reset --hard [branch] Datei</code> (wenn <code>reset</code> Sie das ausführen lassen würde) – das Arbeitsverzeichnis ist nicht sicher und der Befehl verschiebt den HEAD nicht.</p>
+</div>
+<div class="paragraph">
+<p>Ebenso wie <code>git reset</code> und <code>git add</code> akzeptiert <code>checkout</code> die Option <code>--patch</code>, die es Ihnen erlaubt, den Inhalt von Dateien auf Basis von einzelnen Teilen selektiv zurückzusetzen.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_zusammenfassung_10">Zusammenfassung</h3>
+<div class="paragraph">
+<p>Wir hoffen, dass Sie jetzt den Befehl <code>reset</code> besser kennen und anwenden können. Wahrscheinlich sind Sie aber immer noch etwas unsicher, wie genau er sich von <code>checkout</code> unterscheidet. Sie können sich vermutlich nicht alle Regeln der verschiedenen Aufrufe merken.</p>
+</div>
+<div class="paragraph">
+<p>Hier ist eine Tabelle, die zeigt, welche Befehle sich auf welche Bäume auswirken.
+In der Spalte „HEAD“ bedeutet „REF“, dass dieser Befehl die Referenz (den Branch) verschiebt, auf die HEAD zeigt. „HEAD“ signalisiert, dass er HEAD selbst verschiebt.
+Achten Sie besonders auf die Spalte „WD sicher?“ – wenn dort <strong>„NO“</strong> steht, überlegen Sie sich genau, ob Sie diesen Befehl ausführen wollen.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 42.8571%;">
+<col style="width: 14.2857%;">
+<col style="width: 14.2857%;">
+<col style="width: 14.2857%;">
+<col style="width: 14.2858%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top"></th>
+<th class="tableblock halign-left valign-top">HEAD</th>
+<th class="tableblock halign-left valign-top">Index</th>
+<th class="tableblock halign-left valign-top">Workdir</th>
+<th class="tableblock halign-left valign-top">WD sicher?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Commit Level</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reset --soft [commit]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">REF</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reset [commit]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">REF</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reset --hard [commit]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">REF</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>NO</strong></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>checkout &lt;commit&gt;</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">HEAD</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>File Level</strong></p></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>reset [commit] &lt;paths&gt;</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>checkout [commit] &lt;paths&gt;</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NO</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">YES</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>NO</strong></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
