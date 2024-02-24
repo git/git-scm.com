@@ -1,0 +1,456 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: GitHub
+    number: 6
+  section:
+    title: Scripting en GitHub
+    number: 5
+    cs_number: '6.5'
+    previous: book/es/v2/GitHub-Gestión-de-una-organización
+    next: book/es/v2/GitHub-Resumen
+title: Git - Scripting en GitHub
+
+---
+<h2 id="_scripting_en_github">Scripting en GitHub</h2>
+<div class="paragraph">
+<p>Ya conocemos casi todas las características y modos de trabajo de GitHub. Sin
+embargo, cualquier grupo o proyecto medianamente grande necesitará
+personalizar o integrar GitHub con servicios externos.</p>
+</div>
+<div class="paragraph">
+<p>Por suerte para nosotros, GitHub es bastante <em>hackeable</em> en muchos
+sentidos. En esta sección veremos cómo se usan los <em>enganches</em>
+(hooks) de GitHub y las API para conseguir hacer lo que queremos.</p>
+</div>
+<div class="sect3">
+<h3 id="_enganches">Enganches</h3>
+<div class="paragraph">
+<p>Las secciones Hooks y Services, de la página de administración del
+repositorio en Github, es la forma más simple de hacer que GitHub
+interactúe con sistemas externos.</p>
+</div>
+<div class="sect4">
+<h4 id="_servicios">Servicios</h4>
+<div class="paragraph">
+<p>En primer lugar, echaremos un ojo a los Servicios. Ambos, enganches
+y servicios, pueden configurarse desde la sección Settings del
+repositorio, el mismo sitio donde vimos que podíamos añadir
+colaboradores al proyecto o cambiar la rama predeterminada.
+Bajo la opción “Webhooks and Services” veremos algo similar
+a <a href="{{< relurl "book/es/v2/ch00/r_services_hooks" >}}">Sección Services and Hooks.</a>.</p>
+</div>
+<div id="r_services_hooks" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-01-services.png" >}}" alt="Servicios y enganches">
+</div>
+<div class="title">Figura 130. Sección Services and Hooks.</div>
+</div>
+<div class="paragraph">
+<p>Hay docenas de servicios que podemos elegir, muchos de ellos
+para integrarse en otros sistemas de código abierto o
+comerciales. Muchos son servicios de integración continua,
+gestores de incidencias y fallos, salas de charla y sistemas
+de documentación. Veremos cómo levantar un servicio sencillo:
+el enganche con el correo electrónico. Si elegimos “email”
+en la opción “Add Service” veremos una pantalla de
+configuración similar a <a href="{{< relurl "book/es/v2/ch00/r_service_config" >}}">Configuración de servicio de correo.</a>.</p>
+</div>
+<div id="r_service_config" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-02-email-service.png" >}}" alt="Servicio de correo">
+</div>
+<div class="title">Figura 131. Configuración de servicio de correo.</div>
+</div>
+<div class="paragraph">
+<p>En este caso, si pulsamos en el botón “Add service”, la
+dirección de correo especificada recibirá un correo cada vez que
+alguien envía cambios (push) al repositorio. Los servicios pueden
+dispararse con muchos otros tipos de eventos, aunque la mayoría
+sólo se usan para los eventos de envío de cambios (push) y hacer
+algo con los datos del mismo.</p>
+</div>
+<div class="paragraph">
+<p>Si quieres integrar algún sistema concreto con GitHub, debes
+mirar si hay algún servicio de integración ya creado. Por ejemplo,
+si usas Jenkins para ejecutar pruebas de tu código, puedes activar
+el servicio de integración de Jenkins que lo disparará cada vez
+que alguien altera el repositorio.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_hooks_enganches">Hooks (enganches)</h4>
+<div class="paragraph">
+<p>Si necesitas algo más concreto o quieres integrarlo con un servicio
+o sitio no incluido en la lista, puedes usar el sistema de enganches
+más genérico. Los enganches de GitHub son bastante simples. Indicas
+una URL y GitHub enviará una petición HTTP a dicha URL cada vez que
+suceda el evento que quieras.</p>
+</div>
+<div class="paragraph">
+<p>Normalmente, esto funcionará si puedes configurar un pequeño servicio
+web para escuchar las peticiones de GitHub y luego hacer algo con los
+datos que son enviados.</p>
+</div>
+<div class="paragraph">
+<p>Para activar un enganche, pulsa en el botón “Add webhook” de
+<a href="{{< relurl "book/es/v2/ch00/r_services_hooks" >}}">Sección Services and Hooks.</a>. Esto mostrará una página como <a href="{{< relurl "book/es/v2/ch00/r_web_hook" >}}">Configuración de enganches web.</a>.</p>
+</div>
+<div id="r_web_hook" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-03-webhook.png" >}}" alt="Enganches web">
+</div>
+<div class="title">Figura 132. Configuración de enganches web.</div>
+</div>
+<div class="paragraph">
+<p>La configuración de un enganche web es bastante simple. Casi siempre
+basta con incluir una URL y una clave secreta, y pulsar en “Add webhook”.
+Hay algunas opciones sobre qué eventos quieres que disparen el envío de
+datos (de forma predeterminada el único evento considerado es el evento
+<code>push</code>, que se dispara cuando alguien sube algo a cualquier rama del repositorio).</p>
+</div>
+<div class="paragraph">
+<p>Veamos un pequeño ejemplo de servicio web para manejar un enganche web.
+Usaremos el entorno Sinatra de Ruby, puesto que es conciso y podrás
+entender con facilidad qué estamos haciendo.</p>
+</div>
+<div class="paragraph">
+<p>Pongamos que queremos recibir un correo cada vez que alguien sube algo
+a una rama concreta del repositorio, modificando un archivo en particular.
+Podríamos hacerlo con un código similar a este:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">require 'sinatra'
+require 'json'
+require 'mail'
+
+post '/payload' do
+  push = JSON.parse(request.body.read) # parse the JSON
+
+  # gather the data we're looking for
+  pusher = push["pusher"]["name"]
+  branch = push["ref"]
+
+  # get a list of all the files touched
+  files = push["commits"].map do |commit|
+    commit['added'] + commit['modified'] + commit['removed']
+  end
+  files = files.flatten.uniq
+
+  # check for our criteria
+  if pusher == 'schacon' &amp;&amp;
+     branch == 'ref/heads/special-branch' &amp;&amp;
+     files.include?('special-file.txt')
+
+    Mail.deliver do
+      from     'tchacon@example.com'
+      to       'tchacon@example.com'
+      subject  'Scott Changed the File'
+      body     "ALARM"
+    end
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Aquí estamos tomando el bloque JSON que GitHub entrega y mirando
+quién hizo el envío, qué rama se envió y qué archivos se modificaron en cada
+“commit” realizado en este push. Entonces, comprobamos si se cumple nuestro
+criterio y enviamos un correo si es así.</p>
+</div>
+<div class="paragraph">
+<p>Para poder probar algo como esto, tienes una consola de desarrollador en la
+misma pantalla donde configuraste el enganche, donde se pueden ver las últimas
+veces que GitHub ha intentado ejecutar el enganche. Para cada uno, puedes
+mirar qué información se ha enviado y si fué recibido correctamente, junto
+con las cabeceras correspondientes de la petición y de la respuesta. Esto
+facilita mucho las pruebas de tus enganches.</p>
+</div>
+<div id="r_web_hook_debug" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-04-webhook-debug.png" >}}" alt="Depuración de Webhook">
+</div>
+<div class="title">Figura 133. Depuración de un web hook.</div>
+</div>
+<div class="paragraph">
+<p>Otra cosa muy interesante es que puedes repetir el envío de cualquier petición
+para probar el servicio con facilidad.</p>
+</div>
+<div class="paragraph">
+<p>Para más información sobre cómo escribir webhooks (enganches) y los
+diferentes tipos de eventos que puedes tratar, puedes ir a la
+documentación del desarrollador de GitHub, en:
+<a href="https://developer.github.com/webhooks/" class="bare">https://developer.github.com/webhooks/</a></p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_la_api_de_github">La API de GitHub</h3>
+<div class="paragraph">
+<p>
+Servicios y enganches nos sirven para recibir notificaciones “push” sobre
+eventos que suceden en tus repositorios. Pero, ¿qué pasa si necesitas más
+información acerca de estos eventos?, ¿y si necesitas automatizar algo como
+añadir colaboradores o etiquetar incidencias?</p>
+</div>
+<div class="paragraph">
+<p>Aquí es donde entra en juego la API de GitHub. GitHub tiene montones de
+llamadas de API para hacer casi cualquier cosa que puedes hacer vía web,
+de forma automatizada. En esta sección aprenderemos cómo autentificar y
+conectar a la API, cómo comentar una incidencia y cómo cambiar el estado
+de un Pull Request mediante la API.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_uso_básico_2">Uso Básico</h3>
+<div class="paragraph">
+<p>Lo más básico que podemos hacer es una petición GET a una llamada que no
+necesite autentificación. Por ejemplo, información de solo lectura de un
+proyecto de código abierto. Por ejemplo, si queremos conocer información
+acerca del usuario “schacon”, podemos ejecutar algo como:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-javascript" data-lang="javascript">$ curl https://api.github.com/users/schacon
+{
+  "login": "schacon",
+  "id": 70,
+  "avatar_url": "https://avatars.githubusercontent.com/u/70",
+# …
+  "name": "Scott Chacon",
+  "company": "GitHub",
+  "following": 19,
+  "created_at": "2008-01-27T17:19:28Z",
+  "updated_at": "2014-06-10T02:37:23Z"
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hay muchísimas llamadas como esta para obtener información sobre
+organizaciones, proyectos, incidencias, commits, es decir, todo lo que
+podemos ver públicamente en la web de GitHub. Se puede usar la API para
+otras cosas como ver un archivo Markdown cualquiera o encontrar una
+plantilla de <code>.gitignore</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-javascript" data-lang="javascript">$ curl https://api.github.com/gitignore/templates/Java
+{
+  "name": "Java",
+  "source": "*.class
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+"
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_comentarios_en_una_incidencia">Comentarios en una incidencia</h3>
+<div class="paragraph">
+<p>Sin embargo, si lo que quieres es realizar una acción como comentar una
+incidencia o un Pull Request, o si quieres ver o interactuar con un
+contenido privado, necesitas identificarte.</p>
+</div>
+<div class="paragraph">
+<p>Hay varias formas de hacerlo. Puedes usar la autentificación básica, con
+tu usuario y tu contraseña, aunque generalmente es mejor usar un token de
+acceso personal. Puedes generarlo en la opción “Applications” de tu
+página de ajustes personales.</p>
+</div>
+<div id="r_access_token" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-05-access-token.png" >}}" alt="Token de acceso">
+</div>
+<div class="title">Figura 134. Generación del token de acceso.</div>
+</div>
+<div class="paragraph">
+<p>Te preguntará acerca del ámbito que quieres para el token y una descripción.
+Asegúrate de usar una buena descripción para que te resulte fácil localizar
+aquellos token que ya no necesitas.</p>
+</div>
+<div class="paragraph">
+<p>GitHub te permitirá ver el token una vez, por lo que tienes que copiarlo en
+ese momento. Ahora podrás identificarte en el script con el token, en lugar
+del usuario y la contraseña. Esto está bien porque puedes limitar el ámbito de
+lo que se quiere hacer y porque el token se puede anular.</p>
+</div>
+<div class="paragraph">
+<p>También tiene la ventaja de incrementar la tasa de accesos. Sin la
+autentificación podrás hacer 60 peticiones a la hora. Con una identificación
+el número de accesos permitidos sube a 5,000 por hora.</p>
+</div>
+<div class="paragraph">
+<p>Realicemos entonces un comentario en una de nuestras incidencias. Por ejemplo,
+queremos dejar un comentario en la incidencia #6. Para ello, hacemos una
+petición HTTP POST a <code>repos/&lt;usuario&gt;/&lt;repo&gt;/issues/&lt;num&gt;/comments</code> con el
+token que acabamos de generar como cabecera <em>Authorization</em>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-javascript" data-lang="javascript">$ curl -H "Content-Type: application/json" \
+       -H "Authorization: token TOKEN" \
+       --data '{"body":"A new comment, :+1:"}' \
+       https://api.github.com/repos/schacon/blink/issues/6/comments
+{
+  "id": 58322100,
+  "html_url": "https://github.com/schacon/blink/issues/6#issuecomment-58322100",
+  ...
+  "user": {
+    "login": "tonychacon",
+    "id": 7874698,
+    "avatar_url": "https://avatars.githubusercontent.com/u/7874698?v=2",
+    "type": "User",
+  },
+  "created_at": "2014-10-08T07:48:19Z",
+  "updated_at": "2014-10-08T07:48:19Z",
+  "body": "A new comment, :+1:"
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora, si vas a la incidencia, verás el comentario que acabas de enviar tal como
+en <a href="{{< relurl "book/es/v2/ch00/r_api_comment" >}}">Comentario enviado desde la API de GitHub.</a>.</p>
+</div>
+<div id="r_api_comment" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-06-comment.png" >}}" alt="Comentario via API">
+</div>
+<div class="title">Figura 135. Comentario enviado desde la API de GitHub.</div>
+</div>
+<div class="paragraph">
+<p>Puedes usar la API para hacer todo lo que harías en el sitio web: crear y
+ajustar hitos, asignar gente a incidencias o Pull Requests, crear y cambiar
+etiquetas, acceder a datos de “commit”, crear nuevos commits y ramas, abrir, cerrar
+o fusionar Pull Requests, crear y editar equipos, comentar líneas de cambio en
+Pull Requests, buscar en el sitio y mucho más.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_cambio_de_estado_de_un_pull_request">Cambio de estado de un Pull Request</h3>
+<div class="paragraph">
+<p>Un ejemplo final que veremos es realmente útil si trabajas con Pull Requests.
+Cada “commit” tiene uno o más estados asociados con él, y hay una API
+para alterar y consultar ese estado.</p>
+</div>
+<div class="paragraph">
+<p>Los servicios de integración continua y pruebas hacen uso de esta API
+para actuar cuando alguien envía código al repositorio, probando el mismo y
+devolviendo como resultado si el “commit” pasó todas las pruebas. Además,
+se podría comprobar si el mensaje del “commit” tiene un formato adecuado, si
+el autor siguió todas las recomendaciones para autores, si fue firmado, etc.</p>
+</div>
+<div class="paragraph">
+<p>Supongamos que tenemos un enganche web en el repositorio que llama a un servicio
+web que comprueba si en el mensaje del “commit” aparece la cadena <code>Signed-off-by</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">require 'httparty'
+require 'sinatra'
+require 'json'
+
+post '/payload' do
+  push = JSON.parse(request.body.read) # parse the JSON
+  repo_name = push['repository']['full_name']
+
+  # look through each commit message
+  push["commits"].each do |commit|
+
+    # look for a Signed-off-by string
+    if /Signed-off-by/.match commit['message']
+      state = 'success'
+      description = 'Successfully signed off!'
+    else
+      state = 'failure'
+      description = 'No signoff found.'
+    end
+
+    # post status to GitHub
+    sha = commit["id"]
+    status_url = "https://api.github.com/repos/#{repo_name}/statuses/#{sha}"
+
+    status = {
+      "state"       =&gt; state,
+      "description" =&gt; description,
+      "target_url"  =&gt; "http://example.com/how-to-signoff",
+      "context"     =&gt; "validate/signoff"
+    }
+    HTTParty.post(status_url,
+      :body =&gt; status.to_json,
+      :headers =&gt; {
+        'Content-Type'  =&gt; 'application/json',
+        'User-Agent'    =&gt; 'tonychacon/signoff',
+        'Authorization' =&gt; "token #{ENV['TOKEN']}" }
+    )
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Creemos que esto es fácil de seguir. En este controlador del enganche, miramos
+en cada “commit” enviado, y buscamos la cadena <em>Signed-off-by</em> en el mensaje de
+“commit”, y finalmente hacemos un HTTP POST al servicio de API
+<code>/repos/&lt;user&gt;/&lt;repo&gt;/statuses/&lt;commit_sha&gt;</code> con el resultado.</p>
+</div>
+<div class="paragraph">
+<p>En este caso, puedes enviar un estado (<em>success</em>, <em>failure</em>, <em>error</em>), una
+descripción de qué ocurrió, una URL objetivo donde el usuario puede
+ir a buscar más información y un “contexto” en caso de que haya múltiples
+estados para un “commit”. Por ejemplo, un servicio de test puede dar un estado,
+y un servicio de validación puede dar por su parte su propio estado; el campo
+“context” serviría para diferenciarlos.</p>
+</div>
+<div class="paragraph">
+<p>Si alguien abre un nuevo Pull Request en GitHub y este enganche está
+configurado, verías algo como <a href="{{< relurl "book/es/v2/ch00/r_commit_status" >}}">Estado del commit mediante API.</a>.</p>
+</div>
+<div id="r_commit_status" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/scripting-07-status.png" >}}" alt="Estado del commit">
+</div>
+<div class="title">Figura 136. Estado del commit mediante API.</div>
+</div>
+<div class="paragraph">
+<p>Podrás ver entonces una pequeña marca de color verde, que nos indica que
+el “commit” tiene la cadena “Signed-off-by” en el mensaje y un aspa roja
+en aquellos donde el autor olvidase hacer esa firma. También verías
+que el Pull Request toma el estado del último “commit” en la rama y te avisa
+de si es un fallo. Esto es realmente útil si usas la API para pruebas,
+y así evitar hacer una fusión accidental de unos commits que han fallado
+las pruebas.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_octokit">Octokit</h3>
+<div class="paragraph">
+<p>Hasta ahora hemos hecho casi todas las pruebas con <code>curl</code> y peticiones HTTP
+simples, pero en GitHub hay diferentes bibliotecas de código abierto que hacen
+más fácil el manejo de la API, agrupadas bajo el nombre de Octokit. En el
+momento de escribir esto, están soportados lenguajes como Go, Objective-C, Ruby
+y .NET. Se puede ir a <a href="https://github.com/octokit" class="bare">https://github.com/octokit</a> para más información sobre
+esto, que te ayudarán a manejar peticiones y respuestas a la API de GitHub.</p>
+</div>
+<div class="paragraph">
+<p>Con suerte estas utilidades te ayudarán a personalizar y modificar GitHub para
+integrarlo mejor con tu forma concreta de trabajar. Para una documentación
+completa de la API así como ayudas para realizar tareas comunes, puedes
+consultar en https://developer.github.com.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
