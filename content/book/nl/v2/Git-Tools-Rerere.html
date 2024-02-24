@@ -1,0 +1,305 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Rerere
+    number: 9
+    cs_number: '7.9'
+    previous: book/nl/v2/Git-Tools-Mergen-voor-gevorderden
+    next: book/nl/v2/Git-Tools-Debuggen-met-Git
+title: Git - Rerere
+
+---
+<h2 id="ref_rerere">Rerere</h2>
+<div class="paragraph">
+<p>De functionaliteit van <code>git rerere</code> is een beetje onbekend.
+De naam staat voor “reuse recorded resolution” (hergebruik opgenomen resoluties/oplossingen) en zoals de naam al aangeeft, stelt het je in staat om Git te vragen te onthouden hoe je een bepaald deel van een conflict hebt opgelost zodat Git, als het de volgende keer een vergelijkbaar conflict ziet, deze automatisch voor je kan oplossen.</p>
+</div>
+<div class="paragraph">
+<p>Er zijn een aantal scenarios waarin deze functionaliteit erg handig zou kunnen zijn.
+Een van de voorbeelden dat in de documentatie wordt genoemd is dat je ervoor wilt zorgen dat een langlevende topic branch netjes zal mergen maar dat je niet een berg tussenliggende merge commits hoeft te maken die je historie vervuilen.
+Met <code>rerere</code> ingeschakeld kan je af en toe mergen, de conflicten oplossen en dan de merge terugdraaien.
+Als je dit doorlopend doet, zou de laatste merge eenvoudig moeten zijn omdat <code>rerere</code> alles gewoon automatisch voor je kan doen.</p>
+</div>
+<div class="paragraph">
+<p>Deze zelfde taktiek kan gebruikt worden als je een branch rebased wilt houden zodat je niet elke keer met dezelfde rebasing conflicten te maken krijgt elke keer als je dit doet.
+Of als je een branch hebt die je hebt gemerged en daar een bergje conflicten hebt opgelost en dan besluit om deze toch maar te rebasen — je zult waarschijnlijk niet dezelfde conflicten willen doorlopen.</p>
+</div>
+<div class="paragraph">
+<p>Een andere toepassing van <code>rerere</code> is er een waar je een af en toe aantal in ontwikkeling zijnde topic branches wilt mergen in een testbare head, zoals in het Git project zelf ook vaark gebeurt.
+Als de tests falen, kan je de merges terugdraaien en ze weer doen zonder de topic branch die de tests liet falen zonder de conflicten opnieuw te moeten oplossen.</p>
+</div>
+<div class="paragraph">
+<p>Om de <code>rerere</code> functionaliteit in te schakelen, kan je eenvoudigweg de volgende configuratie setting aanroepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global rerere.enabled true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt het ook inschakelen door de <code>.git/rr-cache</code> directory in een specifieke repository aan te maken, maar de configuratie setting is duidelijker en het kan globaal gedaan worden.</p>
+</div>
+<div class="paragraph">
+<p>Laten we nu eens een eenvoudig voorbeeld bekijken, vergelijkbaar met de vorige.
+Laten we zeggen dat we een bestand hebben dat er als volgt uitziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hello world'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In de ene branch hebben we het woord “hello” in “hola” gewijzigd, en daarna in de andere branch veranderen we “world” in “mundo”, net zoals eerder.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/rerere1.png" >}}" alt="rerere1">
+</div>
+</div>
+<div class="paragraph">
+<p>Als we de twee branches mergen, zullen we een merge conflict krijgen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge i18n-world
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Recorded preimage for 'hello.rb'
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je zult de nieuwe regel <code>Recorded preimage for FILE</code> hier opmerken.
+Verder zou het er precies als een normale merge conflict uit moeten zien.
+Op dit moment kan <code>rerere</code> ons een aantal dingen vertellen.
+Normaalgesproken zou je een <code>git status</code> kunnen aanroepen om te zien waar de conflicten zitten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status
+# On branch master
+# Unmerged paths:
+#   (use "git reset HEAD &lt;file&gt;..." to unstage)
+#   (use "git add &lt;file&gt;..." to mark resolution)
+#
+#	both modified:      hello.rb
+#</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Echter, <code>git rerere</code> zal je ook vertellen waar het de pre-merge status voor heeft opgenomen met <code>git rerere status</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere status
+hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>En <code>git rerere diff</code> zal ons de huidige staat van de resolutie laten zien — waar je mee begonnen bent met oplossen en waar je het in hebt opgelost.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,11 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
++&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+   puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++=======
++  puts 'hello mundo'
++&gt;&gt;&gt;&gt;&gt;&gt;&gt; i18n-world
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Daarnaast (en dit is eigenlijk niet gerelateerd aan <code>rerere</code>), kan je <code>ls-files -u</code> gebruiken om de conflicterende bestanden en de voor, links en rechts versies te zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -u
+100644 39804c942a9c1f2c03dc7c5ebcd7f3e3a6b97519 1	hello.rb
+100644 a440db6e8d1fd76ad438a49025a9ad9ce746f581 2	hello.rb
+100644 54336ba847c3758ab604876419607e9443848474 3	hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt het oplossen zodat het alleen <code>puts 'hola mundo'</code> wordt en je kunt het <code>rerere diff</code> commando nog een keer aanroepen om te zien wat rerere zal onthouden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,7 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
+-  puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++  puts 'hola mundo'
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit zegt eigenlijk dat, wanneer Git een conflict in een deel van een <code>hello.rb</code> bestand ziet waar “hello mundo” aan de ene en “hola world” aan de andere kant staat, het zal oplossen naar “hola mundo”.</p>
+</div>
+<div class="paragraph">
+<p>Nu kunnen we het als opgelost markeren en committen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git commit
+Recorded resolution for 'hello.rb'.
+[master 68e16e5] Merge branch 'i18n'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt zien aan de boodschap "Recorded resolution for FILE" zien dat het de resolutie voor het bestand heeft opgeslagen.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/rerere2.png" >}}" alt="rerere2">
+</div>
+</div>
+<div class="paragraph">
+<p>Laten we nu die merge eens ongedaan maken, en in plaats daarvan deze op onze master branch gaan rebasen.
+We kunnen onze branch terugzetten door <code>reset</code> te gebruiken zoals we zagen in <a href="{{< relurl "book/nl/v2/ch00/_git_reset" >}}">Reset ontrafeld</a>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard HEAD^
+HEAD is now at ad63f15 i18n the hello</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Onze merge is ongedaan gemaakt.
+Laten we de topic branch gaan rebasen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout i18n-world
+Switched to branch 'i18n-world'
+
+$ git rebase master
+First, rewinding head to replay your work on top of it...
+Applying: i18n one word
+Using index info to reconstruct a base tree...
+Falling back to patching base and 3-way merge...
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Resolved 'hello.rb' using previous resolution.
+Failed to merge in the changes.
+Patch failed at 0001 i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We hebben nu dezelfde merge conflict zoals verwacht, maar kijk eens naar de regel met <code>Resolved FILE using previous resolution</code>.
+Als we nu het bestand bekijken zullen we zien dat het al is opgelost, er staan geen merge conflict markeringen in.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ook zal <code>git diff</code> je laten zien hoe het automatisch opnieuw was opgelost:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc hello.rb
+index a440db6,54336ba..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/rerere3.png" >}}" alt="rerere3">
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt ook de staat van het conflicterende bestand opnieuw creeëren met het <code>git checkout</code> commando:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout --conflict=merge hello.rb
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours
+  puts 'hola world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We zagen hier eerder een voorbeeld van in <a href="{{< relurl "book/nl/v2/ch00/_advanced_merging" >}}">Mergen voor gevorderden</a>.
+Voor nu echter, laten we het opnieuw oplossen door eenvoudigweg weer <code>rerere</code> aan te roepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere
+Resolved 'hello.rb' using previous resolution.
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We hebben het bestand automatisch her-opgelost door de opgeslagen <code>rerere</code> resolutie te gebruiken.
+Je kunt het nu toevoegen en de rebase vervolgen om het te voltooien.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git rebase --continue
+Applying: i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dus, als je vaak opnieuw merget, of je wilt een topic branch up-to-date houden met je master branch zonder talloze merges, of als je vaak rebaset, kan je <code>rerere</code> aanzetten om je leven wat aangenamer te maken.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

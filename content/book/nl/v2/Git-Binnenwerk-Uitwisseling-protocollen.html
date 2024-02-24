@@ -1,0 +1,360 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Binnenwerk
+    number: 10
+  section:
+    title: Uitwisseling protocollen
+    number: 6
+    cs_number: '10.6'
+    previous: book/nl/v2/Git-Binnenwerk-De-Refspec
+    next: book/nl/v2/Git-Binnenwerk-Onderhoud-en-gegevensherstel
+title: Git - Uitwisseling protocollen
+
+---
+<h2 id="_uitwisseling_protocollen">Uitwisseling protocollen</h2>
+<div class="paragraph">
+<p>Git kan op twee belangrijke manieren gegevens uitwisselen tussen twee repositories: het “domme” (dumb) protocol en het “slimme” (smart) protocol.
+In dit gedeelte zal de manier van werken van beide snel worden besproken.</p>
+</div>
+<div class="sect3">
+<h3 id="_het_domme_protocol">Het domme protocol</h3>
+<div class="paragraph">
+<p>ALs je een repository opzet die alleen gelezen hoeft te worden via HTTP, is het domme protocol het meest waarschijnlijke zijn die zal worden gebruikt.
+Dit protocol wordt “dom” genoemd omdat het geen Git-specifieke code nodig heeft aan de kant van de server tijdens het uitwisselingsproces; het fetch proces is een reeks van HTTP <code>GET</code> requests, waar het werkstation aannames mag doen over de inrichting van de Git repository op de server.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Het domme protocol wordt tegenwoordig nog maar sporadisch gebruikt.
+Het is moeilijk te beveiligen of af te schermen, dus de meeste Git hosts (zowel in de cloud als op locatie) zullen het weigeren te gebruiken.
+Het wordt over het algemeen aangeraden om het slimme protocol te gebruiken, die we iets verderop zullen bespreken.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Laten we het <code>http-fetch</code> proces voor de simplegit library eens volgen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone http://server/simplegit-progit.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het eerste wat dit commando doet is het <code>info/refs</code> bestand pullen.
+Dit bestand wordt geschreven door het <code>update-server-info</code> commando, wat de reden is waarom je dit als <code>post-receive</code> hook moet activeren om het uitwisselen via HTTP goed te laten werken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET info/refs
+ca82a6dff817ec66f44342007202690a93763949     refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu heb je een lijst met de remote referenties en SHA-1 waarden.
+Vervolgens ga je op zoek naar de HEAD referentie zodat je weet wat je moet uitchecken als je klaar bent:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je moet de <code>master</code>-branch uitchecken als je het proces hebt voltooid.
+Op dit punt ben je gereed om het proces te doorlopen.
+Omdat je vertrekpunt het <code>ca82a6</code> commit object is die je in het <code>info/refs</code> bestand zag, begin je met die te fetchen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/ca/82a6dff817ec66f44342007202690a93763949
+(179 bytes of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je krijgt een object terug - dat object is in het losse (loose) formaat op de server, en je hebt het met een statische HTTP GET request gefetcht.
+Je kunt het nu met zlib-uncompress uitpakken, de header ervan afhalen, en naar de commit inhoud kijken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p ca82a6dff817ec66f44342007202690a93763949
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+changed the version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vervolgens heb je nog twee objecten op te halen - <code>cfda3b</code>, wat de boom met inhoud is waar de commit die we zojuist opgehaald hebben naar wijst, en <code>085bb3</code>, wat de ouder-commit is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/08/5bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+(179 bytes of data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>En daarmee krijg je je volgende commit object.
+Haal het boom-object op:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/cf/da3bf379e4f8dba8717dee55aab78aef7f4daf
+(404 - Not Found)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Oeps, het ziet er naar uit dat het boom-object niet in het losse formaat op de server is, dus je krijgt een 404 antwoord.
+Hier zijn een aantal mogelijke oorzaken voor - het object kan in een andere repository zitten, of het zou in een packfile in deze repository kunnen zitten.
+Git controleert eerst of er alternatieven zijn opgegeven:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/http-alternates
+(empty file)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit geeft een lijst met alternatieve URLs terug, Git controleert daar op losse bestanden en packfiles - dit is een aardig mechanisme voor projecten die forks zijn van elkaar zijn om objecten te delen op schijf.
+Echter, omdat er in dit geval geen alternatieven worden gegeven, moet het object in een packfile zitten.
+Om te zien welke packfiles er beschikbaar zijn op deze server, moet je het <code>objects/info/packs</code> bestand te pakken krijgen, waar een opsomming hiervan in staat (wat ook door de <code>update-server-info</code> wordt gegenereerd):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/packs
+P pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Er is maar één packfile op de server, dus jouw object moet daar wel in zitten, maar je gaat het index bestand toch controleren om er zeker van te zijn.
+Dit is ook handig als je meerdere packfiles op de server hebt, omdat je dan kan zien welk packfile het object wat je nodig hebt bevat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.idx
+(4k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu je de packfile index hebt, kan je kijken of jouw object daar in zit - omdat de index de SHA-1 waarden van de objecten bevat die in de packfile zitten en de relatieve afstand (offset) naar deze objecten.
+Jouw object is er, dus ga je verder en haalt de hele packfile op:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack
+(13k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je hebt je boom object, dus je gaat verder met je commits af te lopen.
+Die zitten ook allemaal in de packfile die je zojuist hebt gedownload, dus je hoeft geen verzoeken meer te doen naar de server.
+Git checkt een werk-kopie van de <code>master</code>-branch uit waarnaar werd verwezen door de HEAD referentie die je aan het begin hebt gedownload.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_het_slimme_protocol">Het slimme protocol</h3>
+<div class="paragraph">
+<p>Het domme protocol is eenvoudig, maar een beetje inefficiënt, het kan geen gegevens aan die van het werkstation naar de server moet worden geschreven.
+Het slimme protocol is een meer gebruikelijke methode van gegevens uit te wisselen, maar het heeft een proces aan de remote kant nodig die op de hoogte is van Git - het moet lokale gegevens kunnen lezen, uitvinden wat het werkstation al heeft en nog nodig heeft, en een op maat gemaakte packfile hiervoor maken.
+Er zijn twee groepen van processen voor het uitwisselen van gegevens: een paar voor het uploaden van gegevens en een paar voor het downloaden van gegevens.</p>
+</div>
+<div class="sect4">
+<h4 id="_het_uploaden_van_gegevens">Het uploaden van gegevens</h4>
+<div class="paragraph">
+<p>
+Om gegevens te uploaden naar een remote proces, gebruikt Git de <code>send-pack</code> en <code>receive-pack</code> processen.
+Het <code>send-pack</code> proces loopt op het werkstation en maakt verbinding met een <code>receive-pack</code> proces aan de remote kant.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh">SSH</h6>
+<div class="paragraph">
+<p>Bijvoorbeeld, stel dat je <code>git push origin master</code> in jouw project aanroept en <code>origin</code> is als een URL gedefiniëerd die het SSH protocol gebruikt.
+Git start het <code>send-pack</code> proces op, die over SSH een verbinding initiëert naar je server.
+Het probeert een commando op de remote server aan te roepen via een SSH call die er ongeveer zo uitziet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-receive-pack 'simplegit-progit.git'"
+00a5ca82a6dff817ec66f4437202690a93763949 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1+github-607-gfba4028 delete-refs
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het <code>git-receive-pack</code> commando antwoordt meteen met een regel voor elke referentie die het op dit moment heeft - in dit geval alleen de <code>master</code>-branch en zijn SHA-1.
+De eerste regel heeft ook een lijst met de mogelijkheden van de server (hier, <code>report-status</code>, <code>delete-refs</code>, en een aantal andere, inclusief de identificatie van de client).</p>
+</div>
+<div class="paragraph">
+<p>Elke regel begint met een hex waarde van 4 tekens die aangeeft hoe lang de rest van de regel is.
+Je eerste regel begint met 00a5, wat hexadecimaal is voor 165, wat weer inhoudt dat er nog 165 bytes tot die regel behoren.
+De volgende regel is 0000, wat betekent dat de server klaar is met het uitlijsten van de referenties.</p>
+</div>
+<div class="paragraph">
+<p>Nu dat het de status van de server kent, bepaalt je <code>send-pack</code> proces welke commits het heeft die de server niet heeft.
+Voor elke referentie die deze push gaat bijwerken, vertelt het <code>send-pack</code> proces het <code>receive-pack</code> proces deze informatie.
+Bijvoorbeeld, als je de <code>master</code>-branch aan het bijwerken bent en een <code>experiment</code>-branch toevoegt, zal het antwoord van <code>send-pack</code> er ongeveer zo uitzien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0076ca82a6dff817ec66f44342007202690a93763949 15027957951b64cf874c3557a0f3547bd83b3ff6 \
+	refs/heads/master report-status
+006c0000000000000000000000000000000000000000 cdfdb42577e2506715f8cfeacdbabc092bf63e8d \
+	refs/heads/experiment
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git stuurt een regel voor elke referentie die je bijwerkt met de lengte van de regel, de oude SHA-1, de nieuwe SHA-1 en de referentie die wordt geüpdate.
+De eerste regel bevat ook de mogelijkheden van het werkstation.
+De SHA-1 waarde van allemaal '0’en houdt in dat er niets daarvoor was - omdat je de referentie van het experiment aan het toevoegen bent.
+Als je een referentie aan het verwijderen zou zijn, zou je het omgekeerde zien: alle '0’en aan de rechterkant.</p>
+</div>
+<div class="paragraph">
+<p>Daarna stuurt het werkstation een packfile van alle objecten die de server nog niet heeft.
+Als laatste antwoordt de server met een indicatie van succes (of falen):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>000eunpack ok</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https">HTTP(S)</h6>
+<div class="paragraph">
+<p>Dit proces is voor het grootste gedeelte hetzelfde als over HTTP, al is de <em>handshaking</em> iets anders.
+De verbinding wordt begonnen met dit verzoek:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET http://server/simplegit-progit.git/info/refs?service=git-receive-pack
+001f# service=git-receive-pack
+00ab6c5f0e45abd7832bf23074a333f739977c9e8188 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1~vmg-bitmaps-bugaloo-608-g116744e
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dat is het einde van de eerste werkstation-server uitwisseling.
+Het werkstation stuurt daarna een ander verzoek, dit keer een <code>POST</code>, met de gegevens die worden geleverd door <code>send-pack</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST http://server/simplegit-progit.git/git-receive-pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het <code>POST</code> verzoek bevat de uitvoer van <code>send-pack</code> en de packfile als zijn bagage (payload).
+De server geeft daarna aan of het succesvol of niet heeft verwerkt in zijn HTTP antwoord.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_gegevens_downloaden">Gegevens downloaden</h4>
+<div class="paragraph">
+<p>
+Als je gegevens download, zijn de <code>fetch-pack</code> en 'upload-pack` processen erbij betrokken.
+Het werkstation begint een <code>fetch-pack</code> proces die verbinding maakt met een <code>upload-pack</code> proces op de remote kant om te onderhandelen welke gegevens er naar het werkstation zullen worden gestuurd.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh_2">SSH</h6>
+<div class="paragraph">
+<p>Als je de fetch via SSH doet, zal <code>fetch-pack</code> ongeveer dit aanroepen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-upload-pack 'simplegit-progit.git'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nadat <code>fetch-pack</code> verbinding heeft gemaakt, stuurt <code>upload-pack</code> zoiets als dit terug:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>00dfca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fe2409a098dc3e53539a9028a94b6224db9d6a6b6 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit lijkt op waar <code>receive-pack</code> mee antwoordt, maar de mogelijkheden zijn anders.
+Daarenboven stuurt het terug waar HEAD op dit moment naar wijst (<code>symref=HEAD:refs/heads/master</code>), zodat het werkstation weet wat het uit moet checken als dit een kloon is.</p>
+</div>
+<div class="paragraph">
+<p>Op dit punt kijkt het <code>fetch-pack</code>-proces naar welke objecten het heeft en antwoordt met de objecten dat het nodig heeft door “want” te sturen en dan de SHA-1 die het wil hebben.
+Het stuurt alle objecten die het al heeft met “have” en daarna de SHA-1.
+En aan het einde van deze lijst, schrijft het “done” om het <code>upload-pack</code> proces aan te zetten tot het beginnen met sturen van de packfile met de gegevens die het nodig heeft:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>003cwant ca82a6dff817ec66f44342007202690a93763949 ofs-delta
+0032have 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+0009done
+0000</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https_2">HTTP(S)</h6>
+<div class="paragraph">
+<p>De <em>handshake</em> voor een fetch operatie vergt twee HTTP verzoeken.
+Het eerste is een <code>GET</code> naar hetzelfde adres als gebruikt in het domme protocol:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET $GIT_URL/info/refs?service=git-upload-pack
+001e# service=git-upload-pack
+00e7ca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed no-done symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit lijkt erg op het aanroepen van <code>git-upload-pack</code> over een SSH verbinding, maar de tweede uitwisseling wordt uitgevoerd als een separaat verzoek:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST $GIT_URL/git-upload-pack HTTP/1.0
+0032want 0a53e9ddeaddad63ad106860237bbf53411d11a7
+0032have 441b40d833fdfa93eb2908e52742248faf0ee993
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wederom, dit volgt hetzelfde patroon als hierboven.
+Het antwoord op dit verzoek geeft succes of falen aan, en bevat de packfile.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_protocolen_samenvatting">Protocolen samenvatting</h3>
+<div class="paragraph">
+<p>Deze paragraaf bevat een zeer basale overzicht van de uitwisselings-protocollen.
+Het protocol omvat vele andere mogelijkheden, zoals <code>multi_ack</code> of <code>side-band</code> mogelijkheden, maar de behandeling hiervan valt buiten het bestek van dit boek.
+We hebben geprobeerd je een idee te geven van het globale over-en-weer tussen werkstation en server; als je hierover meer wilt weten, dan kan je bijvoorbeeld een kijkje nemen in de Git broncode.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

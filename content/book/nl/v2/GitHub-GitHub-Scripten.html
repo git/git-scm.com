@@ -1,0 +1,381 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: GitHub
+    number: 6
+  section:
+    title: GitHub Scripten
+    number: 5
+    cs_number: '6.5'
+    previous: book/nl/v2/GitHub-Een-organisatie-beheren
+    next: book/nl/v2/GitHub-Samenvatting
+title: Git - GitHub Scripten
+
+---
+<h2 id="_github_scripten">GitHub Scripten</h2>
+<div class="paragraph">
+<p>We hebben nu alle hoofdfuncties en workflows van GitHub hebben behandeld, maar elke grote groep of project zal aanpassingen hebben die ze willen maken of services van buitenaf die ze willen integreren.</p>
+</div>
+<div class="paragraph">
+<p>Gelukkig voor ons is GitHub echt op vele manieren redelijk te hacken.
+In deze paragraaf zullen we behandelen hoe het zgn. GitHub haken (hooks) en API systeem te gebruiken om GitHub zich te laten gedragen zoals we willen.</p>
+</div>
+<div class="sect3">
+<h3 id="_services_en_hooks">Services en Hooks</h3>
+<div class="paragraph">
+<p>Het Hooks en Services deel van het GitHub repository beheer is de eenvoudigste manier om GitHub te laten samenwerken met externe systemen.</p>
+</div>
+<div class="sect4">
+<h4 id="_services">Services</h4>
+<div class="paragraph">
+<p>Eerst zullen we naar Services kijken.
+Zowel Hooks als Services integratie kunnen in het Settings gedeelte van je repository gevonden worden, waar we eerder naar gekeken hebben bij het toevoegen van medewerkers en het wijzigen van de standaard-branch van je project.
+Onder de “Webhooks and Services” tab zul je iets als <a href="{{< relurl "book/nl/v2/ch00/_services_hooks" >}}">Services and Hooks configuratie deel.</a> zien.</p>
+</div>
+<div id="_services_hooks" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-01-services.png" >}}" alt="Services en hooks">
+</div>
+<div class="title">Figuur 130. Services and Hooks configuratie deel.</div>
+</div>
+<div class="paragraph">
+<p>Er zijn tientallen services waar je uit kunt kiezen, de meeste zijn integraties naar andere commerciele en open source systemen.
+De meeste daarvan zijn Continuous Integration services, bug en issue trackers, chat room systemen en documentatie systemen.
+We zullen je door het opzetten van een eenvoudige leiden: de Email-hook.
+Als je “email” kiest uit de “Add Service” dropdown, krijg je een configuratie scherm zoals <a href="{{< relurl "book/nl/v2/ch00/_service_config" >}}">E-mail service configuratie.</a>.</p>
+</div>
+<div id="_service_config" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-02-email-service.png" >}}" alt="E-mail service">
+</div>
+<div class="title">Figuur 131. E-mail service configuratie.</div>
+</div>
+<div class="paragraph">
+<p>In dit geval, als we de “Add service” knop klikken, zal het e-mail adres die we intypen elke keer een bericht ontvangen als iemand naar de repository pusht.
+Services kunnen luisteren naar verschillende type gebeurtenissen, maar de meeste luisteren alleen naar push-events en doen dan iets met die gegevens.</p>
+</div>
+<div class="paragraph">
+<p>Als er een systeem is dat je gebruikt en die je wilt integreren met GitHub, zou je hier moeten kijken om te zien of er een bestaande service integratie beschikbaar is.
+Je zou, als je bijvoorbeeld Jenkins gebruikt om tests te draaien op je codebase, de ingebouwde Jenkins service integratie kunnen aanzetten om een testrun af te trappen elke keer als iemand naar jouw repository pusht.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_hooks">Hooks</h4>
+<div class="paragraph">
+<p>Als je iets meer specifieker nodig hebt, of je wilt een service of site integreren die niet in de lijst staat, kan je in plaats daarvan het meer generieke hooks systeem gebruiken.
+GitHub repository hooks zijn redelijk eenvoudig.
+Je geeft een URL op en GitHub zal een HTTP payload posten op die URL bij elke gebeurtenis dat je maar wilt.</p>
+</div>
+<div class="paragraph">
+<p>Hoe dit globaal werkt is dat je een kleine web service kunt opzetten die naar een GitHub hook payload luistert en dan iets met de gegevens doet als het is ontvangen.</p>
+</div>
+<div class="paragraph">
+<p>Om een hook aan te zetten, klik je de “Add webhook” knop in <a href="{{< relurl "book/nl/v2/ch00/_services_hooks" >}}">Services and Hooks configuratie deel.</a>.
+Dit leidt je naar een pagina die eruit ziet als <a href="{{< relurl "book/nl/v2/ch00/_web_hook" >}}">Web hook configuratie.</a>.</p>
+</div>
+<div id="_web_hook" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-03-webhook.png" >}}" alt="Web hook">
+</div>
+<div class="title">Figuur 132. Web hook configuratie.</div>
+</div>
+<div class="paragraph">
+<p>De configuratie van een web hook is redelijk eenvoudig.
+In de meeste gevallen voer je een URL in en een geheime sleutel en klikt “Add webhook”.
+Er zijn een paar opties voor welke gebeurtenissen je wilt waarvor GitHub je een payload stuurt — standaard is om alleen een payload te ontvangen voor de <code>push</code> gebeurtenis, als iemand nieuwe code naar een van de branches uit je repository pusht.</p>
+</div>
+<div class="paragraph">
+<p>Laten we een kort voorbeeld van een web service bekijken die je zou kunnen opzetten om een web hook te verwerken.
+We zullen het Ruby web framework Sinatra gebruiken omdat dit redelijk bondig is en je in staat zou moeten zijn om snel te zien wat we aan het doen zijn.</p>
+</div>
+<div class="paragraph">
+<p>Laten we stellen dat we een e-mail willen ontvangen als een bepaald persoon naar een specifieke branch van ons project pusht waarin een zeker bestand wordt gewijzigd.
+We kunnen dat relatief eenvoudig doen met code zoals deze:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">require 'sinatra'
+require 'json'
+require 'mail'
+
+post '/payload' do
+  push = JSON.parse(request.body.read) # parse the JSON
+
+  # gather the data we're looking for
+  pusher = push["pusher"]["name"]
+  branch = push["ref"]
+
+  # get a list of all the files touched
+  files = push["commits"].map do |commit|
+    commit['added'] + commit['modified'] + commit['removed']
+  end
+  files = files.flatten.uniq
+
+  # check for our criteria
+  if pusher == 'schacon' &amp;&amp;
+     branch == 'ref/heads/special-branch' &amp;&amp;
+     files.include?('special-file.txt')
+
+    Mail.deliver do
+      from     'tchacon@example.com'
+      to       'tchacon@example.com'
+      subject  'Scott Changed the File'
+      body     "ALARM"
+    end
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier nemen we de JSON payload die GitHub ons levert en kijken na wie gepusht heeft, naar welke branch hij gepusht heeft en welke bestanden geraakt zijn in alle commits die zijn gepusht.
+Dan houden we die gegevens tegen onze criteria en sturen een e-mail als ze passen.</p>
+</div>
+<div class="paragraph">
+<p>Om zoiets te kunnen ontwikkelen en testen, heb je een nette ontwikkelaarsscherm in hetzelfde scherm waar je ook de hook ingesteld hebt.
+Je kunt de laatste paar leveranties die GitHub heeft proberen te maken voor die webhook zien.
+Voor elke hook kan je uitvinden wanneer het was afgeleverd, of dit succesvol was en de body en headers voor zowel de vraag en het antwoord.
+Dit maakt het ongelofelijk eenvoudig om je hooks te testen en te debuggen.</p>
+</div>
+<div id="_web_hook_debug" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-04-webhook-debug.png" >}}" alt="Webhook debug">
+</div>
+<div class="title">Figuur 133. Web hook debug informatie.</div>
+</div>
+<div class="paragraph">
+<p>De andere geweldige mogelijkheid van dit is dat je elk van de payloads opnieuw kan laten afleveren om je service makkelijk te testen.</p>
+</div>
+<div class="paragraph">
+<p>Voor meer informatie over hoe webhooks te schrijven en alle verschillende type gebeurtenissen waar je naar kunt verwijzen we je naar de GitHub Developer documentatie op: <a href="https://developer.github.com/webhooks/" class="bare">https://developer.github.com/webhooks/</a></p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_de_github_api">De GitHub API</h3>
+<div class="paragraph">
+<p>
+Services en hooks bieden je een manier om push berichten te ontvangen van gebeurtenissen die plaatsvinden op je repositories, maar wat nu als je meer informatie hierover nodig hebt?
+Wat als je iets wilt automatiseren zoals medewerkers toevoegen of issues markeren?</p>
+</div>
+<div class="paragraph">
+<p>Dit is waar de GitHub API handig bij gebruikt kan worden.
+GitHub heeft ongelofelijk veel API endpoints om bijna alles wat je op de website kan doen op een geautomatiseerde manier kan doen.
+In deze paragraaf zullen we leren hoe te authenticeren en te verbinden met de API, hoe te reageren op een issue en hoe de status van een Pull Request te wijzigen middels de API.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_eenvoudig_gebruik_2">Eenvoudig gebruik</h3>
+<div class="paragraph">
+<p>Het meest basale wat je kunt doen is een simpele GET request op een endpoint die geen authenticatie behoeft.
+Dit zou een gebruiker of read-only informatie op een open source project kunnen zijn.
+Bijvoorbeeld, als we meer willen weten van een gebruiker genaamd “schacon”, kunnen we zoiets uitvoeren:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-javascript" data-lang="javascript">$ curl https://api.github.com/users/schacon
+{
+  "login": "schacon",
+  "id": 70,
+  "avatar_url": "https://avatars.githubusercontent.com/u/70",
+# …
+  "name": "Scott Chacon",
+  "company": "GitHub",
+  "following": 19,
+  "created_at": "2008-01-27T17:19:28Z",
+  "updated_at": "2014-06-10T02:37:23Z"
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Er zijn honderden van soortgelijke endpoints als deze om informatie over organisaties, projecten, issues, commits te verkrijgen — zo ongeveer alles wat je publiekelijk kan zien op GitHub.
+Je kunt de API zelfs gebruiken om willekeurige MarkDown te tonen of een <code>.gitignore</code> template vinden.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-javascript" data-lang="javascript">$ curl https://api.github.com/gitignore/templates/Java
+{
+  "name": "Java",
+  "source": "*.class
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see https://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+"
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_reageren_op_een_issue">Reageren op een issue</h3>
+<div class="paragraph">
+<p>Echter, als je een actie wilt uitvoeren op de website zoals reageren op een Issue of Pull Request of als je gesloten informatie wilt zien of ermee interacteren, zal je je moeten authenticeren.</p>
+</div>
+<div class="paragraph">
+<p>Er zijn verschillende manieren om je te authenticeren.
+Je kunt eenvoudige authenticatie gebruiken met gewoon je gebruikersnaam en wachtwoord, maar over het algemeen is het een beter idee om een persoonlijke toegangs bewijs (access token) te gebruiken.
+Deze kan je genereren vanaf de “Applications” tab van je instellingen pagina.</p>
+</div>
+<div id="_access_token" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-05-access-token.png" >}}" alt="Access Token">
+</div>
+<div class="title">Figuur 134. Genereer je access token vanaf de “Applications” tab op je instellingen pagina.</div>
+</div>
+<div class="paragraph">
+<p>Het zal je vragen welke contexten je wilt voor dit token en een omschrijving.
+Zorg ervoor dat je een goede omschrijving gebruikt zo dat je met vertrouwen het token kan weggooien als je script of applicatie niet langer meer in gebruik is.</p>
+</div>
+<div class="paragraph">
+<p>GitHub laat je het token maar één keer zien, dus zorg ervoor dat je het kopieert.
+Je kunt deze nu gebruiken om te authenticeren in je script in plaats van een gebruikersnaam en wachtwoord.
+Dit is prettig omdat je de context waarin je iets wilt doen kan beperken en het token is weer intrekbaar.</p>
+</div>
+<div class="paragraph">
+<p>Het heeft ook het bijkomende voordeel dat het je aanvraag limiet verhoogt.
+Zonder authenticatie ben je gelimiteerd tot 60 aanvragen per uur.
+Als je authenticeert kan je tot 5.000 aanvragen per uur doen.</p>
+</div>
+<div class="paragraph">
+<p>Dus laten we het gebruiken om een reactie te geven op een van onze issues.
+Stel dat we een reactie willen geven op een specifieke issue, Issue #6.
+Om dit te doen moeten we een HTTP POST request op <code>repos/&lt;user&gt;/&lt;repo&gt;/issues/&lt;num&gt;/comments</code> uitvoeren met het token wat we zojuist gegeneerd hebben als een Authorization header.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-javascript" data-lang="javascript">$ curl -H "Content-Type: application/json" \
+       -H "Authorization: token TOKEN" \
+       --data '{"body":"A new comment, :+1:"}' \
+       https://api.github.com/repos/schacon/blink/issues/6/comments
+{
+  "id": 58322100,
+  "html_url": "https://github.com/schacon/blink/issues/6#issuecomment-58322100",
+  ...
+  "user": {
+    "login": "tonychacon",
+    "id": 7874698,
+    "avatar_url": "https://avatars.githubusercontent.com/u/7874698?v=2",
+    "type": "User",
+  },
+  "created_at": "2014-10-08T07:48:19Z",
+  "updated_at": "2014-10-08T07:48:19Z",
+  "body": "A new comment, :+1:"
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je nu naar dat issue gaat, kan je de reactie zien dat we zojuist succesvol gepost hebben in <a href="{{< relurl "book/nl/v2/ch00/_api_comment" >}}">Een commentaar gepost via de GitHub API.</a>.</p>
+</div>
+<div id="_api_comment" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-06-comment.png" >}}" alt="Reactie via API">
+</div>
+<div class="title">Figuur 135. Een commentaar gepost via de GitHub API.</div>
+</div>
+<div class="paragraph">
+<p>Je kun de API gebruiken om zo ongeveer alles te doen wat je op website kunt doen — mijlpalen maken en zetten, mensen aan issues en pull requests toewijzen, labels maken en wijzigen, commit gegevens benaderen, nieuwe commits en branches maken, Pull Requests openen, sluiten of mergen, teams maken en wijzigen, reageren op regels code in een Pull Request, op de site zoeken enzovoorts, etcetera.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_de_status_van_een_pull_request_wijzigen">De status van een Pull Request wijzigen</h3>
+<div class="paragraph">
+<p>We zullen nog een laatste voorbeeld bekijken omdat het echt handig is als je werkt met Pull Requests.
+Elke commit kan een of meerdere statussen hebben en er is een API om een status toe te voegen en deze uit te vragen.</p>
+</div>
+<div class="paragraph">
+<p>De meeste Continuous Integration en test services gebruiken deze API om op pushes te reageren door de code die is gepusht te testen, en dan terug te melden of die commit alle tests heeft gepasseerd.
+Je kunt dit ook gebruiken om te kijken of het commit bericht juist is geformatteerd, of de indiener al je bijdrage richtlijnen heeft gevolgd, of de commit juist getekend was — verzin het maar.</p>
+</div>
+<div class="paragraph">
+<p>Laten we stellen dat je een webhook op je repository ingericht hebt die een kleine webservice aanroept die controleert of er een <code>Signed-off-by</code> letterreeks in het commit bericht voorkomt.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">require 'httparty'
+require 'sinatra'
+require 'json'
+
+post '/payload' do
+  push = JSON.parse(request.body.read) # parse the JSON
+  repo_name = push['repository']['full_name']
+
+  # look through each commit message
+  push["commits"].each do |commit|
+
+    # look for a Signed-off-by string
+    if /Signed-off-by/.match commit['message']
+      state = 'success'
+      description = 'Successfully signed off!'
+    else
+      state = 'failure'
+      description = 'No signoff found.'
+    end
+
+    # post status to GitHub
+    sha = commit["id"]
+    status_url = "https://api.github.com/repos/#{repo_name}/statuses/#{sha}"
+
+    status = {
+      "state"       =&gt; state,
+      "description" =&gt; description,
+      "target_url"  =&gt; "http://example.com/how-to-signoff",
+      "context"     =&gt; "validate/signoff"
+    }
+    HTTParty.post(status_url,
+      :body =&gt; status.to_json,
+      :headers =&gt; {
+        'Content-Type'  =&gt; 'application/json',
+        'User-Agent'    =&gt; 'tonychacon/signoff',
+        'Authorization' =&gt; "token #{ENV['TOKEN']}" }
+    )
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hopelijk is dit redelijk eenvoudig te volgen.
+In deze webhook-verwerker kijken we door elke commit die zojuist is gepusht, we zoeken naar de reeks <em>Signed-off-by</em> in het commit bericht en tenslotten POSTen we via HTTP naar de <code>/repos/&lt;user&gt;/&lt;repo&gt;/statuses/&lt;commit_sha&gt;</code> API endpoint met de status.</p>
+</div>
+<div class="paragraph">
+<p>In dit geval kan je een status (<em>success</em>, <em>failure</em>, <em>error</em>) sturen, een omschrijving wat er gebeurd is, een doel URL waar de gebruiker heen kan gaan voor meer informatie en een “context” in geval er meerdere statussen voor een enkele commit zijn.
+Bijvoorbeeld, een test-service kan een status aangeven en een validatie service zoals deze kan ook een status aangeven — het “context” veld maakt hierin het onderscheid.</p>
+</div>
+<div class="paragraph">
+<p>Als iemand een nieuwe Pull Request op GitHub opent en deze hook is opgezet, kan je iets zoals <a href="{{< relurl "book/nl/v2/ch00/_commit_status" >}}">Commit status via de API.</a> zien.</p>
+</div>
+<div id="_commit_status" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/scripting-07-status.png" >}}" alt="Commit status">
+</div>
+<div class="title">Figuur 136. Commit status via de API.</div>
+</div>
+<div class="paragraph">
+<p>Je kunt nu een klein groen vinkje zien naast de commit die “Signed-off-by” in het bericht heeft staan en een rode kruis door die waar de auteur is vergeten te tekenen.
+Je kunt ook zien dat de Pull Request de status krijgt van de laatste commit op de branch en waarschuwt je als het niet geslaagd is.
+Dit is erg handig als je deze API gebruikt voor test resultaten, zodat je niet per ongeluk iets merget waar de laatste commit tests laat falen.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_octokit">Octokit</h3>
+<div class="paragraph">
+<p>Alhoewel we ongeveer alles middels <code>curl</code> en eenvoudige HTTP requests hebben gedaan in deze voorbeelden, bestaan er diverse open source libraries die deze API in een meer taalspecifieke manier beschikbaar maken.
+Op het moment van schrijven, zijn de ondersteunde talen onder andere Go, Objective-C, Ruby en .NET.
+Kijk op <a href="https://github.com/octokit" class="bare">https://github.com/octokit</a> voor meer informatie hiervoor, omdat ze veel van de HTTP voor je afhandelen.</p>
+</div>
+<div class="paragraph">
+<p>Hopelijk kunnen deze instrumenten je helpen om GitHub aan te passen en te wijzigen zodat deze beter werkt voor jouw specifieke workflows.
+Voor volledige documentatie over de hele API zowel als handleidingen voor veelvoorkomende taken, verwijzen we je naar <a href="https://developer.github.com" class="bare">https://developer.github.com</a>.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
