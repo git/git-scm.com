@@ -1,0 +1,256 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: cs
+  chapter:
+    title: Git Internals
+    number: 10
+  section:
+    title: Git References
+    number: 3
+    cs_number: '10.3'
+    previous: book/cs/v2/Git-Internals-Git-Objects
+    next: book/cs/v2/Git-Internals-Balíčkové-soubory
+title: Git - Git References
+
+---
+<h2 id="_git_refs">Git References</h2>
+<div class="paragraph">
+<p>Chcete-li si prohlédnout celou svou historii, můžete zadat příkaz <code>git log 1a410e</code>. Problém je v tom, že si k prohlížení historie a nalezení objektů stále ještě musíte pamatovat, že poslední revizí byla <code>1a410e</code>.
+Hodil by se soubor, do nějž budete pod jednoduchým názvem ukládat hodnotu SHA-1. Tento ukazatel pro vás bude srozumitelnější než nevlídná hodnota SHA-1.</p>
+</div>
+<div class="paragraph">
+<p>In Git, these are called “references” or “refs”; you can find the files that contain the SHA-1 values in the <code>.git/refs</code> directory.
+V aktuálním projektu nejsou v tomto adresáři žádné soubory, zatím tu najdete jen jednoduchou strukturu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/refs
+.git/refs
+.git/refs/heads
+.git/refs/tags
+$ find .git/refs -type f</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Chcete-li vytvořit novou referenci, díky níž si budete pamatovat, kde se nachází vaše poslední revize, lze to technicky provést velmi jednoduše:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo "1a410efbd13591db07496601ebc7a059dd55cfe9" &gt; .git/refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nyní můžete v příkazech Git používat „head“ referenci, kterou jste právě vytvořili, místo hodnoty SHA-1:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --pretty=oneline master
+1a410efbd13591db07496601ebc7a059dd55cfe9 third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You aren’t encouraged to directly edit the reference files.
+Git zná bezpečnější metodu, jak referenci aktualizovat: příkaz <code>update-ref</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git update-ref refs/heads/master 1a410efbd13591db07496601ebc7a059dd55cfe9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That’s basically what a branch in Git is: a simple pointer or reference to the head of a line of work.
+Chcete-li vytvořit větev zpětně na druhé revizi, můžete zadat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git update-ref refs/heads/test cac0ca</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vaše větev bude obsahovat pouze práci od této revize níže:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --pretty=oneline test
+cac0cab538b970a37ea1e769cbbde608743bc96d second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, your Git database conceptually looks something like this:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/cs/v2/images/data-model-4.png" >}}" alt="Git directory objects with branch head references included.">
+</div>
+<div class="title">Figure 152. Git directory objects with branch head references included.</div>
+</div>
+<div class="paragraph">
+<p>When you run commands like <code>git branch (branchname)</code>, Git basically runs that <code>update-ref</code> command to add the SHA-1 of the last commit of the branch you’re on into whatever new reference you want to create.</p>
+</div>
+<div class="sect3">
+<h3 id="_the_head">The HEAD</h3>
+<div class="paragraph">
+<p>Nyní se však nabízí otázka, jak může Git při spuštění příkazu <code>git branch (název větve)</code> znát hodnotu SHA-1 poslední revize.
+Odpověď zní: soubor HEAD.</p>
+</div>
+<div class="paragraph">
+<p>The HEAD file is a symbolic reference to the branch you’re currently on.
+By symbolic reference, we mean that unlike a normal reference, it doesn’t generally contain a SHA-1 value but rather a pointer to another reference.
+If you look at the file, you’ll normally see something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .git/HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Spustíte-li příkaz <code>git checkout test</code>, Git aktualizuje soubor do následující podoby:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .git/HEAD
+ref: refs/heads/test</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Spustíte-li příkaz <code>git commit</code>, systém vytvoří objekt revize, jehož rodičem bude hodnota SHA-1, na niž ukazuje reference v souboru HEAD.</p>
+</div>
+<div class="paragraph">
+<p>Soubor můžete editovat také ručně, ale opět existuje i bezpečnější příkaz: <code>symbolic-ref</code>.
+Hodnotu souboru HEAD můžete načíst tímto příkazem:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git symbolic-ref HEAD
+refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hodnotu pro soubor HEAD můžete také nastavit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git symbolic-ref HEAD refs/heads/test
+$ cat .git/HEAD
+ref: refs/heads/test</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can’t set a symbolic reference outside of the refs style:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git symbolic-ref HEAD test
+fatal: Refusing to point HEAD outside of refs/</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_značky">Značky</h3>
+<div class="paragraph">
+<p>We just finished discussing Git’s three main object types, but there is a fourth.
+The tag object is very much like a commit object – it contains a tagger, a date, a message, and a pointer.
+The main difference is that a tag object generally points to a commit rather than a tree.
+It’s like a branch reference, but it never moves – it always points to the same commit but gives it a friendlier name.</p>
+</div>
+<div class="paragraph">
+<p>As discussed in <a href="{{< relurl "book/cs/v2/ch00/_git_basics_chapter" >}}">Základy práce se systémem Git</a>, there are two types of tags: annotated and lightweight.
+Prostou značku lze vytvořit spuštěním například tohoto příkazu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git update-ref refs/tags/v1.0 cac0cab538b970a37ea1e769cbbde608743bc96d</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That is all a lightweight tag is – a reference that never moves.
+Anotovaná značka je už složitější.
+Vytvoříte-li anotovanou značku, Git vytvoří objekt značky a zapíše referenci, která na objekt ukazuje (neukazuje tedy na samotnou revizi).
+You can see this by creating an annotated tag (<code>-a</code> specifies that it’s an annotated tag):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git tag -a v1.1 1a410efbd13591db07496601ebc7a059dd55cfe9 -m 'test tag'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Here’s the object SHA-1 value it created:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .git/refs/tags/v1.1
+9585191f37f7b0fb9444f35a9bf50de191beadc2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nyní pro tuto hodnotu SHA-1 spusťte příkaz <code>cat-file</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 9585191f37f7b0fb9444f35a9bf50de191beadc2
+object 1a410efbd13591db07496601ebc7a059dd55cfe9
+type commit
+tag v1.1
+tagger Scott Chacon &lt;schacon@gmail.com&gt; Sat May 23 16:48:58 2009 -0700
+
+test tag</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Všimněte si, že záznam objektu ukazuje na hodnotu revize SHA-1, k níž jste značku přidali.
+Also notice that it doesn’t need to point to a commit; you can tag any Git object.
+Ve zdrojovém kódu systému Git správce například vložil svůj veřejný klíč GPG jako objekt blobu a ten označil značkou.
+You can view the public key by running this in a clone of the Git repository:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file blob junio-gpg-pub</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The Linux kernel repository also has a non-commit-pointing tag object – the first tag created points to the initial tree of the import of the source code.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_reference_na_vzdálené_repozitáře">Reference na vzdálené repozitáře</h3>
+<div class="paragraph">
+<p>The third type of reference that you’ll see is a remote reference.
+Přidáte-li vzdálený repozitář a odešlete do něj revize, Git v adresáři <code>refs/remotes</code> uloží pro každou větev hodnotu, kterou jste do tohoto repozitáře naposled odesílali.
+Můžete například přidat vzdálený repozitář <code>origin</code> a odeslat do něj větev <code>master</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add origin git@github.com:schacon/simplegit-progit.git
+$ git push origin master
+Counting objects: 11, done.
+Compressing objects: 100% (5/5), done.
+Writing objects: 100% (7/7), 716 bytes, done.
+Total 7 (delta 2), reused 4 (delta 1)
+To git@github.com:schacon/simplegit-progit.git
+  a11bef0..ca82a6d  master -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Poté se můžete podívat, jakou podobu měla větev <code>master</code> na vzdáleném serveru <code>origin</code>, když jste s ním naposledy komunikovali. Pomůže vám s tím soubor <code>refs/remotes/origin/master</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .git/refs/remotes/origin/master
+ca82a6dff817ec66f44342007202690a93763949</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Remote references differ from branches (<code>refs/heads</code> references) mainly in that they’re considered read-only.
+You can <code>git checkout</code> to one, but Git won’t point HEAD at one, so you’ll never update it with a <code>commit</code> command.
+Git manages them as bookmarks to the last known state of where those branches were on those servers.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
