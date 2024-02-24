@@ -1,0 +1,135 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: tl
+  chapter:
+    title: Git sa Server
+    number: 4
+  section:
+    title: Git Daemon
+    number: 5
+    cs_number: '4.5'
+    previous: book/tl/v2/Git-sa-Server-Pag-Setup-ng-Server
+    next: book/tl/v2/Git-sa-Server-Smart-HTTP
+title: Git - Git Daemon
+
+---
+<h2 id="_git_daemon">Git Daemon</h2>
+<div class="paragraph">
+<p>
+Susunod ay magse-set up tayo ng isang naglilingkod na repositoryo ng daemon gamit ang protokol ng “Git”.
+Ito ay isang karaniwang pagpili para sa mabilis, unauthenticated na access sa iyong datos sa Git.
+Tandaan na dahil ito ay isang unauthenticated na serbisyo, anumang bagay na ihahatid mo sa protokol na ito ay pampubliko sa network nito.</p>
+</div>
+<div class="paragraph">
+<p>Kapag pinapatakbo mo ito sa isang server sa labas ng iyong firewall, ito ay dapat ginagamit lamang sa mga proyekto na makikita ng publiko sa mundo.
+Kapag ang server na pinapatakbo mo ay sa loob ng iyong firewall, maaari mo itong gamitin sa mga proyekto na mayroong malaking bilang ng tao o mga kompyuter (tuloy-tuloy na pagsasama o mga build server) ay mayroong read-only na access, kapag ayaw mong magdagdag ng SSH key para sa bawat isa.</p>
+</div>
+<div class="paragraph">
+<p>Sa anumang kaso, ang protokol ng Git ay medyo madaling gamitin.
+Kailangan mo patakbuhin ang utos na ito sa isang daemonized na paraan:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git daemon --reuseaddr --base-path=/srv/git/ /srv/git/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ang <code>--reuseaddr</code> na opsyon ay nagpapahintulot sa server na mag-restart nang hindi naghihintay na mag-timeout ang mga lumang mga koneksyon na mag time out, habang ang <code>--base-path</code> na opsyon ay nagpapahintulot sa mga tao na mag-clone ng mga proyekto na hindi tinutukoy ang buong landas, at ang landas sa dulo ay sinasabihan ang Git daemon kung saan tumingin para sa mga repositoryo na i-export.
+Kapag ikaw ay nagpapatakbo ng isang firewall, kakailanganin mo ring butasan ito sa port 9418 sa kahon kung asan ka nagse-set up.</p>
+</div>
+<div class="paragraph">
+<p>Maaari mong i-daemonize ang prosesong ito sa iilang paraan, depende sa operating system na pinapatakbo mo.</p>
+</div>
+<div class="paragraph">
+<p>Dahil ang <code>systemd</code> ang pinakakaraniwan na init na sistema sa mga modernong distribusyon ng Linux, maaari mong gamitin ito para sa layunin na iyon.
+Maglagay lamang ng isang file sa <code>/etc/systemd/system/git-daemon.service</code> na may ganitong nilalaman:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">[Unit]
+Description=Start Git Daemon
+
+[Service]
+ExecStart=/usr/bin/git daemon --reuseaddr --base-path=/srv/git/ /srv/git/
+
+Restart=always
+RestartSec=500ms
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=git-daemon
+
+User=git
+Group=git
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Maaaring napansin mo na ang Git daemon ay nagsimula dito kasama ang <code>git</code> bilang parehong grupo at user.
+Baguhin ito upang magkasya sa iyong pangangailangan at siguraduhin ang ibinigay na user ay umiiral sa sistema.
+Gayundin, tiyakin na ang Git binary ay matatagpuan sa <code>/usr/bin/git</code> at baguhin ang landas kung kailangan man.</p>
+</div>
+<div class="paragraph">
+<p>Sa wakas, ipatakbo ang <code>systemctl enable git-daemon</code> para awtomatikong simulan ang serbisyo sa pag-boot, at maaaring simulan o itigil ang serbisyo gamit ang, ayon sa pagkakabanggit <code>systemctl start git-daemon</code> at <code>systemctl stop git-daemon</code>.</p>
+</div>
+<div class="paragraph">
+<p>Hanggang LTS 14.04, ginamit ng Ubuntu ang kompigurasyon ng upstart na unit ng serbisyo.
+Sa gayon, sa Ubuntu ⇐ 14.04 magagamit mo ang Upstart na iskrip.
+Kaya, sa mga sumusunod na file</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">/etc/init/local-git-daemon.conf</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ilagay mo ang iskrip na ito:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">start on startup
+stop on shutdown
+exec /usr/bin/git daemon \
+    --user=git --group=git \
+    --reuseaddr \
+    --base-path=/srv/git/ \
+    /srv/git/
+respawn</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para sa dahilan ng seguridad, malakas na hinihikayat na ipatakbo ang daemon na ito bilang isang user na mayroong read-only na mga pahintulot sa mga repositoryo — madali mo itong magagawa sa pamamagitan ng paglikha ng isang bagong user <em>git-ro</em> at pagpapatakbo ng daemon bilang sila.
+Para sa kapanan ng pagiging simple, ipapatakbo lang natin ito pareho sa <code>git</code> na user na pinapatakbo ng <code>git-shell</code>.</p>
+</div>
+<div class="paragraph">
+<p>Kapag na-restart mo na iyong makina, ang iyong Git daemon ay awtomatikong magsisimula at mag-respawn kapag bumaba ito.
+Upang mapatakbo ito na hindi kailangan mag-reboot, maaari mong ipatakbo ito:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ initctl start local-git-daemon</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sa mga ibang sistema, maaaring nais mong gamitin ang <code>xinetd</code>, isang iskrip sa iyong <code>sysvinit</code> na sistema, o ibang bagay — hangga’t makahanap ka ng paraan na makakuha ng utos na daemonized at pinapanood.</p>
+</div>
+<div class="paragraph">
+<p>Sunod, dapat mong sabihan ang Git kung anong repository ang papayagan na magkaroon ng unauthenticated na pagpasok ayon sa server.
+Maaari mo itong gawin sa bawat repositoryo sa pamamagitan ng paglikha ng isang file na may pangalang <code>git-daemon-export-ok</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd /path/to/project.git
+$ touch git-daemon-export-ok</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ang presensya ng file na iyon ay nagsasabi sa Git na OK na paglingkuran ang proyektong ito na walang pagpapatunay.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
