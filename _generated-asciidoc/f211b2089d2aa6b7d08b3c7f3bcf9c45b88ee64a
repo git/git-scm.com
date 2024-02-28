@@ -1,0 +1,253 @@
+git-notes(1)
+============
+
+NOM
+---
+git-notes - Ajouter ou inspecter les notes des objets
+
+SYNOPSIS
+--------
+[verse]
+'git notes' [list [<objet>]]
+'git notes' add [-f] [--allow-empty] [--[no-]separator | --separator=<coupure-paragraphe>] [--[no-]stripspace] [-F <fichier> | -m <msg> | (-c | -C) <objet>] [<objet>]
+'git notes' copy [-f] ( --stdin | <objet-source> [<objet-cible>] )
+'git notes' append [--allow-empty] [--[no-]separator | --separator=<coupure-paragraphe>] [--[no-]stripspace] [-F <fichier> | -m <msg> | (-c | -C) <objet>] [<objet>]
+'git notes' edit [--allow-empty] [<objet>]
+'git notes' show [<objet>]
+'git notes' merge [-v | -q] [-s <strategie> ] <ref-de-notes>
+'git notes' merge --commit [-v | -q]
+'git notes' merge --abort [-v | -q]
+'git notes' remove [--ignore-missing] [--stdin] [<objet>...]
+'git notes' prune [-n] [-v]
+'git notes' get-ref
+
+
+DESCRIPTION
+-----------
+Ajoute, supprime ou lit les notes attachées aux objets, sans toucher les objets eux-mêmes.
+
+Par défaut, les notes sont enregistrées et lues dans `refs/notes/commits`, mais cette valeur peut être modifiée. Voir les sections OPTIONS, CONFIGURATION, et ENVIRONNEMENT ci-dessous. Si cette référence n'existe pas, elle sera discrètement créée lorsqu'elle sera nécessaire pour stocker une note.
+
+Une utilisation typique des notes est de compléter un message de validation sans modifier le commit lui-même. Les notes peuvent être affichées par 'git log' avec le message de validation original. Pour distinguer ces notes du message stocké dans l'objet commit, les notes sont indentées comme le message, après une ligne non indentée disant "Notes (<nom-de-ref>) :" (ou "Notes :" pour `refs/notes/commits`).
+
+Des notes peuvent également être ajoutées aux rustines préparées avec `git format-patch` en utilisant l'option `--notes`. De telles notes sont ajoutées comme un commentaire de rustine après une ligne de séparation à trois tirets.
+
+Pour changer les notes qui sont affichées par 'git log', voir la discussion sur "notes.displayRef" dans <<CONFIGURATION>>.
+
+Voir la configuration "notes.rewrite.<commande>" pour un moyen de transporter les notes à travers les commandes qui réécrivent les commits.
+
+
+SOUS-COMMANDES
+--------------
+
+list::
+	Affiche la liste des objets notes pour un objet donné. Si aucun objet n'est donné, affiche une liste de tous les objets notes et des objets qu'ils annotent (au format "<objet note> <objet annoté>"). Il s'agit de la sous-commande par défaut si aucune sous-commande n'est donnée.
+
+add::
+	Ajouter des notes pour un objet donné (par défaut HEAD). Abandonner si l'objet a déjà des notes (utilisez `-f` pour écraser les notes existantes). Cependant, si vous utilisez `add` de manière interactive (en utilisant un éditeur pour fournir le contenu des notes), alors - au lieu d'abandonner - les notes existantes seront ouvertes dans l'éditeur (comme la sous-commande `edit`). Si vous spécifiez plusieurs `-m` et `-F`, une ligne vierge sera insérée entre les messages. Utilisez l'option `--separator` pour insérer d'autres délimiteurs.
+
+copy::
+	Copier les notes du premier objet sur le deuxième objet (par défaut HEAD). Abandonner si le second objet a déjà des notes, ou si le premier objet n'en a pas (utilisez -f pour écraser les notes existantes sur le second objet). Cette sous-commande est équivalente à : `git notes add [-f] -C $(git notes list <objet-source>) <objet-cible>`
++
+En mode `--stdin`, prendre les lignes au format
++
+----------
+<objet-source> ESP <objet-source> [ ESP <reste> ] LF
+----------
++
+sur l'entrée standard, et copier les notes de chaque <objet-source> vers son <objet-cible> correspondant. (Le`<rest>` optionnel est ignoré afin que la commande puisse lire l'entrée donnée au crochet `post-rewrite`.)
+
+append::
+	Appliquer un ou plusieurs nouveaux messages donnés par des options `-m` ou `-F` à une note existante, ou les ajouter comme une nouvelle note si aucune n'existe , pour l'objet (par défaut à HEAD). Lorsqu'elle continue une note existante, une ligne vierge est ajoutée avant chaque nouveau message en tant que séparateur inter-paragraphe. Le séparateur peut être personnalisé avec l'option `--separator`.
+
+edit::
+	Modifier les notes pour un objet donné (par défaut HEAD).
+
+show::
+	Afficher les notes pour un objet donné (par défaut, HEAD).
+
+merge::
+	Fusionner la référence de notes donnée dans la référence de notes actuelle. Cette commande essaiera de fusionner les modifications apportées par la référence de notes donnée (appelée "remote") depuis la base de fusion (si elle existe) dans la référence de notes actuelle (appelée "local").
++
+Si des conflits surviennent et qu'une stratégie pour résoudre automatiquement les notes en conflit (voir la section "STRATEGIES DE FUSION DES NOTES") n'est pas donnée, le résolveur "manuel" est utilisé. Ce résolveur vérifie les notes en conflit dans un arbre de travail spécial (`.git/NOTES_MERGE_WORKTREE`), et demande à l'utilisateur de résoudre manuellement les conflits à cet endroit. Lorsque cela est fait, l'utilisateur peut soit finaliser la fusion avec 'git notes merge --commit', soit abandonner la fusion avec 'git notes merge --abort'.
+
+remove::
+	Supprimer les notes pour les objets donnés (la valeur par défaut est HEAD). Lorsque l'on donne zéro ou un objet depuis la ligne de commande, cela équivaut à spécifier un message de note vide à la sous-commande `edit`.
+
+prune::
+	Supprimer toutes les notes relatives aux objets inexistants ou inaccessibles.
+
+get-ref::
+	Afficher la référence des notes actuelles. Ceci fournit un moyen facile de récupérer la référence des notes actuelles (par exemple, à partir de scripts).
+
+OPTIONS
+-------
+-f::
+--force::
+	Lors de l'ajout de notes à un objet qui en possède déjà, les notes existantes sont écrasées (au lieu d'être abandonnées).
+
+-m <msg>::
+--message=<msg>::
+	Utiliser le message de note fourni (au lieu de le demander). Si plusieurs options `-m` sont fournies, leurs valeurs sont concaténées comme paragraphes séparés. Les lignes commençant par `#` et les lignes vides sont supprimées si elles ne sont pas uniques entre paragraphes. Si vous souhaitez les garder verbatim, utilisez `--no-stripspace`.
+
+-F <fichier>::
+--file=<fichier>::
+	Prendre le message de note depuis le fichier indiqué. Utilisez '-' pour lire le message depuis l'entrée standard. Les lignes commençant par `#` et les lignes vides sont supprimées si elles ne sont pas uniques entre paragraphes. Si vous souhaitez les garder verbatim, utilisez `--no-stripspace`.
+
+-C <objet>::
+--reuse-message=<objet>::
+	Prendre l'objet blob donné (par exemple, une autre note) comme message de note. (Utilisez `git notes copy <objet>` au lieu de copier les notes entre les objets). Par défaut, le message sera copié verbatim, mais si vous souhaitez supprimer les lignes commençant par `#` et les lignes vides autres que les lignes uniques entre les paragraphes, utilisez l'option `--stripspace`.
+
+-c <objet>::
+--reedit-message=<objet>::
+	Comme '-C', mais avec `-c`, l'éditeur est appelé pour permettre à l'utilisateur de modifier le message de note.
+
+--allow-empty::
+	Permettre de stocker un objet note vide. Le comportement par défaut consiste à supprimer automatiquement les notes vides.
+
+--[no-]separator, --separator=<coupure-paragraphe>::
+	Spécifier une chaîne utilisée comme séparateur d'inter-paragraphe personnalisé (une nouvelle ligne est ajoutée à la fin si nécessaire). Si `--no-separator` , aucun séparateur ne sera ajouté entre les paragraphes. Par défaut, la valeur est une ligne vierge.
+
+--[no-]stripspace::
+	Éliminer les espaces précédant et suivant le message de note. Également éliminer les lignes vides autres que les lignes uniques entre les paragraphes. Les lignes commençant par `#` seront nettoyées dans des cas sans éditeur comme `-m`, `-F` et `-C`, mais pas dans les cas avec éditeur comme `git notes edit`, `-c`, etc.
+
+--ref <réf>::
+	Manipuler l'arbre des notes dans <réf>. Ceci a priorité sur `GIT_NOTES_REF` et la configuration "core.notesRef". La réf spécifie le nom complet de la réf quand elle commence par `refs/notes/` ; quand elle commence par `notes/`, `refs/` ou autre, `refs/notes/` est préfixé pour former un nom complet de la réf.
+
+--ignore-missing::
+	Ne pas considérer comme une erreur de demander la suppression des notes d'un objet qui n'a pas de notes qui lui sont attachées.
+
+--stdin::
+	Lire également les noms d'objets pour supprimer les notes à partir de l'entrée standard (il n'y a aucune raison pour que vous ne puissiez pas combiner cela avec les noms d'objets à partir de la ligne de commande).
+
+-n::
+--dry-run::
+	Ne rien supprimer ; signaler simplement les noms des objets dont les notes seraient supprimées.
+
+-s <stratégie>::
+--strategy=<strategie>::
+	Lors d'une fusion de notes, résoudre les conflits de notes en utilisant la stratégie donnée. Les stratégies suivantes sont reconnues : "manual" (par défaut), "ours", "theirs", "union" et "cat_sort_uniq". Cette option a priorité sur le paramètre de configuration "notes.mergeStrategy". Voir la section "STRATÉGIES DE FUSION DES NOTES" ci-dessous pour plus d'informations sur chaque stratégie de fusion des notes.
+
+--commit::
+	Finaliser une fusion de notes en cours. Utilisez cette option lorsque vous avez résolu les conflits que 'git notes merge' a stockés dans .git/NOTES_MERGE_WORKTREE. Cela modifie le commit de fusion partielle créé par 'git notes merge' (stocké dans .git/NOTES_MERGE_PARTIAL) en ajoutant les notes dans .git/NOTES_MERGE_WORKTREE. La référence des notes stockée dans la réf symbolique .git/NOTES_MERGE_REF est mise à jour avec le commit résultant.
+
+--abort::
+	Abandonner/réinitialiser un 'git notes merge' en cours, c'est-à-dire une fusion de notes avec des conflits. Cela supprime simplement tous les fichiers liés à la fusion de notes.
+
+-q::
+--quiet::
+	Mode silencieux lors d'une fusion de notes.
+
+-v::
+--verbose::
+	Mode verbeux lors d'une fusion de notes. Lors de l'élagage des notes, signaler tous les noms d'objets dont les notes sont supprimées.
+
+
+DISCUSSION
+----------
+
+Les notes de commit sont des blobs contenant des informations supplémentaires sur un objet (généralement des informations pour compléter le message de validation). Ces blobs sont extraits des réfs de notes. Une réf. de notes est généralement une branche qui contient des "fichiers" dont les chemins sont les noms des objets qu'ils décrivent, avec quelques séparateurs de répertoires inclus pour des raisons de performances footnote:[Les noms de chemins autorisés ont la forme 'bf'`/`'fe'`/`'30'`/`'...'`/`'680d5a...' : une séquence de noms de répertoires de deux chiffres hexadécimaux chacun suivis d'un nom de fichier avec le reste de l'ID de l'objet].
+
+Chaque changement de notes crée un nouveau commit à la réf. de notes spécifiée. Vous pouvez donc inspecter l'historique des notes en invoquant, par exemple, `git log -p notes/commits`. Actuellement, le message de validation n'enregistre que l'opération qui a déclenché la mise à jour, et la paternité du commit est déterminée selon les règles habituelles (voir linkgit:git-commit[1]). Ces détails peuvent changer dans le futur.
+
+Il est également permis qu'une réf de notes pointe directement vers un objet arbre, dans ce cas l'historique des notes peut être lu avec `git log -p -g <nom-de-réf>`.
+
+
+STRATÉGIES DE FUSION DES NOTES
+------------------------------
+
+La stratégie de fusion de notes par défaut est "manual", qui extrait les notes en conflit dans un arbre de travail spécial pour résoudre les conflits de notes (`.git/NOTES_MERGE_WORKTREE`), et demande à l'utilisateur de résoudre les conflits dans cet arbre de travail. Lorsque cela est fait, l'utilisateur peut soit finaliser la fusion avec 'git notes merge --commit', soit abandonner la fusion avec 'git notes merge --abort'.
+
+Les utilisateurs peuvent sélectionner une stratégie de fusion automatisée parmi les suivantes en utilisant l'option -s/--strategy ou en configurant notes.mergeStrategy :
+
+"ours" résout automatiquement les conflits de notes en faveur de la version locale (c'est-à-dire la réf. de notes actuelle).
+
+"theirs" résout automatiquement les conflits de notes en faveur de la version distante (c'est-à-dire que la référence de notes donnée est fusionnée avec la référence de notes actuelle).
+
+"union" résout automatiquement les conflits de notes en concaténant les versions locales et distantes.
+
+"cat_sort_uniq" est similaire à "union", mais en plus de concaténer les versions locales et distantes, cette stratégie trie également les lignes résultantes, et supprime les lignes en double du résultat. Cela équivaut à appliquer le pipeline shell "cat | sort | uniq" aux versions locales et distantes. Cette stratégie est utile si les notes suivent un format basé sur les lignes et que l'on veut éviter les lignes dupliquées dans le résultat de la fusion. Notez que si la version locale ou distante contient des lignes dupliquées avant la fusion, celles-ci seront également supprimées par cette stratégie de fusion de notes.
+
+
+EXEMPLES
+--------
+
+Vous pouvez utiliser les notes pour ajouter des annotations avec des informations qui n'étaient pas disponibles au moment où le commit a été écrit.
+
+------------
+$ git notes add -m 'Tested-by: Johannes Sixt <j6t@kdbg.org>' 72a144e2
+$ git show -s 72a144e
+[...]
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+Notes:
+    Tested-by: Johannes Sixt <j6t@kdbg.org>
+------------
+
+En principe, une note est un blob Git ordinaire, et tout type de (non-)format est accepté. Vous pouvez créer des notes binaires de manière sûre à partir de fichiers arbitraires en utilisant 'git hash-object' :
+
+------------
+$ cc *.c
+$ blob=$(git hash-object -w a.out)
+$ git notes --ref=built add --allow-empty -C "$blob" HEAD
+------------
+
+(Vous ne pouvez pas simplement utiliser `git notes --ref=built add -F a.out HEAD` car cela n'est pas binairement sûr). Bien sûr, cela n'a pas beaucoup de sens d'afficher des notes qui ne sont pas au format texte avec "git log", donc si vous utilisez de telles notes, vous aurez probablement besoin d'écrire des outils spéciaux pour en faire quelque chose d'utile.
+
+
+[[CONFIGURATION]]
+CONFIGURATION
+-------------
+
+core.notesRef::
+	Réf. de notes à lire et à manipuler à la place de `refs/notes/commits`. Doit être un nom de référence non abrégé. Ce paramètre peut être remplacé via l'environnement et la ligne de commande.
+
+
+
+[WARNING]
+====
+Missing `fr/includes/cmd-config-section-rest.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/notes.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+ENVIRONNEMENT
+-------------
+
+`GIT_NOTES_REF`::
+	La référence dont les notes doivent être manipulées, au lieu de `refs/notes/commits`. Ceci remplace le paramètre `core.notesRef`.
+
+`GIT_NOTES_DISPLAY_REF`::
+	Liste de refs ou de globs délimités par des colonnes indiquant les réfs, en plus de la valeur par défaut de `core.notesRef` ou de `GIT_NOTES_REF`, à partir desquelles lire les notes lors de l'affichage des messages de validation. Ceci surcharge le paramètre `notes.displayRef`.
++
+Un avertissement sera émis pour les réfs qui n'existent pas, mais un glob qui ne correspond à aucune réf est silencieusement ignoré.
+
+`GIT_NOTES_REWRITE_MODE`::
+	Lors de la copie de notes pendant une réécriture, action à faire si le commit cible a déjà une note. Doit être parmi `overwrite`, `concatenate`, `cat_sort_uniq`, ou `ignore`. Ceci surcharge le paramètre `core.rewriteMode`.
+
+`GIT_NOTES_REWRITE_REF`::
+	Lors de la réécriture de commits, quelles notes copier de l'original vers le commit réécrit. Doit être une liste de refs ou de globs délimitée par deux points.
++
+Si elle n'est pas définie dans l'environnement, la liste des notes à copier dépend des paramètres `notes.rewrite.<commande>` et `notes.rewriteRef`.
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .
