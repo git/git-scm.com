@@ -1,0 +1,365 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git Interna
+    number: 10
+  section:
+    title: Transfer Protokolle
+    number: 6
+    cs_number: '10.6'
+    previous: book/de/v2/Git-Interna-Die-Referenzspezifikation-engl-Refspec
+    next: book/de/v2/Git-Interna-Wartung-und-Datenwiederherstellung
+title: Git - Transfer Protokolle
+
+---
+<h2 id="_transfer_protokolle">Transfer Protokolle</h2>
+<div class="paragraph">
+<p>Git kann Daten zwischen zwei Repositorys hauptsächlich auf zwei Arten übertragen: mittels dem „dummen“ Protokoll und dem „intelligenten“ Protokoll.
+In diesem Abschnitt wird kurz erläutert, wie diese beiden Hauptprotokolle funktionieren.</p>
+</div>
+<div class="sect3">
+<h3 id="_das_dumme_protokoll">Das dumme Protokoll</h3>
+<div class="paragraph">
+<p>Wenn Sie ein Repository einrichten, das schreibgeschützt über HTTP bereitgestellt wird, wird wahrscheinlich das dumme Protokoll verwendet.
+Dieses Protokoll wird als „dumm“ bezeichnet, da es während des Transportvorgangs keinen Git-spezifischen Code auf der Serverseite erfordert. Der Abrufprozess besteht aus einer Reihe von HTTP <code>GET</code> Abfragen, bei denen der Client das Layout des Git-Repositorys auf dem Server übernehmen kann.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Anmerkung</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Das dumme Protokoll wird heutzutage ziemlich selten verwendet.
+Es ist schwierig, es sicher oder privat einzurichten, daher lehnen die meisten Git-Hosts (sowohl cloudbasiert als auch on-premise) die Verwendung ab.
+Es wird generell empfohlen, das smarte Protokoll zu verwenden, welches wir weiter unten beschreiben.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Folgen wir dem <code>http-fetch</code> Prozess für die simplegit-Bibliothek:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone http://server/simplegit-progit.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das erste, was dieser Befehl tut, ist das pullen der Datei <code>info/refs</code>.
+Diese Datei wird mit dem Befehl <code>update-server-info</code> geschrieben. Aus diesem Grund müssen Sie diesen als <code>post-receive</code> Hook aktivieren, damit der HTTP-Transport ordnungsgemäß funktioniert:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET info/refs
+ca82a6dff817ec66f44342007202690a93763949     refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt haben Sie eine Liste der remote Referenzen und der SHA-1s.
+Als Nächstes suchen Sie nach der HEAD-Referenz, damit Sie wissen, was Sie abschließend überprüfen müssen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie müssen den 'master'-Branch auschecken, wenn Sie den Vorgang abgeschlossen haben.
+Jetzt können Sie mit dem laufenden Prozess beginnen.
+Da Ihr Ausgangspunkt das Commit-Objekt <code>ca82a6</code> ist, das Sie in der Datei <code>info/refs</code> gesehen haben, rufen Sie zunächst Folgendes ab:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/ca/82a6dff817ec66f44342007202690a93763949
+(179 bytes of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie erhalten ein Objekt zurück – das Objekt befindet sich in losem Format auf dem Server und Sie haben es über einen statischen HTTP-GET-Aufruf abgerufen.
+Sie können es zlib-dekomprimieren, den Header entfernen und den Commit-Inhalt anzeigen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p ca82a6dff817ec66f44342007202690a93763949
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+Change version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als nächstes müssen Sie zwei weitere Objekte abrufen – <code>cfda3b</code>, das ist der Inhaltsbaum, auf den das gerade abgerufene Commit verweist; und <code>085bb3</code>, welches das übergeordnete Commit ist:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/08/5bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+(179 bytes of data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Damit haben Sie Ihr nächstes Commit-Objekt.
+Holen Sie sich nun das Baumobjekt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/cf/da3bf379e4f8dba8717dee55aab78aef7f4daf
+(404 - Not Found)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hoppla – es sieht so aus, als ob das Baum-Objekt auf dem Server nicht im losen Format vorliegt, sodass Sie eine 404-Antwort erhalten.
+Dafür gibt es mehrere Gründe: Das Objekt befindet sich möglicherweise in einem alternativen Repository oder in einem packfile Paketdatei in diesem Repository.
+Git sucht zuerst nach allen gelisteten Alternativen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/http-alternates
+(empty file)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn dies mit einer Liste alternativer URLs zurückgibt, sucht Git dort nach losen Dateien und packfiles. Dies ist ein nützlicher Mechanismus für Projekte, die sich gegenseitig forken, um Objekte auf der Festplatte zu teilen.
+Da in diesem Fall jedoch keine Alternativen aufgeführt sind, muss sich Ihr Objekt in einem packfile befinden.
+Um zu sehen, welche packfiles auf diesem Server verfügbar sind, müssen Sie die Datei <code>objects/info/packs</code> abrufen, die eine Liste dieser Dateien enthält (dies wird ebenfalls mittels <code>update-server-info</code> generiert):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/packs
+P pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es gibt nur ein packfile auf dem Server, sodass sich Ihr Objekt offensichtlich dort befindet. Überprüfen Sie jedoch den Index, um dies auch sicherzustellen.
+Dies ist ebenfalls nützlich, wenn sich mehrere packfiles auf dem Server befinden. Sie können so prüfen, welches packfile das gewünschte Objekt enthält:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.idx
+(4k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nachdem Sie nun den packfile-Index haben, können Sie sehen, ob sich Ihr Objekt darin befindet. Da Index listet die SHA-1-Werte der in dem packfile enthaltenen Objekte und die Offsets zu diesen Objekten.
+Ihr Objekt ist vorhanden, also holen sie sich das komplette packfile:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack
+(13k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nun haben Sie Ihr Baumobjekt und gehen Ihre Commits weiter durch.
+Sie befinden sich alle in dem gerade heruntergeladenen packfile, sodass Sie keine weiteren Anfragen an Ihren Server stellen müssen.
+Git checkt eine Arbeitskopie des <code>master</code> Branches aus, auf die in der HEAD-Referenz verwiesen wurde, die Sie zu Beginn heruntergeladen haben.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_das_smarte_protokoll">Das smarte Protokoll</h3>
+<div class="paragraph">
+<p>Das dumme Protokoll ist einfach, aber ein bisschen ineffizient. Es kann keine Daten vom Client auf den Server schreiben.
+Das Smart-Protokoll wird oft zum Übertragen von Daten genutzt. Es erfordert jedoch einen intelligenten Git-Prozess auf der Remote-Seite. Es kann lokale Daten lesen, herausfinden, was der Client hat und benötigt, und eine benutzerdefiniertes packfile dafür generieren.
+Es gibt zwei Arten von Prozessen um Daten zu übertragen: zwei zum Hochladen von Daten und zwei zum Herunterladen von Daten.</p>
+</div>
+<div class="sect4">
+<h4 id="_daten_hochladen">Daten hochladen</h4>
+<div class="paragraph">
+<p>
+Um Daten remote hochzuladen, verwendet Git die Prozesse <code>send-pack</code> und <code>receive-pack</code>.
+Der <code>send-pack</code> Prozess wird auf dem Client ausgeführt und stellt eine Verbindung zu einem <code>receive-pack</code> Prozess auf der Remote-Seite her.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh">SSH</h6>
+<div class="paragraph">
+<p>Angenommen, Sie führen in Ihrem Projekt <code>git push origin master</code> aus, und <code>origin</code> ist als URL definiert, die das SSH-Protokoll verwendet.
+Git startet den <code>send-pack</code> Prozess, der eine Verbindung über SSH zu Ihrem Server aufbaut.
+Es wird versucht, einen Befehl auf dem Remote-Server über einen SSH-Aufruf auszuführen, der in etwa so aussieht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-receive-pack 'simplegit-progit.git'"
+00a5ca82a6dff817ec66f4437202690a93763949 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1+github-607-gfba4028 delete-refs
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der Befehl <code>git-receive-pack</code> antwortet sofort mit einer Zeile für jede Referenz, die er derzeit hat – in diesem Fall nur den <code>master</code> Branch und seinen SHA-1.
+Die erste Zeile enthält auch eine Liste der Serverfunktionen (hier <code>report-status</code>, <code>delete-refs</code> und einige andere, einschließlich der Client-ID).</p>
+</div>
+<div class="paragraph">
+<p>Die Daten werden in Paketen (eng. chunks) übertragen.
+Jeder Chunk beginnt mit einem 4-stelligen Hex-Wert, der angibt, wie lang der Chunk ist (einschließlich der 4 Bytes der Gesamtlänge).
+Die Pakete enthalten in der Regel eine einzige Zeile mit Daten und einen abschließenden Zeilenvorschub.
+Ihr erster Chunk beginnt mit 00a5, also hexadezimal für 165, womit das Paket 165 Bytes lang ist.
+Der nächste Chunk ist 0000, d.h. der Server ist mit seiner Referenzliste fertig.</p>
+</div>
+<div class="paragraph">
+<p>Jetzt, da der Server-Status bekannt ist, bestimmt Ihr <code>send-pack</code> Prozess, welche Commits er hat, die der Server nicht hat.
+Für jede Referenz, die durch diesen Push aktualisiert wird, teilt der <code>send-pack</code> Prozess dem <code>receive-pack</code> Prozess diese Informationen mit.
+Wenn Sie beispielsweise den <code>master</code> Branch aktualisieren und einen <code>experiment</code> Branch hinzufügen, sieht die Antwort von <code>send-pack</code> möglicherweise so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0076ca82a6dff817ec66f44342007202690a93763949 15027957951b64cf874c3557a0f3547bd83b3ff6 \
+	refs/heads/master report-status
+006c0000000000000000000000000000000000000000 cdfdb42577e2506715f8cfeacdbabc092bf63e8d \
+	refs/heads/experiment
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git sendet eine Zeile für jede Referenz, die Sie aktualisieren, mit der Länge der Zeile, dem alten SHA-1, dem neuen SHA-1 und der Referenz, die aktualisiert wird.
+Die erste Zeile enthält auch die Funktionen des Clients.
+Der SHA-1-Wert aller Nullen bedeutet, dass zuvor nichts vorhanden war, da Sie die experiment-Referenz hinzufügen.
+Wenn Sie eine Referenz löschen, sehen Sie das Gegenteil: Alle Nullen auf der rechten Seite.</p>
+</div>
+<div class="paragraph">
+<p>Als nächstes sendet der Client ein packfile mit allen Objekten, die der Server noch nicht hat.
+Schließlich antwortet der Server mit einer Erfolgs- oder Fehlermeldung:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>000eunpack ok</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https">HTTP(S)</h6>
+<div class="paragraph">
+<p>Der Prozess über HTTP ist fast derselbe, nur das Handshaking ist ein wenig anders.
+Die Verbindung wird mit folgender Anfrage initiiert:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET http://server/simplegit-progit.git/info/refs?service=git-receive-pack
+001f# service=git-receive-pack
+00ab6c5f0e45abd7832bf23074a333f739977c9e8188 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1~vmg-bitmaps-bugaloo-608-g116744e
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist das Ende der ersten Client-Server-Unterhaltung.
+Der Client stellt dann eine weitere Anfrage, diesmal einen <code>POST</code>, mit den Daten, die <code>send-pack</code> liefert.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST http://server/simplegit-progit.git/git-receive-pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die <code>POST</code> Abfrage enthält die <code>send-pack</code> Ausgabe und das packfile als Nutzdaten.
+Der Server zeigt dann mit seiner HTTP-Antwort Erfolg oder Fehler an.</p>
+</div>
+<div class="paragraph">
+<p>Denken Sie daran, dass das HTTP-Protokoll diese Daten möglicherweise zusätzlich in einen „chunked transfer“ Code verpackt.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_daten_herunterladen">Daten herunterladen</h4>
+<div class="paragraph">
+<p>
+Wenn Sie Daten herunterladen, sind die Prozesse <code>fetch-pack</code> und <code>upload-pack</code> beteiligt.
+Der Client initiiert einen <code>fetch-Pack</code> Prozess, der eine Verbindung zu einem <code>upload-pack</code> Prozess auf der Remote-Seite herstellt, um auszuhandeln, welche Daten nach übertragen werden sollen.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh_2">SSH</h6>
+<div class="paragraph">
+<p>Wenn Sie den Abruf über SSH ausführen, führt <code>fetch-pack</code> in etwa Folgendes aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-upload-pack 'simplegit-progit.git'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nachdem <code>fetch-pack</code> eine Verbindung hergestellt hat, sendet <code>upload-pack</code> in etwas Folgendes zurück:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>00dfca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fe2409a098dc3e53539a9028a94b6224db9d6a6b6 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dies ist sehr ähnlich zu dem, was <code>receive-pack</code> antwortet, aber die Einsatzmöglichkeiten sind unterschiedlich.
+Außerdem wird zurückgesendet, worauf HEAD verweist (<code>symref=HEAD:refs/heads/master</code>), sodass der Client weiß, was er überprüfen muss, wenn es sich um einen Klon handelt.</p>
+</div>
+<div class="paragraph">
+<p>Zu diesem Punkt prüft der <code>fetch-pack</code> Prozess, über welche Objekte er verfügt, und antwortet mit den Objekten, die er benötigt, indem er „want“ und dann den gewünschten SHA-1 sendet.
+Es sendet alle Objekte, die es bereits hat, mit „have“ und dann den SHA-1.
+Am Ende dieser Liste wird „done“ geschrieben, um den `upload-pack“-Prozess einzuleiten, der das packfile mit den benötigten Daten sendet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>003cwant ca82a6dff817ec66f44342007202690a93763949 ofs-delta
+0032have 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+0009done
+0000</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https_2">HTTP(S)</h6>
+<div class="paragraph">
+<p>Der Handshake für einen Abrufvorgang benötigt zwei HTTP Aufrufe.
+Das erste ist ein <code>GET</code> zum selben Endpunkt, der im dummen Protokoll verwendet wird:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET $GIT_URL/info/refs?service=git-upload-pack
+001e# service=git-upload-pack
+00e7ca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed no-done symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dies ist dem Aufrufen von <code>git-upload-pack</code> über eine SSH-Verbindung sehr ähnlich. Der zweite Austausch wird als separater Aufruf ausgeführt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST $GIT_URL/git-upload-pack HTTP/1.0
+0032want 0a53e9ddeaddad63ad106860237bbf53411d11a7
+0032have 441b40d833fdfa93eb2908e52742248faf0ee993
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Auch dies ist das gleiche Format wie oben.
+Die Antwort auf diese Anfrage zeigt Erfolg oder Fehler an und enthält das packfile.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_zusammenfassung_der_protokolle">Zusammenfassung der Protokolle</h3>
+<div class="paragraph">
+<p>Dieser Abschnitt enthält eine sehr grundlegende Übersicht über die Transfer Protokolle.
+Das Protokoll enthält viele andere Funktionen, wie z.B. <code>multi_ack</code> oder <code>side-band</code>, die jedoch nicht in diesem Buch behandelt werden.
+Wir haben versucht, Ihnen ein Gefühl für das allgemeine Hin und Her zwischen Client und Server zu vermitteln. Wenn Sie mehr Informationen diesbezüglich benötigen, sollten Sie sich  den Git-Quellcode ansehen.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

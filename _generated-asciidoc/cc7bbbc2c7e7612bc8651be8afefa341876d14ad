@@ -1,0 +1,358 @@
+git-reset(1)
+============
+
+名称
+--
+git-reset - 重置当前HEAD到指定的状态
+
+概述
+--
+[verse]
+'git reset' [-q] [<目录树对象>] [--] <路径规范>...
+'git reset' [-q] [--pathspec-from-file=<文件> [--pathspec-file-nul]] [<目录树对象>]
+'git reset' (--patch | -p) [<目录树对象>] [--] [<路径规范>...]
+'git reset' [--soft | --mixed [-N] | --hard | --merge | --keep] [-q] [<提交>]
+
+描述
+--
+In the first three forms, copy entries from `<tree-ish>` to the index. In the last form, set the current branch head (`HEAD`) to `<commit>`, optionally modifying index and working tree to match. The `<tree-ish>`/`<commit>` defaults to `HEAD` in all forms.
+
+'git reset' [-q] [<目录树对象>] [--] <路径规范>...::
+'git reset' [-q] [--pathspec-from-file=<文件> [--pathspec-file-nul]] [<目录树对象>]::
+	These forms reset the index entries for all paths that match the `<pathspec>` to their state at `<tree-ish>`. (It does not affect the working tree or the current branch.)
++
+这意味着，`git reset <pathspec>`与`git add <pathspec>`相反。该命令等同于`git restore [--source=<treeish>] --staged <pathspec>...`。
++
+运行 `git reset <pathspec>` 来更新索引条目后，您可以使用 linkgit:git-restore[1] 来检查索引中的内容到工作树上。另外，使用 linkgit:git-restore[1] 并用 `--source` 指定一个提交，你可以一次性将一个路径的内容从提交中复制到索引和工作树上。
+
+'git reset' (--patch | -p) [<目录树对象>] [--] [<路径规范>...]::
+	Interactively select hunks in the difference between the index and `<tree-ish>` (defaults to `HEAD`). The chosen hunks are applied in reverse to the index.
++
+This means that `git reset -p` is the opposite of `git add -p`, i.e. you can use it to selectively reset hunks. See the ``Interactive Mode'' section of linkgit:git-add[1] to learn how to operate the `--patch` mode.
+
+'git reset' [<模式>] [<提交>]::
+	此表单会将当前分支的头重置为 `<提交>`，并可能根据 `<模式>`更新索引（重置为 `<提交>`的目录树）和工作目录树。在操作之前，`ORIG_HEAD` 会被设置为当前分支的顶端。如果省略了 `<模式>`，则默认为 `--mixed`。`<模式>` 必须是以下之一：
++
+--
+--soft::
+	完全不碰索引文件或工作树（但将头部重置为`<commit>`，就像所有模式一样）。这使你的所有更改的文件都是 "待提交的更改"，正如`git status`所说的。
+
+--mixed::
+	重置索引，但不重置工作树（即保留已修改的文件，但不标记为提交）并报告未更新的内容。这是默认动作。
++
+如果指定了 `-N`，则删除的路径将被标记为要添加（请参阅 linkgit:git-add[1]）。
+
+--hard::
+	Resets the index and working tree. Any changes to tracked files in the working tree since `<commit>` are discarded. Any untracked files or directories in the way of writing any tracked files are simply deleted.
+
+--merge::
+	Resets the index and updates the files in the working tree that are different between `<commit>` and `HEAD`, but keeps those which are different between the index and working tree (i.e. which have changes which have not been added). If a file that is different between `<commit>` and the index has unstaged changes, reset is aborted.
++
+换句话说，`--merge`做的是类似于`git read-tree -u -m <commit>`的事情，但会转发未合并的索引条目。
+
+--keep::
+	Resets index entries and updates files in the working tree that are different between `<commit>` and `HEAD`. If a file that is different between `<commit>` and `HEAD` has local changes, reset is aborted.
+
+--[no-]recurse-submodules::
+	当工作树被更新时，使用 --recurse-submodules 也将根据超级项目中记录的提交，递归地重置所有活动的子模块的工作树，同时也将子模块的 HEAD 设置为在该提交中被分离。
+--
+
+关于这三个命令的区别，见linkgit:git[1]中的 "重置、恢复和还原"。
+
+
+选项
+--
+
+-q::
+--quiet::
+	静默模式，只报告错误。
+
+--refresh::
+--no-refresh::
+	在混合重置后刷新索引，默认启用。
+
+--pathspec-from-file=<file>::
+	Pathspec在 `<文件>` 中传递，而不是在命令行参数中传递。如果 `<文件>` 正好是 `-`，则使用标准输入。路径规范元素由 LF 或 CR/LF 分隔。可以引用配置变量 `core.quotePath` 的路径规范元素（请参见 linkgit:git-config[1]）。另请参见 `--pathspec-file-nul` 和全局 `--literal-pathspecs`。
+
+--pathspec-file-nul::
+	只有在使用 `--pathspec-from-file` 选项时才有意义。指定路径元素用 NUL 字符分隔，所有其他字符都按字面意思（包括换行符和引号）表示。
+
+\--::
+	不将之后的参数解释为选项。
+
+<pathspec>...::
+	限制受操作影响的路径。
++
+更多细节请参见 linkgit:gitglossary[7] 中的 '路径规范' 条目。
+
+实例
+--
+
+撤销添加::
++
+------------
+$ edit                                     <1>
+$ git add frotz.c filfre.c
+$ mailx                                    <2>
+$ git reset                                <3>
+$ git pull git://info.example.com/ nitfol  <4>
+------------
++
+<1> You are happily working on something, and find the changes in these files are in good order. You do not want to see them when you run `git diff`, because you plan to work on other files and changes with these files are distracting.
+<2> 有人要求你拉，而且这些变化听起来值得合并。
+<3> However, you already dirtied the index (i.e. your index does not match the `HEAD` commit). But you know the pull you are going to make does not affect `frotz.c` or `filfre.c`, so you revert the index changes for these two files. Your changes in working tree remain there.
+<4> 然后你可以拉出并合并，留下`frotz.c`和`filfre.c`的修改仍在工作树上。
+
+撤销一个提交并重做::
++
+------------
+$ git commit ...
+$ git reset --soft HEAD^      <1>
+$ edit                        <2>
+$ git commit -a -c ORIG_HEAD  <3>
+------------
++
+<1> This is most often done when you remembered what you just committed is incomplete, or you misspelled your commit message, or both. Leaves working tree as it was before "reset".
+<2> 对工作树文件进行修正。
+<3> "reset" copies the old head to `.git/ORIG_HEAD`; redo the commit by starting with its log message. If you do not need to edit the message further, you can give `-C` option instead.
++
+参见linkgit:git-commit[1]的`--amend`选项。
+
+撤销一个提交，使其成为一个主题分支::
++
+------------
+$ git branch topic/wip          <1>
+$ git reset --hard HEAD~3       <2>
+$ git switch topic/wip          <3>
+------------
++
+<1> You have made some commits, but realize they were premature to be in the `master` branch. You want to continue polishing them in a topic branch, so create `topic/wip` branch off of the current `HEAD`.
+<2> 回溯主分支，去掉这三个提交。
+<3> 切换到`topic/wip`分支并继续工作。
+
+永久撤销提交::
++
+------------
+$ git commit ...
+$ git reset --hard HEAD~3 <1>
+------------
++
+<1> The last three commits (`HEAD`, `HEAD^`, and `HEAD~2`) were bad and you do not want to ever see them again. Do *not* do this if you have already given these commits to somebody else. (See the "RECOVERING FROM UPSTREAM REBASE" section in linkgit:git-rebase[1] for the implications of doing so.)
+
+撤销合并或拉动::
++
+------------
+$ git pull <1>
+自动合并nitfol
+CONFLICT（内容）。nitfol的合并冲突
+自动合并失败；修复冲突，然后提交结果。
+$ git reset --hard <2>
+$ git pull . topic/branch <3>
+从41223...更新到13134...
+快进
+$ git reset --hard ORIG_HEAD <4>
+------------
++
+<1> 试图从上游更新导致了很多冲突；你现在还没有准备好花费大量的时间来合并，所以你决定以后再做这个。
+<2> "pull "没有进行合并提交，所以`git reset --hard`是`git reset --hard HEAD`的同义词，它清除了索引文件和工作树上的混乱。
+<3> 将一个主题分支合并到当前分支，这导致了快进。
+<4> But you decided that the topic branch is not ready for public consumption yet. "pull" or "merge" always leaves the original tip of the current branch in `ORIG_HEAD`, so resetting hard to it brings your index file and the working tree back to that state, and resets the tip of the branch to that commit.
+
+撤消合并或拉动肮脏的工作树的行为::
++
+------------
+$ git pull                         <1>
+Auto-merging nitfol
+Merge made by recursive.
+ nitfol                |   20 +++++----
+ ...
+$ git reset --merge ORIG_HEAD      <2>
+------------
++
+<1> 即使你的工作树中可能有局部的修改，当你知道另一个分支中的修改没有与之重叠时，你可以放心地说`git pull`。
+<2> After inspecting the result of the merge, you may find that the change in the other branch is unsatisfactory. Running `git reset --hard ORIG_HEAD` will let you go back to where you were, but it will discard your local changes, which you do not want. `git reset --merge` keeps your local changes.
+
+
+中断的工作流程::
++
+Suppose you are interrupted by an urgent fix request while you are in the middle of a large change. The files in your working tree are not in any shape to be committed yet, but you need to get to the other branch for a quick bugfix.
++
+------------
+$ git switch feature ;# 你在 "feature "分支工作，并且
+$ work work work;# 被打断了
+$ git commit -a -m "snapshot WIP" <1
+$ git switch master
+$ fix fix fix
+$ git commit ;# 提交时有真实日志
+$ git switch feature
+$ git reset --soft HEAD^ ;# 回到 WIP 状态 <2>
+$ git reset <3>
+------------
++
+<1> 这个提交会被吹走，所以扔掉的日志信息是可以的。
+<2> 这将从提交历史中删除 "WIP "提交，并将你的工作树设置为刚刚做出快照之前的状态。
+<3> At this point the index file still has all the WIP changes you committed as 'snapshot WIP'. This updates the index to show your WIP files as uncommitted.
++
+也请参见 linkgit:git-stash[1]。
+
+重置索引中的单个文件::
++
+假设你在索引中添加了一个文件，但后来决定不想把它加入你的提交中。你可以用git reset将该文件从索引中删除，同时保留你的修改。
++
+------------
+$ git reset -- frotz.c <1>.
+$ git commit -m "将文件存入索引" <2>
+$ git add frotz.c <3>
+------------
++
+<1> 这将从索引中删除该文件，同时将其保留在工作目录中。
+<2> 这将提交索引中的所有其他变化。
+<3> 再次将该文件添加到索引中。
+
+在工作树中保留修改，同时丢弃一些以前的提交内容::
++
+假设你正在做某件事，并提交了它，然后你又继续做了一会儿，但现在你认为你工作树中的内容应该在另一个分支中，而这个分支与你之前提交的内容毫无关系。你可以启动一个新的分支，并重置它，同时保留工作树中的变化。
++
+------------
+$ git tag start
+$ git switch -c branch1
+$ 编辑
+$ git commit ...                            <1>
+$ 编辑
+$ git switch -c branch2                     <2>
+$ git reset --keep start                    <3>
+------------
++
+<1> 这将提交你在 `branch1`中的第一次编辑。
+<2> 在理想的世界里，你可以在创建并切换到 "分支2"（即 "git switch -c branch2 start"）时意识到先前的提交不属于新主题，但人无完人。
+<3> 但你可以用`reset --keep`来删除你切换到`branch2`后不需要的提交。
+
+将一个提交分割成一连串的提交::
++
+假设你创建了很多逻辑上独立的修改，并将它们一起提交。然后，后来你决定让每个逻辑块与自己的提交相关联可能更好。你可以使用 git reset 来回溯历史，而不改变本地文件的内容，然后连续使用 `git add -p` 来交互式地选择哪些块包含在每个提交中，使用 `git commit -c` 来预先填入提交信息。
++
+------------
+$ git reset -N HEAD^ <1>
+$ git add -p <2>
+$ git diff --cached <3>
+$ git commit -c HEAD@{1}.                    <4>
+...                                         <5>
+$ git add ...                               <6>
+$ git diff --cached <7>
+$ git commit ...                            <8>
+------------
++
+<1> 首先，将历史记录向后重设一次提交，这样我们就删除了原始提交，但保留了工作树上的所有修改。N确保任何用`HEAD`添加的新文件仍然被标记，以便`git add -p`能够找到它们。
+<2> 接下来，我们使用 "git add -p "工具，交互式地选择要添加的diff hunks。这将依次询问每个差异块，你可以使用简单的命令，如 "是，包括这个"，"不，不包括这个"，甚至是非常强大的 "编辑 "工具。
+<3> 一旦对你想要包括的hunks感到满意，你应该通过使用`git diff --cached`来验证为第一次提交准备了什么。这将显示所有已经移入索引并即将提交的修改。
+<4> Next, commit the changes stored in the index. The `-c` option specifies to pre-populate the commit message from the original message that you started with in the first commit. This is helpful to avoid retyping it. The `HEAD@{1}` is a special notation for the commit that `HEAD` used to be at prior to the original reset commit (1 change ago). See linkgit:git-reflog[1] for more details. You may also use any other valid commit reference.
+<5> 你可以多次重复第2-4步，将原始代码分解成任意数量的提交。
+<6> 现在你已经把许多修改拆成了自己的提交，可能不再使用`git add`的补丁模式，以便选择所有剩余的未提交的修改。
+<7> 再一次检查以确认你已经包含了你想要的东西。你可能还想确认git diff没有显示任何剩余的修改，以便以后提交。
+<8> 最后创建最后的提交。
+
+
+讨论
+--
+
+下面的表格显示了运行时发生的情况：
+
+----------
+git reset --option 目标
+----------
+
+来重置`HEAD`到另一个提交（`target`），根据文件的状态，有不同的重置选项。
+
+In these tables, `A`, `B`, `C` and `D` are some different states of a file. For example, the first line of the first table means that if a file is in state `A` in the working tree, in state `B` in the index, in state `C` in `HEAD` and in state `D` in the target, then `git reset --soft target` will leave the file in the working tree in state `A` and in the index in state `B`. It resets (i.e. moves) the `HEAD` (i.e. the tip of the current branch, if you are on one) to `target` (which has the file in state `D`).
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ A B C D --soft(软的) A B D
+			  --mixed(混合型) A D D
+			  --hard(硬的) D D D
+			  --merge(合并) (不允许)
+			  --keep(保持) (不允许)
+....
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ A B C C --soft(软的) A B C
+			  --mixed(混合型) A C C
+			  --hard(硬性) C C C
+			  --merge(合并)(不允许)
+			  --keep(保持) A C C
+....
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ B B C D --soft(软) B B D
+			  --mixed(混合型) B D D
+			  --hard(硬的) D D D
+			  --merge(合并) D D D
+			  --keep(保持)(不允许)
+....
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ B B C C --soft(软) B B C
+			  --mixed(混合型) B C C
+			  --hard(硬性) C C C
+			  --merge(合并) C C C
+			  --keep(保持) B C C
+....
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ B C C D --soft(软) B C D
+			  --mixed(混合型) B D D
+			  --hard(硬的) D D D
+			  --merge(合并) (不允许)
+			  --keep(保持) (不允许)
+....
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ B C C C --soft(软B) C C
+			  --mixed(混合型) B C C
+			  --hard(硬性) C C C
+			  --merge(合并) B C C
+			  --keep(保持) B C C
+....
+
+`reset --merge`是指在重设冲突的合并时使用。任何合并操作都会保证参与合并的工作树文件在开始之前没有相对于索引的局部变化，并且会将结果写入工作树。因此，如果我们看到索引和目标之间，以及索引和工作树之间有一些差异，那么这意味着我们没有从一个合并操作失败后留下的冲突状态中重新设置出来。这就是为什么我们在这种情况下不允许使用`--合并`选项。
+
+`reset --keep 意思是在删除当前分支中的一些最后的提交，同时保留工作树中的修改时使用。如果我们想删除的提交和我们想保留的工作树上的修改之间可能存在冲突，那么重置是不允许的。这就是为什么如果工作树和`HEAD'之间，以及`HEAD'和目标之间都有变化，那么就不允许重置。为了安全起见，当有未合并的条目时，也不允许这样做。
+
+下表显示了有未合并的条目时发生的情况：
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ X U A B --soft(软)（不允许）。
+			  --mixed(混合型) X B B
+			  --hard(硬的) B B B
+			  --merge(合并) B B B
+			  --keep(保持) (不允许)
+....
+
+....
+工作索引 HEAD 目标工作索引 HEAD
+----------------------------------------------------
+ X U A A --soft(软) (不允许)
+			  --mixed(混合型) X A A
+			  --hard(硬性) A A A
+			  --merge(合并) A A A
+			  --keep(保持) (不允许)
+....
+
+`X`指任何状态，`U`指未合并的索引。
+
+GIT
+---
+属于 linkgit:git[1] 文档

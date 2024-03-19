@@ -1,0 +1,158 @@
+git-cvsimport(1)
+================
+
+名称
+--
+git-cvsimport - 从另一个让人由爱生恨的 SCM 中获取数据
+
+
+概述
+--
+[verse]
+'git cvsimport' [-o <HEAD 分支>] [-h] [-v] [-d <CVSROOT>]
+	      [-A <author-conv-file>] [-p <options-for-cvsps>] [-P <文件>]
+	      [-C <Git 仓库>] [-z <fuzz>] [-i] [-k] [-u] [-s <subst>]
+	      [-a] [-m] [-M <正则表达式>] [-S <正则表达式>] [-L <提交范围>]
+	      [-r <远程仓库>] [-R] [<CVS 模块>]
+
+
+描述
+--
+*WARNING:* `git cvsimport` uses cvsps version 2, which is considered deprecated; it does not work with cvsps version 3 and later. If you are performing a one-shot import of a CVS repository consider using http://cvs2svn.tigris.org/cvs2git.html[cvs2git] or https://gitlab.com/esr/cvs-fast-export[cvs-fast-export].
+
+将 CVS 仓库导入 Git。它既可以创建一个新的仓库，也可以增量导入现有仓库。
+
+Splitting the CVS log into patch sets is done by 'cvsps'. At least version 2.1 is required.
+
+*WARNING:* for certain situations the import leads to incorrect results. Please see the section <<issues,ISSUES>> for further reference.
+
+You should *never* do any work of your own on the branches that are created by 'git cvsimport'. By default initial import will create and populate a "master" branch from the CVS repository's main branch which you're free to work with; after that, you need to 'git merge' incremental imports, or any CVS branches, yourself. It is advisable to specify a named remote via -r to separate and protect the incoming branches.
+
+If you intend to set up a shared public repository that all developers can read/write, or if you want to use linkgit:git-cvsserver[1], then you probably want to make a bare clone of the imported repository, and use the clone as the shared repository. See linkgit:gitcvs-migration[7].
+
+
+选项
+--
+-v::
+	Verbosity: 让 'cvsimport' 报告他正在做什么。
+
+-d <CVSROOT>::
+	CVS 存档的根目录。可以是本地（简单路径）或远程；目前只支持 :local:、:ext: 和 :pserver: 访问方法。如果没有给出，'git cvsimport' 将尝试从 'CVS/Root' 中读取。如果没有此类文件，则会检查 `CVSROOT` 环境变量。
+
+<CVS_module>::
+	The CVS module you want to import. Relative to <CVSROOT>. If not given, 'git cvsimport' tries to read it from `CVS/Repository`.
+
+-C <目标目录>::
+The Git repository to import to. If the directory doesn't exist, it will be created. Default is the current directory.
+
+-r <远程仓库>::
+	The Git remote to import this CVS repository into. Moves all CVS branches into remotes/<remote>/<branch> akin to the way 'git clone' uses 'origin' by default.
+
+-o <branch-for-HEAD>::
+	When no remote is specified (via -r) the `HEAD` branch from CVS is imported to the 'origin' branch within the Git repository, as `HEAD` already has a special meaning for Git. When a remote is specified the `HEAD` branch is named remotes/<remote>/master mirroring 'git clone' behaviour. Use this option if you want to import into a different branch.
++
+使用 '-o master' 继续导入最初由旧版 cvs2git 工具完成的导入。
+
+-i::
+	Import-only: don't perform a checkout after importing. This option ensures the working directory and index remain untouched and will not create them if they do not exist.
+
+-k::
+	杀死关键字：将从 CVS 存档中提取带有 '-kk' 的文件，以避免出现嘈杂的更改集。强烈建议使用，但默认为关闭，以保持与早期导入树的兼容性。
+
+-u::
+	将标记和分支名称中的下划线转换为点。
+
+-s <subst>::
+	用 <subst> 代替分支名称中的字符"/"
+
+-p <options-for-cvsps>::
+	Additional options for cvsps. The options `-u` and '-A' are implicit and should not be used here.
++
+如果需要传递多个选项，请用逗号分隔。
+
+-z <fuzz>::
+	向 cvsps 传递时间戳模糊因子，单位为秒。如果未设置，cvsps 默认为 300 秒。
+
+-P <cvsps 输出文件>::
+	不调用 cvsps，而是读取提供的 cvsps 输出文件。在调试或在 cvsimport 之外处理 cvsps 时非常有用。
+
+-m::
+	尝试根据提交信息检测合并。该选项将启用默认的 regexes，尝试从提交信息中捕捉源分支名称。
+
+-M <正则表达式>::
+	尝试使用自定义正则表达式根据提交信息检测合并。也可与 `-m` 搭配使用，启用默认的 regexes。必须转义为正斜杠。
++
+正则表达式必须在 $1 中捕获源分支名称。
++
+该选项可多次使用，以提供多个检测 regexes。
+
+-S <正则表达式>::
+	跳过与正则表达式匹配的路径。
+
+-a::
+	cvsimport 默认跳过时间戳少于 10 分钟的提交。
+
+-L <限制>::
+	限制导入的提交次数。针对 cvsimport 泄露内存情况的解决方法。
+
+-A <作者的 conv 文件>::
+	CVS 在编写提交日志时默认使用 Unix 用户名。使用此选项和 author-conv 文件可将 CVS 中记录的姓名映射为作者姓名、电子邮件和可选的时区：
++
+---------
+	exon=Andreas Ericsson <ae@op5.se>
+	spawn=Simon Pawn <spawn@frog-pond.org> America/Chicago
+
+---------
++
+'git cvsimport' will make it appear as those authors had their GIT_AUTHOR_NAME and GIT_AUTHOR_EMAIL set properly all along. If a time zone is specified, GIT_AUTHOR_DATE will have the corresponding offset applied.
++
+为方便起见，每次提供 '-A' 选项时，这些数据都会被保存到 `$GIT_DIR/cvs-authors` 中，每次运行 'git cvsimport' 时，都会从同一文件中读取这些数据。
++
+如果您打算稍后再用 'git cvsexportcommit' 将更改导出回 CVS，则不建议使用此功能。
+
+-R::
+	Generate a `$GIT_DIR/cvs-revisions` file containing a mapping from CVS revision numbers to newly-created Git commit IDs. The generated file will contain one line for each (filename, revision) pair imported; each line will look like
++
+---------
+src/widget.c 1.1 1d862f173cdc7325b6fa6d2ae1cfd61fd1b512b7
+---------
++
+如果已存在修订数据，则会将其附加到文件中，以便在进行增量导入时使用。
++
+如果在提交信息、错误跟踪系统、电子邮件归档等中存储了 CVS 版本号，该选项可能会很有用。
+
+-h::
+	打印简短的使用信息并退出。
+
+输出
+--
+如果指定了 `-v`，脚本会报告它正在做什么。
+
+否则，将以 Unix 的方式表示成功，即直接以零退出状态退出。
+
+[[issues]]
+问题
+--
+与时间戳有关的问题：
+
+ * 如果 CVS 存储库中提交的时间戳不够稳定，无法用于对提交进行排序，则更改可能会以错误的顺序显示。
+ * 如果任何文件曾被多次 "cvs import"（如导入多个供应商发布的版本），则 HEAD 包含错误的内容。
+ * 如果在提交匹配时间窗口内，不同文件的时间戳顺序与修订顺序不一致，提交顺序可能会出错。
+
+与分支机构有关的问题:
+
+ * 未提交的分支不会被导入。
+ * 分支点的所有文件都会添加到分支中，即使从未在 CVS 中添加过。
+ * 这适用于在创建子分支*之后*添加到源分支的文件：如果之前没有在子分支上提交，这些文件就会在 git 中被错误地添加到子分支上。
+
+与标签有关的问题：
+
+* 不会导入同一修订版上的多个标记。
+
+如果您怀疑要导入的仓库可能存在上述问题，请考虑使用 cvs2git：
+
+* cvs2git (part of cvs2svn), `https://subversion.apache.org/`
+
+GIT
+---
+属于 linkgit:git[1] 文档

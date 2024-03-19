@@ -1,0 +1,645 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - gitworkflows Documentation
+docname: gitworkflows
+version: 2.16.6
+aliases:
+- "/docs/gitworkflows/2.16.6/index.html"
+- "/docs/gitworkflows/2.17.0/index.html"
+- "/docs/gitworkflows/2.17.1/index.html"
+- "/docs/gitworkflows/2.17.2/index.html"
+- "/docs/gitworkflows/2.17.3/index.html"
+- "/docs/gitworkflows/2.17.4/index.html"
+- "/docs/gitworkflows/2.17.5/index.html"
+- "/docs/gitworkflows/2.17.6/index.html"
+
+---
+<div class="sect1">
+<h2 id="_name"><a class="anchor" href="#_name"></a>NAME</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>gitworkflows - An overview of recommended workflows with Git</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_synopsis"><a class="anchor" href="#_synopsis"></a>SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="verseblock">
+<pre class="content">git *</pre>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description"><a class="anchor" href="#_description"></a>DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This document attempts to write down and motivate some of the workflow
+elements used for <code>git.git</code> itself.  Many ideas apply in general,
+though the full workflow is rarely required for smaller projects with
+fewer people involved.</p>
+</div>
+<div class="paragraph">
+<p>We formulate a set of <em>rules</em> for quick reference, while the prose
+tries to motivate each of them.  Do not always take them literally;
+you should value good reasons for your actions higher than manpages
+such as this one.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_separate_changes"><a class="anchor" href="#_separate_changes"></a>SEPARATE CHANGES</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>As a general rule, you should try to split your changes into small
+logical steps, and commit each of them.  They should be consistent,
+working independently of any later commits, pass the test suite, etc.
+This makes the review process much easier, and the history much more
+useful for later inspection and analysis, for example with
+<a href='{{< relurl "docs/git-blame" >}}'>git-blame[1]</a> and <a href='{{< relurl "docs/git-bisect" >}}'>git-bisect[1]</a>.</p>
+</div>
+<div class="paragraph">
+<p>To achieve this, try to split your work into small steps from the very
+beginning. It is always easier to squash a few commits together than
+to split one big commit into several.  Don&#8217;t be afraid of making too
+small or imperfect steps along the way. You can always go back later
+and edit the commits with <code>git rebase --interactive</code> before you
+publish them.  You can use <code>git stash push --keep-index</code> to run the
+test suite independent of other uncommitted changes; see the EXAMPLES
+section of <a href='{{< relurl "docs/git-stash" >}}'>git-stash[1]</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_managing_branches"><a class="anchor" href="#_managing_branches"></a>MANAGING BRANCHES</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There are two main tools that can be used to include changes from one
+branch on another: <a href='{{< relurl "docs/git-merge" >}}'>git-merge[1]</a> and
+<a href='{{< relurl "docs/git-cherry-pick" >}}'>git-cherry-pick[1]</a>.</p>
+</div>
+<div class="paragraph">
+<p>Merges have many advantages, so we try to solve as many problems as
+possible with merges alone.  Cherry-picking is still occasionally
+useful; see "Merging upwards" below for an example.</p>
+</div>
+<div class="paragraph">
+<p>Most importantly, merging works at the branch level, while
+cherry-picking works at the commit level.  This means that a merge can
+carry over the changes from 1, 10, or 1000 commits with equal ease,
+which in turn means the workflow scales much better to a large number
+of contributors (and contributions).  Merges are also easier to
+understand because a merge commit is a "promise" that all changes from
+all its parents are now included.</p>
+</div>
+<div class="paragraph">
+<p>There is a tradeoff of course: merges require a more careful branch
+management.  The following subsections discuss the important points.</p>
+</div>
+<div class="sect2">
+<h3 id="_graduation"><a class="anchor" href="#_graduation"></a>Graduation</h3>
+<div class="paragraph">
+<p>As a given feature goes from experimental to stable, it also
+"graduates" between the corresponding branches of the software.
+<code>git.git</code> uses the following <em>integration branches</em>:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><em>maint</em> tracks the commits that should go into the next "maintenance
+release", i.e., update of the last released stable version;</p>
+</li>
+<li>
+<p><em>master</em> tracks the commits that should go into the next release;</p>
+</li>
+<li>
+<p><em>next</em> is intended as a testing branch for topics being tested for
+stability for master.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>There is a fourth official branch that is used slightly differently:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><em>pu</em> (proposed updates) is an integration branch for things that are
+not quite ready for inclusion yet (see "Integration Branches"
+below).</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Each of the four branches is usually a direct descendant of the one
+above it.</p>
+</div>
+<div class="paragraph">
+<p>Conceptually, the feature enters at an unstable branch (usually <em>next</em>
+or <em>pu</em>), and "graduates" to <em>master</em> for the next release once it is
+considered stable enough.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_merging_upwards"><a class="anchor" href="#_merging_upwards"></a>Merging upwards</h3>
+<div class="paragraph">
+<p>The "downwards graduation" discussed above cannot be done by actually
+merging downwards, however, since that would merge <em>all</em> changes on
+the unstable branch into the stable one.  Hence the following:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Rule: Merge upwards</div>
+<div class="content">
+<div class="paragraph">
+<p>Always commit your fixes to the oldest supported branch that require
+them.  Then (periodically) merge the integration branches upwards into each
+other.</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>This gives a very controlled flow of fixes.  If you notice that you
+have applied a fix to e.g. <em>master</em> that is also required in <em>maint</em>,
+you will need to cherry-pick it (using <a href='{{< relurl "docs/git-cherry-pick" >}}'>git-cherry-pick[1]</a>)
+downwards.  This will happen a few times and is nothing to worry about
+unless you do it very frequently.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_topic_branches"><a class="anchor" href="#_topic_branches"></a>Topic branches</h3>
+<div class="paragraph">
+<p>Any nontrivial feature will require several patches to implement, and
+may get extra bugfixes or improvements during its lifetime.</p>
+</div>
+<div class="paragraph">
+<p>Committing everything directly on the integration branches leads to many
+problems: Bad commits cannot be undone, so they must be reverted one
+by one, which creates confusing histories and further error potential
+when you forget to revert part of a group of changes.  Working in
+parallel mixes up the changes, creating further confusion.</p>
+</div>
+<div class="paragraph">
+<p>Use of "topic branches" solves these problems.  The name is pretty
+self explanatory, with a caveat that comes from the "merge upwards"
+rule above:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Rule: Topic branches</div>
+<div class="content">
+<div class="paragraph">
+<p>Make a side branch for every topic (feature, bugfix, &#8230;&#8203;). Fork it off
+at the oldest integration branch that you will eventually want to merge it
+into.</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>Many things can then be done very naturally:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>To get the feature/bugfix into an integration branch, simply merge
+it.  If the topic has evolved further in the meantime, merge again.
+(Note that you do not necessarily have to merge it to the oldest
+integration branch first.  For example, you can first merge a bugfix
+to <em>next</em>, give it some testing time, and merge to <em>maint</em> when you
+know it is stable.)</p>
+</li>
+<li>
+<p>If you find you need new features from the branch <em>other</em> to continue
+working on your topic, merge <em>other</em> to <em>topic</em>.  (However, do not
+do this "just habitually", see below.)</p>
+</li>
+<li>
+<p>If you find you forked off the wrong branch and want to move it
+"back in time", use <a href='{{< relurl "docs/git-rebase" >}}'>git-rebase[1]</a>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Note that the last point clashes with the other two: a topic that has
+been merged elsewhere should not be rebased.  See the section on
+RECOVERING FROM UPSTREAM REBASE in <a href='{{< relurl "docs/git-rebase" >}}'>git-rebase[1]</a>.</p>
+</div>
+<div class="paragraph">
+<p>We should point out that "habitually" (regularly for no real reason)
+merging an integration branch into your topics&#8201;&#8212;&#8201;and by extension,
+merging anything upstream into anything downstream on a regular basis&#8201;&#8212;&#8201;is frowned upon:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Rule: Merge to downstream only at well-defined points</div>
+<div class="content">
+<div class="paragraph">
+<p>Do not merge to downstream except with a good reason: upstream API
+changes affect your branch; your branch no longer merges to upstream
+cleanly; etc.</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>Otherwise, the topic that was merged to suddenly contains more than a
+single (well-separated) change.  The many resulting small merges will
+greatly clutter up history.  Anyone who later investigates the history
+of a file will have to find out whether that merge affected the topic
+in development.  An upstream might even inadvertently be merged into a
+"more stable" branch.  And so on.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_throw_away_integration"><a class="anchor" href="#_throw_away_integration"></a>Throw-away integration</h3>
+<div class="paragraph">
+<p>If you followed the last paragraph, you will now have many small topic
+branches, and occasionally wonder how they interact.  Perhaps the
+result of merging them does not even work?  But on the other hand, we
+want to avoid merging them anywhere "stable" because such merges
+cannot easily be undone.</p>
+</div>
+<div class="paragraph">
+<p>The solution, of course, is to make a merge that we can undo: merge
+into a throw-away branch.</p>
+</div>
+<div class="exampleblock">
+<div class="title">Rule: Throw-away integration branches</div>
+<div class="content">
+<div class="paragraph">
+<p>To test the interaction of several topics, merge them into a
+throw-away branch.  You must never base any work on such a branch!</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>If you make it (very) clear that this branch is going to be deleted
+right after the testing, you can even publish this branch, for example
+to give the testers a chance to work with it, or other developers a
+chance to see if their in-progress work will be compatible.  <code>git.git</code>
+has such an official throw-away integration branch called <em>pu</em>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_branch_management_for_a_release"><a class="anchor" href="#_branch_management_for_a_release"></a>Branch management for a release</h3>
+<div class="paragraph">
+<p>Assuming you are using the merge approach discussed above, when you
+are releasing your project you will need to do some additional branch
+management work.</p>
+</div>
+<div class="paragraph">
+<p>A feature release is created from the <em>master</em> branch, since <em>master</em>
+tracks the commits that should go into the next feature release.</p>
+</div>
+<div class="paragraph">
+<p>The <em>master</em> branch is supposed to be a superset of <em>maint</em>. If this
+condition does not hold, then <em>maint</em> contains some commits that
+are not included on <em>master</em>. The fixes represented by those commits
+will therefore not be included in your feature release.</p>
+</div>
+<div class="paragraph">
+<p>To verify that <em>master</em> is indeed a superset of <em>maint</em>, use git log:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Verify <em>master</em> is a superset of <em>maint</em></div>
+<div class="content">
+<div class="paragraph">
+<p><code>git log master..maint</code></p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>This command should not list any commits.  Otherwise, check out
+<em>master</em> and merge <em>maint</em> into it.</p>
+</div>
+<div class="paragraph">
+<p>Now you can proceed with the creation of the feature release. Apply a
+tag to the tip of <em>master</em> indicating the release version:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Release tagging</div>
+<div class="content">
+<div class="paragraph">
+<p><code>git tag -s -m "Git X.Y.Z" vX.Y.Z master</code></p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>You need to push the new tag to a public Git server (see
+"DISTRIBUTED WORKFLOWS" below). This makes the tag available to
+others tracking your project. The push could also trigger a
+post-update hook to perform release-related items such as building
+release tarballs and preformatted documentation pages.</p>
+</div>
+<div class="paragraph">
+<p>Similarly, for a maintenance release, <em>maint</em> is tracking the commits
+to be released. Therefore, in the steps above simply tag and push
+<em>maint</em> rather than <em>master</em>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_maintenance_branch_management_after_a_feature_release"><a class="anchor" href="#_maintenance_branch_management_after_a_feature_release"></a>Maintenance branch management after a feature release</h3>
+<div class="paragraph">
+<p>After a feature release, you need to manage your maintenance branches.</p>
+</div>
+<div class="paragraph">
+<p>First, if you wish to continue to release maintenance fixes for the
+feature release made before the recent one, then you must create
+another branch to track commits for that previous release.</p>
+</div>
+<div class="paragraph">
+<p>To do this, the current maintenance branch is copied to another branch
+named with the previous release version number (e.g. maint-X.Y.(Z-1)
+where X.Y.Z is the current release).</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Copy maint</div>
+<div class="content">
+<div class="paragraph">
+<p><code>git branch maint-X.Y.(Z-1) maint</code></p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>The <em>maint</em> branch should now be fast-forwarded to the newly released
+code so that maintenance fixes can be tracked for the current release:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Update maint to new release</div>
+<div class="content">
+<div class="ulist">
+<ul>
+<li>
+<p><code>git checkout maint</code></p>
+</li>
+<li>
+<p><code>git merge --ff-only master</code></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>If the merge fails because it is not a fast-forward, then it is
+possible some fixes on <em>maint</em> were missed in the feature release.
+This will not happen if the content of the branches was verified as
+described in the previous section.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_branch_management_for_next_and_pu_after_a_feature_release"><a class="anchor" href="#_branch_management_for_next_and_pu_after_a_feature_release"></a>Branch management for next and pu after a feature release</h3>
+<div class="paragraph">
+<p>After a feature release, the integration branch <em>next</em> may optionally be
+rewound and rebuilt from the tip of <em>master</em> using the surviving
+topics on <em>next</em>:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Rewind and rebuild next</div>
+<div class="content">
+<div class="ulist">
+<ul>
+<li>
+<p><code>git checkout next</code></p>
+</li>
+<li>
+<p><code>git reset --hard master</code></p>
+</li>
+<li>
+<p><code>git merge ai/topic_in_next1</code></p>
+</li>
+<li>
+<p><code>git merge ai/topic_in_next2</code></p>
+</li>
+<li>
+<p>&#8230;&#8203;</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>The advantage of doing this is that the history of <em>next</em> will be
+clean. For example, some topics merged into <em>next</em> may have initially
+looked promising, but were later found to be undesirable or premature.
+In such a case, the topic is reverted out of <em>next</em> but the fact
+remains in the history that it was once merged and reverted. By
+recreating <em>next</em>, you give another incarnation of such topics a clean
+slate to retry, and a feature release is a good point in history to do
+so.</p>
+</div>
+<div class="paragraph">
+<p>If you do this, then you should make a public announcement indicating
+that <em>next</em> was rewound and rebuilt.</p>
+</div>
+<div class="paragraph">
+<p>The same rewind and rebuild process may be followed for <em>pu</em>. A public
+announcement is not necessary since <em>pu</em> is a throw-away branch, as
+described above.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_distributed_workflows"><a class="anchor" href="#_distributed_workflows"></a>DISTRIBUTED WORKFLOWS</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>After the last section, you should know how to manage topics.  In
+general, you will not be the only person working on the project, so
+you will have to share your work.</p>
+</div>
+<div class="paragraph">
+<p>Roughly speaking, there are two important workflows: merge and patch.
+The important difference is that the merge workflow can propagate full
+history, including merges, while patches cannot.  Both workflows can
+be used in parallel: in <code>git.git</code>, only subsystem maintainers use
+the merge workflow, while everyone else sends patches.</p>
+</div>
+<div class="paragraph">
+<p>Note that the maintainer(s) may impose restrictions, such as
+"Signed-off-by" requirements, that all commits/patches submitted for
+inclusion must adhere to.  Consult your project&#8217;s documentation for
+more information.</p>
+</div>
+<div class="sect2">
+<h3 id="_merge_workflow"><a class="anchor" href="#_merge_workflow"></a>Merge workflow</h3>
+<div class="paragraph">
+<p>The merge workflow works by copying branches between upstream and
+downstream.  Upstream can merge contributions into the official
+history; downstream base their work on the official history.</p>
+</div>
+<div class="paragraph">
+<p>There are three main tools that can be used for this:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href='{{< relurl "docs/git-push" >}}'>git-push[1]</a> copies your branches to a remote repository,
+usually to one that can be read by all involved parties;</p>
+</li>
+<li>
+<p><a href='{{< relurl "docs/git-fetch" >}}'>git-fetch[1]</a> that copies remote branches to your repository;
+and</p>
+</li>
+<li>
+<p><a href='{{< relurl "docs/git-pull" >}}'>git-pull[1]</a> that does fetch and merge in one go.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Note the last point.  Do <em>not</em> use <em>git pull</em> unless you actually want
+to merge the remote branch.</p>
+</div>
+<div class="paragraph">
+<p>Getting changes out is easy:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Push/pull: Publishing branches/topics</div>
+<div class="content">
+<div class="paragraph">
+<p><code>git push &lt;remote&gt; &lt;branch&gt;</code> and tell everyone where they can fetch
+from.</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>You will still have to tell people by other means, such as mail.  (Git
+provides the <a href='{{< relurl "docs/git-request-pull" >}}'>git-request-pull[1]</a> to send preformatted pull
+requests to upstream maintainers to simplify this task.)</p>
+</div>
+<div class="paragraph">
+<p>If you just want to get the newest copies of the integration branches,
+staying up to date is easy too:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Push/pull: Staying up to date</div>
+<div class="content">
+<div class="paragraph">
+<p>Use <code>git fetch &lt;remote&gt;</code> or <code>git remote update</code> to stay up to date.</p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>Then simply fork your topic branches from the stable remotes as
+explained earlier.</p>
+</div>
+<div class="paragraph">
+<p>If you are a maintainer and would like to merge other people&#8217;s topic
+branches to the integration branches, they will typically send a
+request to do so by mail.  Such a request looks like</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>Please pull from
+    &lt;url&gt; &lt;branch&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In that case, <em>git pull</em> can do the fetch and merge in one go, as
+follows.</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: Push/pull: Merging remote topics</div>
+<div class="content">
+<div class="paragraph">
+<p><code>git pull &lt;url&gt; &lt;branch&gt;</code></p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>Occasionally, the maintainer may get merge conflicts when they try to
+pull changes from downstream.  In this case, they can ask downstream to
+do the merge and resolve the conflicts themselves (perhaps they will
+know better how to resolve them).  It is one of the rare cases where
+downstream <em>should</em> merge from upstream.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_patch_workflow"><a class="anchor" href="#_patch_workflow"></a>Patch workflow</h3>
+<div class="paragraph">
+<p>If you are a contributor that sends changes upstream in the form of
+emails, you should use topic branches as usual (see above).  Then use
+<a href='{{< relurl "docs/git-format-patch" >}}'>git-format-patch[1]</a> to generate the corresponding emails
+(highly recommended over manually formatting them because it makes the
+maintainer&#8217;s life easier).</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: format-patch/am: Publishing branches/topics</div>
+<div class="content">
+<div class="ulist">
+<ul>
+<li>
+<p><code>git format-patch -M upstream..topic</code> to turn them into preformatted
+patch files</p>
+</li>
+<li>
+<p><code>git send-email --to=&lt;recipient&gt; &lt;patches&gt;</code></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>See the <a href='{{< relurl "docs/git-format-patch" >}}'>git-format-patch[1]</a> and <a href='{{< relurl "docs/git-send-email" >}}'>git-send-email[1]</a>
+manpages for further usage notes.</p>
+</div>
+<div class="paragraph">
+<p>If the maintainer tells you that your patch no longer applies to the
+current upstream, you will have to rebase your topic (you cannot use a
+merge because you cannot format-patch merges):</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: format-patch/am: Keeping topics up to date</div>
+<div class="content">
+<div class="paragraph">
+<p><code>git pull --rebase &lt;url&gt; &lt;branch&gt;</code></p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>You can then fix the conflicts during the rebase.  Presumably you have
+not published your topic other than by mail, so rebasing it is not a
+problem.</p>
+</div>
+<div class="paragraph">
+<p>If you receive such a patch series (as maintainer, or perhaps as a
+reader of the mailing list it was sent to), save the mails to files,
+create a new topic branch and use <em>git am</em> to import the commits:</p>
+</div>
+<div class="exampleblock">
+<div class="title">Recipe: format-patch/am: Importing patches</div>
+<div class="content">
+<div class="paragraph">
+<p><code>git am &lt; patch</code></p>
+</div>
+</div>
+</div>
+<div class="paragraph">
+<p>One feature worth pointing out is the three-way merge, which can help
+if you get conflicts: <code>git am -3</code> will use index information contained
+in patches to figure out the merge base.  See <a href='{{< relurl "docs/git-am" >}}'>git-am[1]</a> for
+other options.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_see_also"><a class="anchor" href="#_see_also"></a>SEE ALSO</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><a href='{{< relurl "docs/gittutorial" >}}'>gittutorial[7]</a>,
+<a href='{{< relurl "docs/git-push" >}}'>git-push[1]</a>,
+<a href='{{< relurl "docs/git-pull" >}}'>git-pull[1]</a>,
+<a href='{{< relurl "docs/git-merge" >}}'>git-merge[1]</a>,
+<a href='{{< relurl "docs/git-rebase" >}}'>git-rebase[1]</a>,
+<a href='{{< relurl "docs/git-format-patch" >}}'>git-format-patch[1]</a>,
+<a href='{{< relurl "docs/git-send-email" >}}'>git-send-email[1]</a>,
+<a href='{{< relurl "docs/git-am" >}}'>git-am[1]</a></p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Part of the <a href='{{< relurl "docs/git" >}}'>git[1]</a> suite</p>
+</div>
+</div>
+</div>

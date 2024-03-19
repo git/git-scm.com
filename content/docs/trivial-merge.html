@@ -1,0 +1,171 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - trivial-merge Documentation
+docname: trivial-merge
+version: 2.15.4
+latest-changes: 2.15.4
+aliases:
+- "/docs/trivial-merge/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This document describes the outcomes of the trivial merge logic in read-tree.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_one_way_merge"><a class="anchor" href="#_one_way_merge"></a>One-way merge</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This replaces the index with a different tree, keeping the stat info
+for entries that don&#8217;t change, and allowing -u to make the minimum
+required changes to the working tree to have it match.</p>
+</div>
+<div class="paragraph">
+<p>Entries marked <em>+</em> have stat information. Spaces marked <em>*</em> don&#8217;t
+affect the result.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>index   tree    result
+-----------------------
+*       (empty) (empty)
+(empty) tree    tree
+index+  tree    tree
+index+  index   index+</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_two_way_merge"><a class="anchor" href="#_two_way_merge"></a>Two-way merge</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>It is permitted for the index to lack an entry; this does not prevent
+any case from applying.</p>
+</div>
+<div class="paragraph">
+<p>If the index exists, it is an error for it not to match either the old
+or the result.</p>
+</div>
+<div class="paragraph">
+<p>If multiple cases apply, the one used is listed first.</p>
+</div>
+<div class="paragraph">
+<p>A result which changes the index is an error if the index is not empty
+and not up to date.</p>
+</div>
+<div class="paragraph">
+<p>Entries marked <em>+</em> have stat information. Spaces marked <em>*</em> don&#8217;t
+affect the result.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>case  index   old     new     result
+-------------------------------------
+0/2   (empty) *       (empty) (empty)
+1/3   (empty) *       new     new
+4/5   index+  (empty) (empty) index+
+6/7   index+  (empty) index   index+
+10    index+  index   (empty) (empty)
+14/15 index+  old     old     index+
+18/19 index+  old     index   index+
+20    index+  index   new     new</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_three_way_merge"><a class="anchor" href="#_three_way_merge"></a>Three-way merge</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>It is permitted for the index to lack an entry; this does not prevent
+any case from applying.</p>
+</div>
+<div class="paragraph">
+<p>If the index exists, it is an error for it not to match either the
+head or (if the merge is trivial) the result.</p>
+</div>
+<div class="paragraph">
+<p>If multiple cases apply, the one used is listed first.</p>
+</div>
+<div class="paragraph">
+<p>A result of "no merge" means that index is left in stage 0, ancest in
+stage 1, head in stage 2, and remote in stage 3 (if any of these are
+empty, no entry is left for that stage). Otherwise, the given entry is
+left in stage 0, and there are no other entries.</p>
+</div>
+<div class="paragraph">
+<p>A result of "no merge" is an error if the index is not empty and not
+up to date.</p>
+</div>
+<div class="paragraph">
+<p><strong>empty</strong> means that the tree must not have a directory-file conflict
+ with the entry.</p>
+</div>
+<div class="paragraph">
+<p>For multiple ancestors, a <em>+</em> means that this case applies even if
+only one ancestor or remote fits; a <em>^</em> means all of the ancestors
+must be the same.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>case  ancest    head    remote    result
+----------------------------------------
+1     (empty)+  (empty) (empty)   (empty)
+2ALT  (empty)+  *empty* remote    remote
+2     (empty)^  (empty) remote    no merge
+3ALT  (empty)+  head    *empty*   head
+3     (empty)^  head    (empty)   no merge
+4     (empty)^  head    remote    no merge
+5ALT  *         head    head      head
+6     ancest+   (empty) (empty)   no merge
+8     ancest^   (empty) ancest    no merge
+7     ancest+   (empty) remote    no merge
+10    ancest^   ancest  (empty)   no merge
+9     ancest+   head    (empty)   no merge
+16    anc1/anc2 anc1    anc2      no merge
+13    ancest+   head    ancest    head
+14    ancest+   ancest  remote    remote
+11    ancest+   head    remote    no merge</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Only #2ALT and #3ALT use <strong>empty</strong>, because these are the only cases
+where there can be conflicts that didn&#8217;t exist before. Note that we
+allow directory-file conflicts between things in different stages
+after the trivial merge.</p>
+</div>
+<div class="paragraph">
+<p>A possible alternative for #6 is (empty), which would make it like
+#1. This is not used, due to the likelihood that it arises due to
+moving the file to multiple different locations or moving and deleting
+it in different branches.</p>
+</div>
+<div class="paragraph">
+<p>Case #1 is included for completeness, and also in case we decide to
+put on <em>+</em> markings; any path that is never mentioned at all isn&#8217;t
+handled.</p>
+</div>
+<div class="paragraph">
+<p>Note that #16 is when both #13 and #14 apply; in this case, we refuse
+the trivial merge, because we can&#8217;t tell from this data which is
+right. This is a case of a reverted patch (in some direction, maybe
+multiple times), and the right answer depends on looking at crossings
+of history or common ancestors of the ancestors.</p>
+</div>
+<div class="paragraph">
+<p>Note that, between #6, #7, #9, and #11, all cases not otherwise
+covered are handled in this table.</p>
+</div>
+<div class="paragraph">
+<p>For #8 and #10, there is alternative behavior, not currently
+implemented, where the result is (empty). As currently implemented,
+the automatic merge will generally give this effect.</p>
+</div>
+</div>
+</div>

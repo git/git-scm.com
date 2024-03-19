@@ -1,0 +1,518 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - commit-graph Documentation
+docname: commit-graph
+version: 2.29.0
+aliases:
+- "/docs/commit-graph/2.29.0/index.html"
+- "/docs/commit-graph/2.29.1/index.html"
+- "/docs/commit-graph/2.29.2/index.html"
+- "/docs/commit-graph/2.29.3/index.html"
+- "/docs/commit-graph/2.30.0/index.html"
+- "/docs/commit-graph/2.30.1/index.html"
+- "/docs/commit-graph/2.30.2/index.html"
+- "/docs/commit-graph/2.30.3/index.html"
+- "/docs/commit-graph/2.30.4/index.html"
+- "/docs/commit-graph/2.30.5/index.html"
+- "/docs/commit-graph/2.30.6/index.html"
+- "/docs/commit-graph/2.30.7/index.html"
+- "/docs/commit-graph/2.30.8/index.html"
+- "/docs/commit-graph/2.30.9/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>Git walks the commit graph for many reasons, including:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Listing and filtering commit history.</p>
+</li>
+<li>
+<p>Computing merge bases.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>These operations can become slow as the commit count grows. The merge
+base calculation shows up in many user-facing commands, such as <em>merge-base</em>
+or <em>status</em> and can take minutes to compute depending on history shape.</p>
+</div>
+<div class="paragraph">
+<p>There are two main costs here:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Decompressing and parsing commits.</p>
+</li>
+<li>
+<p>Walking the entire graph to satisfy topological order constraints.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>The commit-graph file is a supplemental data structure that accelerates
+commit graph walks. If a user downgrades or disables the <em>core.commitGraph</em>
+config setting, then the existing ODB is sufficient. The file is stored
+as "commit-graph" either in the .git/objects/info directory or in the info
+directory of an alternate.</p>
+</div>
+<div class="paragraph">
+<p>The commit-graph file stores the commit graph structure along with some
+extra metadata to speed up graph walks. By listing commit OIDs in
+lexicographic order, we can identify an integer position for each commit
+and refer to the parents of a commit using those integer positions. We
+use binary search to find initial commits and then use the integer
+positions for fast lookups during the walk.</p>
+</div>
+<div class="paragraph">
+<p>A consumer may load the following info for a commit from the graph:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>The commit OID.</p>
+</li>
+<li>
+<p>The list of parents, along with their integer position.</p>
+</li>
+<li>
+<p>The commit date.</p>
+</li>
+<li>
+<p>The root tree OID.</p>
+</li>
+<li>
+<p>The generation number (see definition below).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Values 1-4 satisfy the requirements of parse_commit_gently().</p>
+</div>
+<div class="paragraph">
+<p>Define the "generation number" of a commit recursively as follows:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>A commit with no parents (a root commit) has generation number one.</p>
+</li>
+<li>
+<p>A commit with at least one parent has generation number one more than
+the largest generation number among its parents.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Equivalently, the generation number of a commit A is one more than the
+length of a longest path from A to a root commit. The recursive definition
+is easier to use for computation and observing the following property:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>If A and B are commits with generation numbers N and M, respectively,
+and N &lt;= M, then A cannot reach B. That is, we know without searching
+that B is not an ancestor of A because it is further from a root commit
+than A.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Conversely, when checking if A is an ancestor of B, then we only need
+to walk commits until all commits on the walk boundary have generation
+number at most N. If we walk commits using a priority queue seeded by
+generation numbers, then we always expand the boundary commit with highest
+generation number and can easily detect the stopping condition.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This property can be used to significantly reduce the time it takes to
+walk commits and determine topological relationships. Without generation
+numbers, the general heuristic is the following:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>If A and B are commits with commit time X and Y, respectively, and
+X &lt; Y, then A _probably_ cannot reach B.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This heuristic is currently used whenever the computation is allowed to
+violate topological relationships due to clock skew (such as "git log"
+with default order), but is not used when the topological order is
+required (such as merge base calculations, "git log --graph").</p>
+</div>
+<div class="paragraph">
+<p>In practice, we expect some commits to be created recently and not stored
+in the commit graph. We can treat these commits as having "infinite"
+generation number and walk until reaching commits with known generation
+number.</p>
+</div>
+<div class="paragraph">
+<p>We use the macro GENERATION_NUMBER_INFINITY = 0xFFFFFFFF to mark commits not
+in the commit-graph file. If a commit-graph file was written by a version
+of Git that did not compute generation numbers, then those commits will
+have generation number represented by the macro GENERATION_NUMBER_ZERO = 0.</p>
+</div>
+<div class="paragraph">
+<p>Since the commit-graph file is closed under reachability, we can guarantee
+the following weaker condition on all commits:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>If A and B are commits with generation numbers N and M, respectively,
+and N &lt; M, then A cannot reach B.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Note how the strict inequality differs from the inequality when we have
+fully-computed generation numbers. Using strict inequality may result in
+walking a few extra commits, but the simplicity in dealing with commits
+with generation number *_INFINITY or *_ZERO is valuable.</p>
+</div>
+<div class="paragraph">
+<p>We use the macro GENERATION_NUMBER_MAX = 0x3FFFFFFF to for commits whose
+generation numbers are computed to be at least this value. We limit at
+this value since it is the largest value that can be stored in the
+commit-graph file using the 30 bits available to generation numbers. This
+presents another case where a commit can have generation number equal to
+that of a parent.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_design_details"><a class="anchor" href="#_design_details"></a>Design Details</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>The commit-graph file is stored in a file named <em>commit-graph</em> in the
+.git/objects/info directory. This could be stored in the info directory
+of an alternate.</p>
+</li>
+<li>
+<p>The core.commitGraph config setting must be on to consume graph files.</p>
+</li>
+<li>
+<p>The file format includes parameters for the object ID hash function,
+so a future change of hash algorithm does not require a change in format.</p>
+</li>
+<li>
+<p>Commit grafts and replace objects can change the shape of the commit
+history. The latter can also be enabled/disabled on the fly using
+<code>--no-replace-objects</code>. This leads to difficultly storing both possible
+interpretations of a commit id, especially when computing generation
+numbers. The commit-graph will not be read or written when
+replace-objects or grafts are present.</p>
+</li>
+<li>
+<p>Shallow clones create grafts of commits by dropping their parents. This
+leads the commit-graph to think those commits have generation number 1.
+If and when those commits are made unshallow, those generation numbers
+become invalid. Since shallow clones are intended to restrict the commit
+history to a very small set of commits, the commit-graph feature is less
+helpful for these clones, anyway. The commit-graph will not be read or
+written when shallow commits are present.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_commit_graphs_chains"><a class="anchor" href="#_commit_graphs_chains"></a>Commit Graphs Chains</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Typically, repos grow with near-constant velocity (commits per day). Over time,
+the number of commits added by a fetch operation is much smaller than the
+number of commits in the full history. By creating a "chain" of commit-graphs,
+we enable fast writes of new commit data without rewriting the entire commit
+history&#8201;&#8212;&#8201;at least, most of the time.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_file_layout"><a class="anchor" href="#_file_layout"></a>File Layout</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A commit-graph chain uses multiple files, and we use a fixed naming convention
+to organize these files. Each commit-graph file has a name
+<code>$OBJDIR/info/commit-graphs/graph-{hash}.graph</code> where <code>{hash}</code> is the hex-
+valued hash stored in the footer of that file (which is a hash of the file&#8217;s
+contents before that hash). For a chain of commit-graph files, a plain-text
+file at <code>$OBJDIR/info/commit-graphs/commit-graph-chain</code> contains the
+hashes for the files in order from "lowest" to "highest".</p>
+</div>
+<div class="paragraph">
+<p>For example, if the <code>commit-graph-chain</code> file contains the lines</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>	{hash0}
+	{hash1}
+	{hash2}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>then the commit-graph chain looks like the following diagram:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>+-----------------------+
+|  graph-{hash2}.graph  |
++-----------------------+
+  |
++-----------------------+
+|                       |
+|  graph-{hash1}.graph  |
+|                       |
++-----------------------+
+  |
++-----------------------+
+|                       |
+|                       |
+|                       |
+|  graph-{hash0}.graph  |
+|                       |
+|                       |
+|                       |
++-----------------------+</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Let X0 be the number of commits in <code>graph-{hash0}.graph</code>, X1 be the number of
+commits in <code>graph-{hash1}.graph</code>, and X2 be the number of commits in
+<code>graph-{hash2}.graph</code>. If a commit appears in position i in <code>graph-{hash2}.graph</code>,
+then we interpret this as being the commit in position (X0 + X1 + i), and that
+will be used as its "graph position". The commits in <code>graph-{hash2}.graph</code> use these
+positions to refer to their parents, which may be in <code>graph-{hash1}.graph</code> or
+<code>graph-{hash0}.graph</code>. We can navigate to an arbitrary commit in position j by checking
+its containment in the intervals [0, X0), [X0, X0 + X1), [X0 + X1, X0 + X1<br>
+X2).</p>
+</div>
+<div class="paragraph">
+<p>Each commit-graph file (except the base, <code>graph-{hash0}.graph</code>) contains data
+specifying the hashes of all files in the lower layers. In the above example,
+<code>graph-{hash1}.graph</code> contains <code>{hash0}</code> while <code>graph-{hash2}.graph</code> contains
+<code>{hash0}</code> and <code>{hash1}</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_merging_commit_graph_files"><a class="anchor" href="#_merging_commit_graph_files"></a>Merging commit-graph files</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If we only added a new commit-graph file on every write, we would run into a
+linear search problem through many commit-graph files.  Instead, we use a merge
+strategy to decide when the stack should collapse some number of levels.</p>
+</div>
+<div class="paragraph">
+<p>The diagram below shows such a collapse. As a set of new commits are added, it
+is determined by the merge strategy that the files should collapse to
+<code>graph-{hash1}</code>. Thus, the new commits, the commits in <code>graph-{hash2}</code> and
+the commits in <code>graph-{hash1}</code> should be combined into a new <code>graph-{hash3}</code>
+file.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>		    +---------------------+
+		    |                     |
+		    |    (new commits)    |
+		    |                     |
+		    +---------------------+
+		    |                     |
++-----------------------+  +---------------------+
+|  graph-{hash2}        |-&gt;|                     |
++-----------------------+  +---------------------+
+  |                 |                     |
++-----------------------+  +---------------------+
+|                       |  |                     |
+|  graph-{hash1}        |-&gt;|                     |
+|                       |  |                     |
++-----------------------+  +---------------------+
+  |                  tmp_graphXXX
++-----------------------+
+|                       |
+|                       |
+|                       |
+|  graph-{hash0}        |
+|                       |
+|                       |
+|                       |
++-----------------------+</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>During this process, the commits to write are combined, sorted and we write the
+contents to a temporary file, all while holding a <code>commit-graph-chain.lock</code>
+lock-file.  When the file is flushed, we rename it to <code>graph-{hash3}</code>
+according to the computed <code>{hash3}</code>. Finally, we write the new chain data to
+<code>commit-graph-chain.lock</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>	{hash3}
+	{hash0}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We then close the lock-file.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_merge_strategy"><a class="anchor" href="#_merge_strategy"></a>Merge Strategy</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>When writing a set of commits that do not exist in the commit-graph stack of
+height N, we default to creating a new file at level N + 1. We then decide to
+merge with the Nth level if one of two conditions hold:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><code>--size-multiple=&lt;X&gt;</code> is specified or X = 2, and the number of commits in
+level N is less than X times the number of commits in level N + 1.</p>
+</li>
+<li>
+<p><code>--max-commits=&lt;C&gt;</code> is specified with non-zero C and the number of commits
+in level N + 1 is more than C commits.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>This decision cascades down the levels: when we merge a level we create a new
+set of commits that then compares to the next level.</p>
+</div>
+<div class="paragraph">
+<p>The first condition bounds the number of levels to be logarithmic in the total
+number of commits.  The second condition bounds the total number of commits in
+a <code>graph-{hashN}</code> file and not in the <code>commit-graph</code> file, preventing
+significant performance issues when the stack merges and another process only
+partially reads the previous stack.</p>
+</div>
+<div class="paragraph">
+<p>The merge strategy values (2 for the size multiple, 64,000 for the maximum
+number of commits) could be extracted into config settings for full
+flexibility.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_deleting_graph_hash_files"><a class="anchor" href="#_deleting_graph_hash_files"></a>Deleting graph-{hash} files</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>After a new tip file is written, some <code>graph-{hash}</code> files may no longer
+be part of a chain. It is important to remove these files from disk, eventually.
+The main reason to delay removal is that another process could read the
+<code>commit-graph-chain</code> file before it is rewritten, but then look for the
+<code>graph-{hash}</code> files after they are deleted.</p>
+</div>
+<div class="paragraph">
+<p>To allow holding old split commit-graphs for a while after they are unreferenced,
+we update the modified times of the files when they become unreferenced. Then,
+we scan the <code>$OBJDIR/info/commit-graphs/</code> directory for <code>graph-{hash}</code>
+files whose modified times are older than a given expiry window. This window
+defaults to zero, but can be changed using command-line arguments or a config
+setting.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_chains_across_multiple_object_directories"><a class="anchor" href="#_chains_across_multiple_object_directories"></a>Chains across multiple object directories</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In a repo with alternates, we look for the <code>commit-graph-chain</code> file starting
+in the local object directory and then in each alternate. The first file that
+exists defines our chain. As we look for the <code>graph-{hash}</code> files for
+each <code>{hash}</code> in the chain file, we follow the same pattern for the host
+directories.</p>
+</div>
+<div class="paragraph">
+<p>This allows commit-graphs to be split across multiple forks in a fork network.
+The typical case is a large "base" repo with many smaller forks.</p>
+</div>
+<div class="paragraph">
+<p>As the base repo advances, it will likely update and merge its commit-graph
+chain more frequently than the forks. If a fork updates their commit-graph after
+the base repo, then it should "reparent" the commit-graph chain onto the new
+chain in the base repo. When reading each <code>graph-{hash}</code> file, we track
+the object directory containing it. During a write of a new commit-graph file,
+we check for any changes in the source object directory and read the
+<code>commit-graph-chain</code> file for that source and create a new file based on those
+files. During this "reparent" operation, we necessarily need to collapse all
+levels in the fork, as all of the files are invalid against the new base file.</p>
+</div>
+<div class="paragraph">
+<p>It is crucial to be careful when cleaning up "unreferenced" <code>graph-{hash}.graph</code>
+files in this scenario. It falls to the user to define the proper settings for
+their custom environment:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>When merging levels in the base repo, the unreferenced files may still be
+referenced by chains from fork repos.</p>
+</li>
+<li>
+<p>The expiry time should be set to a length of time such that every fork has
+time to recompute their commit-graph chain to "reparent" onto the new base
+file(s).</p>
+</li>
+<li>
+<p>If the commit-graph chain is updated in the base, the fork will not have
+access to the new chain until its chain is updated to reference those files.
+(This may change in the future [5].)</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_related_links"><a class="anchor" href="#_related_links"></a>Related Links</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>[0] <a href="https://bugs.chromium.org/p/git/issues/detail?id=8" class="bare">https://bugs.chromium.org/p/git/issues/detail?id=8</a>
+    Chromium work item for: Serialized Commit Graph</p>
+</div>
+<div class="paragraph">
+<p>[1] <a href="https://lore.kernel.org/git/20110713070517.GC18566@sigill.intra.peff.net/" class="bare">https://lore.kernel.org/git/20110713070517.GC18566@sigill.intra.peff.net/</a>
+    An abandoned patch that introduced generation numbers.</p>
+</div>
+<div class="paragraph">
+<p>[2] <a href="https://lore.kernel.org/git/20170908033403.q7e6dj7benasrjes@sigill.intra.peff.net/" class="bare">https://lore.kernel.org/git/20170908033403.q7e6dj7benasrjes@sigill.intra.peff.net/</a>
+    Discussion about generation numbers on commits and how they interact
+    with fsck.</p>
+</div>
+<div class="paragraph">
+<p>[3] <a href="https://lore.kernel.org/git/20170908034739.4op3w4f2ma5s65ku@sigill.intra.peff.net/" class="bare">https://lore.kernel.org/git/20170908034739.4op3w4f2ma5s65ku@sigill.intra.peff.net/</a>
+    More discussion about generation numbers and not storing them inside
+    commit objects. A valuable quote:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>"I think we should be moving more in the direction of keeping
+ repo-local caches for optimizations. Reachability bitmaps have been
+ a big performance win. I think we should be doing the same with our
+ properties of commits. Not just generation numbers, but making it
+ cheap to access the graph structure without zlib-inflating whole
+ commit objects (i.e., packv4 or something like the "metapacks" I
+ proposed a few years ago)."</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>[4] <a href="https://lore.kernel.org/git/20180108154822.54829-1-git@jeffhostetler.com/T/#u" class="bare">https://lore.kernel.org/git/20180108154822.54829-1-git@jeffhostetler.com/T/#u</a>
+    A patch to remove the ahead-behind calculation from <em>status</em>.</p>
+</div>
+<div class="paragraph">
+<p>[5] <a href="https://lore.kernel.org/git/f27db281-abad-5043-6d71-cbb083b1c877@gmail.com/" class="bare">https://lore.kernel.org/git/f27db281-abad-5043-6d71-cbb083b1c877@gmail.com/</a>
+    A discussion of a "two-dimensional graph position" that can allow reading
+    multiple commit-graph chains at the same time.</p>
+</div>
+</div>
+</div>

@@ -1,0 +1,356 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Het opslaan van inloggegevens
+    number: 14
+    cs_number: '7.14'
+    previous: book/nl/v2/Git-Tools-Vervangen
+    next: book/nl/v2/Git-Tools-Samenvatting
+title: Git - Het opslaan van inloggegevens
+
+---
+<h2 id="_credential_caching">Het opslaan van inloggegevens</h2>
+<div class="paragraph">
+<p>
+
+Als je het SSH transport gebruikt om verbinding te maken met remotes, is het mogelijk om een sleutel te hebben zonder wachtwoord, wat je in staat stelt veilig gegevens uit te wisselen zonder je gebruikersnaam en wachtwoord in te typen.
+Dit is echter niet mogelijk met de HTTP protocollen - elke connectie heeft een gebruikersnaam en wachtwoord nodig.
+Het wordt zelfs lastiger voor systemen met twee-factor authenticatie, waar het token dat je gebruikt voor een wachtwoord willekeurig wordt gegenereerd en onuitspreekbaar is.</p>
+</div>
+<div class="paragraph">
+<p>Gelukkig heeft Git een credentials systeem die ons daarbij kan helpen.
+Git heeft standaard een aantal opties in de aanbieding:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>De standaard is om helemaal niets op te slaan.
+Elke verbinding wordt je gevraagd om je gebruikersnaam en wachtwoord.</p>
+</li>
+<li>
+<p>De “cache” modus houdt deze gegevens voor een bepaalde tijd in het geheugen.
+Geen van de wachtwoorden worden ooit op schijf opgeslagen, en ze worden na 15 minuten uit de cache verwijderd.</p>
+</li>
+<li>
+<p>De “store” modus bewaart deze gegevens in bestand in een leesbaar tekstformaat, en ze verlopen nooit.
+Dit houdt in dat totdat je je wachtwoord wijzigt op de Git host, je nooit meer je gegevens hoeft in te typen.
+Het nadeel van deze aanpak is dat je wachtwoorden onversleuteld bewaard worden in een gewoon bestand in je home directory.</p>
+</li>
+<li>
+<p>Als je een Mac gebruikt, wordt Git geleverd met een “osxkeychain” modus, waarbij de gegevens opgeslagen worden in een beveiligde sleutelring die verbonden is aan je systeem account.
+Deze methode bewaart je gegevens op schijf, en ze verlopen nooit, maar ze zijn versleuteld met het zelfde systeem dat de HTTPS certificaten en Safari auto-fills bewaart.</p>
+</li>
+<li>
+<p>Als je Windows gebruikt, kan je het hulpprogramma “Git Credential Manager for Windows” installeren.
+Dit is vergelijkbaar met het “osxkeychain” programma zoals hierboven beschreven, maar het gebruikt de Windows Credential Store om de gevoelige gegevens te beheren.
+Dit kan gevonden worden op <a href="https://github.com/Microsoft/Git-Credential-Manager-for-Windows" class="bare">https://github.com/Microsoft/Git-Credential-Manager-for-Windows</a>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Je kunt een van deze methoden kiezen door een Git configuratie waarde in te stellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper cache</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Een aantal van deze hulpprogramma’s hebben opties.
+De “store” helper accepteert een <code>--file &lt;path&gt;</code> argument, waarmee je kunt sturen waar het leesbare bestand wordt opgeslagen (standaard is <code>~/.git-credentials</code>).
+De “cache” helper accepteert de <code>--timeout &lt;seconds&gt;</code> optie, die de tijdsduur wijzigt gedurende welke de daemon blijft draaien (standaard is dit “900”, ofwel 15 minuten).
+Hier is een voorbeeld van hoe je de “store” helper configureert met een eigen bestandsnaam:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper store --file ~/.my-credentials</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git staat het je zelfs toe om meerdere helpers te configureren.
+Als Git op zoek gaat naar inloggegevens voor een specifieke host, zal Git ze in volgorde afvragen, en stoppen als het eerste antwoord wordt gegeven.
+Bij het opslaan van de gegevens, zal Git de gebruikersnaam en wachtwoord naar <strong>alle</strong> helpers in de lijst sturen, en zij kunnen besluiten wat met deze gegevens te doen.
+Hier is hoe een <code>.gitconfig</code> eruit zou kunnen zien als je een credentials bestand op een stickie zou hebben staan, maar de opslag in het geheugen zou willen gebruiken om wat typen te besparen als die stick niet ingeplugd is:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini"> [credential]
+    helper = store --file /mnt/thumbdrive/.git-credentials
+    helper = cache --timeout 30000</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_onder_de_motorkap">Onder de motorkap</h3>
+<div class="paragraph">
+<p>Hoe werkt dit nu allemaal?
+Het basiscommando van Git voor het credential-helper systeem is <code>git credential</code>, wat een commando als argument neemt, en daarna meer invoer vanuit stdin.</p>
+</div>
+<div class="paragraph">
+<p>Dit is misschien beter te begrijpen met een voorbeeld.
+Laten we zeggen dat een credential helper geconfigureerd is, en de helper heeft gegevens bewaard voor <code>mygithost</code>.
+Hier is een sessie die het “fill” commando gebruikt, wat wordt aangeroepen als Git probeert inloggegevens te vinden voor een host:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential fill <b class="conum">(1)</b>
+protocol=https <b class="conum">(2)</b>
+host=mygithost
+<b class="conum">(3)</b>
+protocol=https <b class="conum">(4)</b>
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential fill <b class="conum">(5)</b>
+protocol=https
+host=unknownhost
+
+Username for 'https://unknownhost': bob
+Password for 'https://bob@unknownhost':
+protocol=https
+host=unknownhost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Dit is de commando regel die de interactie initieert.</p>
+</li>
+<li>
+<p>Git-credential gaat dan wachten op invoer van stdin.
+We geven het de dingen die we weten: het protocol en de hostnaam.</p>
+</li>
+<li>
+<p>Een blanco regel geeft aan dat de invoer compleet is, en het credential systeem moet nu antwoorden met wat het weet.</p>
+</li>
+<li>
+<p>Git-credential neemt het daarna over, en schrijft de stukken informatie het gevonden heeft naar stdout.</p>
+</li>
+<li>
+<p>Als er geen inloggegevens gevonden zijn, vraag Git de gebruiker om de gebruikersnaam en wachtwoord en stelt die ter beschikking aan de stdout van de aanroeper (hier zitten ze verbonden met dezelfde console).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Het credential systeem roept feitelijk een programma aan dat los staat van Git zelf; welke dat is en hoe hangt af van de waarde die is ingevuld bij <code>credential.helper</code>.
+Deze kan verschillende vormen aannemen:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Configuratie waarde</th>
+<th class="tableblock halign-left valign-top">Gedrag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Roept <code>git-credential-foo</code> aan</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo -a --opt=bcd</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Roept <code>git-credential-foo -a --opt=bcd</code> aan</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/absolute/path/foo -xyz</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Roept <code>/absolute/path/foo -xyz</code> aan</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>!f() { echo "password=s3cre7"; }; f</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Code na <code>!</code> wordt in shell geëvalueerd</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Dus de helpers die hierboven zijn beschreven heten eigenlijk <code>git-credential-cache</code>, <code>git-credential-store</code>, en zo voorts, en we kunnen ze configureren om commando-regel argumenten te accepteren.
+De algemene vorm voor dit is “git-credential-foo [args] &lt;actie&gt;.”
+Het stdin/stdout protocol is dezelfde als git-credential, maar deze gebruiken een iets andere set acties:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>get</code> is een verzoek voor een gebruikersnaam/wachtwoord paar.</p>
+</li>
+<li>
+<p><code>store</code> is een verzoek om een groep van inloggegevens in het geheugen van de helper op te slaan.</p>
+</li>
+<li>
+<p><code>erase</code> verwijder de inloggegevens voor de opgegeven kenmerken uit het geheugen van deze helper.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Voor de <code>store</code> en <code>erase</code> acties, is geen antwoord nodig (Git negeert deze in elk geval).
+Voor de <code>get</code> actie echter is Git zeer geïntereseerd in het antwoord van de helper.
+Als de helper geen zinnig antwoord kan geven, kan het simpelweg stoppen zonder uitvoer, maar als het wel een antwoord heeft, moet het de gegeven informatie aanvullen met de gegevens die het heeft opgeslagen.
+De uitvoer wordt behandeld als een reeks van toewijzigs-opdrachten; alles wat wordt aangereikt zal wat Git hierover al weet vervangen.</p>
+</div>
+<div class="paragraph">
+<p>Hier is het zelfde voorbeeld als hierboven, maar git-credential wordt overgeslagen en er wordt direct naar git-credential-store gegaan:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-store --file ~/git.store store <b class="conum">(1)</b>
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential-store --file ~/git.store get <b class="conum">(2)</b>
+protocol=https
+host=mygithost
+
+username=bob <b class="conum">(3)</b>
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Hier vertellen we <code>git-credential-store</code> om wat inloggegevens te bewaren: de gebruikersnaam “bob” en het wachtwoord “s3cre7” moeten worden gebruikt as <code>https://mygithost</code> wordt benaderd.</p>
+</li>
+<li>
+<p>Nu gaan we deze inloggegevens ophalen.
+We geven de delen van de verbinding die we al weten (<code>https://mygithost</code>) en een lege regel.</p>
+</li>
+<li>
+<p>De <code>git-credential-store</code> antwoordt met de gebruikersnaam en wachtwoord die we hierboven hebben opgeslagen.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Hier is hoe het <code>~/git.store</code> bestand eruit zal zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>https://bob:s3cre7@mygithost</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het is niet meer dan een reeks regels, die elk een van inloggegevens voorziene URL bevat.
+De <code>osxkeychain</code> en <code>wincred</code> helpers gebruiken het eigen formaat van hun eigen achterliggende opslag, terwijl <code>cache</code> zijn eigen <em>in-memory</em> formaat gebruikt (wat geen enkel ander proces kan lezen).</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_een_eigen_inloggegevens_cache">Een eigen inloggegevens cache</h3>
+<div class="paragraph">
+<p>Gegeven dat <code>git-credential-store</code> en zijn vriendjes programma’s zijn die los staan van Git, is het geen grote stap om te beseffen dat <em>elk</em> programma een Git credential helper kan zijn.
+De helpers die bij Git worden geleverd dekken veel gewone gebruikssituaties, maar niet alle.
+Bijvoorbeeld, stel nu dat je team een aantal inloggegevens hebben die met het hele team worden gedeeld, misschien om te deployen.
+Deze worden opgeslagen in een gedeelde directory, maar je wilt ze niet naar je eigen credential opslagplaats kopiëren, omdat ze vaak veranderen.
+Geen van de bestaande helpers kan hierin voorzien; laten we eens kijken hoeveel moeite het kost om er zelf een te schrijven.
+Er zijn een aantal sleutelkenmerken die dit programma moet hebben:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>De enige actie waar we aandacht aan moeten besteden is <code>get</code>; <code>store</code> en <code>erase</code> zijn schrijf-acties, dus we negeren deze en sluiten gewoon af als ze worden ontvangen.</p>
+</li>
+<li>
+<p>Het bestandsformaat van het gedeelde credential bestand is dezelfde als die wordt gebruikt door <code>git-credential-store</code>.</p>
+</li>
+<li>
+<p>De locatie van dat bestand is redelijk standaard, maar we moeten toestaan dat de gebruiker een aangepast pad doorgeeft, voor het geval dat.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Nogmaals, we schrijven deze extensie in Ruby, maar een andere willekeurige taal werkt ook, zolang Git het uiteindelijke product maar kan aanroepen.
+Hier is de volledige broncode van onze nieuwe credential helper:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+require 'optparse'
+
+path = File.expand_path '~/.git-credentials' # <b class="conum">(1)</b>
+OptionParser.new do |opts|
+    opts.banner = 'USAGE: git-credential-read-only [options] &lt;action&gt;'
+    opts.on('-f', '--file PATH', 'Specify path for backing store') do |argpath|
+        path = File.expand_path argpath
+    end
+end.parse!
+
+exit(0) unless ARGV[0].downcase == 'get' # <b class="conum">(2)</b>
+exit(0) unless File.exists? path
+
+known = {} # <b class="conum">(3)</b>
+while line = STDIN.gets
+    break if line.strip == ''
+    k,v = line.strip.split '=', 2
+    known[k] = v
+end
+
+File.readlines(path).each do |fileline| # <b class="conum">(4)</b>
+    prot,user,pass,host = fileline.scan(/^(.*?):\/\/(.*?):(.*?)@(.*)$/).first
+    if prot == known['protocol'] and host == known['host'] and user == known['username'] then
+        puts "protocol=#{prot}"
+        puts "host=#{host}"
+        puts "username=#{user}"
+        puts "password=#{pass}"
+        exit(0)
+    end
+end</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Hier parsen we de commando-regel opties, waarbij we de gebruiker het invoerbestand kunnen laten aangeven.
+De standaardwaarde is <code>~/.git-credentials</code>.</p>
+</li>
+<li>
+<p>Dit programma geeft alleen antwoord als de actie <code>get</code> is, en het achterliggende bestand bestaat.</p>
+</li>
+<li>
+<p>In deze lus wordt stdin gelezen tot de eerste blanco regel wordt bereikt.
+De invoergegevens worden opgeslagen in de <code>known</code> hash voor later gebruik.</p>
+</li>
+<li>
+<p>In deze lus wordt de inhoud van het achterliggende bestand gelezen op zoek naar passende inhoud.
+Als het protocol en de host van <code>known</code> gelijk is aan deze regel, drukt het programma de resultaten af op stdout en stopt.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>We zullen onze helper als <code>git-credential-read-only</code> opslaan, zetten het ergens in onze <code>PATH</code> en maken het uitvoerbaar.
+Hier is hoe een interactieve sessie eruit zou zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-read-only --file=/mnt/shared/creds get
+protocol=https
+host=mygithost
+
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Omdat de naam met “git-” begint, kunnen we de eenvoudige syntax voor de configuratie waarde gebruiken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper read-only --file /mnt/shared/creds</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Zoals je kunt zien, is het uitbreiden van dit systeem redelijk eenvoudig, en we kunnen een aantal gebruikelijke problemen voor jou en je team oplossen.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

@@ -1,0 +1,293 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - rerere Documentation
+docname: rerere
+version: 2.35.0
+aliases:
+- "/docs/rerere/2.35.0/index.html"
+- "/docs/rerere/2.35.1/index.html"
+- "/docs/rerere/2.35.2/index.html"
+- "/docs/rerere/2.35.3/index.html"
+- "/docs/rerere/2.35.4/index.html"
+- "/docs/rerere/2.35.5/index.html"
+- "/docs/rerere/2.35.6/index.html"
+- "/docs/rerere/2.35.7/index.html"
+- "/docs/rerere/2.35.8/index.html"
+- "/docs/rerere/2.36.0/index.html"
+- "/docs/rerere/2.36.1/index.html"
+- "/docs/rerere/2.36.2/index.html"
+- "/docs/rerere/2.36.3/index.html"
+- "/docs/rerere/2.36.4/index.html"
+- "/docs/rerere/2.36.5/index.html"
+- "/docs/rerere/2.36.6/index.html"
+- "/docs/rerere/2.37.0/index.html"
+- "/docs/rerere/2.37.1/index.html"
+- "/docs/rerere/2.37.2/index.html"
+- "/docs/rerere/2.37.3/index.html"
+- "/docs/rerere/2.37.4/index.html"
+- "/docs/rerere/2.37.5/index.html"
+- "/docs/rerere/2.37.6/index.html"
+- "/docs/rerere/2.37.7/index.html"
+- "/docs/rerere/2.38.0/index.html"
+- "/docs/rerere/2.38.1/index.html"
+- "/docs/rerere/2.38.2/index.html"
+- "/docs/rerere/2.38.3/index.html"
+- "/docs/rerere/2.38.4/index.html"
+- "/docs/rerere/2.38.5/index.html"
+- "/docs/rerere/2.39.0/index.html"
+- "/docs/rerere/2.39.1/index.html"
+- "/docs/rerere/2.39.2/index.html"
+- "/docs/rerere/2.39.3/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This document describes the rerere logic.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_conflict_normalization"><a class="anchor" href="#_conflict_normalization"></a>Conflict normalization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To ensure recorded conflict resolutions can be looked up in the rerere
+database, even when branches are merged in a different order,
+different branches are merged that result in the same conflict, or
+when different conflict style settings are used, rerere normalizes the
+conflicts before writing them to the rerere database.</p>
+</div>
+<div class="paragraph">
+<p>Different conflict styles and branch names are normalized by stripping
+the labels from the conflict markers, and removing the common ancestor
+version from the <code>diff3</code> or <code>zdiff3</code> conflict styles.  Branches that
+are merged in different order are normalized by sorting the conflict
+hunks.  More on each of those steps in the following sections.</p>
+</div>
+<div class="paragraph">
+<p>Once these two normalization operations are applied, a conflict ID is
+calculated based on the normalized conflict, which is later used by
+rerere to look up the conflict in the rerere database.</p>
+</div>
+<div class="sect2">
+<h3 id="_removing_the_common_ancestor_version"><a class="anchor" href="#_removing_the_common_ancestor_version"></a>Removing the common ancestor version</h3>
+<div class="paragraph">
+<p>Say we have three branches AB, AC and AC2.  The common ancestor of
+these branches has a file with a line containing the string "A" (for
+brevity this is called "line A" in the rest of the document).  In
+branch AB this line is changed to "B", in AC, this line is changed to
+"C", and branch AC2 is forked off of AC, after the line was changed to
+"C".</p>
+</div>
+<div class="paragraph">
+<p>Forking a branch ABAC off of branch AB and then merging AC into it, we
+get a conflict like the following:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+B
+=======
+C
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; AC</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Doing the analogous with AC2 (forking a branch ABAC2 off of branch AB
+and then merging branch AC2 into it), using the diff3 or zdiff3
+conflict style, we get a conflict like the following:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+B
+||||||| merged common ancestors
+A
+=======
+C
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; AC2</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By resolving this conflict, to leave line D, the user declares:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>After examining what branches AB and AC did, I believe that making
+line A into line D is the best thing to do that is compatible with
+what AB and AC wanted to do.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>As branch AC2 refers to the same commit as AC, the above implies that
+this is also compatible what AB and AC2 wanted to do.</p>
+</div>
+<div class="paragraph">
+<p>By extension, this means that rerere should recognize that the above
+conflicts are the same.  To do this, the labels on the conflict
+markers are stripped, and the common ancestor version is removed.  The above
+examples would both result in the following normalized conflict:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+B
+=======
+C
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_sorting_hunks"><a class="anchor" href="#_sorting_hunks"></a>Sorting hunks</h3>
+<div class="paragraph">
+<p>As before, lets imagine that a common ancestor had a file with line A
+its early part, and line X in its late part.  And then four branches
+are forked that do these things:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>AB: changes A to B</p>
+</li>
+<li>
+<p>AC: changes A to C</p>
+</li>
+<li>
+<p>XY: changes X to Y</p>
+</li>
+<li>
+<p>XZ: changes X to Z</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Now, forking a branch ABAC off of branch AB and then merging AC into
+it, and forking a branch ACAB off of branch AC and then merging AB
+into it, would yield the conflict in a different order.  The former
+would say "A became B or C, what now?" while the latter would say "A
+became C or B, what now?"</p>
+</div>
+<div class="paragraph">
+<p>As a reminder, the act of merging AC into ABAC and resolving the
+conflict to leave line D means that the user declares:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>After examining what branches AB and AC did, I believe that
+making line A into line D is the best thing to do that is
+compatible with what AB and AC wanted to do.</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>So the conflict we would see when merging AB into ACAB should be
+resolved the same way---it is the resolution that is in line with that
+declaration.</p>
+</div>
+<div class="paragraph">
+<p>Imagine that similarly previously a branch XYXZ was forked from XY,
+and XZ was merged into it, and resolved "X became Y or Z" into "X
+became W".</p>
+</div>
+<div class="paragraph">
+<p>Now, if a branch ABXY was forked from AB and then merged XY, then ABXY
+would have line B in its early part and line Y in its later part.
+Such a merge would be quite clean.  We can construct 4 combinations
+using these four branches AB, AC) x (XY, XZ.</p>
+</div>
+<div class="paragraph">
+<p>Merging ABXY and ACXZ would make "an early A became B or C, a late X
+became Y or Z" conflict, while merging ACXY and ABXZ would make "an
+early A became C or B, a late X became Y or Z".  We can see there are
+4 combinations of ("B or C", "C or B") x ("X or Y", "Y or X").</p>
+</div>
+<div class="paragraph">
+<p>By sorting, the conflict is given its canonical name, namely, "an
+early part became B or C, a late part became X or Y", and whenever
+any of these four patterns appear, and we can get to the same conflict
+and resolution that we saw earlier.</p>
+</div>
+<div class="paragraph">
+<p>Without the sorting, we&#8217;d have to somehow find a previous resolution
+from combinatorial explosion.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_conflict_id_calculation"><a class="anchor" href="#_conflict_id_calculation"></a>Conflict ID calculation</h3>
+<div class="paragraph">
+<p>Once the conflict normalization is done, the conflict ID is calculated
+as the sha1 hash of the conflict hunks appended to each other,
+separated by &lt;NUL&gt; characters.  The conflict markers are stripped out
+before the sha1 is calculated.  So in the example above, where we
+merge branch AC which changes line A to line C, into branch AB, which
+changes line A to line C, the conflict ID would be
+SHA1(<em>B&lt;NUL&gt;C&lt;NUL&gt;</em>).</p>
+</div>
+<div class="paragraph">
+<p>If there are multiple conflicts in one file, the sha1 is calculated
+the same way with all hunks appended to each other, in the order in
+which they appear in the file, separated by a &lt;NUL&gt; character.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_nested_conflicts"><a class="anchor" href="#_nested_conflicts"></a>Nested conflicts</h3>
+<div class="paragraph">
+<p>Nested conflicts are handled very similarly to "simple" conflicts.
+Similar to simple conflicts, the conflict is first normalized by
+stripping the labels from conflict markers, stripping the common ancestor
+version, and the sorting the conflict hunks, both for the outer and the
+inner conflict.  This is done recursively, so any number of nested
+conflicts can be handled.</p>
+</div>
+<div class="paragraph">
+<p>Note that this only works for conflict markers that "cleanly nest".  If
+there are any unmatched conflict markers, rerere will fail to handle
+the conflict and record a conflict resolution.</p>
+</div>
+<div class="paragraph">
+<p>The only difference is in how the conflict ID is calculated.  For the
+inner conflict, the conflict markers themselves are not stripped out
+before calculating the sha1.</p>
+</div>
+<div class="paragraph">
+<p>Say we have the following conflict for example:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+1
+=======
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+3
+=======
+2
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; branch-2
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; branch-3~</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>After stripping out the labels of the conflict markers, and sorting
+the hunks, the conflict would look as follows:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+1
+=======
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+2
+=======
+3
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>and finally the conflict ID would be calculated as:
+<code>sha1('1&lt;NUL&gt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;\n3\n=======\n2\n&gt;&gt;&gt;&gt;&gt;&gt;&gt;&lt;NUL&gt;')</code></p>
+</div>
+</div>
+</div>
+</div>

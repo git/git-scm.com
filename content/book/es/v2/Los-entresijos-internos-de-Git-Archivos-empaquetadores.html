@@ -1,0 +1,198 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Los entresijos internos de Git
+    number: 10
+  section:
+    title: Archivos empaquetadores
+    number: 4
+    cs_number: '10.4'
+    previous: book/es/v2/Los-entresijos-internos-de-Git-Referencias-Git
+    next: book/es/v2/Los-entresijos-internos-de-Git-Las-especificaciones-para-hacer-referencia-a…​-refspec
+title: Git - Archivos empaquetadores
+
+---
+<h2 id="_archivos_empaquetadores">Archivos empaquetadores</h2>
+<div class="paragraph">
+<p>Volviendo a los objetos en la base de datos de tu repositorio Git de pruebas.
+En este momento, tienes 11 objetos --4 binarios, 3 árboles, 3 confirmaciones de cambios y 1 etiqueta--.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/01/55eb4229851634a0f03eb265b69f5a2d56f341 # tree 2
+.git/objects/1a/410efbd13591db07496601ebc7a059dd55cfe9 # commit 3
+.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a # test.txt v2
+.git/objects/3c/4e9cd789d88d8d89c1073707c3585e41b0e614 # tree 3
+.git/objects/83/baae61804e65cc73a7201a7252750c76066a30 # test.txt v1
+.git/objects/95/85191f37f7b0fb9444f35a9bf50de191beadc2 # tag
+.git/objects/ca/c0cab538b970a37ea1e769cbbde608743bc96d # commit 2
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4 # 'test content'
+.git/objects/d8/329fc1cc938780ffdd9f94e0d364e0ea74f579 # tree 1
+.git/objects/fa/49b077972391ad58037050f2a75f74e3671e92 # new.txt
+.git/objects/fd/f4fc3344e67ab068f836878b6c4951e3b15f3d # commit 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git comprime todos esos archivos con zlib, por lo que ocupan más bien poco, entre todos suponen solamente 925 bytes.
+Puedes añadir algún otro archivo de gran contenido al repositorio y verás una interesante funcionalidad de Git.
+Para demostrarlo, añadiremos el archivo <code>repo.rb</code> de la librería Grit --es un archivo de código fuente de unos 22K--:.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ curl https://raw.githubusercontent.com/mojombo/grit/master/lib/grit/repo.rb &gt; repo.rb
+$ git add repo.rb
+$ git commit -m 'added repo.rb'
+[master 484a592] added repo.rb
+ 3 files changed, 709 insertions(+), 2 deletions(-)
+ delete mode 100644 bak/test.txt
+ create mode 100644 repo.rb
+ rewrite test.txt (100%)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si hechas un vistazo al árbol resultante, podrás observar el valor SHA-1 del objeto binario correspondiente a dicho archivo repo.rb:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob 033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5      repo.rb
+100644 blob e3f094f522629ae358806b17daf78246c27c007b      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Puedes usar <code>git cat-file</code> para ver como de grande es este objeto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -s 033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5
+22044</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora, modifica un poco dicho archivo y comprueba lo que sucede:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '# testing' &gt;&gt; repo.rb
+$ git commit -am 'modified repo a bit'
+[master 2431da6] modified repo.rb a bit
+ 1 file changed, 1 insertion(+)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Revisando el árbol creado por esta última confirmación de cambios, verás algo interesante:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p master^{tree}
+100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+100644 blob b042a60ef7dff760008df33cee372b945b6e884e      repo.rb
+100644 blob e3f094f522629ae358806b17daf78246c27c007b      test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>El objeto binario es ahora un binario completamente diferente. Aunque solo has añadido una única línea al final de un archivo que ya contenía 400 líneas, Git ha almacenado el resultado como un objeto completamente nuevo.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -s b042a60ef7dff760008df33cee372b945b6e884e
+22054</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Y, así, tienes en tu disco dos objetos de 22 Kbytes prácticamente idénticos.
+¿No seria práctico si Git pudiera almacenar uno de ellos completo y luego solo las diferencias del segundo con respecto al primero?</p>
+</div>
+<div class="paragraph">
+<p>Pues bien, Git lo puede hacer.
+El formato inicial como Git guarda sus objetos en disco es el formato conocido como "relajado" (loose).
+Pero, sin embargo, de vez en cuando, Git suele agrupar varios de esos objetos en un único binario denominado archivo "empaquetador", para ahorrar espacio y hacer así más eficiente su almacenamiento.
+Esto sucede cada vez que tiene demasiados objetos en formato "relajado"; o cuando tu invocas manualmente al comando <code>git gc</code>; o justo antes de enviar cualquier cosa a un servidor remoto.
+Puedes comprobar el proceso pidiéndole expresamente a Git que empaquete objetos, utilizando el comando <code>git gc</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc
+Counting objects: 18, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (14/14), done.
+Writing objects: 100% (18/18), done.
+Total 18 (delta 3), reused 0 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Tras esto, si miras los objetos presentes en la carpeta, veras que han desaparecido la mayoría de los que había anteriormente y han apareciendo un par de objetos nuevos:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/objects -type f
+.git/objects/bd/9dbf5aae1a3862dd1526723246b20206e5fc37
+.git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4
+.git/objects/info/packs
+.git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.idx
+.git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Solo han quedado aquellos objetos binarios no referenciados por ninguna confirmación de cambios --en este caso, el ejemplo de "¿que hay de nuevo, viejo?" y el ejemplo de "contenido de pruebas".
+Porque nunca los has llegado a incluir en ninguna confirmación de cambios, no se han considerado como objetos definitivos y, por tanto, no han sido empaquetados.</p>
+</div>
+<div class="paragraph">
+<p>Los otros archivos presentes son el nuevo archivo empaquetador y un índice.
+El archivo empaquetador es un único archivo conteniendo dentro de él todos los objetos sueltos eliminados del sistema de archivo.
+El índice es un archivo que contiene las posiciones de cada uno de esos objetos dentro del archivo empaquetador, permitiéndonos así buscarlos y extraer rápidamente cualquiera de ellos.
+Lo que es interesante es el hecho de que, aunque los objetos originales presentes en el disco antes del <code>gc</code> ocupaban unos 22 Kbytes, el nuevo archivo empaquetador apenas ocupa 7 Kbytes.
+Empaquetando los objetos, has conseguido reducir a ⅔ el uso de disco.</p>
+</div>
+<div class="paragraph">
+<p>¿Cómo consigue Git esto?
+Cuando Git empaqueta objetos, va buscando archivos de igual nombre y tamaño similar, almacenando únicamente las diferencias entre una versión de cada archivo y la siguiente.
+Puedes comprobarlo mirando en el interior del archivo empaquetador.
+Y, para eso, has de utilizar el comando "de fontanería" <code>git verify-pack</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git verify-pack -v .git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.idx
+2431da676938450a4d72e260db3bf7b0f587bbc1 commit 223 155 12
+69bcdaff5328278ab1c0812ce0e07fa7d26a96d7 commit 214 152 167
+80d02664cb23ed55b226516648c7ad5d0a3deb90 commit 214 145 319
+43168a18b7613d1281e5560855a83eb8fde3d687 commit 213 146 464
+092917823486a802e94d727c820a9024e14a1fc2 commit 214 146 610
+702470739ce72005e2edff522fde85d52a65df9b commit 165 118 756
+d368d0ac0678cbe6cce505be58126d3526706e54 tag    130 122 874
+fe879577cb8cffcdf25441725141e310dd7d239b tree   136 136 996
+d8329fc1cc938780ffdd9f94e0d364e0ea74f579 tree   36 46 1132
+deef2e1b793907545e50a2ea2ddb5ba6c58c4506 tree   136 136 1178
+d982c7cb2c2a972ee391a85da481fc1f9127a01d tree   6 17 1314 1 \
+  deef2e1b793907545e50a2ea2ddb5ba6c58c4506
+3c4e9cd789d88d8d89c1073707c3585e41b0e614 tree   8 19 1331 1 \
+  deef2e1b793907545e50a2ea2ddb5ba6c58c4506
+0155eb4229851634a0f03eb265b69f5a2d56f341 tree   71 76 1350
+83baae61804e65cc73a7201a7252750c76066a30 blob   10 19 1426
+fa49b077972391ad58037050f2a75f74e3671e92 blob   9 18 1445
+b042a60ef7dff760008df33cee372b945b6e884e blob   22054 5799 1463
+033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5 blob   9 20 7262 1 \
+  b042a60ef7dff760008df33cee372b945b6e884e
+1f7a7a472abf3dd9643fd615f6da379c4acb3e3a blob   10 19 7282
+non delta: 15 objects
+chain length = 1: 3 objects
+.git/objects/pack/pack-978e03944f5c581011e6998cd0e9e30000905586.pack: ok</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Puedes observar que el objeto binario <code>033b4</code>, (correspondiente a la primera versión de tu archivo repo.rb), tiene una referencia al binario <code>b042a</code> (la segunda versión de ese archivo).
+La tercera columna refleja el tamaño de cada objeto dentro del paquete, observándose que <code>b042a</code> ocupa unos 22 Kbytes; pero <code>033b4</code> solo ocupa 9 bytes.
+Resulta curioso que se almacene completa la segunda versión del archivo, mientras que la versión original es donde se almacena solo la diferencia --esto se debe a la mayor probabilidad de que vayamos a recuperar rápidamente la versión mas reciente del archivo--.</p>
+</div>
+<div class="paragraph">
+<p>Lo verdaderamente interesante de todo este proceso es que podemos reempaquetar en cualquier momento.
+De vez en cuando, Git, en su empeño por optimizar la ocupación de espacio, reempaqueta automáticamente toda la base de datos, pero también tu mismo puedes reempaquetar en cualquier momento, lanzando manualmente el comando <code>git gc</code>.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

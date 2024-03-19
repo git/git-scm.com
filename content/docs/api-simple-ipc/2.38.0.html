@@ -1,0 +1,149 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - api-simple-ipc Documentation
+docname: api-simple-ipc
+version: 2.38.0
+aliases:
+- "/docs/api-simple-ipc/2.38.0/index.html"
+- "/docs/api-simple-ipc/2.38.1/index.html"
+- "/docs/api-simple-ipc/2.38.2/index.html"
+- "/docs/api-simple-ipc/2.38.3/index.html"
+- "/docs/api-simple-ipc/2.38.4/index.html"
+- "/docs/api-simple-ipc/2.38.5/index.html"
+- "/docs/api-simple-ipc/2.39.0/index.html"
+- "/docs/api-simple-ipc/2.39.1/index.html"
+- "/docs/api-simple-ipc/2.39.2/index.html"
+- "/docs/api-simple-ipc/2.39.3/index.html"
+- "/docs/api-simple-ipc/2.40.0/index.html"
+- "/docs/api-simple-ipc/2.40.1/index.html"
+- "/docs/api-simple-ipc/2.41.0/index.html"
+- "/docs/api-simple-ipc/2.42.0/index.html"
+- "/docs/api-simple-ipc/2.42.1/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>The Simple-IPC API is a collection of <code>ipc_</code> prefixed library routines
+and a basic communication protocol that allow an IPC-client process to
+send an application-specific IPC-request message to an IPC-server
+process and receive an application-specific IPC-response message.</p>
+</div>
+<div class="paragraph">
+<p>Communication occurs over a named pipe on Windows and a Unix domain
+socket on other platforms.  IPC-clients and IPC-servers rendezvous at
+a previously agreed-to application-specific pathname (which is outside
+the scope of this design) that is local to the computer system.</p>
+</div>
+<div class="paragraph">
+<p>The IPC-server routines within the server application process create a
+thread pool to listen for connections and receive request messages
+from multiple concurrent IPC-clients.  When received, these messages
+are dispatched up to the server application callbacks for handling.
+IPC-server routines then incrementally relay responses back to the
+IPC-client.</p>
+</div>
+<div class="paragraph">
+<p>The IPC-client routines within a client application process connect
+to the IPC-server and send a request message and wait for a response.
+When received, the response is returned back the caller.</p>
+</div>
+<div class="paragraph">
+<p>For example, the <code>fsmonitor--daemon</code> feature will be built as a server
+application on top of the IPC-server library routines.  It will have
+threads watching for file system events and a thread pool waiting for
+client connections.  Clients, such as <code>git status</code> will request a list
+of file system events since a point in time and the server will
+respond with a list of changed files and directories.  The formats of
+the request and response are application-specific; the IPC-client and
+IPC-server routines treat them as opaque byte streams.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_comparison_with_sub_process_model"><a class="anchor" href="#_comparison_with_sub_process_model"></a>Comparison with sub-process model</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The Simple-IPC mechanism differs from the existing <code>sub-process.c</code>
+model (Documentation/technical/long-running-process-protocol.txt) and
+used by applications like Git-LFS.  In the LFS-style sub-process model
+the helper is started by the foreground process, communication happens
+via a pair of file descriptors bound to the stdin/stdout of the
+sub-process, the sub-process only serves the current foreground
+process, and the sub-process exits when the foreground process
+terminates.</p>
+</div>
+<div class="paragraph">
+<p>In the Simple-IPC model the server is a very long-running service.  It
+can service many clients at the same time and has a private socket or
+named pipe connection to each active client.  It might be started
+(on-demand) by the current client process or it might have been
+started by a previous client or by the OS at boot time.  The server
+process is not associated with a terminal and it persists after
+clients terminate.  Clients do not have access to the stdin/stdout of
+the server process and therefore must communicate over sockets or
+named pipes.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_server_startup_and_shutdown"><a class="anchor" href="#_server_startup_and_shutdown"></a>Server startup and shutdown</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>How an application server based upon IPC-server is started is also
+outside the scope of the Simple-IPC design and is a property of the
+application using it.  For example, the server might be started or
+restarted during routine maintenance operations, or it might be
+started as a system service during the system boot-up sequence, or it
+might be started on-demand by a foreground Git command when needed.</p>
+</div>
+<div class="paragraph">
+<p>Similarly, server shutdown is a property of the application using
+the simple-ipc routines.  For example, the server might decide to
+shutdown when idle or only upon explicit request.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_simple_ipc_protocol"><a class="anchor" href="#_simple_ipc_protocol"></a>Simple-IPC protocol</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The Simple-IPC protocol consists of a single request message from the
+client and an optional response message from the server.  Both the
+client and server messages are unlimited in length and are terminated
+with a flush packet.</p>
+</div>
+<div class="paragraph">
+<p>The pkt-line routines (<a href='{{< relurl "docs/gitprotocol-common" >}}'>gitprotocol-common[5]</a>)
+are used to simplify buffer management during message generation,
+transmission, and reception.  A flush packet is used to mark the end
+of the message.  This allows the sender to incrementally generate and
+transmit the message.  It allows the receiver to incrementally receive
+the message in chunks and to know when they have received the entire
+message.</p>
+</div>
+<div class="paragraph">
+<p>The actual byte format of the client request and server response
+messages are application specific.  The IPC layer transmits and
+receives them as opaque byte buffers without any concern for the
+content within.  It is the job of the calling application layer to
+understand the contents of the request and response messages.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_summary"><a class="anchor" href="#_summary"></a>Summary</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Conceptually, the Simple-IPC protocol is similar to an HTTP REST
+request.  Clients connect, make an application-specific and
+stateless request, receive an application-specific
+response, and disconnect.  It is a one round trip facility for
+querying the server.  The Simple-IPC routines hide the socket,
+named pipe, and thread pool details and allow the application
+layer to focus on the application at hand.</p>
+</div>
+</div>
+</div>

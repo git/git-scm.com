@@ -1,0 +1,362 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Los entresijos internos de Git
+    number: 10
+  section:
+    title: Protocolos de transferencia
+    number: 6
+    cs_number: '10.6'
+    previous: book/es/v2/Los-entresijos-internos-de-Git-Las-especificaciones-para-hacer-referencia-a…​-refspec
+    next: book/es/v2/Los-entresijos-internos-de-Git-Mantenimiento-y-recuperación-de-datos
+title: Git - Protocolos de transferencia
+
+---
+<h2 id="_protocolos_de_transferencia">Protocolos de transferencia</h2>
+<div class="paragraph">
+<p>Git puede transferir datos entre dos repositorios utilizando uno de sus dos principales mecanismos de transporte: sobre protocolo <em>'tonto</em>', o sobre protocolo <em>'inteligente</em>'.
+En esta parte, se verán sucintamente cómo trabajan esos dos tipos de protocolo.</p>
+</div>
+<div class="sect3">
+<h3 id="_el_protocolo_tonto">El protocolo tonto</h3>
+<div class="paragraph">
+<p>Si vas a configurar un repositorio para ser servido en forma de sólo lectura a través de HTTP, es probable que uses el protocolo tonto.
+Este protocolo se llama <em>'tonto</em>' porque no requiere ningún tipo de código Git en la parte servidor durante el proceso de transporte; el proceso de recuperación (fetch) de datos se limita a una serie de peticiones GET, siendo el cliente quien ha de conocer la estructura del repositorio Git en el servidor.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Nota</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>El protocolo tonto es muy poco usado hoy en día.
+Es difícil dar confidencialidad, por lo que la mayoría de los servidores Git (tanto los basados en la nube como los normales) se negarán a usarlo.
+Por lo general se recomienda utilizar el protocolo inteligente, que se describe un poco más adelante.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Vamos a revisar el proceso <code>http-fetch</code> para una librería simple de Git:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone http://server/simplegit-progit.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Lo primero que hace este comando es recuperar el archivo <code>info/refs</code>.
+Este es un archivo escrito por el comando <code>update-server-info</code>, el que has de habilitar como enganche (hook)  <code>post-receive</code> para permitir funcionar correctamente al transporte HTTP:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET info/refs
+ca82a6dff817ec66f44342007202690a93763949     refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A partir de ahí, ya tienes una lista de las referencias remotas y sus SHA-1s.
+Lo siguiente es mirar cual es la referencia a HEAD, de tal forma que puedas saber el punto a activar (checkout) cuando termines:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ves que es la rama <code>master</code> la que has de activar cuando el proceso esté completado.
+En este punto, ya estás preparado para seguir procesando el resto de los objetos.
+En el archivo <code>info/refs</code> se ve que el punto de partida es la confirmación de cambios (commit) <code>ca82a6</code>, y, por tanto, comenzaremos recuperándola:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/ca/82a6dff817ec66f44342007202690a93763949
+(179 bytes of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Cuando recuperas un objeto, dicho objeto se encuentra suelto (loose) en el servidor y lo traes mediante una petición estática HTTP GET.
+Puedes descomprimirlo, quitarle la cabecera y mirar el contenido:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p ca82a6dff817ec66f44342007202690a93763949
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+changed the version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Tras esto, ya tienes más objetos a recuperar --el árbol de contenido <code>cfda3b</code> al que apunta la confirmación de cambios; y la confirmación de cambios padre <code>085bb3</code>--.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/08/5bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+(179 bytes of data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>El siguiente objeto confirmación de cambio (commit).
+Y el árbol de contenido:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/cf/da3bf379e4f8dba8717dee55aab78aef7f4daf
+(404 - Not Found)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Pero…​¡Ay!…​parece que el objeto árbol no está suelto en el servidor, por lo que obtienes una respuesta 404 (objeto no encontrado).
+Puede haber un par de razones para que suceda esto: el objeto está en otro repositorio alternativo; o el objeto está en este repositorio, pero dentro de un objeto empaquetador (packfile).
+Git comprueba primero a ver si en el listado hay alguna alternativa:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/http-alternates
+(empty file)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>En el caso de que esto devolviera una lista de ubicaciones (URL) alternativas, Git busca en ellas (es un mecanismo muy adecuado en aquellos proyectos donde hay segmentos derivados uno de otro compartiendo objetos en disco.)
+Pero, en este caso, no hay alternativas, por lo que el objeto debe encontrarse dentro de un empaquetado.
+Para ver que empaquetados hay disponibles en el servidor, has de recuperar el archivo <code>objects/info/packs</code>, que contiene una lista de todos ellos: (que ha sido generada por <code>update-server-info</code>)</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/packs
+P pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vemos que hay un archivo empaquetado, y el objeto buscado ha de encontrarse dentro de él; pero merece comprobarlo revisando el archivo de índice, para asegurarse.
+Hacer la comprobación es sobre todo útil en aquellos casos donde existan múltiples archivos empaquetados en el servidor, para determinar así en cual de ellos se encuentra el objeto que necesitas:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.idx
+(4k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Una vez tengas el índice del empaquetado, puedes mirar si el objeto buscado está en él, (Dicho índice contiene la lista de SHA-1s de los objetos dentro del empaquetado y las ubicaciones -offsets- de cada uno de ellos dentro de él).
+Una vez comprobada la presencia del objeto, adelante con la recuperación de todo el archivo empaquetado:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack
+(13k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Cuando tengas el objeto árbol, puedes continuar avanzando por las confirmaciones de cambio.
+Y, como éstas también están dentro del archivo empaquetado que acabas de descargar, ya no necesitas hacer mas peticiones al servidor.
+Git activa una copia de trabajo de la rama  <code>master</code> señalada por la referencia HEAD que has descargado al principio.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_el_protocolo_inteligente">El protocolo inteligente</h3>
+<div class="paragraph">
+<p>El protocolo tonto es simple pero ineficiente, y no puede manejar la escritura de datos desde el cliente al servidor.
+El protocolo inteligente es un método mucho más común de transmisión de datos, pero requiere un proceso en el lado remoto que es inteligente acerca de Git --puede leer datos localmente, determinar lo que el cliente tiene y necesita, y generar un empaquetado expresamente para él--.
+Existen dos conjuntos de procesos para transferir datos: uno para enviar y otro para recibir.</p>
+</div>
+<div class="sect4">
+<h4 id="_enviando_datos_uploading">Enviando datos (uploading)</h4>
+<div class="paragraph">
+<p>
+Para enviar datos a un proceso remoto, Git utliza <code>send-pack</code> (enviar paquete) y <code>receive-pack</code> (recibir paquete).
+El proceso <code>send-pack</code> corre en el cliente y conecta con el proceso <code>receive-pack</code> corriendo en el lado remoto.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh">SSH</h6>
+<div class="paragraph">
+<p>Por ejemplo, si lanzas el comando <code>git push origin master</code> en tu proyecto y <code>origin</code> está definida como una ubicación que utiliza el protocolo SSH.
+Git lanzará el proceso <code>send-pack</code>, con el que establece conexión SSH con tu servidor.
+En el servidor remoto, a través de una llamada SSH, intentará lanzar un comando tal como:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-receive-pack 'simplegit-progit.git'"
+005bca82a6dff817ec66f4437202690a93763949 refs/heads/master report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1+github-607-gfba4028 delete-refs
+003e085bb3bcb608e1e84b2432f8ecbe6306e7e7 refs/heads/topic
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>El comando <code>git-receive-pack</code> responde con una linea por cada una de las referencias que tenga, --en este caso, la rama  <code>master</code> y su SHA-1--.
+La primera línea también tiene una lista de las capacidades del servidor (en este caso, <code>report-status</code>, <code>delete-refs</code>, y algunas otras, incluyendo el identificador del cliente).</p>
+</div>
+<div class="paragraph">
+<p>Cada línea comienza con 4 caracteres, con valor en hexadecimal, indicando la longitud del resto de la línea.
+La primera de las líneas comienza con 005b, valor hexadecimal de 91, indicándonos que hay 91 bytes más en esa línea.
+La siguiente línea comienza con 003e, 62 en decimal, por lo que has de leer otros 62 bytes hasta el final de la línea.
+Y la última línea comienza con 0000, indicando así que la lista de referencias ha terminado.</p>
+</div>
+<div class="paragraph">
+<p>Con esta información, el proceso <code>send-pack</code> ya puede determinar las confirmaciones de cambios (commits) no presentes en el servidor.
+Para cada una de las referencias que se van a actualizar, el proceso <code>send-pack</code> llama al proceso <code>receive-pack</code> con la información pertinente.
+Por ejemplo, si estás actualizando la rama <code>master</code> y añadiendo otra rama <code>experiment</code>, la respuesta del proceso <code>send-pack</code> será algo así como:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0085ca82a6dff817ec66f44342007202690a93763949  15027957951b64cf874c3557a0f3547bd83b3ff6 \
+	refs/heads/master report-status
+00670000000000000000000000000000000000000000 cdfdb42577e2506715f8cfeacdbabc092bf63e8d \
+	refs/heads/experiment
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git envía una línea por cada referencia a actualizar, indicando la longitud de la línea, el viejo SHA-1, el nuevo SHA-1, y la referencia a actualizar.
+La primera línea indica también las capacidades disponibles en el cliente.
+Una clave SHA-1 con todo '0’s, nos indica que no había nada anteriormente, y que, por tanto, estamos añadiendo una nueva referencia.
+Si estuvieras borrando una referencia existente, verías lo contrario: una clave todo '0’s en el lado derecho.</p>
+</div>
+<div class="paragraph">
+<p>A continuación, el cliente envía un archivo empaquetado con todos los objetos que faltan en el servidor.
+Y, por ultimo, el servidor responde con un indicador de éxito (o fracaso) de la operación:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>000Aunpack ok</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https">HTTP(S)</h6>
+<div class="paragraph">
+<p>Este proceso es, en general, el mismo con HTTP, aunque la negociación (handshaking) es un poco diferente.
+La conexión se inicia con esta solicitud:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET http://server/simplegit-progit.git/info/refs?service=git-receive-pack
+001f# service=git-receive-pack
+000000ab6c5f0e45abd7832bf23074a333f739977c9e8188 refs/heads/master \
+	report-status delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1~vmg-bitmaps-bugaloo-608-g116744e
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Este es el final del primer intercambio cliente-servidor.
+El cliente, entonces, realiza otra petición, esta vez un <code>POST</code>, con los datos que proporciona <code>git-upload-pack</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST http://server/simplegit-progit.git/git-receive-pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>La solicitud <code>POST</code> incluye la salida de <code>send-pack</code> y el archivo empaquetado como su carga útil.
+Después, el servidor indica el éxito o el fracaso con su respuesta HTTP.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_recibiendo_datos_downloading">Recibiendo datos (downloading)</h4>
+<div class="paragraph">
+<p>
+Cuando descargas datos, los procesos que se ven envueltos son <code>fetch-pack</code> (recuperar paquete) y <code>upload-pack</code> (enviar paquete).
+El cliente arranca un proceso <code>fetch-pack</code>, para conectar con un proceso <code>upload-pack</code> en el lado servidor y negociar con él los datos a transferir.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh_2">SSH</h6>
+<div class="paragraph">
+<p>Si realizas la recuperación (fetch) sobre SSH, entonces <code>fetch-pack</code> ejecuta algo como:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-upload-pack 'simplegit-progit.git'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Después de establecer conexión, <code>upload-pack</code> responderá:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>00dfca82a6dff817ec66f44342007202690a93763949 HEADmulti_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>La respuesta es muy similar a la dada por <code>receive-pack</code>, pero las capacidades que se indican son diferentes.
+Además, nos indica a qué apunta HEAD (<code>symref=HEAD:refs/heads/master</code>) para que el cliente pueda saber qué ha de activar (check out) en el caso de estar requiriendo un clon.</p>
+</div>
+<div class="paragraph">
+<p>En este punto, el proceso <code>fetch-pack</code> revisa los objetos que tiene y responde indicando los objetos que necesita, enviando <em>'want</em>' (quiero) y la clave SHA-1 que necesita.
+Los objetos que ya tiene, los envía con <em>'have</em>' (tengo) y la correspondiente clave SHA-1.
+Llegando al final de la lista, escribe <em>'done</em>' (hecho), para indicar al proceso <code>upload-pack</code> que ya puede comenzar a enviar el archivo empaquetado con los datos requeridos:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0054want ca82a6dff817ec66f44342007202690a93763949 ofs-delta
+0032have 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+0000
+0009done</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https_2">HTTP(S)</h6>
+<div class="paragraph">
+<p>La negociación (handshake) para una operación de recuperación (fetch) requiere dos peticiones HTTP.
+La primera es un <code>GET</code> al mismo destino usado en el protocolo tonto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET $GIT_URL/info/refs?service=git-upload-pack
+001e# service=git-upload-pack
+000000e7ca82a6dff817ec66f44342007202690a93763949 HEADmulti_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed no-done symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esto es muy parecido a invocar <code>git-upload-pack</code> sobre una conexión SSH, pero el segundo intercambio es realizado como una petición separada:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST $GIT_URL/git-upload-pack HTTP/1.0
+0032want 0a53e9ddeaddad63ad106860237bbf53411d11a7
+0032have 441b40d833fdfa93eb2908e52742248faf0ee993
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De nuevo, este es el mismo formato visto más arriba.
+La respuesta a esta petición será éxito o fallo, e incluirá el empaquetado.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_resumen_11">Resumen</h3>
+<div class="paragraph">
+<p>Esta sección contiene una descripción muy básica de los protocolos de transferencia.
+El protocolo incluye muchas otras características, como las capacidades <code>multi_ack</code> o <code>side-band</code>, pero su tratamiento está fuera del alcance de este libro.
+Hemos tratado de darte una panorámica de la comunicación entre cliente y servidor; si necesitas profundizar en esto, es probable que desees echar un vistazo al código fuente de Git.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

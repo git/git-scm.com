@@ -1,0 +1,184 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git aanpassen
+    number: 8
+  section:
+    title: Git Hooks
+    number: 3
+    cs_number: '8.3'
+    previous: book/nl/v2/Git-aanpassen-Git-attributen
+    next: book/nl/v2/Git-aanpassen-Een-voorbeeld-van-Git-afgedwongen-beleid
+title: Git - Git Hooks
+
+---
+<h2 id="_git_hooks">Git Hooks</h2>
+<div class="paragraph">
+<p>
+Net als veel andere versie beheer systemen, heeft Git een manier om eigen scripts aan te roepen als er bepaalde belangrijke gebeurtenissen plaatsvinden.
+Er zijn twee groepen van deze haken (hooks): aan de kant van het werkstation en aan de kant van de server.
+De hooks aan de kant van het werkstation worden afgetrapt door operaties zoals committen en mergen, terwijl die aan de server kant worden afgetrapt door netwerk operaties zoals het ontvangen van gepushte commits.
+Je kunt deze hooks voor allerhande doeleinden gebruiken.</p>
+</div>
+<div class="sect3">
+<h3 id="_het_installeren_van_een_hook">Het installeren van een hook</h3>
+<div class="paragraph">
+<p>De hooks worden allemaal opgeslagen in de <code>hooks</code> subdirectory van de Git directory.
+In de meeste projecten is dat <code>.git/hooks</code>.
+Als je een nieuwe repository met <code>git init</code> initialiseert, vult Git de hooks directory met een aantal voorbeeld scripts, vele ervan zijn op zichzelf al nuttig; maar ze beschrijven ook de invoer waarden van elk script.
+Al de voorbeelden zijn geschreven als shell scripts, met af en toe wat Perl erdoorheen, maar elk uitvoerbaar script met een goede naam zal prima werken - je kunt ze in Ruby of Python schrijven of verzin maar een taal.
+Als je de meegeleverde hook scripts wilt gebruiken, zul je ze moeten hernoemen; de bestandsnamen eindigen allemaal met <code>.sample</code>.</p>
+</div>
+<div class="paragraph">
+<p>Om een hook script te activeren, zet een bestand in de <code>hooks</code> subdirectory van je Git directory met een juiste naam (geen enkele extensie) en zorg dat 'ie uitvoerbaar is.
+Vanaf dat moment zou het aangeroepen moeten worden.
+We zullen de meest belangrijke hook bestandsnamen hier behandelen.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_hooks_bij_werkstations">Hooks bij werkstations</h3>
+<div class="paragraph">
+<p>Er zijn veel hooks aan de kant van een werkstation.
+Deze paragraaf verdeelt ze in hooks voor een committing-workflow, scripts voor een e-mail-workflow en al het andere.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Het is belangrijk om op te weten dat hooks bij werkstations <strong>niet</strong> worden gekopieerd als je een repository kloont.
+Als het de bedoeling is van deze scripts om een beleid af te dwingen, moet je dat waarschijnlijk aan de kant van de server doen; zie het voorbeeld in <a href="{{< relurl "book/nl/v2/ch00/_an_example_git_enforced_policy" >}}">Een voorbeeld van Git-afgedwongen beleid</a>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="sect4">
+<h4 id="_committing_workflow_hooks">Committing-Workflow Hooks</h4>
+<div class="paragraph">
+<p>De eerste vier hooks hebben te maken met het proces van committen.</p>
+</div>
+<div class="paragraph">
+<p>De <code>pre-commit</code> hook wordt het eerst aangeroepen, voordat je zelfs een commit bericht begint te typen.
+Het wordt gebruikt om de snapshot die op het punt staat te worden gecommit te inspecteren, om te zien of je iets vergeten bent, om er zeker van te zijn dat de tests slagen of om de code te controleren op iets waar je het op gecontroleerd wilt hebben.
+Als dit script met niet-nul wordt beëindigd breekt de commit af, al kan je er altijd nog omheen met <code>git commit --no-verify</code>.
+Je kunt dingen doen als de code op stijl controleren (<code>lint</code> of iets vergelijkbaar aanroepen), controleren op witruimtes aan het eind van regels (de standaard hook doet precies dat), of controleren of nieuwe methoden goed zijn gedocumenteerd.</p>
+</div>
+<div class="paragraph">
+<p>De <code>prepare-commit-msg</code> hook wordt aangeroepen voordat de commit bericht tekstverwerker wordt opgestart, maar nadat het standaard bericht gemaakt is.
+Dit geeft je de ruimte om het standaard bericht aan te passen voordat de commit auteur deze ziet.
+Deze hook heeft een aantal parameters: het pad naar het bestand dat het commit bericht op dat moment bevat, het type commit en de SHA-1 van de commit als het een amended (gewijzigde) commit betreft.
+Deze hook is over het algemeen niet nuttig voor normale commits; maar is daarentegen goed voor commits waar het standaard bericht automatisch is gegenereerd, zoals commit berichten van een sjabloon, merge commits, squashed commits en amended commits.
+Je kunt het gebruiken in combinatie met een commit sjabloon om via een programma informatie in te voegen.</p>
+</div>
+<div class="paragraph">
+<p>De <code>commit-msg</code> hook krijgt één parameter, en dat is weer het pad naar een tijdelijk bestand dat het commit bericht bevat die door de ontwikkelaar is geschreven.
+Als dit script met een niet-nul waarde eindigt, zal Git het commit proces afbreken, en daarmee kan je dit gebruiken om de status van het project of het commit bericht te valideren voordat je toestaat dat een commit doorgaat.
+In de laatste paragraaf van dit hoofdstuk zullen we laten zien hoe deze hook te gebruiken om te controleren dat het commit bericht voldoet aan een vereist patroon.</p>
+</div>
+<div class="paragraph">
+<p>Als het gehele commit proces is voltooid wordt de <code>post-commit</code> hook aangeroepen.
+Deze krijgt geen enkele parameter, maar je kunt de laatste commit eenvoudig te pakken krijgen door <code>git log -1 HEAD</code> aan te roepen.
+Meestal wordt dit script gebruikt voor het doen van meldingen of iets vergelijkbaars.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_email_hooks">E-mail workflow hooks</h4>
+<div class="paragraph">
+<p>Je kunt drie hooks aan de kant van het werkstation inrichten voor een op e-mail gebaseerde workflow.
+Ze worden alle aangeroepen door het <code>git am</code> commando, dus als je dat commando niet gebruikt in je workflow, kan je dit gedeelte rustig overslaan en doorgaan naar de volgende paragraaf.
+Als je patches per e-mail ontvangt die door <code>git format-patch</code> zijn gemaakt, kunnen een aantal van deze behulpzaam zijn.</p>
+</div>
+<div class="paragraph">
+<p>De eerste hook die wordt aangeroepen is <code>applypatch-msg</code>.
+Deze krijgt een enkele argument: de naam van het tijdelijke bestand dat het voorgestelde commit bericht bevat.
+Git breekt het patchen af als dit script met niet-nul eindigt.
+Je kunt deze gebruiken om je ervan te verzekeren dat het commit bericht juist geformatteerd is, of het bericht normaliseren door met het script deze ter plaatse te bewerken.</p>
+</div>
+<div class="paragraph">
+<p>De volgende hook die aangeroepen wordt als patches met <code>git am</code> worden toegepast is <code>pre-applypatch</code>.
+Ietwat verwarrend, wordt deze <em>na</em> het toepassen van een patch aangreoepen maar voordat een commit gemaakt wordt, dus je kunt het gebruiken om de snapshot te inspacteren voordat de commit gemaakt wordt.
+Je kunt tests uitvoeren of op een andere manier de werk-tree met dit script inspecteren.
+Als er iets ontbreekt of de tests slagen niet, zal het eindigen met niet-nul het <code>git am</code> script afbreken zonder de patch te committen.</p>
+</div>
+<div class="paragraph">
+<p>De laatste hook die wordt aangeroepen met een <code>git am</code> operatie is <code>post-applypatch</code>, die wordt aangeroepen nadat de commit gemaakt is.
+Je kunt deze gebruiken om een groep of de auteur van de patch een bericht te sturen van dat je de patch hebt gepulld.
+Je kunt het patching proces niet stoppen met dit script.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_other_client_hooks">Overige werkstation hooks</h4>
+<div class="paragraph">
+<p>De <code>pre-rebase</code> hook wordt aangeroepen voordat je ook maar iets rebaset en kan het proces stoppen door met niet-nul te eindigen.
+Je kunt deze hook gebruiken om het rebasen van commits die al zijn gepusht te weigeren.
+Het voorbeeld <code>pre-rebase</code> hook die Git installeert dit dit, al doet het een aantal aannamen die misschien niet van toepassing zijn op jouw workflow.</p>
+</div>
+<div class="paragraph">
+<p>De <code>post-rewrite</code> hook wordt aangeroepen door commando’s die commits vervangen, zoals <code>git commit --amend</code> en <code>git rebase</code> (echter weer niet door <code>git filter-branch</code>).
+Het enige argument is het commando dat herschrijven heeft veroorzaakt, en het ontvangt een lijst van herschrijvingen op <code>stdin</code>.
+Deze hook heeft veel wat gebruik betreft overeenkomsten met het gebruik van de <code>post-checkout</code> en <code>post-merge</code> hooks.</p>
+</div>
+<div class="paragraph">
+<p>Nadat je succesvol een <code>git checkout</code> hebt aangeroepen, wordt de <code>post-checkout</code> hook aangeroepen; je kunt deze gebruiken om je werk directory juist in te richten voor jouw project omgeving.
+Dit zou het binnenhalen van grote binaire bestanden die je niet in versie beheer wilt hebben kunnen inhouden, het automatisch genereren van documentatie of iets van dien aard.</p>
+</div>
+<div class="paragraph">
+<p>De <code>post-merge</code> hook wordt aangeroepen na een succesvolle <code>merge</code> commando.
+Je kunt deze gebruiken om gegevens terug te zetten in de werk tree die Git niet kan tracken, zoals permissie gegevens.
+Deze hook kan op vergelijkbare manier de aanwezigheid van bestanden buiten Git valideren die je misschien naar binnen wilt kopieren als de werk tree wijzigt.</p>
+</div>
+<div class="paragraph">
+<p>De <code>pre-push</code> hook wordt aangeroepen tijdens <code>git push</code>, nadat de remote refs zijn ge-update maar voordat er objecten zijn verstuurd.
+Het ontvangt de naam en locatie van de remote als parameters, en een lijst met refs die op het punt staan te worden geactualiseerd via <code>stdin</code>.
+Je kunt dit gebruiken om een aantal ref updates te valideren voordat er een push plaatsvindt (een niet-nul einde zal de push afbreken).</p>
+</div>
+<div class="paragraph">
+<p>Git zal nu en dan afval verzamelen (garbage collection) als onderdeel van zijn normale taken, door <code>git gc --auto</code> aan te roepen.
+De <code>pre-auto-gc</code> hook wordt aangeroepen vlak voordat de garbage collection plaatsvindt, en kan worden gebruikt om aan te geven dat het staat te gebeuren, of deze operatie af te breken als het nu niet goed uitkomt.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_hooks_aan_de_kant_van_de_server">Hooks aan de kant van de server</h3>
+<div class="paragraph">
+<p>Naast de hooks aan de kant van de werkstation, kan je als systeem beheerder een aantal belangrijke hooks op de server gebruiken om bijna alle vormen van beleid af te dwingen voor je project.
+Deze scripts worden voor en na pushes naar de server aangeroepen.
+De pre hooks kunnen op elk moment niet-nul aflopen om de push af te wijzen zowel als een fout bericht afdrukken die naar het werkstation worden gestuurd; je kunt een push beleid opzetten die zo complex is als je zelf wenst.</p>
+</div>
+<div class="sect4">
+<h4 id="_pre_receive"><code>pre-receive</code></h4>
+<div class="paragraph">
+<p>Het eerste script die wordt aangeroepen als een push wordt afgehandeld van een werkstation is <code>pre-receive</code>.
+Deze krijgt een lijst van referenties die worden gepusht vanuit stdin; als het niet-nul eindigt wordt geen enkele geaccepteerd.
+Je kunt deze hook gebruiken om zaken te doen als het verzekeren dat geen van de bijgewerkte referenties non-fast-forwards zijn, of toegangscontroles uit te voeren voor alle refs en bestanden die met de push worden gewijzigd.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_update"><code>update</code></h4>
+<div class="paragraph">
+<p>Het <code>update</code> script lijkt erg op het <code>pre-receive</code> script, behalve dat het eenmaal wordt aangroepen voor elke branch die de pusher probeert bij te werken.
+Als de pusher meerdere branches probeert te pushen, wordt <code>pre-receive</code> maar één keer aangeroepen, terwijl update één keer per branch waarnaar wordt gepusht wordt aangeroepen.
+In plaats van van stdin te lezen,  krijgt dit script drie argumenten: de naam van de referentie (branch), de SHA-1 waar die referentie naar wees voor de push en de SHA-1 die de gebruiker probeert te pushen.
+Als het update script niet-nul eindigt, wordt alleen die referentie geweigerd, de andere referenties kunnen nog steeds worden geüpdatet.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_post_receive"><code>post-receive</code></h4>
+<div class="paragraph">
+<p>De <code>post-receive</code> hook wordt aangeroepen zodra het hele proces gereed is, en kan worden gebruikt om andere diensten bij te werken of gebruikers een bericht te sturen.
+Het krijgt dezelfde stdin gegevens als de <code>pre-receive</code> hook.
+Voorbeelden omvatten het mailen naar een lijst, continuous integratie services notificeren of een ticket-traceer systeem bij werken - je kunt zelfs de commit berichten doorlezen om te zien of er tickets geopend, gewijzigd of gesloten moeten worden.
+Dit script kan het push proces niet stoppen, maar het werkstation zal de verbinding niet verbreken voordat dit script geëindigd is, dus wees voorzichtig als je iets probeert te doen wat veel tijd in beslag neemt.</p>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

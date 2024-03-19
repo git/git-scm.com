@@ -1,0 +1,271 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git Tools
+    number: 7
+  section:
+    title: Vervangen
+    number: 13
+    cs_number: '7.13'
+    previous: book/nl/v2/Git-Tools-Bundelen
+    next: book/nl/v2/Git-Tools-Het-opslaan-van-inloggegevens
+title: Git - Vervangen
+
+---
+<h2 id="_replace">Vervangen</h2>
+<div class="paragraph">
+<p>Zoals we eerder hebben benadrukt zijn de objecten in de database van Git onwijzigbaar, maar Git heeft een interessante manier om te <em>doen alsof</em> je objecten in de database vervangt met andere objecten.</p>
+</div>
+<div class="paragraph">
+<p>Het <code>replace</code> commando laat je een object in Git opgeven en te zeggen dat "elke keer als je <em>dit</em> object ziet, doe alsof het dit een <em>ander</em> object is".
+Dit is het nuttigst voor het vervangen van een commit in je historie met een andere zonder de gehele historie te vervangen met, laten we zeggen, <code>git filter-branch</code>.</p>
+</div>
+<div class="paragraph">
+<p>Bijvoorbeeld, stel dat je een enorme code historie hebt en je wilt je repository opsplitsen in een korte historie voor nieuwe ontwikkelaars en een veel langere en grotere historie voor mensen die geïnteresseerd zijn in het graven in gegevens (data mining).
+Je kunt de ene historie op de andere enten door de vroegste commit in de nieuwe lijn met de laatste commit van de oude lijn te "vervangen".
+Dit is prettig omdat het betekent dat je niet echt alle commits in de nieuwe historie hoeft te herschrijven, wat je normaalgesproken wel zou moeten doen om ze samen te voegen (omdat de voorouderschap de SHA-1’s beïnvloedt).</p>
+</div>
+<div class="paragraph">
+<p>Laten we dat eens uitproberen.
+Laten we een bestaande repository nemen, en deze in twee repositories splitsen, een recente en een historische, en laten we dan kijken hoe we ze kunnen herschikken zonder de SHA-1 waarden van de recente repository te wijzigen met behulp van <code>replace</code>.</p>
+</div>
+<div class="paragraph">
+<p>We zullen een eenvoudige repository met vijf simpele commits gebruiken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline
+ef989d8 fifth commit
+c6e1e95 fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>We willen deze opdelen in twee historische lijnen.
+Een lijn gaat van commit een tot commit vier - dat zal de historische worden.
+De tweede lijn zal alleen commits vier en vijf zijn - dat is dan de recente historie.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/replace1.png" >}}" alt="replace1">
+</div>
+</div>
+<div class="paragraph">
+<p>Nu, de historische historie maken is eenvoudig, we kunnen gewoon een branch in de geschiedenis zetten en dan die branch naar de master branch pushen van een nieuwe remote repository.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch history c6e1e95
+$ git log --oneline --decorate
+ef989d8 (HEAD, master) fifth commit
+c6e1e95 (history) fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/replace2.png" >}}" alt="replace2">
+</div>
+</div>
+<div class="paragraph">
+<p>Nu kunnen we de nieuwe <code>history</code>-branch naar de <code>master</code>-branch van onze nieuwe repository pushen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add project-history https://github.com/schacon/project-history
+$ git push project-history history:master
+Counting objects: 12, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (12/12), 907 bytes, done.
+Total 12 (delta 0), reused 0 (delta 0)
+Unpacking objects: 100% (12/12), done.
+To git@github.com:schacon/project-history.git
+ * [new branch]      history -&gt; master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Goed, onze historie is nu gepubliceerd.
+Nu is het moeilijkere gedeelte het terugsnoeien van onze recente historie zodat deze kleiner wordt.
+We moeten een overlapping maken op zo’n manier dat we een commit kunnen vervangen in een repository die een gelijke commit heeft, dus we gaan deze afkappen tot alleen commits vier en vijf (dus de vierde commit overlapt).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --decorate
+ef989d8 (HEAD, master) fifth commit
+c6e1e95 (history) fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het is in dit geval handig om een basis commit te maken die instructies bevat hoe de historie uit te breiden, zodat andere ontwikkelaars weten wat te doen als ze de eerste commit in de afgekapte historie tegenkomen en meer nodig hebben.
+Dus wat we hier gaan doen is een initieel commit object maken als onze basis en daar instructies in zetten, dan rebasen we de overige commits (vier en vijf) daar bovenop.</p>
+</div>
+<div class="paragraph">
+<p>Om dat te doen, moeten we een punt kiezen om af te splitsen, wat voor ons de derde commit is, welke <code>9c68fdc</code> in SHA-spraak is.
+Dus onze basis commit zal van die tree af worden getakt.
+We kunnen onze basis commit maken met het <code>commit-tree</code> commando, wat gewoon een tree neemt en ons een SHA-1 teuggeeft van een gloednieuw, ouderloos commit object.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'get history from blah blah blah' | git commit-tree 9c68fdc^{tree}
+622e88e9cbfbacfb75b5279245b9fb38dfea10cf</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Noot</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Het <code>commit-tree</code> commando is een uit de reeks van commando’s die gewoonlijk <em>binnenwerk</em> (plumbing) commando’s worden genoemd.
+Dit zijn commando’s die niet direct voor normaal gebruik bedoeld zijn, maar die in plaats daarvan door <strong>andere</strong> Git commando’s worden gebruikt om kleinere taken uit te voeren.
+Bij tijd en wijle, als we wat vreemdere zaken dan dit uitvoeren, stellen ze ons in staat om echt <em>lage</em> dingen uit te voeren maar ze zijn niet bedoeld voor dagelijks gebruik.
+Je kunt meer over deze plumbing commando’s lezen in <a href="{{< relurl "book/nl/v2/ch00/_plumbing_porcelain" >}}">Binnenwerk en koetswerk (plumbing and porcelain)</a>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/replace3.png" >}}" alt="replace3">
+</div>
+</div>
+<div class="paragraph">
+<p>Goed, nu we dus een basis commit hebben, kunnen we de rest van onze historie hier boven op rebasen met <code>git rebase --onto</code>.
+Het <code>--onto</code> argument zal de SHA-1 zijn die we zojuist terugkregen van <code>commit-tree</code> en het rebase punt zal de derde commit zijn (de ouder van de eerste commit die we willen bewaren: <code>9c68fdc</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rebase --onto 622e88 9c68fdc
+First, rewinding head to replay your work on top of it...
+Applying: fourth commit
+Applying: fifth commit</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/replace4.png" >}}" alt="replace4">
+</div>
+</div>
+<div class="paragraph">
+<p>Mooi, dus we hebben onze recente historie herschreven bovenop een weggooi basis commit die nu onze instructies bevat hoe de gehele historie weer te herbouwen als we dat zouden willen.
+We kunnen die nieuwe historie op een nieuw project pushen en nu, als mensen die repository klonen, zullen ze alleen de meest recente twee commits zien en dan een basis commit met instructies.</p>
+</div>
+<div class="paragraph">
+<p>Laten we de rollen nu omdraaien naar iemand die het project voor het eerst kloont en die de hele historie wil hebben.
+Om de historische gegevens na het klonen van deze gesnoeide repository te krijgen, moet je een tweede remote toevoegen voor de historische repository en dan fetchen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://github.com/schacon/project
+$ cd project
+
+$ git log --oneline master
+e146b5f fifth commit
+81a708d fourth commit
+622e88e get history from blah blah blah
+
+$ git remote add project-history https://github.com/schacon/project-history
+$ git fetch project-history
+From https://github.com/schacon/project-history
+ * [new branch]      master     -&gt; project-history/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu zal de medewerker hun recente commits in de <code>master</code>-branch hebben en de historische commits in de <code>project-history/master</code>-branch.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master
+e146b5f fifth commit
+81a708d fourth commit
+622e88e get history from blah blah blah
+
+$ git log --oneline project-history/master
+c6e1e95 fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Om deze te combineren, kan je simpelweg <code>git replace</code> aanroepen met de commit die je wilt vervangen en dan de commit waarmee je het wilt vervangen.
+Dus we willen de "fourth" commit in de master branch met de "fourth" commit in de <code>project-history/master</code>-branch vervangen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git replace 81a708d c6e1e95</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je nu naar de historie van de <code>master</code>-branch kijkt, lijkt het er zo uit te zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline master
+e146b5f fifth commit
+81a708d fourth commit
+9c68fdc third commit
+945704c second commit
+c1822cf first commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Gaaf, toch?  Zonder alle SHA-1 stroomopwaarts te hoeven vervangen, waren we toch in staat om een commit in onze history te vervangen met een compleet andere commit en alle normale instrumenten (<code>bisect</code>, <code>blame</code>, etc.) blijven werken zoals we van ze mogen verwachten.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/replace5.png" >}}" alt="replace5">
+</div>
+</div>
+<div class="paragraph">
+<p>Interessant genoeg, blijf het nog steeds <code>81a708d</code> als de SHA-1 laten zien, zelfs als het in werkelijkheid de gegevens van de <code>c6e1e95</code> commit gebruikt waar we het mee hebben vervangen.
+Zelfs als je een commando als <code>cat-file</code> aanroept, zal het je de vervangen gegevens tonen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p 81a708d
+tree 7bc544cf438903b65ca9104a1e30345eee6c083d
+parent 9c68fdceee073230f19ebb8b5e7fc71b479c0252
+author Scott Chacon &lt;schacon@gmail.com&gt; 1268712581 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1268712581 -0700
+
+fourth commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Onthoud dat de echte ouder van <code>81a708d</code> onze plaatsvervangende commit was (<code>622e88e</code>), niet <code>9c68fdce</code> zoals hier vermeld staat.</p>
+</div>
+<div class="paragraph">
+<p>Het andere interessante is dat deze gegevens in onze referenties opgeslagen zijn:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git for-each-ref
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/heads/master
+c6e1e95051d41771a649f3145423f8809d1a74d4 commit	refs/remotes/history/master
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/remotes/origin/HEAD
+e146b5f14e79d4935160c0e83fb9ebe526b8da0d commit	refs/remotes/origin/master
+c6e1e95051d41771a649f3145423f8809d1a74d4 commit	refs/replace/81a708dd0e167a3f691541c7a6463343bc457040</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit houdt in dat het eenvoudig is om onze vervanging met anderen te delen, omdat we deze naar onze server kunnen pushen en andere mensen het eenvoudig kunnen downloaden.
+Dit is niet zo nuttig in het scenario van historie-enten welke we hier nu behandeld hebben (als iedereen toch beide histories zou gaan downloaden, waarom zouden we ze dan gaan splitsen) maar het kan handig zijn in andere omstandigheden.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

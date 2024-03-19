@@ -1,0 +1,365 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: en
+  chapter:
+    title: Git Internals
+    number: 10
+  section:
+    title: Transfer Protocols
+    number: 6
+    cs_number: '10.6'
+    previous: book/en/v2/Git-Internals-The-Refspec
+    next: book/en/v2/Git-Internals-Maintenance-and-Data-Recovery
+title: Git - Transfer Protocols
+
+---
+<h2 id="_transfer_protocols">Transfer Protocols</h2>
+<div class="paragraph">
+<p>Git can transfer data between two repositories in two major ways: the “dumb” protocol and the “smart” protocol.
+This section will quickly cover how these two main protocols operate.</p>
+</div>
+<div class="sect3">
+<h3 id="_the_dumb_protocol">The Dumb Protocol</h3>
+<div class="paragraph">
+<p>If you’re setting up a repository to be served read-only over HTTP, the dumb protocol is likely what will be used.
+This protocol is called “dumb” because it requires no Git-specific code on the server side during the transport process; the fetch process is a series of HTTP <code>GET</code> requests, where the client can assume the layout of the Git repository on the server.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>The dumb protocol is fairly rarely used these days.
+It’s difficult to secure or make private, so most Git hosts (both cloud-based and on-premises) will refuse to use it.
+It’s generally advised to use the smart protocol, which we describe a bit further on.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Let’s follow the <code>http-fetch</code> process for the simplegit library:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone http://server/simplegit-progit.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The first thing this command does is pull down the <code>info/refs</code> file.
+This file is written by the <code>update-server-info</code> command, which is why you need to enable that as a <code>post-receive</code> hook in order for the HTTP transport to work properly:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET info/refs
+ca82a6dff817ec66f44342007202690a93763949     refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now you have a list of the remote references and SHA-1s.
+Next, you look for what the HEAD reference is so you know what to check out when you’re finished:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You need to check out the <code>master</code> branch when you’ve completed the process.
+At this point, you’re ready to start the walking process.
+Because your starting point is the <code>ca82a6</code> commit object you saw in the <code>info/refs</code> file, you start by fetching that:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/ca/82a6dff817ec66f44342007202690a93763949
+(179 bytes of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You get an object back – that object is in loose format on the server, and you fetched it over a static HTTP GET request.
+You can zlib-uncompress it, strip off the header, and look at the commit content:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p ca82a6dff817ec66f44342007202690a93763949
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+Change version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Next, you have two more objects to retrieve – <code>cfda3b</code>, which is the tree of content that the commit we just retrieved points to; and <code>085bb3</code>, which is the parent commit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/08/5bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+(179 bytes of data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That gives you your next commit object.
+Grab the tree object:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/cf/da3bf379e4f8dba8717dee55aab78aef7f4daf
+(404 - Not Found)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Oops – it looks like that tree object isn’t in loose format on the server, so you get a 404 response back.
+There are a couple of reasons for this – the object could be in an alternate repository, or it could be in a packfile in this repository.
+Git checks for any listed alternates first:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/http-alternates
+(empty file)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If this comes back with a list of alternate URLs, Git checks for loose files and packfiles there – this is a nice mechanism for projects that are forks of one another to share objects on disk.
+However, because no alternates are listed in this case, your object must be in a packfile.
+To see what packfiles are available on this server, you need to get the <code>objects/info/packs</code> file, which contains a listing of them (also generated by <code>update-server-info</code>):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/info/packs
+P pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>There is only one packfile on the server, so your object is obviously in there, but you’ll check the index file to make sure.
+This is also useful if you have multiple packfiles on the server, so you can see which packfile contains the object you need:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.idx
+(4k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now that you have the packfile index, you can see if your object is in it – because the index lists the SHA-1s of the objects contained in the packfile and the offsets to those objects.
+Your object is there, so go ahead and get the whole packfile:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack
+(13k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You have your tree object, so you continue walking your commits.
+They’re all also within the packfile you just downloaded, so you don’t have to do any more requests to your server.
+Git checks out a working copy of the <code>master</code> branch that was pointed to by the HEAD reference you downloaded at the beginning.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_the_smart_protocol">The Smart Protocol</h3>
+<div class="paragraph">
+<p>The dumb protocol is simple but a bit inefficient, and it can’t handle writing of data from the client to the server.
+The smart protocol is a more common method of transferring data, but it requires a process on the remote end that is intelligent about Git – it can read local data, figure out what the client has and needs, and generate a custom packfile for it.
+There are two sets of processes for transferring data: a pair for uploading data and a pair for downloading data.</p>
+</div>
+<div class="sect4">
+<h4 id="_uploading_data">Uploading Data</h4>
+<div class="paragraph">
+<p>
+To upload data to a remote process, Git uses the <code>send-pack</code> and <code>receive-pack</code> processes.
+The <code>send-pack</code> process runs on the client and connects to a <code>receive-pack</code> process on the remote side.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh">SSH</h6>
+<div class="paragraph">
+<p>For example, say you run <code>git push origin master</code> in your project, and <code>origin</code> is defined as a URL that uses the SSH protocol.
+Git fires up the <code>send-pack</code> process, which initiates a connection over SSH to your server.
+It tries to run a command on the remote server via an SSH call that looks something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-receive-pack 'simplegit-progit.git'"
+00a5ca82a6dff817ec66f4437202690a93763949 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1+github-607-gfba4028 delete-refs
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>git-receive-pack</code> command immediately responds with one line for each reference it currently has – in this case, just the <code>master</code> branch and its SHA-1.
+The first line also has a list of the server’s capabilities (here, <code>report-status</code>, <code>delete-refs</code>, and some others, including the client identifier).</p>
+</div>
+<div class="paragraph">
+<p>The data is transmitted in chunks.
+Each chunk starts with a 4-character hex value specifying how long the chunk is (including the 4 bytes of the length itself).
+Chunks usually contain a single line of data and a trailing linefeed.
+Your first chunk starts with 00a5, which is hexadecimal for 165, meaning the chunk is 165 bytes long.
+The next chunk is 0000, meaning the server is done with its references listing.</p>
+</div>
+<div class="paragraph">
+<p>Now that it knows the server’s state, your <code>send-pack</code> process determines what commits it has that the server doesn’t.
+For each reference that this push will update, the <code>send-pack</code> process tells the <code>receive-pack</code> process that information.
+For instance, if you’re updating the <code>master</code> branch and adding an <code>experiment</code> branch, the <code>send-pack</code> response may look something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0076ca82a6dff817ec66f44342007202690a93763949 15027957951b64cf874c3557a0f3547bd83b3ff6 \
+	refs/heads/master report-status
+006c0000000000000000000000000000000000000000 cdfdb42577e2506715f8cfeacdbabc092bf63e8d \
+	refs/heads/experiment
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git sends a line for each reference you’re updating with the line’s length, the old SHA-1, the new SHA-1, and the reference that is being updated.
+The first line also has the client’s capabilities.
+The SHA-1 value of all '0’s means that nothing was there before – because you’re adding the <code>experiment</code> reference.
+If you were deleting a reference, you would see the opposite: all '0’s on the right side.</p>
+</div>
+<div class="paragraph">
+<p>Next, the client sends a packfile of all the objects the server doesn’t have yet.
+Finally, the server responds with a success (or failure) indication:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>000eunpack ok</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https">HTTP(S)</h6>
+<div class="paragraph">
+<p>This process is mostly the same over HTTP, though the handshaking is a bit different.
+The connection is initiated with this request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET http://server/simplegit-progit.git/info/refs?service=git-receive-pack
+001f# service=git-receive-pack
+00ab6c5f0e45abd7832bf23074a333f739977c9e8188 refs/heads/master□report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1~vmg-bitmaps-bugaloo-608-g116744e
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>That’s the end of the first client-server exchange.
+The client then makes another request, this time a <code>POST</code>, with the data that <code>send-pack</code> provides.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST http://server/simplegit-progit.git/git-receive-pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>POST</code> request includes the <code>send-pack</code> output and the packfile as its payload.
+The server then indicates success or failure with its HTTP response.</p>
+</div>
+<div class="paragraph">
+<p>Keep in mind the HTTP protocol may further wrap this data inside a chunked transfer encoding.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_downloading_data">Downloading Data</h4>
+<div class="paragraph">
+<p>
+When you download data, the <code>fetch-pack</code> and <code>upload-pack</code> processes are involved.
+The client initiates a <code>fetch-pack</code> process that connects to an <code>upload-pack</code> process on the remote side to negotiate what data will be transferred down.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh_2">SSH</h6>
+<div class="paragraph">
+<p>If you’re doing the fetch over SSH, <code>fetch-pack</code> runs something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-upload-pack 'simplegit-progit.git'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>After <code>fetch-pack</code> connects, <code>upload-pack</code> sends back something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>00dfca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fe2409a098dc3e53539a9028a94b6224db9d6a6b6 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This is very similar to what <code>receive-pack</code> responds with, but the capabilities are different.
+In addition, it sends back what HEAD points to (<code>symref=HEAD:refs/heads/master</code>) so the client knows what to check out if this is a clone.</p>
+</div>
+<div class="paragraph">
+<p>At this point, the <code>fetch-pack</code> process looks at what objects it has and responds with the objects that it needs by sending “want” and then the SHA-1 it wants.
+It sends all the objects it already has with “have” and then the SHA-1.
+At the end of this list, it writes “done” to initiate the <code>upload-pack</code> process to begin sending the packfile of the data it needs:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>003cwant ca82a6dff817ec66f44342007202690a93763949 ofs-delta
+0032have 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+0009done
+0000</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https_2">HTTP(S)</h6>
+<div class="paragraph">
+<p>The handshake for a fetch operation takes two HTTP requests.
+The first is a <code>GET</code> to the same endpoint used in the dumb protocol:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; GET $GIT_URL/info/refs?service=git-upload-pack
+001e# service=git-upload-pack
+00e7ca82a6dff817ec66f44342007202690a93763949 HEAD□multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed no-done symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This is very similar to invoking <code>git-upload-pack</code> over an SSH connection, but the second exchange is performed as a separate request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>=&gt; POST $GIT_URL/git-upload-pack HTTP/1.0
+0032want 0a53e9ddeaddad63ad106860237bbf53411d11a7
+0032have 441b40d833fdfa93eb2908e52742248faf0ee993
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Again, this is the same format as above.
+The response to this request indicates success or failure, and includes the packfile.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_protocols_summary">Protocols Summary</h3>
+<div class="paragraph">
+<p>This section contains a very basic overview of the transfer protocols.
+The protocol includes many other features, such as <code>multi_ack</code> or <code>side-band</code> capabilities, but covering them is outside the scope of this book.
+We’ve tried to give you a sense of the general back-and-forth between client and server; if you need more knowledge than this, you’ll probably want to take a look at the Git source code.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

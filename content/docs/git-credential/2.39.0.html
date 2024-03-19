@@ -1,0 +1,232 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - git-credential Documentation
+docname: git-credential
+version: 2.39.0
+aliases:
+- "/docs/git-credential/2.39.0/index.html"
+- "/docs/git-credential/2.39.1/index.html"
+- "/docs/git-credential/2.39.2/index.html"
+- "/docs/git-credential/2.39.3/index.html"
+
+---
+<div class="sect1">
+<h2 id="_name"><a class="anchor" href="#_name"></a>NAME</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>git-credential - Retrieve and store user credentials</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_synopsis"><a class="anchor" href="#_synopsis"></a>SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="listingblock">
+<div class="content">
+<pre>'git credential' (fill|approve|reject)</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description"><a class="anchor" href="#_description"></a>DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Git has an internal interface for storing and retrieving credentials
+from system-specific helpers, as well as prompting the user for
+usernames and passwords. The git-credential command exposes this
+interface to scripts which may want to retrieve, store, or prompt for
+credentials in the same manner as Git. The design of this scriptable
+interface models the internal C API; see credential.h for more
+background on the concepts.</p>
+</div>
+<div class="paragraph">
+<p>git-credential takes an "action" option on the command-line (one of
+<code>fill</code>, <code>approve</code>, or <code>reject</code>) and reads a credential description
+on stdin (see <a href="#IOFMT">INPUT/OUTPUT FORMAT</a>).</p>
+</div>
+<div class="paragraph">
+<p>If the action is <code>fill</code>, git-credential will attempt to add "username"
+and "password" attributes to the description by reading config files,
+by contacting any configured credential helpers, or by prompting the
+user. The username and password attributes of the credential
+description are then printed to stdout together with the attributes
+already provided.</p>
+</div>
+<div class="paragraph">
+<p>If the action is <code>approve</code>, git-credential will send the description
+to any configured credential helpers, which may store the credential
+for later use.</p>
+</div>
+<div class="paragraph">
+<p>If the action is <code>reject</code>, git-credential will send the description to
+any configured credential helpers, which may erase any stored
+credential matching the description.</p>
+</div>
+<div class="paragraph">
+<p>If the action is <code>approve</code> or <code>reject</code>, no output should be emitted.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_typical_use_of_git_credential"><a class="anchor" href="#_typical_use_of_git_credential"></a>TYPICAL USE OF GIT CREDENTIAL</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>An application using git-credential will typically use <code>git
+credential</code> following these steps:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Generate a credential description based on the context.</p>
+<div class="paragraph">
+<p>For example, if we want a password for
+<code>https://example.com/foo.git</code>, we might generate the following
+credential description (don&#8217;t forget the blank line at the end; it
+tells <code>git credential</code> that the application finished feeding all the
+information it has):</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>protocol=https
+host=example.com
+path=foo.git</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Ask git-credential to give us a username and password for this
+description. This is done by running <code>git credential fill</code>,
+feeding the description from step (1) to its standard input. The complete
+credential description (including the credential per se, i.e. the
+login and password) will be produced on standard output, like:</p>
+<div class="literalblock">
+<div class="content">
+<pre>protocol=https
+host=example.com
+username=bob
+password=secr3t</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In most cases, this means the attributes given in the input will be
+repeated in the output, but Git may also modify the credential
+description, for example by removing the <code>path</code> attribute when the
+protocol is HTTP(s) and <code>credential.useHttpPath</code> is false.</p>
+</div>
+<div class="paragraph">
+<p>If the <code>git credential</code> knew about the password, this step may
+not have involved the user actually typing this password (the
+user may have typed a password to unlock the keychain instead,
+or no user interaction was done if the keychain was already
+unlocked) before it returned <code>password=secr3t</code>.</p>
+</div>
+</li>
+<li>
+<p>Use the credential (e.g., access the URL with the username and
+password from step (2)), and see if it&#8217;s accepted.</p>
+</li>
+<li>
+<p>Report on the success or failure of the password. If the
+credential allowed the operation to complete successfully, then
+it can be marked with an "approve" action to tell <code>git
+credential</code> to reuse it in its next invocation. If the credential
+was rejected during the operation, use the "reject" action so
+that <code>git credential</code> will ask for a new password in its next
+invocation. In either case, <code>git credential</code> should be fed with
+the credential description obtained from step (2) (which also
+contain the ones provided in step (1)).</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="IOFMT"><a class="anchor" href="#IOFMT"></a>INPUT/OUTPUT FORMAT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><code>git credential</code> reads and/or writes (depending on the action used)
+credential information in its standard input/output. This information
+can correspond either to keys for which <code>git credential</code> will obtain
+the login information (e.g. host, protocol, path), or to the actual
+credential data to be obtained (username/password).</p>
+</div>
+<div class="paragraph">
+<p>The credential is split into a set of named attributes, with one
+attribute per line. Each attribute is specified by a key-value pair,
+separated by an <code>=</code> (equals) sign, followed by a newline.</p>
+</div>
+<div class="paragraph">
+<p>The key may contain any bytes except <code>=</code>, newline, or NUL. The value may
+contain any bytes except newline or NUL.</p>
+</div>
+<div class="paragraph">
+<p>In both cases, all bytes are treated as-is (i.e., there is no quoting,
+and one cannot transmit a value with newline or NUL in it). The list of
+attributes is terminated by a blank line or end-of-file.</p>
+</div>
+<div class="paragraph">
+<p>Git understands the following attributes:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/git-credential.txt-codeprotocolcode"> <a class="anchor" href="#Documentation/git-credential.txt-codeprotocolcode"></a><code>protocol</code> </dt>
+<dd>
+<p>The protocol over which the credential will be used (e.g.,
+<code>https</code>).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-credential.txt-codehostcode"> <a class="anchor" href="#Documentation/git-credential.txt-codehostcode"></a><code>host</code> </dt>
+<dd>
+<p>The remote hostname for a network credential.  This includes
+the port number if one was specified (e.g., "example.com:8088").</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-credential.txt-codepathcode"> <a class="anchor" href="#Documentation/git-credential.txt-codepathcode"></a><code>path</code> </dt>
+<dd>
+<p>The path with which the credential will be used. E.g., for
+accessing a remote https repository, this will be the
+repository&#8217;s path on the server.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-credential.txt-codeusernamecode"> <a class="anchor" href="#Documentation/git-credential.txt-codeusernamecode"></a><code>username</code> </dt>
+<dd>
+<p>The credential&#8217;s username, if we already have one (e.g., from a
+URL, the configuration, the user, or from a previously run helper).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-credential.txt-codepasswordcode"> <a class="anchor" href="#Documentation/git-credential.txt-codepasswordcode"></a><code>password</code> </dt>
+<dd>
+<p>The credential&#8217;s password, if we are asking it to be stored.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-credential.txt-codeurlcode"> <a class="anchor" href="#Documentation/git-credential.txt-codeurlcode"></a><code>url</code> </dt>
+<dd>
+<p>When this special attribute is read by <code>git credential</code>, the
+value is parsed as a URL and treated as if its constituent parts
+were read (e.g., <code>url=https://example.com</code> would behave as if
+<code>protocol=https</code> and <code>host=example.com</code> had been provided). This
+can help callers avoid parsing URLs themselves.</p>
+<div class="paragraph">
+<p>Note that specifying a protocol is mandatory and if the URL
+doesn&#8217;t specify a hostname (e.g., "cert:///path/to/file") the
+credential will contain a hostname attribute whose value is an
+empty string.</p>
+</div>
+<div class="paragraph">
+<p>Components which are missing from the URL (e.g., there is no
+username in the example above) will be left unset.</p>
+</div>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>Unrecognised attributes are silently discarded.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_git"><a class="anchor" href="#_git"></a>GIT</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Part of the <a href='{{< relurl "docs/git" >}}'>git[1]</a> suite</p>
+</div>
+</div>
+</div>

@@ -1,0 +1,292 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - api-diff Documentation
+docname: api-diff
+version: 2.20.0
+aliases:
+- "/docs/api-diff/2.20.0/index.html"
+- "/docs/api-diff/2.20.1/index.html"
+- "/docs/api-diff/2.20.2/index.html"
+- "/docs/api-diff/2.20.3/index.html"
+- "/docs/api-diff/2.20.4/index.html"
+- "/docs/api-diff/2.20.5/index.html"
+- "/docs/api-diff/2.21.0/index.html"
+- "/docs/api-diff/2.21.1/index.html"
+- "/docs/api-diff/2.21.2/index.html"
+- "/docs/api-diff/2.21.3/index.html"
+- "/docs/api-diff/2.21.4/index.html"
+- "/docs/api-diff/2.22.0/index.html"
+- "/docs/api-diff/2.22.1/index.html"
+- "/docs/api-diff/2.22.2/index.html"
+- "/docs/api-diff/2.22.3/index.html"
+- "/docs/api-diff/2.22.4/index.html"
+- "/docs/api-diff/2.22.5/index.html"
+- "/docs/api-diff/2.23.0/index.html"
+- "/docs/api-diff/2.23.1/index.html"
+- "/docs/api-diff/2.23.2/index.html"
+- "/docs/api-diff/2.23.3/index.html"
+- "/docs/api-diff/2.23.4/index.html"
+- "/docs/api-diff/2.24.0/index.html"
+- "/docs/api-diff/2.24.1/index.html"
+- "/docs/api-diff/2.24.2/index.html"
+- "/docs/api-diff/2.24.3/index.html"
+- "/docs/api-diff/2.24.4/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>The diff API is for programs that compare two sets of files (e.g. two
+trees, one tree and the index) and present the found difference in
+various ways.  The calling program is responsible for feeding the API
+pairs of files, one from the "old" set and the corresponding one from
+"new" set, that are different.  The library called through this API is
+called diffcore, and is responsible for two things.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>finding total rewrites (<code>-B</code>), renames (<code>-M</code>) and copies (<code>-C</code>), and
+changes that touch a string (<code>-S</code>), as specified by the caller.</p>
+</li>
+<li>
+<p>outputting the differences in various formats, as specified by the
+caller.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_calling_sequence"><a class="anchor" href="#_calling_sequence"></a>Calling sequence</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>Prepare <code>struct diff_options</code> to record the set of diff options, and
+then call <code>repo_diff_setup()</code> to initialize this structure.  This
+sets up the vanilla default.</p>
+</li>
+<li>
+<p>Fill in the options structure to specify desired output format, rename
+detection, etc.  <code>diff_opt_parse()</code> can be used to parse options given
+from the command line in a way consistent with existing git-diff
+family of programs.</p>
+</li>
+<li>
+<p>Call <code>diff_setup_done()</code>; this inspects the options set up so far for
+internal consistency and make necessary tweaking to it (e.g. if
+textual patch output was asked, recursive behaviour is turned on);
+the callback set_default in diff_options can be used to tweak this more.</p>
+</li>
+<li>
+<p>As you find different pairs of files, call <code>diff_change()</code> to feed
+modified files, <code>diff_addremove()</code> to feed created or deleted files,
+or <code>diff_unmerge()</code> to feed a file whose state is <em>unmerged</em> to the
+API.  These are thin wrappers to a lower-level <code>diff_queue()</code> function
+that is flexible enough to record any of these kinds of changes.</p>
+</li>
+<li>
+<p>Once you finish feeding the pairs of files, call <code>diffcore_std()</code>.
+This will tell the diffcore library to go ahead and do its work.</p>
+</li>
+<li>
+<p>Calling <code>diff_flush()</code> will produce the output.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_data_structures"><a class="anchor" href="#_data_structures"></a>Data structures</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><code>struct diff_filespec</code></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>This is the internal representation for a single file (blob).  It
+records the blob object name (if known&#8201;&#8212;&#8201;for a work tree file it
+typically is a NUL SHA-1), filemode and pathname.  This is what the
+<code>diff_addremove()</code>, <code>diff_change()</code> and <code>diff_unmerge()</code> synthesize and
+feed <code>diff_queue()</code> function with.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>struct diff_filepair</code></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>This records a pair of <code>struct diff_filespec</code>; the filespec for a file
+in the "old" set (i.e. preimage) is called <code>one</code>, and the filespec for a
+file in the "new" set (i.e. postimage) is called <code>two</code>.  A change that
+represents file creation has NULL in <code>one</code>, and file deletion has NULL
+in <code>two</code>.</p>
+</div>
+<div class="paragraph">
+<p>A <code>filepair</code> starts pointing at <code>one</code> and <code>two</code> that are from the same
+filename, but <code>diffcore_std()</code> can break pairs and match component
+filespecs with other filespecs from a different filepair to form new
+filepair.  This is called <em>rename detection</em>.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>struct diff_queue</code></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>This is a collection of filepairs.  Notable members are:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codequeuecode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codequeuecode"></a><code>queue</code> </dt>
+<dd>
+<p>An array of pointers to <code>struct diff_filepair</code>.  This
+dynamically grows as you add filepairs;</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codealloccode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codealloccode"></a><code>alloc</code> </dt>
+<dd>
+<p>The allocated size of the <code>queue</code> array;</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codenrcode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codenrcode"></a><code>nr</code> </dt>
+<dd>
+<p>The number of elements in the <code>queue</code> array.</p>
+<div class="ulist">
+<ul>
+<li>
+<p><code>struct diff_options</code></p>
+</li>
+</ul>
+</div>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>This describes the set of options the calling program wants to affect
+the operation of diffcore library with.</p>
+</div>
+<div class="paragraph">
+<p>Notable members are:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codeoutputformatcode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codeoutputformatcode"></a><code>output_format</code> </dt>
+<dd>
+<p>The output format used when <code>diff_flush()</code> is run.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codecontextcode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codecontextcode"></a><code>context</code> </dt>
+<dd>
+<p>Number of context lines to generate in patch output.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codebreakoptcodecodedetectrenamecodecoderename-scorecodecoderenamelimitcode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codebreakoptcodecodedetectrenamecodecoderename-scorecodecoderenamelimitcode"></a><code>break_opt</code>, <code>detect_rename</code>, <code>rename-score</code>, <code>rename_limit</code> </dt>
+<dd>
+<p>Affects the way detection logic for complete rewrites, renames
+and copies.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codeabbrevcode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codeabbrevcode"></a><code>abbrev</code> </dt>
+<dd>
+<p>Number of hexdigits to abbreviate raw format output to.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codepickaxecode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codepickaxecode"></a><code>pickaxe</code> </dt>
+<dd>
+<p>A constant string (can and typically does contain newlines to
+look for a block of text, not just a single line) to filter out
+the filepairs that do not change the number of strings contained
+in its preimage and postimage of the diff_queue.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codeflagscode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codeflagscode"></a><code>flags</code> </dt>
+<dd>
+<p>This is mostly a collection of boolean options that affects the
+operation, but some do not have anything to do with the diffcore
+library.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codetouchedflagscode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codetouchedflagscode"></a><code>touched_flags</code> </dt>
+<dd>
+<p>Records whether a flag has been changed due to user request
+(rather than just set/unset by default).</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-codesetdefaultcode"> <a class="anchor" href="#Documentation/technical/api-diff.txt-codesetdefaultcode"></a><code>set_default</code> </dt>
+<dd>
+<p>Callback which allows tweaking the options in diff_setup_done().</p>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-BINARYTEXT"> <a class="anchor" href="#Documentation/technical/api-diff.txt-BINARYTEXT"></a>BINARY, TEXT </dt>
+<dd>
+<p>Affects the way how a file that is seemingly binary is treated.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-FULLINDEX"> <a class="anchor" href="#Documentation/technical/api-diff.txt-FULLINDEX"></a>FULL_INDEX </dt>
+<dd>
+<p>Tells the patch output format not to use abbreviated object
+names on the "index" lines.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-FINDCOPIESHARDER"> <a class="anchor" href="#Documentation/technical/api-diff.txt-FINDCOPIESHARDER"></a>FIND_COPIES_HARDER </dt>
+<dd>
+<p>Tells the diffcore library that the caller is feeding unchanged
+filepairs to allow copies from unmodified files be detected.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-COLORDIFF"> <a class="anchor" href="#Documentation/technical/api-diff.txt-COLORDIFF"></a>COLOR_DIFF </dt>
+<dd>
+<p>Output should be colored.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-COLORDIFFWORDS"> <a class="anchor" href="#Documentation/technical/api-diff.txt-COLORDIFFWORDS"></a>COLOR_DIFF_WORDS </dt>
+<dd>
+<p>Output is a colored word-diff.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-NOINDEX"> <a class="anchor" href="#Documentation/technical/api-diff.txt-NOINDEX"></a>NO_INDEX </dt>
+<dd>
+<p>Tells diff-files that the input is not tracked files but files
+in random locations on the filesystem.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-ALLOWEXTERNAL"> <a class="anchor" href="#Documentation/technical/api-diff.txt-ALLOWEXTERNAL"></a>ALLOW_EXTERNAL </dt>
+<dd>
+<p>Tells output routine that it is Ok to call user specified patch
+output routine.  Plumbing disables this to ensure stable output.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-QUIET"> <a class="anchor" href="#Documentation/technical/api-diff.txt-QUIET"></a>QUIET </dt>
+<dd>
+<p>Do not show any output.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-REVERSEDIFF"> <a class="anchor" href="#Documentation/technical/api-diff.txt-REVERSEDIFF"></a>REVERSE_DIFF </dt>
+<dd>
+<p>Tells the library that the calling program is feeding the
+filepairs reversed; <code>one</code> is two, and <code>two</code> is one.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-EXITWITHSTATUS"> <a class="anchor" href="#Documentation/technical/api-diff.txt-EXITWITHSTATUS"></a>EXIT_WITH_STATUS </dt>
+<dd>
+<p>For communication between the calling program and the options
+parser; tell the calling program to signal the presence of
+difference using program exit code.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-HASCHANGES"> <a class="anchor" href="#Documentation/technical/api-diff.txt-HASCHANGES"></a>HAS_CHANGES </dt>
+<dd>
+<p>Internal; used for optimization to see if there is any change.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-SILENTONREMOVE"> <a class="anchor" href="#Documentation/technical/api-diff.txt-SILENTONREMOVE"></a>SILENT_ON_REMOVE </dt>
+<dd>
+<p>Affects if diff-files shows removed files.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/technical/api-diff.txt-RECURSIVETREEINRECURSIVE"> <a class="anchor" href="#Documentation/technical/api-diff.txt-RECURSIVETREEINRECURSIVE"></a>RECURSIVE, TREE_IN_RECURSIVE </dt>
+<dd>
+<p>Tells if tree traversal done by tree-diff should recursively
+descend into a tree object pair that are different in preimage
+and postimage set.</p>
+</dd>
+</dl>
+</div>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>(JC)</p>
+</div>
+</div>
+</div>

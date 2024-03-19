@@ -1,0 +1,375 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - parallel-checkout Documentation
+docname: parallel-checkout
+version: 2.39.0
+aliases:
+- "/docs/parallel-checkout/2.39.0/index.html"
+- "/docs/parallel-checkout/2.39.1/index.html"
+- "/docs/parallel-checkout/2.39.2/index.html"
+- "/docs/parallel-checkout/2.39.3/index.html"
+- "/docs/parallel-checkout/2.40.0/index.html"
+- "/docs/parallel-checkout/2.40.1/index.html"
+- "/docs/parallel-checkout/2.41.0/index.html"
+- "/docs/parallel-checkout/2.42.0/index.html"
+- "/docs/parallel-checkout/2.42.1/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>The "Parallel Checkout" feature attempts to use multiple processes to
+parallelize the work of uncompressing the blobs, applying in-core
+filters, and writing the resulting contents to the working tree during a
+checkout operation. It can be used by all checkout-related commands,
+such as <code>clone</code>, <code>checkout</code>, <code>reset</code>, <code>sparse-checkout</code>, and others.</p>
+</div>
+<div class="paragraph">
+<p>These commands share the following basic structure:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Step 1: Read the current index file into memory.</p>
+</li>
+<li>
+<p>Step 2: Modify the in-memory index based upon the command, and
+temporarily mark all cache entries that need to be updated.</p>
+</li>
+<li>
+<p>Step 3: Populate the working tree to match the new candidate index.
+This includes iterating over all of the to-be-updated cache entries
+and delete, create, or overwrite the associated files in the working
+tree.</p>
+</li>
+<li>
+<p>Step 4: Write the new index to disk.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Step 3 is the focus of the "parallel checkout" effort described here.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_sequential_implementation"><a class="anchor" href="#_sequential_implementation"></a>Sequential Implementation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>For the purposes of discussion here, the current sequential
+implementation of Step 3 is divided in 3 parts, each one implemented in
+its own function:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Step 3a: <code>unpack-trees.c:check_updates()</code> contains a series of
+sequential loops iterating over the <code>cache_entry</code>'s array. The main
+loop in this function calls the Step 3b function for each of the
+to-be-updated entries.</p>
+</li>
+<li>
+<p>Step 3b: <code>entry.c:checkout_entry()</code> examines the existing working tree
+for file conflicts, collisions, and unsaved changes. It removes files
+and creates leading directories as necessary. It calls the Step 3c
+function for each entry to be written.</p>
+</li>
+<li>
+<p>Step 3c: <code>entry.c:write_entry()</code> loads the blob into memory, smudges
+it if necessary, creates the file in the working tree, writes the
+smudged contents, calls <code>fstat()</code> or <code>lstat()</code>, and updates the
+associated <code>cache_entry</code> struct with the stat information gathered.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>It wouldn&#8217;t be safe to perform Step 3b in parallel, as there could be
+race conditions between file creations and removals. Instead, the
+parallel checkout framework lets the sequential code handle Step 3b,
+and uses parallel workers to replace the sequential
+<code>entry.c:write_entry()</code> calls from Step 3c.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_rejected_multi_threaded_solution"><a class="anchor" href="#_rejected_multi_threaded_solution"></a>Rejected Multi-Threaded Solution</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The most "straightforward" implementation would be to spread the set of
+to-be-updated cache entries across multiple threads. But due to the
+thread-unsafe functions in the object database code, we would have to use locks to
+coordinate the parallel operation. An early prototype of this solution
+showed that the multi-threaded checkout would bring performance
+improvements over the sequential code, but there was still too much lock
+contention. A <code>perf</code> profiling indicated that around 20% of the runtime
+during a local Linux clone (on an SSD) was spent in locking functions.
+For this reason this approach was rejected in favor of using multiple
+child processes, which led to a better performance.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_multi_process_solution"><a class="anchor" href="#_multi_process_solution"></a>Multi-Process Solution</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Parallel checkout alters the aforementioned Step 3 to use multiple
+<code>checkout--worker</code> background processes to distribute the work. The
+long-running worker processes are controlled by the foreground Git
+command using the existing run-command API.</p>
+</div>
+<div class="sect2">
+<h3 id="_overview"><a class="anchor" href="#_overview"></a>Overview</h3>
+<div class="paragraph">
+<p>Step 3b is only slightly altered; for each entry to be checked out, the
+main process performs the following steps:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>M1: Check whether there is any untracked or unclean file in the
+working tree which would be overwritten by this entry, and decide
+whether to proceed (removing the file(s)) or not.</p>
+</li>
+<li>
+<p>M2: Create the leading directories.</p>
+</li>
+<li>
+<p>M3: Load the conversion attributes for the entry&#8217;s path.</p>
+</li>
+<li>
+<p>M4: Check, based on the entry&#8217;s type and conversion attributes,
+whether the entry is eligible for parallel checkout (more on this
+later). If it is eligible, enqueue the entry and the loaded
+attributes to later write the entry in parallel. If not, write the
+entry right away, using the default sequential code.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Note: we save the conversion attributes associated with each entry
+because the workers don&#8217;t have access to the main process' index state,
+so they can&#8217;t load the attributes by themselves (and the attributes are
+needed to properly smudge the entry). Additionally, this has a positive
+impact on performance as (1) we don&#8217;t need to load the attributes twice
+and (2) the attributes machinery is optimized to handle paths in
+sequential order.</p>
+</div>
+<div class="paragraph">
+<p>After all entries have passed through the above steps, the main process
+checks if the number of enqueued entries is sufficient to spread among
+the workers. If not, it just writes them sequentially. Otherwise, it
+spawns the workers and distributes the queued entries uniformly in
+continuous chunks. This aims to minimize the chances of two workers
+writing to the same directory simultaneously, which could increase lock
+contention in the kernel.</p>
+</div>
+<div class="paragraph">
+<p>Then, for each assigned item, each worker:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>W1: Checks if there is any non-directory file in the leading part of
+the entry&#8217;s path or if there already exists a file at the entry' path.
+If so, mark the entry with <code>PC_ITEM_COLLIDED</code> and skip it (more on
+this later).</p>
+</li>
+<li>
+<p>W2: Creates the file (with O_CREAT and O_EXCL).</p>
+</li>
+<li>
+<p>W3: Loads the blob into memory (inflating and delta reconstructing
+it).</p>
+</li>
+<li>
+<p>W4: Applies any required in-process filter, like end-of-line
+conversion and re-encoding.</p>
+</li>
+<li>
+<p>W5: Writes the result to the file descriptor opened at W2.</p>
+</li>
+<li>
+<p>W6: Calls <code>fstat()</code> or lstat()` on the just-written path, and sends
+the result back to the main process, together with the end status of
+the operation and the item&#8217;s identification number.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Note that, when possible, steps W3 to W5 are delegated to the streaming
+machinery, removing the need to keep the entire blob in memory.</p>
+</div>
+<div class="paragraph">
+<p>If the worker fails to read the blob or to write it to the working tree,
+it removes the created file to avoid leaving empty files behind. This is
+the <strong>only</strong> time a worker is allowed to remove a file.</p>
+</div>
+<div class="paragraph">
+<p>As mentioned earlier, it is the responsibility of the main process to
+remove any file that blocks the checkout operation (or abort if the
+removal(s) would cause data loss and the user didn&#8217;t ask to <code>--force</code>).
+This is crucial to avoid race conditions and also to properly detect
+path collisions at Step W1.</p>
+</div>
+<div class="paragraph">
+<p>After the workers finish writing the items and sending back the required
+information, the main process handles the results in two steps:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>First, it updates the in-memory index with the <code>lstat()</code> information
+sent by the workers. (This must be done first as this information
+might me required in the following step.)</p>
+</li>
+<li>
+<p>Then it writes the items which collided on disk (i.e. items marked
+with <code>PC_ITEM_COLLIDED</code>). More on this below.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_path_collisions"><a class="anchor" href="#_path_collisions"></a>Path Collisions</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Path collisions happen when two different paths correspond to the same
+entry in the file system. E.g. the paths <em>a</em> and <em>A</em> would collide in a
+case-insensitive file system.</p>
+</div>
+<div class="paragraph">
+<p>The sequential checkout deals with collisions in the same way that it
+deals with files that were already present in the working tree before
+checkout. Basically, it checks if the path that it wants to write
+already exists on disk, makes sure the existing file doesn&#8217;t have
+unsaved data, and then overwrites it. (To be more pedantic: it deletes
+the existing file and creates the new one.) So, if there are multiple
+colliding files to be checked out, the sequential code will write each
+one of them but only the last will actually survive on disk.</p>
+</div>
+<div class="paragraph">
+<p>Parallel checkout aims to reproduce the same behavior. However, we
+cannot let the workers racily write to the same file on disk. Instead,
+the workers detect when the entry that they want to check out would
+collide with an existing file, and mark it with <code>PC_ITEM_COLLIDED</code>.
+Later, the main process can sequentially feed these entries back to
+<code>checkout_entry()</code> without the risk of race conditions. On clone, this
+also has the effect of marking the colliding entries to later emit a
+warning for the user, like the classic sequential checkout does.</p>
+</div>
+<div class="paragraph">
+<p>The workers are able to detect both collisions among the entries being
+concurrently written and collisions between a parallel-eligible entry
+and an ineligible entry. The general idea for collision detection is
+quite straightforward: for each parallel-eligible entry, the main
+process must remove all files that prevent this entry from being written
+(before enqueueing it). This includes any non-directory file in the
+leading path of the entry. Later, when a worker gets assigned the entry,
+it looks again for the non-directories files and for an already existing
+file at the entry&#8217;s path. If any of these checks finds something, the
+worker knows that there was a path collision.</p>
+</div>
+<div class="paragraph">
+<p>Because parallel checkout can distinguish path collisions from the case
+where the file was already present in the working tree before checkout,
+we could alternatively choose to skip the checkout of colliding entries.
+However, each entry that doesn&#8217;t get written would have NULL <code>lstat()</code>
+fields on the index. This could cause performance penalties for
+subsequent commands that need to refresh the index, as they would have
+to go to the file system to see if the entry is dirty. Thus, if we have
+N entries in a colliding group and we decide to write and <code>lstat()</code> only
+one of them, every subsequent <code>git-status</code> will have to read, convert,
+and hash the written file N - 1 times. By checking out all colliding
+entries (like the sequential code does), we only pay the overhead once,
+during checkout.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_eligible_entries_for_parallel_checkout"><a class="anchor" href="#_eligible_entries_for_parallel_checkout"></a>Eligible Entries for Parallel Checkout</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>As previously mentioned, not all entries passed to <code>checkout_entry()</code>
+will be considered eligible for parallel checkout. More specifically, we
+exclude:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Symbolic links; to avoid race conditions that, in combination with
+path collisions, could cause workers to write files at the wrong
+place. For example, if we were to concurrently check out a symlink
+<em>a</em> &#8594; <em>b</em> and a regular file <em>A/f</em> in a case-insensitive file system,
+we could potentially end up writing the file <em>A/f</em> at <em>a/f</em>, due to a
+race condition.</p>
+</li>
+<li>
+<p>Regular files that require external filters (either "one shot" filters
+or long-running process filters). These filters are black-boxes to Git
+and may have their own internal locking or non-concurrent assumptions.
+So it might not be safe to run multiple instances in parallel.</p>
+<div class="paragraph">
+<p>Besides, long-running filters may use the delayed checkout feature to
+postpone the return of some filtered blobs. The delayed checkout queue
+and the parallel checkout queue are not compatible and should remain
+separate.</p>
+</div>
+<div class="paragraph">
+<p>Note: regular files that only require internal filters, like end-of-line
+conversion and re-encoding, are eligible for parallel checkout.</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Ineligible entries are checked out by the classic sequential codepath
+<strong>before</strong> spawning workers.</p>
+</div>
+<div class="paragraph">
+<p>Note: submodules&#8217;s files are also eligible for parallel checkout (as
+long as they don&#8217;t fall into any of the excluding categories mentioned
+above). But since each submodule is checked out in its own child
+process, we don&#8217;t mix the superproject&#8217;s and the submodules' files in
+the same parallel checkout process or queue.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_the_api"><a class="anchor" href="#_the_api"></a>The API</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The parallel checkout API was designed with the goal of minimizing
+changes to the current users of the checkout machinery. This means that
+they don&#8217;t have to call a different function for sequential or parallel
+checkout. As already mentioned, <code>checkout_entry()</code> will automatically
+insert the given entry in the parallel checkout queue when this feature
+is enabled and the entry is eligible; otherwise, it will just write the
+entry right away, using the sequential code. In general, callers of the
+parallel checkout API should look similar to this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>int pc_workers, pc_threshold, err = 0;
+struct checkout state;
+
+get_parallel_checkout_configs(&amp;pc_workers, &amp;pc_threshold);
+
+/*
+ * This check is not strictly required, but it
+ * should save some time in sequential mode.
+ */
+if (pc_workers &gt; 1)
+	init_parallel_checkout();
+
+for (each cache_entry ce to-be-updated)
+	err |= checkout_entry(ce, &amp;state, NULL, NULL);
+
+err |= run_parallel_checkout(&amp;state, pc_workers, pc_threshold, NULL, NULL);</pre>
+</div>
+</div>
+</div>
+</div>

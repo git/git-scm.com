@@ -1,0 +1,130 @@
+git-cherry(1)
+=============
+
+NOM
+---
+git-cherry - Trouver les commits à appliquer en amont
+
+SYNOPSIS
+--------
+[verse]
+'git cherry' [-v] [<branche_amont> [<head> [<limite>]]]
+
+DESCRIPTION
+-----------
+Détermine s'il existe des commits dans `<tête>..<amont>` qui sont équivalents à ceux de la plage `<limite>..<tête>`.
+
+Le test d'équivalence est basé sur le diff, après avoir supprimé les espaces et les numéros de ligne. git-cherry détecte donc quand les commits ont été « copiés » au moyen de linkgit:git-cherry-pick[1], linkgit:git-am[1] ou linkgit:git-rebase[1].
+
+Sort le SHA1 de chaque commit dans `<limite>..<tête>`, préfixé avec `-` pour les commits qui ont un équivalent dans <amont>, et `+` pour les commits qui n'en ont pas.
+
+OPTIONS
+-------
+-v::
+	Montrer les sujets de commit à côté des SHA1s.
+
+<branche_amont>::
+	Branche amont pour rechercher des commits équivalents. La valeur par défaut est la branche amont de HEAD.
+
+<tête>::
+	Branche de travail ; la valeur par défaut est HEAD.
+
+<limite>::
+	Ne pas signaler les commits jusqu'à (et y compris) la limite.
+
+EXEMPLES
+--------
+
+Flux de travail des rustines
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+git-cherry est fréquemment utilisé dans les flux de travail basés sur les rustines (voir linkgit:gitworkflows[7]) pour déterminer si une série de rustines a été appliquée par le mainteneur amont. Dans un tel flux de travail, vous pourriez créer et envoyer une branche thématique comme ceci :
+
+------------
+$ git checkout -b theme origin/master
+# travail et création de commits supplémentaires
+$ git format-patch origin/master
+$ git send-email ... 00*
+------------
+
+Plus tard, vous pourrez voir si vos modifications ont été appliquées en disant (toujours sur `theme`) :
+
+------------
+$ git fetch # met à jour votre notion de origin/master
+$ git cherry -v
+------------
+
+Exemple concret
+~~~~~~~~~~~~~~~
+
+Dans une situation où le sujet consiste en trois commits, et où le mainteneur applique deux d'entre eux, la situation pourrait ressembler à ceci :
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...theme
+* 7654321 (origin/master) upstream tip commit
+[... autres commits élidés ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... encore d'autres commits élidés ...]
+| * cccc000 (theme) commit C
+| * bbbb000 commit B
+| * aaaa000 commit A
+|/
+o 1234567 branch point
+------------
+
+Dans ces cas, git-cherry affiche un résumé concis de ce qui doit encore être appliqué :
+
+------------
+$ git cherry origin/master topic
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+Ici, nous voyons que les commits A et C (marqués par `-`) peuvent être supprimés de votre branche `theme` lorsque vous la rebasez au-dessus de `origin/master`, alors que le commit B (marqué par `+`) doit encore être conservé pour qu'il soit envoyé pour être appliqué à `origin/master`.
+
+
+Utilisation d'une limite
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+L'option <limite> est utile dans les cas où votre thème est basé sur d'autres travaux qui ne sont pas en amont. En développant l'exemple précédent, cela pourrait ressembler à :
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...topic
+* 7654321 (origin/master) upstream tip commit
+[... d'autres commits élidés ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... encore plus d'historique élidé ...]
+| * cccc000 (topic) commit C
+| * bbbb000 commit B
+| * aaaa000 commit A
+| * 0000fff (base) unpublished stuff F
+[... élidé ...]
+| * 0000aaa unpublished stuff A
+|/
+o 1234567 base de fusion entre amont et theme
+------------
+
+En spécifiant `base` comme limite, vous pouvez éviter de lister les commits entre `base` et `theme` :
+
+------------
+$ git cherry origin/master theme base
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+
+VOIR AUSSI
+----------
+linkgit:git-patch-id[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

@@ -1,0 +1,129 @@
+git-rm(1)
+=========
+
+名称
+--
+git-rm - 从工作树和索引中删除文件
+
+概述
+--
+[verse]
+'git rm' [-f | --force] [-n] [-r] [--cached] [--ignore-unmatch]
+	  [--quiet] [--pathspec-from-file=<文件> [--pathspec-file-nul]]
+	  [--] [<路径规范>...]
+
+描述
+--
+Remove files matching pathspec from the index, or from the working tree and the index. `git rm` will not remove a file from just your working directory. (There is no option to remove a file only from the working tree and yet keep it in the index; use `/bin/rm` if you want to do that.) The files being removed have to be identical to the tip of the branch, and no updates to their contents can be staged in the index, though that default behavior can be overridden with the `-f` option. When `--cached` is given, the staged content has to match either the tip of the branch or the file on disk, allowing the file to be removed from just the index. When sparse-checkouts are in use (see linkgit:git-sparse-checkout[1]), `git rm` will only remove paths within the sparse-checkout patterns.
+
+
+选项
+--
+<pathspec>...::
+	Files to remove. A leading directory name (e.g. `dir` to remove `dir/file1` and `dir/file2`) can be given to remove all files in the directory, and recursively all sub-directories, but this requires the `-r` option to be explicitly given.
++
+该命令只删除Git已知的路径。
++
+File globbing matches across directory boundaries. Thus, given two directories `d` and `d2`, there is a difference between using `git rm 'd*'` and `git rm 'd/*'`, as the former will also remove all of directory `d2`.
++
+更多细节请参见 linkgit:gitglossary[7] 中的 '路径规范' 条目。
+
+-f::
+--force::
+	覆盖最新的检查。
+
+-n::
+--dry-run::
+	Don't actually remove any file(s). Instead, just show if they exist in the index and would otherwise be removed by the command.
+
+-r::
+        当给出一个领先的目录名称时，允许递归删除。
+
+\--::
+	此选项可用于分离命令行选项和文件列表（当文件名可能被误认为命令行选项时非常有用）。
+
+--cached::
+	Use this option to unstage and remove paths only from the index. Working tree files, whether modified or not, will be left alone.
+
+--ignore-unmatch::
+	即使没有文件匹配，也以零状态退出。
+
+--sparse::
+	Allow updating index entries outside of the sparse-checkout cone. Normally, `git rm` refuses to update index entries whose paths do not fit within the sparse-checkout cone. See linkgit:git-sparse-checkout[1] for more.
+
+-q::
+--quiet::
+	`git rm` normally outputs one line (in the form of an `rm` command) for each file removed. This option suppresses that output.
+
+--pathspec-from-file=<file>::
+	Pathspec在 `<文件>` 中传递，而不是在命令行参数中传递。如果 `<文件>` 正好是 `-`，则使用标准输入。路径规范元素由 LF 或 CR/LF 分隔。可以引用配置变量 `core.quotePath` 的路径规范元素（请参见 linkgit:git-config[1]）。另请参见 `--pathspec-file-nul` 和全局 `--literal-pathspecs`。
+
+--pathspec-file-nul::
+	只有在使用 `--pathspec-from-file` 选项时才有意义。指定路径元素用 NUL 字符分隔，所有其他字符都按字面意思（包括换行符和引号）表示。
+
+
+删除从文件系统中消失的文件
+-------------
+`git rm`没有选项可以从索引中只删除已经从文件系统中消失的路径。然而，根据不同的使用情况，有几种方法可以做到这一点。
+
+使用``git commit -a''
+~~~~~~~~~~~~~~~~~~~
+If you intend that your next commit should record all modifications of tracked files in the working tree and record all removals of files that have been removed from the working tree with `rm` (as opposed to `git rm`), use `git commit -a`, as it will automatically notice and record all removals. You can also have a similar effect without committing by using `git add -u`.
+
+使用``git add -A''
+~~~~~~~~~~~~~~~~
+当接受一个供应商分支的新代码投放时，你可能想同时记录删除路径和增加新路径以及修改现有路径的内容。
+
+通常情况下，你会先用这个命令从工作目录树上删除所有被追踪的文件：
+
+----------------
+git ls-files -z | xargs -0 rm -f
+----------------
+
+然后解开工作树上的新代码。另外，你也可以通过 "rsync "把修改的内容放到工作树上。
+
+之后，记录工作目录树中所有的删除、添加和修改的最简单方法是：
+
+----------------
+git add -A
+----------------
+
+参见 linkgit:git-add[1]。
+
+其他方式
+~~~~
+如果你真正想做的只是从索引中删除那些不再出现在工作目录树中的文件（也许是因为你的工作目录树很脏，所以你不能使用 `git commit -a` ），使用以下命令：
+
+----------------
+git diff --name-only --diff-filter=D -z | xargs -0 git rm --cached
+----------------
+
+子模块
+---
+Only submodules using a gitfile (which means they were cloned with a Git version 1.7.8 or newer) will be removed from the work tree, as their repository lives inside the .git directory of the superproject. If a submodule (or one of those nested inside it) still uses a .git directory, `git rm` will move the submodules git directory into the superprojects git directory to protect the submodule's history. If it exists the submodule.<name> section in the linkgit:gitmodules[5] file will also be removed and that file will be staged (unless --cached or -n are used).
+
+A submodule is considered up to date when the HEAD is the same as recorded in the index, no tracked files are modified and no untracked files that aren't ignored are present in the submodule's work tree. Ignored files are deemed expendable and won't stop a submodule's work tree from being removed.
+
+如果你只想从你的工作树中移除一个子模块的本地签出而不提交移除，使用linkgit:git-submodule[1] `deinit`代替。也请看 linkgit:gitsubmodules[7] 了解关于子模块移除的细节。
+
+实例
+--
+`git rm Documentation/\*.txt`::
+	从索引中删除所有`*.txt`文件，这些文件在`Documentation`目录和它的任何子目录下。
++
+注意，在这个例子中，星号`*`被引自shell；这让Git，而不是shell，扩展`Documentation/`目录下的文件和子目录的路径名。
+
+`git rm -f git-*.sh`::
+	因为这个例子让shell展开星号（即你明确列出了文件），它没有删除`subdir/git-foo.sh`。
+
+漏洞
+--
+每次超级项目更新删除一个已填充的子模块（例如，在删除前后的提交之间切换时），一个陈旧的子模块检出将保留在旧的位置。只有在使用gitfile时，删除旧目录才是安全的，否则子模块的历史也会被删除。当递归子模块更新被实施后，这个步骤将被淘汰。
+
+参见
+--
+linkgit:git-add[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

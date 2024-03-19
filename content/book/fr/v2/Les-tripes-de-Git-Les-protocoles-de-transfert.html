@@ -1,0 +1,366 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: fr
+  chapter:
+    title: Les tripes de Git
+    number: 10
+  section:
+    title: Les protocoles de transfert
+    number: 6
+    cs_number: '10.6'
+    previous: book/fr/v2/Les-tripes-de-Git-La-refspec
+    next: book/fr/v2/Les-tripes-de-Git-Maintenance-et-récupération-de-données
+title: Git - Les protocoles de transfert
+
+---
+<h2 id="_les_protocoles_de_transfert">Les protocoles de transfert</h2>
+<div class="paragraph">
+<p>Git peut transférer des données entre deux dépôts de deux façons principales : le protocole « stupide » et le protocole « intelligent ».
+Cette section fait un tour d’horizon du fonctionnement de ces deux protocoles.</p>
+</div>
+<div class="sect3">
+<h3 id="_le_protocole_stupide">Le protocole stupide</h3>
+<div class="paragraph">
+<p>Si vous mettez en place un dépôt à accéder en lecture seule sur HTTP, c’est vraisemblablement le protocole stupide qui sera utilisé.
+Ce protocole est dit « stupide », car il ne nécessite aucun code spécifique à Git côté serveur durant le transfert ; le processus de récupération est une série de requêtes GET, où le client devine la structure du dépôt Git présent sur le serveur.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>Le protocole stupide est rarement utilisé ces derniers temps.
+Il est difficile de le rendre sécurisé ou privé, et donc la plupart des hébergeurs Git (sur le <em>cloud</em> ou sur serveur dédié) refusent de l’utiliser.
+On conseille généralement d’utiliser le protocole intelligent, qui est décrit plus loin.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Suivons le processus <code>http-fetch</code> pour la bibliothèque simplegit :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone https://server/simplegit-progit.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>La première chose que fait cette commande est de récupérer le fichier <code>info/refs</code>.
+Ce fichier est écrit par la commande <code>update-server-info</code> et c’est pour cela qu’il faut activer le crochet <code>post-receive</code>, sinon le transfert HTTP ne fonctionnera pas correctement :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET info/refs
+ca82a6dff817ec66f44342007202690a93763949     refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>On possède maintenant une liste des références distantes et empreintes SHA-1.
+Ensuite, on regarde vers quoi pointe HEAD, pour savoir sur quelle branche se placer quand on aura fini :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET HEAD
+ref: refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>On aura besoin de se placer sur la branche <code>master</code>, quand le processus sera terminé.
+On est maintenant prêt à démarrer le processus de parcours.
+Puisque votre point de départ est l’objet <em>commit</em> <code>ca82a6</code> que vous avez vu dans le fichier <code>info/refs</code>, vous commencez par le récupérer :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/ca/82a6dff817ec66f44342007202690a93763949
+(179 bytes of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vous obtenez un objet, cet objet est dans le format brut sur le serveur et vous l’avez récupéré à travers une requête HTTP GET statique.
+Vous pouvez le décompresser avec zlib, ignorer l’en-tête et regarder le contenu du <em>commit</em> :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file -p ca82a6dff817ec66f44342007202690a93763949
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+changed the version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Puis, vous avez deux autres objets supplémentaires à récupérer : <code>cfda3b</code> qui est l’arbre du contenu sur lequel pointe le <em>commit</em> que nous venons de récupérer et <code>085bb3</code> qui est le <em>commit</em> parent :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/08/5bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+(179 bytes of data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Cela vous donne le prochain objet <em>commit</em>.
+Récupérez l’objet arbre :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/cf/da3bf379e4f8dba8717dee55aab78aef7f4daf
+(404 - Not Found)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Oups, on dirait que l’objet arbre n’est pas au format brut sur le serveur, vous obtenez donc une réponse 404.
+On peut en déduire certaines raisons : l’objet peut être dans un dépôt suppléant ou il peut être dans un fichier groupé de ce dépôt.
+Git vérifie la liste des dépôts suppléants d’abord :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/info/http-alternates
+(empty file)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si la réponse contenait une liste d’URL suppléantes, Git aurait cherché les fichiers bruts et les fichiers groupés à ces emplacements, c’est un mécanisme sympathique pour les projets qui ont dérivé d’un autre pour partager les objets sur le disque.
+Cependant, puisqu’il n’y a pas de suppléants listés dans ce cas, votre objet doit se trouver dans un fichier groupé.
+Pour voir quels fichiers groupés sont disponibles sur le serveur, vous avez besoin de récupérer le fichier <code>objects/info/packs</code>, qui en contient la liste (générée également par <code>update-server-info</code>) :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/info/packs
+P pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Il n’existe qu’un seul fichier groupé sur le serveur, votre objet se trouve évidemment dedans, mais vous allez tout de même vérifier l’index pour être sûr.
+C’est également utile lorsque vous avez plusieurs fichiers groupés sur le serveur, vous pouvez donc voir quel fichier groupé contient l’objet dont vous avez besoin :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.idx
+(4k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Maintenant que vous avez l’index du fichier groupé, vous pouvez vérifier si votre objet est bien dedans car l’index liste les empreintes SHA-1 des objets contenus dans ce fichier groupé et des emplacements de ces objets.
+Votre objet est là, allez donc récupérer le fichier groupé complet :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET objects/pack/pack-816a9b2334da9953e530f27bcac22082a9f5b835.pack
+(13k of binary data)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vous avez votre objet arbre, vous continuez donc le chemin des <em>commits</em>.
+Ils sont également tous contenus dans votre fichier groupé que vous venez de télécharger, vous n’avez donc pas d’autres requêtes à faire au serveur.
+Git récupère une copie de travail de votre branche <code>master</code> qui été référencée par HEAD que vous avez téléchargé au début.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_le_protocole_intelligent">Le protocole intelligent</h3>
+<div class="paragraph">
+<p>Le protocole stupide est simple mais un peu inefficace, et il ne permet pas l’écriture de données du client au serveur.
+Le protocole intelligent est une méthode plus habituelle pour transférer des données, mais elle nécessite l’exécution sur le serveur d’un processus qui connaît Git : il peut lire les données locales et déterminer ce que le client a ou ce dont il a besoin pour générer un fichier groupé personnalisé pour lui.
+Il y a deux ensembles d’exécutables pour transférer les données : une paire pour téléverser des données et une paire pour en télécharger.</p>
+</div>
+<div class="sect4">
+<h4 id="_téléverser_des_données">Téléverser des données</h4>
+<div class="paragraph">
+<p>
+Pour téléverser des données vers un exécutable distant, Git utilise les exécutables <code>send-pack</code> et <code>receive-pack</code>.
+L’exécutable <code>send-pack</code> tourne sur le client et se connecte à l’exécutable <code>receive-pack</code> du côté serveur.</p>
+</div>
+<div class="paragraph">
+<p>======= SSH</p>
+</div>
+<div class="paragraph">
+<p>Par exemple, disons que vous exécutez <code>git push origin master</code> dans votre projet et <code>origin</code> est défini comme une URL qui utilise le protocole SSH.
+Git appelle l’exécutable <code>send-pack</code>, qui initialise une connexion à travers SSH vers votre serveur.
+Il essaye d’exécuter une commande sur le serveur distant via un appel SSH qui ressemble à :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-receive-pack 'simplegit-progit.git'"
+00a5ca82a6dff817ec66f4437202690a93763949 refs/heads/master report-status \
+	delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1+github-607-gfba4028 delete-refs
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>La commande <code>git-receive-pack</code> répond immédiatement avec une ligne pour chaque référence qu’elle connaît actuellement, dans ce cas, uniquement la branche <code>master</code> et son empreinte SHA-1.
+La première ligne contient également une liste des compétences du serveur (ici : <code>report-status</code>, <code>delete-refs</code> et quelques autres, dont l’identifiant du client).</p>
+</div>
+<div class="paragraph">
+<p>Chaque ligne commence avec une valeur hexadécimale sur 4 caractères, spécifiant le reste de la longueur de la ligne.
+La première ligne, ici, commence avec <code>00a5</code>, soit 165 en hexadécimal, ce qui signifie qu’il y a 165 octets restants sur cette ligne.
+La ligne d’après est <code>0000</code>, signifiant que le serveur a fini de lister ses références.</p>
+</div>
+<div class="paragraph">
+<p>Maintenant qu’il connait l’état du serveur, votre exécutable <code>send-pack</code> détermine quels <em>commits</em> il a de plus que le serveur.
+L’exécutable <code>send-pack</code> envoie alors à l’exécutable <code>receive-pack</code> les informations concernant chaque référence que cette commande <code>push</code> va mettre à jour.
+Par exemple, si vous mettez à jour la branche <code>master</code> et ajoutez la branche <code>experiment</code>, la réponse de <code>send-pack</code> ressemblera à quelque chose comme :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>0076ca82a6dff817ec66f44342007202690a93763949 15027957951b64cf874c3557a0f3547bd83b3ff6 \
+	refs/heads/master report-status
+006c0000000000000000000000000000000000000000 cdfdb42577e2506715f8cfeacdbabc092bf63e8d \
+	refs/heads/experiment
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git envoie une ligne pour chaque référence que l’on met à jour avec l’ancien SHA-1, le nouveau SHA-1 et la référence en train d’être mise à jour.
+La première ligne contient également les compétences du client.
+La valeur SHA-1 remplie de '0' signifie qu’il n’y avait rien à cet endroit avant, car vous êtes en train d’ajouter la référence <code>experiment</code>.
+Si vous étiez en train de supprimer une référence, vous verriez l’opposé : que des '0' du côté droit.</p>
+</div>
+<div class="paragraph">
+<p>Puis, le client téléverse un fichier groupé de tous les objets que le serveur n’a pas encore.
+Finalement, le serveur répond avec une indication de succès (ou d’échec) :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>000eunpack ok</code></pre>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https">HTTP(S)</h6>
+<div class="paragraph">
+<p>Le processus est quasiment le même avec HTTP, à une différence près lors de l’établissement de la liaison (<em>handshaking</em>).
+La connection est amorcée avec cette requête :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET https://server/simplegit-progit.git/info/refs?service=git-receive-pack
+001f# service=git-receive-pack
+00ab6c5f0e45abd7832bf23074a333f739977c9e8188 refs/heads/master \
+	report-status delete-refs side-band-64k quiet ofs-delta \
+	agent=git/2:2.1.1~vmg-bitmaps-bugaloo-608-g116744e
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ceci est la fin du premier échange client-serveur.
+Le client fait alors une nouvelle requête, qui est cette fois un <code>POST</code>, avec les données fournies par <code>git-upload-pack</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; POST https://server/simplegit-progit.git/git-receive/pack</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>La requête <code>POST</code> contient la sortie de <code>send-pack</code> et le fichier groupé.
+Enfin, le serveur indique le succès ou l’échec dans sa réponse HTTP.</p>
+</div>
+<div class="paragraph">
+<p>Gardez en tête que le protocole HTTP peut ensuite envelopper ces données dans un encodage de transfert par paquets.</p>
+</div>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_téléchargement_des_données">Téléchargement des données</h4>
+<div class="paragraph">
+<p>
+Lorsque vous téléchargez des données, les exécutables <code>fetch-pack</code> et <code>upload-pack</code> entrent en jeu.
+Le client démarre un processus <code>fetch-pack</code> qui se connecte à un processus <code>upload-pack</code> du côté serveur pour négocier les données qui seront téléchargées.</p>
+</div>
+<div class="sect5">
+<h6 id="_ssh">SSH</h6>
+<div class="paragraph">
+<p>Si vous téléchargez par SSH, <code>fetch-pack</code> fait quelque chose comme ceci :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh -x git@server "git-upload-pack 'simplegit-progit.git'"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Une fois <code>fetch-pack</code> connecté, <code>upload-pack</code> lui répond quelque chose du style :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>00dfca82a6dff817ec66f44342007202690a93763949 HEAD multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ceci est très proche de la réponse de <code>receive-pack</code> mais les compétences sont différentes.
+En plus, il envoie ce qui est pointé par HEAD (<code>symref=HEAD:refs/heads/master</code>), afin que le client sache ce qu’il doit récupérer dans le cas d’un clone.</p>
+</div>
+<div class="paragraph">
+<p>À ce moment, <code>fetch-pack</code> regarde les objets qu’il a et répond avec la liste des objets dont il a besoin en envoyant « want » (vouloir) suivi du SHA-1 qu’il veut.
+Il envoie tous les objets qu’il a déjà avec « have » suivi du SHA-1.
+À la fin de la liste, il écrit « done » (fait) pour inciter l’exécutable <code>upload-pack</code> à commencer à envoyer le fichier groupé des données demandées :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>003cwant ca82a6dff817ec66f44342007202690a93763949 ofs-delta
+0032have 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+0009done
+0000</code></pre>
+</div>
+</div>
+</div>
+<div class="sect5">
+<h6 id="_https_2">HTTP(S)</h6>
+<div class="paragraph">
+<p>L’établissement de la liaison pour une opération de téléchargement nécessite deux requêtes HTTP.
+La première est un <code>GET</code> vers le même point que dans le protocole stupide :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; GET $GIT_URL/info/refs?service=git-upload-pack
+001e# service=git-upload-pack
+00e7ca82a6dff817ec66f44342007202690a93763949 HEAD multi_ack thin-pack \
+	side-band side-band-64k ofs-delta shallow no-progress include-tag \
+	multi_ack_detailed no-done symref=HEAD:refs/heads/master \
+	agent=git/2:2.1.1+github-607-gfba4028
+003fca82a6dff817ec66f44342007202690a93763949 refs/heads/master
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ceci ressemble beaucoup à un appel à <code>git-upload-pack</code> par une connection SSH, mais le deuxième échange est fait dans une requête séparée :</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>&gt; POST $GIT_URL/git-upload-pack HTTP/1.0
+0032want 0a53e9ddeaddad63ad106860237bbf53411d11a7
+0032have 441b40d833fdfa93eb2908e52742248faf0ee993
+0000</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Une fois de plus, ce format est le même que plus haut.
+La réponse à cette requête indique le succès ou l’échec, et contient le fichier groupé.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_résumé_sur_les_protocoles">Résumé sur les protocoles</h3>
+<div class="paragraph">
+<p>Cette section contient un survol basique des protocoles de transfert.
+Les protocoles contiennent de nombreuses autres fonctionalités,
+comme les compétences <code>multi_ack</code> ou <code>side-band</code>,
+mais leur étude est hors du sujet de ce livre.
+Nous avons essayé de vous donner une idée générale des échanges entre client et serveur.
+Si vous souhaitez en connaître davantage, vous devrez probablement jeter un œil sur le code source de Git.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

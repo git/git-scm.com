@@ -1,0 +1,663 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Git en entornos distribuidos
+    number: 5
+  section:
+    title: Manteniendo un proyecto
+    number: 3
+    cs_number: '5.3'
+    previous: book/es/v2/Git-en-entornos-distribuidos-Contribuyendo-a-un-Proyecto
+    next: book/es/v2/Git-en-entornos-distribuidos-Resumen
+title: Git - Manteniendo un proyecto
+
+---
+<h2 id="_manteniendo_un_proyecto">Manteniendo un proyecto</h2>
+<div class="paragraph">
+<p>
+Además de saber cómo contribuir de manera efectiva a un proyecto, probablemente necesitarás saber cómo mantenerlo.
+Esto puede comprender desde aceptar y aplicar parches generados vía <code>format-patch</code> enviados por e-mail, hasta integrar cambios en ramas remotas para repositorios que has añadido como remotos a tu proyecto.
+Tanto si mantienes un repositorio canónico como si quieres ayudar verificando o aprobando parches, necesitas conocer cómo aceptar trabajo de otros colaboradores de la forma más clara y sostenible posible a largo plazo.</p>
+</div>
+<div class="sect3">
+<h3 id="_trabajando_en_ramas_puntuales">Trabajando en ramas puntuales</h3>
+<div class="paragraph">
+<p>
+Cuando estás pensando en integrar nuevo trabajo, generalmente es una buena idea probarlo en una rama puntual (topic branch) - una rama temporal específicamente creada para probar ese nuevo trabajo.
+De esta forma, es fácil ajustar un parche individualmente y abandonarlo si no funciona hasta que tengas tiempo de retomarlo.
+Si creas una rama simple con un nombre relacionado con el trabajo que vas a probar, como <code>ruby_client</code> o algo igualmente descriptivo, puedes recordarlo fácilmente si tienes que abandonarlo y retomarlo posteriormente.
+El responsable del mantenimiento del proyecto Git también tiende a usar una nomenclatura con este formato – como <code>sc/ruby_client</code>, donde <code>sc</code> es la abreviatura de la persona que envió el trabajo.
+Como recordarás, puedes crear la rama a partir de la rama master de la siguiente forma:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch sc/ruby_client master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>O, si quieres cambiar inmediatamente a la nueva rama, puedes usar la opción <code>checkout -b</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout -b sc/ruby_client master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora estás listo para añadir el trabajo recibido en esta rama puntual y decidir si quieres incorporarlo en tus ramas de largo recorrido.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_patches_from_email">Aplicando parches recibidos por e-mail</h3>
+<div class="paragraph">
+<p>
+Si recibes por e-mail un parche que necesitas integrar en tu proyecto, deberías aplicarlo en tu rama puntual para evaluarlo.
+Hay dos formas de aplicar un parche enviado por e-mail: con <code>git apply</code> o <code>git am</code>.</p>
+</div>
+<div class="sect4">
+<h4 id="_aplicando_un_parche_con_apply">Aplicando un parche con apply</h4>
+<div class="paragraph">
+<p>
+Si recibiste el parche de alguien que lo generó con <code>git diff</code> o con el comando Unix <code>diff</code> (lo cual no se recomienda; consulta la siguiente sección), puedes aplicarlo con el comando <code>git apply</code>.
+Suponiendo que guardaste el parche en <code>/tmp/patch-ruby-client.patch</code>, puedes aplicarlo de esta forma:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git apply /tmp/patch-ruby-client.patch</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esto modifica los archivos en tu directorio de trabajo.
+Es casi idéntico a ejecutar un comando <code>patch -p1</code> para aplicar el parche, aunque es más paranoico y acepta menos coincidencias aproximadas que patch.
+También puede manejar archivos nuevos, borrados y renombrados si están descritos en formato <code>git diff</code> mientras que <code>patch</code> no puede hacerlo.
+Por último, <code>git apply</code> sigue un modelo “aplica todo o aborta todo”, donde se aplica todo o nada, mientras que <code>patch</code> puede aplicar parches parcialemente, dejando tu directorio de trabajo en un estado inconsistente.
+<code>git apply</code> es en general mucho más conservador que <code>patch</code>.
+No creará un commit por ti – tras ejecutarlo, debes preparar (stage) y confirmar (commit) manualmente los cambios introducidos.</p>
+</div>
+<div class="paragraph">
+<p>También puedes usar <code>git apply</code> para comprobar si un parche se aplica de forma limpia antes de aplicarlo realmente – puedes ejecutar <code>git apply --check</code> indicando el parche:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git apply --check 0001-seeing-if-this-helps-the-gem.patch
+error: patch failed: ticgit.gemspec:1
+error: ticgit.gemspec: patch does not apply</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si no obtienes salida, entonces el parche debería aplicarse limpiamente.
+Este comando también devuelve un estado distinto de cero si la comprobación falla, por lo que puedes usarlo en scripts.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="r_git_am">Aplicando un parche con <code>am</code>
+</h4>
+<div class="paragraph">
+<p>
+Si el colaborador es usuario de Git y conoce lo suficiente como para usar el comando <code>format-patch</code> para generar el parche, entonces tu trabajo es más sencillo, puesto que el parche ya contiene información del autor y un mensaje de commit.
+Si puedes, anima a tus colaboradores a usar <code>format-patch</code> en lugar de <code>diff</code> para generar parches.
+Sólo deberías usar <code>git apply</code> para parches antiguos y cosas similares.</p>
+</div>
+<div class="paragraph">
+<p>Para aplicar un parche generado con <code>format-patch</code>, usa <code>git am</code>.
+Técnicamente, <code>git am</code> se construyó para leer de un archivo mbox (buzón de correo). Es un formato de texto plano simple para almacenar uno o más mensajes de correo en un archivo de texto.
+Es algo parecido a esto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">From 330090432754092d704da8e76ca5c05c198e71a8 Mon Sep 17 00:00:00 2001
+From: Jessica Smith &lt;jessica@example.com&gt;
+Date: Sun, 6 Apr 2008 10:17:23 -0700
+Subject: [PATCH 1/2] add limit to log function
+
+Limit log functionality to the first 20</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esto es el comienzo de la salida del comando <code>format-patch</code> que viste en la sección anterior.
+También es un formato mbox válido.
+Si alguien te ha enviado el parche por e-mail usando <code>git send-email</code> y lo has descargado en formato mbox, entonces puedes pasar ese archivo a <code>git am</code> y comenzará a aplicar todos los parches que encuentre.
+Si usas un cliente de correo que puede guardar varios e-mails en formato mbox, podrías guardar conjuntos completos de parches en un único archivo y a continuación usar <code>git am</code> para aplicarlos de uno en uno.</p>
+</div>
+<div class="paragraph">
+<p>Sin embargo, si alguien subió a un sistema de gestión de incidencias o algo parecido un parche generado con <code>format-patch</code>, podrías guardar localmente el archivo y posteriormente pasarlo a <code>git am</code> para aplicarlo:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git am 0001-limit-log-function.patch
+Applying: add limit to log function</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Puedes ver que aplicó el parche limpiamente y creó automáticamente un nuevo commit.
+La información del autor se toma de las cabeceras <code>From</code> y <code>Date</code> del e-mail, y el mensaje del commit sale del <code>Subject</code> y el cuerpo del e-mail (antes del parche).
+Por ejemplo, si se aplicó este parche desde el archivo mbox del ejemplo anterior, el commit generado sería algo como esto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ git log --pretty=fuller -1
+commit 6c5e70b984a60b3cecd395edd5b48a7575bf58e0
+Author:     Jessica Smith &lt;jessica@example.com&gt;
+AuthorDate: Sun Apr 6 10:17:23 2008 -0700
+Commit:     Scott Chacon &lt;schacon@gmail.com&gt;
+CommitDate: Thu Apr 9 09:19:06 2009 -0700
+
+   add limit to log function
+
+   Limit log functionality to the first 20</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>El campo <code>Commit</code> indica la persona que aplicó el parche y cuándo lo aplicó.
+El campo <code>Author</code> es la persona que creó originalmente el parche y cuándo fué creado.</p>
+</div>
+<div class="paragraph">
+<p>Pero es posible que el parche no se aplique limpiamente.
+Quizás tu rama principal es muy diferente de la rama a partir de la cual se creó el parche, o el parche depende de otro parche que aún no has aplicado.
+En ese caso, el proceso <code>git am</code> fallará y te preguntará qué hacer:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git am 0001-seeing-if-this-helps-the-gem.patch
+Applying: seeing if this helps the gem
+error: patch failed: ticgit.gemspec:1
+error: ticgit.gemspec: patch does not apply
+Patch failed at 0001.
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Este comando marca los conflictos en cualquier archivo para el cual detecte problemas, como si fuera una operación <code>merge</code> o <code>rebase</code>.
+Estos problemas se solucionan de la misma forma - edita el archivo para resolver el conflicto, prepara (stage) el nuevo archivo y por último ejecuta <code>git am --resolved</code> para continuar con el siguiente parche:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ (fix the file)
+$ git add ticgit.gemspec
+$ git am --resolved
+Applying: seeing if this helps the gem</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si quieres que Git intente resolver el conflicto de forma un poco más inteligente, puedes indicar la opción <code>-3</code> para que Git intente hacer un merge a tres bandas.
+Esta opción no está activa por defecto, ya que no funciona si el commit en que el parche está basado no está en tu repositorio.
+Si tienes ese commit – si el parche partió de un commit público – entonces la opción <code>-3</code> es normalmente mucho más inteligente a la hora de aplicar un parche conflictivo:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git am -3 0001-seeing-if-this-helps-the-gem.patch
+Applying: seeing if this helps the gem
+error: patch failed: ticgit.gemspec:1
+error: ticgit.gemspec: patch does not apply
+Using index info to reconstruct a base tree...
+Falling back to patching base and 3-way merge...
+No changes -- Patch already applied.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>En este caso, el parche ya ha sido aplicado.
+Sin la opción <code>-3</code>, aparecería un conflicto.</p>
+</div>
+<div class="paragraph">
+<p>Si estás aplicando varios parches a partir de un archivo mbox, también puedes ejecutar el comando <code>am</code> en modo interactivo, el cual se detiene en cada parche para preguntar si quieres aplicarlo:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git am -3 -i mbox
+Commit Body is:
+--------------------------
+seeing if this helps the gem
+--------------------------
+Apply? [y]es/[n]o/[e]dit/[v]iew patch/[a]ccept all</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esto está bien si tienes guardados varios parches, ya que puedes revisar el parche previamente y no aplicarlo si ya lo has hecho.</p>
+</div>
+<div class="paragraph">
+<p>Una vez aplicados y confirmados todos los parches de tu rama puntual, puedes decidir cómo y cuándo integrarlos en una rama de largo recorrido.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_checking_out_remotes">Recuperando ramas remotas</h3>
+<div class="paragraph">
+<p>
+Si recibes una contribución de un usuario de Git que configuró su propio repositorio, realizó cambios en él y envió la URL del repositorio junto con el nombre de la rama remota donde están los cambios, puedes añadirlo como una rama remota y hacer integraciones (merges) de forma local.</p>
+</div>
+<div class="paragraph">
+<p>Por ejemplo, si Jessica te envía un e-mail diciendo que tiene una nueva funcionalidad muy interesante en la rama <code>ruby-client</code> de su repositorio, puedes probarla añadiendo el repositorio remoto y recuperando localmente dicha rama:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git remote add jessica git://github.com/jessica/myproject.git
+$ git fetch jessica
+$ git checkout -b rubyclient jessica/ruby-client</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si más tarde te envía otro e-mail con una nueva funcionalidad en otra rama, puedes recuperarla (fetch y check out) directamente porque ya tienes el repositorio remoto configurado.</p>
+</div>
+<div class="paragraph">
+<p>Esto es más útil cuando trabajas regularmente con una persona.
+Sin embargo, si alguien sólo envía un parche de forma ocasional, aceptarlo vía e-mail podría llevar menos tiempo que obligar a todo el mundo a ejecutar su propio servidor y tener que añadir y eliminar repositorios remotos continuamente para obtener unos cuantos parches.
+Además, probablemente no quieras tener cientos de repositorios remotos, uno por cada persona que envía uno o dos parches.
+En cualquier caso, los scripts y los servicios alojados pueden facilitar todo esto — depende en gran medida de cómo desarrollan el trabajo tanto tus colaboradores como tú mismo —</p>
+</div>
+<div class="paragraph">
+<p>Otra ventaja de esta opción es que además puedes obtener un historial de commits.
+Aunque pueden surgir los problemas habituales durante la integración (merge), al menos sabes en qué punto de tu historial se basa su trabajo. Por defecto, se realiza una integración a tres bandas, en lugar de indicar un <code>-3</code> y esperar que el parche se generará a partir de un commit público al que tengas acceso.</p>
+</div>
+<div class="paragraph">
+<p>Si no trabajas regularmente con alguien pero aún así quieres obtener sus contribuciones de esta manera, puedes pasar la URL del repositorio remoto al comando <code>git pull</code>.
+Esto recupera los cambios de forma puntual (pull) sin guardar la URL como una referencia remota:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git pull https://github.com/onetimeguy/project
+From https://github.com/onetimeguy/project
+ * branch            HEAD       -&gt; FETCH_HEAD
+Merge made by recursive.</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_what_is_introduced">Decidiendo qué introducir</h3>
+<div class="paragraph">
+<p>
+Ahora tienes una rama puntual con trabajo de los colaboradores.
+En este punto, puedes decidir qué quieres hacer con ella.
+Esta sección repasa un par de comandos para que puedas ver cómo se usan para revisar exactamente qué se va a introducir si integras los cambios en tu rama principal.</p>
+</div>
+<div class="paragraph">
+<p>A menudo es muy útil obtener una lista de todos los commits de una rama que no están en tu rama principal.
+Puedes excluir de dicha lista los commits de tu rama principal anteponiendo la opción <code>--not</code> al nombre de la rama.
+El efecto de esto es el mismo que el formato <code>master..contrib</code> que usamos anteriormente.
+Por ejemplo, si un colaborador te envía dos parches y creas una rama llamada <code>contrib</code> para aplicar los parches, puedes ejecutar esto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log contrib --not master
+commit 5b6235bd297351589efc4d73316f0a68d484f118
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri Oct 24 09:53:59 2008 -0700
+
+    seeing if this helps the gem
+
+commit 7482e0d16d04bea79d0dba8988cc78df655f16a0
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Mon Oct 22 19:38:36 2008 -0700
+
+    updated the gemspec to hopefully work better</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Para ver qué cambios introduce cada commit, recuerda que puedes indicar la opción <code>-p</code> a <code>git log</code>, y  añadirá las diferencias introducidas en cada commit.</p>
+</div>
+<div class="paragraph">
+<p>Para tener una visión completa de qué ocurriría si integraras esta rama puntual en otra rama, podrías usar un sencillo truco para obtener los resultados correctos.
+Podrías pensar en ejecutar esto:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Este comando te da las diferencias, pero los resultados podrían ser confusos.
+Si tu rama <code>master</code> ha avanzado desde que creaste la rama puntual, entonces obtendrás resultados aparentemente extraños.
+Esto ocurre porque Git compara directamente las instantáneas del último commit de la rama puntual en la que estás con la instantánea del último commit de la rama <code>master</code>.
+Por ejemplo, si has añadido una línea a un archivo en la rama <code>master</code>, al hacer una comparación directa de las instantáneas parecerá que la rama puntual va a eliminar esa línea.</p>
+</div>
+<div class="paragraph">
+<p>Si <code>master</code> es un ancestro de tu rama puntual, esto no supone un problema; pero si los dos historiales divergen, al hacer una comparación directa parecerá que estás añadiendo todos los cambios nuevos en tu rama puntual y eliminándolos de la rama <code>master</code>.</p>
+</div>
+<div class="paragraph">
+<p>Lo que realmente necesitas ver son los cambios añadidos en tu rama puntual – el trabajo que introducirás si integras esta rama en la <code>master</code>.
+Para conseguir esto, Git compara el último commit de tu rama puntual con el primer ancestro en común respecto a la rama <code>master</code>.</p>
+</div>
+<div class="paragraph">
+<p>Técnicamente puedes hacer esto averiguando explícitamente el ancestro común y ejecutando el <code>diff</code> sobre dicho ancestro:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge-base contrib master
+36c7dba2c95e6bbb78dfa822519ecfec6e1ca649
+$ git diff 36c7db</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sin embargo, eso no es lo más conveniente, así que Git ofrece un atajo para hacer eso mismo: la sintaxis del triple-punto.
+En el contexto del comando <code>diff</code>, puedes poner tres puntos tras el nombre de una rama para hacer un <code>diff</code> entre el último commit de la rama en la que estás y su ancestro común con otra rama:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff master...contrib</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Este comando sólo muestra el trabajo introducido en tu rama puntual actual desde su ancestro común con la rama <code>master</code>.
+Es una sintaxis muy útil a recordar.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_integrando_el_trabajo_de_los_colaboradores">Integrando el trabajo de los colaboradores</h3>
+<div class="paragraph">
+<p>
+Cuando todo el trabajo de tu rama puntual está listo para ser integrado en una rama de largo recorrido, la cuestión es cómo hacerlo.
+Es más, ¿qué flujo de trabajo general quieres seguir para mantener el proyecto?
+Tienes varias opciones y vamos a ver algunas de ellas.</p>
+</div>
+<div class="sect4">
+<h4 id="_integrando_flujos_de_trabajo">Integrando flujos de trabajo</h4>
+<div class="paragraph">
+<p>
+Un flujo de trabajo sencillo integra tu trabajo en tu rama <code>master</code>.
+En este escenario, tienes una rama <code>master</code> que contiene básicamente código estable.
+Cuando tienes trabajo propio en una rama puntual o trabajo aportado por algún colaborador que ya has verificado, lo integras en tu rama <code>master</code>, borras la rama puntual y continúas el proceso.
+Si tenemos un repositorio con trabajo en dos ramas llamadas <code>ruby_client</code> y <code>php_client</code>, tal y como se muestra en <a href="{{< relurl "book/es/v2/ch00/rmerwf_a" >}}">Historial con varias ramas puntuales.</a> e integramos primero <code>ruby_client</code> y luego <code>php_client</code>, entonces tu historial terminará con este aspecto <a href="{{< relurl "book/es/v2/ch00/rmerwf_b" >}}">Tras integrar una rama puntual.</a>.</p>
+</div>
+<div id="rmerwf_a" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/merging-workflows-1.png" >}}" alt="Historial con varias ramas puntuales.">
+</div>
+<div class="title">Figura 73. Historial con varias ramas puntuales.</div>
+</div>
+<div id="rmerwf_b" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/merging-workflows-2.png" >}}" alt="Tras integrar una rama puntual.">
+</div>
+<div class="title">Figura 74. Tras integrar una rama puntual.</div>
+</div>
+<div class="paragraph">
+<p>Este es probablemente el flujo de trabajo más simple y puede llegar a causar problemas si estás tratando con proyectos de mayor envergadura o más estables, donde hay que ser realmente cuidadoso al introducir cambios.</p>
+</div>
+<div class="paragraph">
+<p>Si tienes un proyecto más importante, podrías preferir usar un ciclo de integración en dos fases.
+En este escenario, tienes dos ramas de largo recorrido, <code>master</code> y <code>develop</code>, y decides que la rama <code>master</code> sólo se actualiza cuando se llega a una versión muy estable y todo el código nuevo está integrado en la rama <code>develop</code>.
+Ambas ramas se envían habitualmente al repositorio público.
+Cada vez que tengas una nueva rama puntual para integrar en (<a href="{{< relurl "book/es/v2/ch00/rmerwf_c" >}}">Antes de integrar una rama puntual.</a>), primero la fusionas con la rama <code>develop</code> (<a href="{{< relurl "book/es/v2/ch00/rmerwf_d" >}}">Tras integrar una rama puntual.</a>); luego, tras etiquetar la versión, avanzas la rama <code>master</code> hasta el punto donde se encuentre la ahora estable rama <code>develop</code> (<a href="{{< relurl "book/es/v2/ch00/rmerwf_e" >}}">Tras el lanzamiento de una rama puntual.</a>).</p>
+</div>
+<div id="rmerwf_c" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/merging-workflows-3.png" >}}" alt="Antes de integrar una rama puntual.">
+</div>
+<div class="title">Figura 75. Antes de integrar una rama puntual.</div>
+</div>
+<div id="rmerwf_d" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/merging-workflows-4.png" >}}" alt="Tras integrar una rama puntual.">
+</div>
+<div class="title">Figura 76. Tras integrar una rama puntual.</div>
+</div>
+<div id="rmerwf_e" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/merging-workflows-5.png" >}}" alt="Tras el lanzamiento de una rama puntual.">
+</div>
+<div class="title">Figura 77. Tras el lanzamiento de una rama puntual.</div>
+</div>
+<div class="paragraph">
+<p>De esta forma, cuando alguien clone el repositorio de tu proyecto, puede recuperar la rama <code>master</code> para construir la última versión estable y mantenerla actualizada fácilmente, o bien puede recuperar la rama <code>develop</code>, que es la que tiene los últimos desarrollos.
+Puedes ir un paso más allá y crear una rama de integración <code>integrate</code>, donde integres todo el trabajo.
+Entonces, cuando el código de esa rama sea estable y pase las pruebas, lo puedes integrar en una rama de desarrollo; y cuando se demuestre que efectivamente permanece estable durante un tiempo, avanzas la rama <code>master</code>.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_flujos_de_trabajo_con_grandes_integraciones">Flujos de trabajo con grandes integraciones</h4>
+<div class="paragraph">
+<p>
+El proyecto Git tiene cuatro ramas de largo recorrido: <code>master</code>, <code>next</code>, y <code>pu</code> (proposed updates, actualizaciones propuestas) para trabajos nuevos, y <code>maint</code> para trabajos de mantenimiento de versiones anteriores.
+Cuando los colaboradores introducen nuevos trabajos, se recopilan en ramas puntuales en el repositorio del responsable de mantenimiento, de manera similar a la que se ha descrito (ver <a href="{{< relurl "book/es/v2/ch00/rmerwf_f" >}}">Gestionando un conjunto complejo de ramas puntuales paralelas.</a>).
+En este punto, los nuevos trabajos se evalúan para decidir si son seguros y si están listos para los usuarios o si por el contrario necesitan más trabajo.
+Si son seguros, se integran en la rama <code>next</code>, y se envía dicha rama al repositorio público para que todo el mundo pueda probar las nuevas funcionalidades ya integradas.</p>
+</div>
+<div id="rmerwf_f" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/large-merges-1.png" >}}" alt="Gestionando un conjunto complejo de ramas puntuales paralelas.">
+</div>
+<div class="title">Figura 78. Gestionando un conjunto complejo de ramas puntuales paralelas.</div>
+</div>
+<div class="paragraph">
+<p>Si las nuevas funcionalidades necesitan más trabajo, se integran en la rama <code>pu</code>.
+Cuando se decide que estas funcionalidades son totalmente estables, se integran de nuevo en la rama <code>master</code>, construyéndolas a partir de las funcionalidades en la rama <code>next</code> que aún no habían pasado a la rama <code>master</code>.
+Esto significa que la rama <code>master</code> casi siempre avanza, <code>next</code> se reorganiza ocasionalmente y <code>pu</code> se reorganiza mucho más a menudo:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/large-merges-2.png" >}}" alt="Fusionando ramas puntuales en ramas de integración de largo recorrido.">
+</div>
+<div class="title">Figura 79. Fusionando ramas puntuales en ramas de integración de largo recorrido.</div>
+</div>
+<div class="paragraph">
+<p>Cuando una rama puntual se ha integrado en la rama <code>master</code>, se elimina del repositorio.
+El proyecto Git también tiene una rama <code>maint</code> creada a partir de la última versión para ofrecer parches, en caso de que fuera necesaria una versión de mantenimiento.
+Así, cuando clonas el repositorio de Git, tienes cuatro ramas que puedes recuperar para evaluar el proyecto en diferentes etapas de desarrollo, dependiendo de si quieres tener una versión muy avanzada o de cómo quieras contribuir. De esta forma, el responsable de mantenimiento tiene un flujo de trabajo estructurado para ayudarle a aprobar las nuevas contribuciones.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="r_rebase_cherry_pick">Flujos de trabajo reorganizando o entresacando</h4>
+<div class="paragraph">
+<p>
+Otros responsables de mantenimiento prefieren reorganizar o entresacar el nuevo trabajo en su propia rama <code>master</code>, en lugar de integrarlo, para mantener un historial prácticamente lineal.
+Cuando tienes trabajo en una rama puntual y has decidido que quieres integrarlo, te posicionas en esa rama y ejecutas el comando <code>rebase</code> para reconstruir los cambios en tu rama <code>master</code> (o <code>develop</code>, y así sucesivamente).
+Si ese proceso funciona bien, puedes avanzar tu rama <code>master</code>, consiguiendo un historial lineal en tu proyecto.</p>
+</div>
+<div class="paragraph">
+<p>
+Otra forma de mover trabajo de una rama a otra es entresacarlo (cherry-pick).
+En Git, "entresacar" es como hacer un <code>rebase</code> para un único commit.
+Toma el parche introducido en un commit e intenta reaplicarlo en la rama en la que estás actualmente.
+Esto es útil si tienes varios commits en una rama puntual y sólo quieres integrar uno de ellos, o si sólo tienes un commit en una rama puntual y prefieres entresacarlo en lugar de hacer una reorganización (rebase).
+Por ejemplo, imagina que tienes un proyecto como éste:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/rebasing-1.png" >}}" alt="Ejemplo de historial" width="antes de entresacar.">
+</div>
+<div class="title">Figura 80. Ejemplo de historial, antes de entresacar.</div>
+</div>
+<div class="paragraph">
+<p>Si sólo deseas integrar el commit <code>e43a6</code> en tu rama <code>master</code>, puedes ejecutar</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cherry-pick e43a6fd3e94888d76779ad79fb568ed180e5fcdf
+Finished one cherry-pick.
+[master]: created a0a41a9: "More friendly message when locking the index fails."
+ 3 files changed, 17 insertions(+), 3 deletions(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esto introduce el mismo cambio introducido en <code>e43a6</code>, pero genera un nuevo valor SHA-1 de confirmación, ya que la fecha en que se ha aplicado es distinta.
+Ahora tu historial queda así:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/es/v2/images/rebasing-2.png" >}}" alt="Historial tras entresacar un commit de una rama puntual.">
+</div>
+<div class="title">Figura 81. Historial tras entresacar un commit de una rama puntual.</div>
+</div>
+<div class="paragraph">
+<p>En este momento ya puedes eliminar tu rama puntual y descartar los commits que no quieres integrar.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_rerere">Rerere</h4>
+<div class="paragraph">
+<p>
+Git dispone de una utilidad llamada “rerere” que puede resultar útil si estás haciendo muchas integraciones y reorganizaciones, o si mantienes una rama puntual de largo recorrido.</p>
+</div>
+<div class="paragraph">
+<p>Rerere significa “reuse recorded resolution” (reutilizar resolución grabada) – es una forma de simplificar la resolución de conflictos.
+Cuando “rerere” está activo, Git mantendrá un conjunto de imágenes anteriores y posteriores a las integraciones correctas, de forma que si detecta que hay un conflicto que parece exactamente igual a otro ya corregido previamente, usará esa misma corrección sin causarte molestias.</p>
+</div>
+<div class="paragraph">
+<p>Esta funcionalidad consta de dos partes: un parámetro de configuración y un comando.
+El parámetro de configuración es <code>rerere.enabled</code> y es bastante útil ponerlo en tu configuración global:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global rerere.enabled true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora, cuando hagas una integración que resuelva conflictos, la resolución se grabará en la caché por si la necesitas en un futuro.</p>
+</div>
+<div class="paragraph">
+<p>Si fuera necesario, puedes interactuar con la caché de “rerere” usando el comando <code>git rerere</code>.
+Cuando se invoca sin ningún parámetro adicional, Git comprueba su base de datos de resoluciones en busca de coincidencias con cualquier conflicto durante la integración actual e intenta resolverlo (aunque se hace automáticamente en caso de que <code>rerere.enabled</code> sea <code>true</code>).
+También existen subcomandos para ver qué se grabará, para eliminar de la caché una resolución específica y para limpiar completamante la caché. Veremos más detalles sobre “rerere” en <a href="{{< relurl "book/es/v2/ch00/r_rerere" >}}">Rerere</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_tagging_releases">Etiquetando tus versiones</h3>
+<div class="paragraph">
+<p>
+Cuando decides lanzar una versión, probablemente quieras etiquetarla para poder generarla más adelante en cualquier momento.
+Puedes crear una nueva etiqueta siguiendo los pasos descritos en <a href="{{< relurl "book/es/v2/ch00/ch02-git-basics" >}}">[ch02-git-basics]</a>.
+Si decides firmar la etiqueta como responsable de mantenimiento, el etiquetado sería algo así:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git tag -s v1.5 -m 'my signed 1.5 tag'
+You need a passphrase to unlock the secret key for
+user: "Scott Chacon &lt;schacon@gmail.com&gt;"
+1024-bit DSA key, ID F721C45A, created 2009-02-09</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si firmas tus etiquetas podrías tener problemas a la hora de distribuir la clave PGP pública usada para firmarlas.
+El responsable de mantenimiento del proyecto Git ha conseguido solucionar este problema incluyendo su clave pública como un objeto binario en el repositorio, añadiendo a continuación una etiqueta que apunta directamente a dicho contenido.
+Para hacer esto, puedes averiguar qué clave necesitas lanzando el comando <code>gpg --list-keys</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ gpg --list-keys
+/Users/schacon/.gnupg/pubring.gpg
+---------------------------------
+pub   1024D/F721C45A 2009-02-09 [expires: 2010-02-09]
+uid                  Scott Chacon &lt;schacon@gmail.com&gt;
+sub   2048g/45D02282 2009-02-09 [expires: 2010-02-09]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora ya puedes importar directamente la clave en la base de datos de Git, exportándola y redirigiéndola a través del comando <code>git hash-object</code>, que escribe en Git un nuevo objeto binario con esos contenidos y devuelve la firma SHA-1 de dicho objeto.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ gpg -a --export F721C45A | git hash-object -w --stdin
+659ef797d181633c87ec71ac3f9ba29fe5775b92</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Una vez que tienes los contenidos de tu clave en Git, puedes crear una etiqueta que apunte directamente a dicha clave indicando el nuevo valor SHA-1 que devolvió el comando <code>hash-object</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git tag -a maintainer-pgp-pub 659ef797d181633c87ec71ac3f9ba29fe5775b92</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si ejecutas <code>git push --tags</code>, la etiqueta <code>maintainer-pgp-pub</code> será compartida con todo el mundo.
+Si alguien quisiera verificar una etiqueta, puede importar tu clave PGP recuperando directamente el objeto binario de la base de datos e importándolo en GPG:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git show maintainer-pgp-pub | gpg --import</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Esa clave se puede usar para verificar todas tus etiquetas firmadas.
+Además, si incluyes instrucciones en el mensaje de la etiqueta, el comando <code>git show &lt;tag&gt;</code> permitirá que el usuario final obtenga instrucciones más específicas sobre el proceso de verificación de etiquetas.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_build_number">Generando un número de compilación</h3>
+<div class="paragraph">
+<p>
+Como Git no genera una serie de números monótonamente creciente como <em>v123</em> o similar con cada commit, si quieres tener un nombre más comprensible para un commit, puedes ejecutar el comando <code>git describe</code> sobre dicho commit.
+Git devolverá el nombre de la etiqueta más próxima junto con el número de commits sobre esa etiqueta y una parte del valor SHA-1 del commit que estás describiendo:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git describe master
+v1.6.2-rc1-20-g8c5b85c</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De esta forma, puedes exportar una instantánea o generar un nombre comprensible para cualquier persona.
+De hecho, si construyes Git a partir del código fuente clonado del repositorio Git, <code>git --version</code> devuelve algo parecido a esto.
+Si estás describiendo un commit que has etiquetado directamente, te dará el nombre de la etiqueta.</p>
+</div>
+<div class="paragraph">
+<p>El comando <code>git describe</code> da preferencia a etiquetas anotadas (etiquetas creadas con las opciones <code>-a</code> o <code>-s</code>), por lo que las etiquetas de versión deberían crearse de esta forma si estás usando <code>git describe</code>, para garantizar que el commit es nombrado adecuadamente cuando se describe.
+También puedes usar esta descripción como objetivo de un comando <code>checkout</code> o <code>show</code>, aunque depende de la parte final del valor SHA-1 abreviado, por lo que podría no ser válida para siempre.
+Por ejemplo, recientemente el núcleo de Linux pasó de 8 a 10 caracteres para asegurar la unicidad del objeto SHA-1, por lo que los nombres antiguos devueltos por <code>git describe</code> fueron invalidados.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_preparing_release">Preparando una versión</h3>
+<div class="paragraph">
+<p>
+Ahora quieres lanzar una versión.
+Una cosa que querrás hacer será crear un archivo con la última instantánea del código para esas pobres almas que no usan Git.
+El comando para hacerlo es <code>git archive</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git archive master --prefix='project/' | gzip &gt; `git describe master`.tar.gz
+$ ls *.tar.gz
+v1.6.2-rc1-20-g8c5b85c.tar.gz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si alguien abre el archivo tar, obtiene la última instantánea de tu proyecto bajo un directorio <code>project</code>.
+También puedes crear un archivo zip de la misma manera, pero añadiendo la opción <code>--format=zip</code> a <code>git archive</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git archive master --prefix='project/' --format=zip &gt; `git describe master`.zip</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ahora tienes tanto un archivo tar como zip con la nueva versión de tu proyecto, listos para subirlos a tu sitio web o para enviarlos por e-mail.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="r_the_shortlog">El registro resumido</h3>
+<div class="paragraph">
+<p>
+Es el momento de enviar un mensaje a tu lista de correo informando sobre el estado de tu proyecto.
+Una buena opción para obtener rápidamente una especie de lista con los cambios introducidos en tu proyecto desde la última versión o e-mail es usar el comando <code>git shortlog</code>.
+Dicho comando resume todos los commits en el rango que se le indique; por ejemplo, el siguiente comando devuelve un resumen de todos los commits desde tu última versión, suponiendo que fuera la v1.0.1:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git shortlog --no-merges master --not v1.0.1
+Chris Wanstrath (8):
+      Add support for annotated tags to Grit::Tag
+      Add packed-refs annotated tag support.
+      Add Grit::Commit#to_patch
+      Update version and History.txt
+      Remove stray `puts`
+      Make ls_tree ignore nils
+
+Tom Preston-Werner (4):
+      fix dates in history
+      dynamic version method
+      Version bump to 1.0.2
+      Regenerated gemspec for version 1.0.2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Consigues un resumen limpio de todos los commits desde la versión v1.0.1, agrupados por autor, que puedes enviar por correo electrónico a tu lista.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

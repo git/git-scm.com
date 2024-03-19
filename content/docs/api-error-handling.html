@@ -1,0 +1,161 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - api-error-handling Documentation
+docname: api-error-handling
+version: 2.37.0
+latest-changes: 2.37.0
+aliases:
+- "/docs/api-error-handling/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p><code>BUG</code>, <code>bug</code>, <code>die</code>, <code>usage</code>, <code>error</code>, and <code>warning</code> report errors of
+various kinds.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>BUG</code> is for failed internal assertions that should never happen,
+i.e. a bug in git itself.</p>
+</li>
+<li>
+<p><code>bug</code> (lower-case, not <code>BUG</code>) is supposed to be used like <code>BUG</code> but
+prints a "BUG" message instead of calling <code>abort()</code>.</p>
+<div class="paragraph">
+<p>A call to <code>bug()</code> will then result in a "real" call to the <code>BUG()</code>
+function, either explicitly by invoking <code>BUG_if_bug()</code> after call(s)
+to <code>bug()</code>, or implicitly at <code>exit()</code> time where we&#8217;ll check if we
+encountered any outstanding <code>bug()</code> invocations.</p>
+</div>
+<div class="paragraph">
+<p>If there were no prior calls to <code>bug()</code> before invoking <code>BUG_if_bug()</code>
+the latter is a NOOP. The <code>BUG_if_bug()</code> function takes the same
+arguments as <code>BUG()</code> itself. Calling <code>BUG_if_bug()</code> explicitly isn&#8217;t
+necessary, but ensures that we die as soon as possible.</p>
+</div>
+<div class="paragraph">
+<p>If you know you had prior calls to <code>bug()</code> then calling <code>BUG()</code> itself
+is equivalent to calling <code>BUG_if_bug()</code>, the latter being a wrapper
+calling <code>BUG()</code> if we&#8217;ve set a flag indicating that we&#8217;ve called
+<code>bug()</code>.</p>
+</div>
+<div class="paragraph">
+<p>This is for the convenience of APIs who&#8217;d like to potentially report
+more than one "bug", such as the optbug() validation in
+parse-options.c.</p>
+</div>
+</li>
+<li>
+<p><code>die</code> is for fatal application errors.  It prints a message to
+the user and exits with status 128.</p>
+</li>
+<li>
+<p><code>usage</code> is for errors in command line usage.  After printing its
+message, it exits with status 129.  (See also <code>usage_with_options</code>
+in the <a href="{{< relurl "docs/api-parse-options" >}}">parse-options API</a>.)</p>
+</li>
+<li>
+<p><code>error</code> is for non-fatal library errors.  It prints a message
+to the user and returns -1 for convenience in signaling the error
+to the caller.</p>
+</li>
+<li>
+<p><code>warning</code> is for reporting situations that probably should not
+occur but which the user (and Git) can continue to work around
+without running into too many problems.  Like <code>error</code>, it
+returns -1 after reporting the situation to the caller.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>These reports will be logged via the trace2 facility. See the "error"
+event in <a href="{{< relurl "docs/api-trace2" >}}">trace2 API</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customizable_error_handlers"><a class="anchor" href="#_customizable_error_handlers"></a>Customizable error handlers</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The default behavior of <code>die</code> and <code>error</code> is to write a message to
+stderr and then exit or return as appropriate.  This behavior can be
+overridden using <code>set_die_routine</code> and <code>set_error_routine</code>.  For
+example, "git daemon" uses set_die_routine to write the reason <code>die</code>
+was called to syslog before exiting.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_library_errors"><a class="anchor" href="#_library_errors"></a>Library errors</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Functions return a negative integer on error.  Details beyond that
+vary from function to function:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Some functions return -1 for all errors.  Others return a more
+specific value depending on how the caller might want to react
+to the error.</p>
+</li>
+<li>
+<p>Some functions report the error to stderr with <code>error</code>,
+while others leave that for the caller to do.</p>
+</li>
+<li>
+<p>errno is not meaningful on return from most functions (except
+for thin wrappers for system calls).</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Check the function&#8217;s API documentation to be sure.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_caller_handled_errors"><a class="anchor" href="#_caller_handled_errors"></a>Caller-handled errors</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>An increasing number of functions take a parameter <em>struct strbuf *err</em>.
+On error, such functions append a message about what went wrong to the
+<em>err</em> strbuf.  The message is meant to be complete enough to be passed
+to <code>die</code> or <code>error</code> as-is.  For example:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>if (ref_transaction_commit(transaction, &amp;err))
+	die("%s", err.buf);</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <em>err</em> parameter will be untouched if no error occurred, so multiple
+function calls can be chained:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>t = ref_transaction_begin(&amp;err);
+if (!t ||
+    ref_transaction_update(t, "HEAD", ..., &amp;err) ||
+    ret_transaction_commit(t, &amp;err))
+	die("%s", err.buf);</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <em>err</em> parameter must be a pointer to a valid strbuf.  To silence
+a message, pass a strbuf that is explicitly ignored:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>if (thing_that_can_fail_in_an_ignorable_way(..., &amp;err))
+	/* This failure is okay. */
+	strbuf_reset(&amp;err);</pre>
+</div>
+</div>
+</div>
+</div>

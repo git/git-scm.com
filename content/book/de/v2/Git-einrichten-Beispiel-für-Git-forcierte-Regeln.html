@@ -1,0 +1,523 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git einrichten
+    number: 8
+  section:
+    title: Beispiel für Git-forcierte Regeln
+    number: 4
+    cs_number: '8.4'
+    previous: book/de/v2/Git-einrichten-Git-Hooks
+    next: book/de/v2/Git-einrichten-Zusammenfassung
+title: Git - Beispiel für Git-forcierte Regeln
+url: "/book/de/v2/Git-einrichten-Beispiel-für-Git-forcierte-Regeln.html"
+
+---
+<h2 id="_an_example_git_enforced_policy">Beispiel für Git-forcierte Regeln</h2>
+<div class="paragraph">
+<p>
+In diesem Abschnitt werden Sie das Erlernte nutzen, um einen Git-Workflow einzurichten, der ein benutzerdefiniertes Commit-Beschreibungs-Format prüft und nur bestimmten Benutzern erlaubt, ausgewählte Unterverzeichnisse in einem Projekt zu ändern.
+Sie erstellen Client-Skripte, die den Entwickler erkennen lassen, ob ihr Push abgelehnt wird, ebenso wie Server-Skripte, die die Einhaltung der Richtlinien erzwingen.</p>
+</div>
+<div class="paragraph">
+<p>Die hier vorgestellten Skripte sind in Ruby geschrieben, teils wegen unserer geistigen Trägheit, teils aber auch weil Ruby leicht zu lesen ist – auch wenn man es nicht unbedingt selbst schreiben kann.
+Allerdings kann jede beliebige Programmiersprache verwendet werden. Alle mit Git vertriebenen Beispiel-Hook-Skripte sind entweder in Perl oder Bash verfasst. Sie können daher viele Beispiele für Hooks in diesen Sprachen verstehen, wenn Sie sich die Beispiele ansehen.</p>
+</div>
+<div class="sect3">
+<h3 id="_serverseitiger_hook">Serverseitiger Hook</h3>
+<div class="paragraph">
+<p>Die gesamte serverseitige Arbeit wird in die <code>update</code> Datei in Ihrem <code>hooks</code> Verzeichnis übernommen.
+Der <code>update</code> Hook läuft einmal pro gepushtem Branch und benötigt drei Argumente:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Der Name der Referenz, zu der gepusht wird</p>
+</li>
+<li>
+<p>Die frühere Version, in der sich dieser Branch befindet</p>
+</li>
+<li>
+<p>Die neue Version, die gepusht werden soll</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Wenn der Push über SSH ausgeführt wird, haben Sie auch Zugriff auf den Benutzer, der den Push durchführt.
+Auch wenn Sie es jedem erlaubt haben, sich mit einem bestimmten Benutzer (z.B. „git“) über die Public-Key-Authentifizierung zu verbinden, müssen Sie diesem Benutzer möglicherweise einen Shell-Wrapper zur Verfügung stellen, der anhand des öffentlichen Schlüssels ermittelt, welcher Benutzer sich verbindet, und eine entsprechende Umgebungsvariable festlegen.
+Hier gehen wir davon aus, dass sich der verbindende Benutzer in der Umgebungsvariablen <code>$USER</code> befindet, so dass Ihr Update-Skript mit dem Sammeln aller benötigten Informationen beginnt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+$refname = ARGV[0]
+$oldrev  = ARGV[1]
+$newrev  = ARGV[2]
+$user    = ENV['USER']
+
+puts "Enforcing Policies..."
+puts "(#{$refname}) (#{$oldrev[0,6]}) (#{$newrev[0,6]})"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ja, das sind globale Variablen.
+Bewerten Sie es nicht – es ist auf diese Weise leichter zu demonstrieren.</p>
+</div>
+<div class="sect4">
+<h4 id="_enforcing_commit_message_format">Ein bestimmtes Commit-Message-Format erzwingen</h4>
+<div class="paragraph">
+<p>Ihre erste Herausforderung besteht darin, die Einhaltung eines bestimmten Formats für jede Commit-Nachricht durchzusetzen.
+Nur um ein Ziel zu haben, gehen Sie davon aus, dass jede Nachricht eine Zeichenkette enthalten muss, die wie „ref: 1234“ aussieht, weil Sie möchten, dass jeder Commit auf einen Arbeitsschritt in Ihrem Ticketing-System verweist.
+Sie müssen sich jeden Commit ansehen, der gepusht wird, um nachzusehen, ob sich diese Zeichenkette in der Commit-Beschreibung befindet und falls die Zeichenkette bei einem der Commits fehlt, mit einem Exit-Status ungleich Null, wird der Push abgelehnt.</p>
+</div>
+<div class="paragraph">
+<p>Sie können eine Liste der SHA-1-Werte aller Commits erhalten, die verschoben werden, indem Sie die Werte <code>$newrev</code> und <code>$oldrev</code> verwenden und sie an das Git-Basiskommando (engl. Plumbing Command) <code>git rev-list</code> übergeben.
+Das ist im Grunde genommen der Befehl git log, der aber standardmäßig nur die SHA-1-Werte und keine anderen Informationen ausgibt.
+Um also eine Liste aller Commit SHA-1-en zu erhalten, die zwischen zwei verschiedenen Commit SHA-1 liegen, kkönnen Sie etwa so vorgehen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rev-list 538c33..d14fc7
+d14fc7c847ab946ec39590d87783c69b031bdfb7
+9f585da4401b0a3999e84113824d15245c13f0be
+234071a1be950e2a8d078e6141f5cd20c1e61ad3
+dfa04c9ef3d5197182f13fb5b9b1fb7717d2222a
+17716ec0f1ff5c77eff40b7fe912f9f6cfd0e475</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können diese Ausgabe nehmen, jeden dieser Commit SHA-1s durchlaufen, die Beschreibung dafür abgreifen und diese Beschreibung gegen einen regulären Ausdruck testen, der nach einem Zeichen-Muster sucht.</p>
+</div>
+<div class="paragraph">
+<p>Sie müssen sich überlegen, wie Sie die Commit-Beschreibung von jedem dieser Commits zum Testen erhalten.
+Um die unformatierten Commit-Daten zu ermitteln, können Sie ein anderes Basiskommando namens <code>git cat-file</code> verwenden.
+Wir werden alle diese Basiskommandos in Kapitel 10, <a href="{{< relurl "book/de/v2/ch00/ch10-git-internals" >}}">Git Interna</a> im Detail betrachten – aber vorerst gibt Ihnen dieser Befehl Folgendes aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file commit ca82a6
+tree cfda3bf379e4f8dba8717dee55aab78aef7f4daf
+parent 085bb3bcb608e1e8451d4b2432f8ecbe6306e7e7
+author Scott Chacon &lt;schacon@gmail.com&gt; 1205815931 -0700
+committer Scott Chacon &lt;schacon@gmail.com&gt; 1240030591 -0700
+
+Change the version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie den SHA-1-Wert kennen ist es einfach die Commit-Beschreibung eines Commits zu erhalten. Gehen Sie in die erste leere Zeile und übernehmen alles danach.
+Auf Unix-Systemen können Sie mit dem <code>sed</code> Befehl arbeiten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git cat-file commit ca82a6 | sed '1,/^$/d'
+Change the version number</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können auf diese Weise die Commit-Beschreibung von jedem Commit, der gepusht werden soll, übernehmen und mit einem Exit-Code ungleich Null beenden, wenn Sie etwas finden, das nicht übereinstimmt.
+Um das Skript zu verlassen und den Push abzulehnen, verlassen Sie das Skript mit ungleich Null.
+Die gesamte Methode sieht dann so aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">$regex = /\[ref: (\d+)\]/
+
+# enforced custom commit message format
+def check_message_format
+  missed_revs = `git rev-list #{$oldrev}..#{$newrev}`.split("\n")
+  missed_revs.each do |rev|
+    message = `git cat-file commit #{rev} | sed '1,/^$/d'`
+    if !$regex.match(message)
+      puts "[POLICY] Your message is not formatted correctly"
+      exit 1
+    end
+  end
+end
+check_message_format</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie das in Ihr <code>update</code> Skript einfügen, werden Updates mit Commit-Beschreibungen, die nicht Ihrer Regel entsprechen, abgelehnt.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_ein_benutzerbasiertes_acl_system_einrichten">Ein benutzerbasiertes ACL-System einrichten</h4>
+<div class="paragraph">
+<p>Angenommen, Sie möchten einen Prozess hinzufügen, der eine Zugriffskontrollliste (ACL) verwendet, die festlegt, welche Benutzer Änderungen an welchen Teilen Ihrer Projekte vornehmen dürfen.
+Einige Personen haben vollen Zugriff, andere können Änderungen nur zu bestimmten Unterverzeichnissen oder bestimmten Dateien pushen.
+Um das zu erreichen, müssen Sie diese Regeln in eine <code>acl</code> Datei schreiben, die in Ihrem blanken Git-Repository auf dem Server liegt.
+Mit dem <code>update</code> Hook können Sie diese Regeln prüfen. Sie können feststellen, welche Dateien für die zu übertragenden Commits eingeführt werden und entscheiden, ob der Benutzer, der den Push durchführt, Zugriff hat, um diese Dateien zu aktualisieren.</p>
+</div>
+<div class="paragraph">
+<p>Zuerst müssen Sie Ihre ACL-Datei erstellen.
+Hier verwenden Sie ein Format ähnlich dem CVS ACL-Mechanismus: Es verwendet eine Reihe von Zeilen, wobei das erste Feld <code>avail</code> (verfügbar) oder <code>unavail</code> (nicht verfügbar) ist. Das nächste Feld ist eine kommagetrennte Liste der gültigen Benutzer und das letzte Feld ist der Pfad, für den die Regel gilt (blank bedeutet Open Access).
+Alle diese Felder werden durch ein Pipe-Zeichen (<code>|</code>) getrennt.</p>
+</div>
+<div class="paragraph">
+<p>In diesem Beispiel haben Sie ein Reihe von Administratoren, einige Dokumentations-Autoren mit Zugriff auf das <code>doc</code> Verzeichnis und einen Entwickler, der nur Zugriff auf die Verzeichnisse <code>lib</code> und <code>tests</code> hat. Ihre ACL-Datei sieht dann wie folgt aus:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>avail|nickh,pjhyett,defunkt,tpw
+avail|usinclair,cdickens,ebronte|doc
+avail|schacon|lib
+avail|schacon|tests</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie beginnen damit, diese Daten in eine Struktur zu übernehmen, die Sie verwenden können.
+In diesem Beispiel werden Sie, um das Beispiel einfach zu halten, nur die <code>avail</code> Anweisungen einführen.
+Hier folgt eine Methode, die Ihnen ein assoziatives Array liefert, wobei der Schlüssel der Benutzername und der Wert ein Array von Pfaden ist, auf die der Benutzer Schreibzugriff hat:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">def get_acl_access_data(acl_file)
+  # read in ACL data
+  acl_file = File.read(acl_file).split("\n").reject { |line| line == '' }
+  access = {}
+  acl_file.each do |line|
+    avail, users, path = line.split('|')
+    next unless avail == 'avail'
+    users.split(',').each do |user|
+      access[user] ||= []
+      access[user] &lt;&lt; path
+    end
+  end
+  access
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In der zuvor angesehenen ACL-Datei gibt die <code>get_acl_access_data</code> Methode eine Datenstruktur zurück, die wie folgt aussieht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">{"defunkt"=&gt;[nil],
+ "tpw"=&gt;[nil],
+ "nickh"=&gt;[nil],
+ "pjhyett"=&gt;[nil],
+ "schacon"=&gt;["lib", "tests"],
+ "cdickens"=&gt;["doc"],
+ "usinclair"=&gt;["doc"],
+ "ebronte"=&gt;["doc"]}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nachdem Sie nun die Berechtigungen geklärt haben, müssen Sie ermitteln, welche Pfade die gepushten Commits geändert haben. So können Sie sicherstellen, dass der Benutzer, der gepusht hat, Zugriff auf alle diese Pfade erhält.</p>
+</div>
+<div class="paragraph">
+<p>Mit der Option <code>--name-only</code> des <code>git log</code> Befehls können Sie relativ einfach sehen, welche Dateien in einem einzelnen Commit geändert wurden (wurde in Kapitel 2, <a href="{{< relurl "book/de/v2/ch00/ch02-git-basics-chapter" >}}">Git Grundlagen</a> kurz erwähnt):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -1 --name-only --pretty=format:'' 9f585d
+
+README
+lib/test.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie die verwendete ACL-Struktur, die von der <code>get_acl_access_data</code> Methode zurückgegeben wird, mit den aufgelisteten Dateien in jedem der Commits vergleichen, können Sie feststellen, ob der Benutzer die Berechtigung hat, um alle seine Commits zu pushen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby"># only allows certain users to modify certain subdirectories in a project
+def check_directory_perms
+  access = get_acl_access_data('acl')
+
+  # see if anyone is trying to push something they can't
+  new_commits = `git rev-list #{$oldrev}..#{$newrev}`.split("\n")
+  new_commits.each do |rev|
+    files_modified = `git log -1 --name-only --pretty=format:'' #{rev}`.split("\n")
+    files_modified.each do |path|
+      next if path.size == 0
+      has_file_access = false
+      access[$user].each do |access_path|
+        if !access_path  # user has access to everything
+           || (path.start_with? access_path) # access to this path
+          has_file_access = true
+        end
+      end
+      if !has_file_access
+        puts "[POLICY] You do not have access to push to #{path}"
+        exit 1
+      end
+    end
+  end
+end
+
+check_directory_perms</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie erhalten eine Liste der neuen Commits, die mit <code>git rev-list</code> auf Ihren Server gepusht werden.
+Dann stellen Sie für jeden dieser Commits fest, welche der Dateien geändert werden sollen und stellen sicher, dass der Benutzer, der den Push ausführt, Zugriff auf alle zu ändernden Pfade hat.</p>
+</div>
+<div class="paragraph">
+<p>Jetzt können Ihre Benutzer keine Commits mit schlecht strukturierten Beschreibungen oder mit modifizierten Dateien außerhalb der zugewiesenen Pfade pushen.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_austesten">Austesten</h4>
+<div class="paragraph">
+<p>Wenn Sie <code>chmod u+x.git/hooks/update</code> ausführen, auf der Datei, in die Sie diesen Code hätten einfügen sollen, und dann versuchen, ein Commit mit einer nicht konformen Beschreibung zu senden, dann erhalten Sie etwa das hier:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git push -f origin master
+Counting objects: 5, done.
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 323 bytes, done.
+Total 3 (delta 1), reused 0 (delta 0)
+Unpacking objects: 100% (3/3), done.
+Enforcing Policies...
+(refs/heads/master) (8338c5) (c5b616)
+[POLICY] Your message is not formatted correctly
+error: hooks/update exited with error code 1
+error: hook declined to update refs/heads/master
+To git@gitserver:project.git
+ ! [remote rejected] master -&gt; master (hook declined)
+error: failed to push some refs to 'git@gitserver:project.git'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier sind noch ein paar interessante Details zu finden.
+Erstens, erkennen Sie die Position, an der der Hook startet.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">Enforcing Policies...
+(refs/heads/master) (fb8c72) (c56860)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Denken Sie daran, dass das ganz am Anfang Ihres Update-Skripts ausgegeben wird.
+Alles, was Ihr Skript an <code>stdout</code> weitergibt, wird an den Client übertragen.</p>
+</div>
+<div class="paragraph">
+<p>Das nächste, was Sie beachten sollten, ist die Fehlermeldung.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">[POLICY] Your message is not formatted correctly
+error: hooks/update exited with error code 1
+error: hook declined to update refs/heads/master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die erste Zeile wurde von Ihnen, die anderen beiden wurden von Git ausgegeben, die Ihnen mitteilten, dass das Update-Skript ungleich Null beendet wurde. Das war es, was Ihren Push verneint hat.
+Zum Schluss noch Folgendes:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">To git@gitserver:project.git
+ ! [remote rejected] master -&gt; master (hook declined)
+error: failed to push some refs to 'git@gitserver:project.git'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie werden eine Nachricht des Remote für jede Referenz erhalten, die von Ihrem Hook abgelehnt wurde. Sie zeigt Ihnen an, dass sie speziell wegen eines Hook-Fehlers abgelehnt wurde.</p>
+</div>
+<div class="paragraph">
+<p>Wenn außerdem jemand versucht, eine Datei, auf die er keinen Zugriff hat, zu bearbeiten und einen Commit damit pusht, dann wird er etwas Ähnliches sehen.
+Versucht ein Dokumentations-Author zum Beispiel, einen Commit zu pushen, indem er etwas im <code>lib</code> Verzeichnis ändert, wird ihm folgendes angezeigt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">[POLICY] You do not have access to push to lib/test.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Von jetzt an, solange dieses <code>update</code> Skript verfügbar und ausführbar ist, wird Ihr Repository nie eine Commit-Beschreibung ohne Ihr eigenes Schema haben, und Ihre Benutzer werden in einer „Sandbox“ eingeschlossen sein.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_clientseitige_hooks_2">Clientseitige Hooks</h3>
+<div class="paragraph">
+<p>Der Nachteil dieses Konzepts ist das Gejammer, das unweigerlich entsteht, wenn die Commit-Pushes Ihrer Benutzer abgelehnt werden.
+Die Tatsache, dass die sorgfältig gestalteten Arbeiten in letzter Minute abgelehnt werden, kann äußerst frustrierend und irritierend sein. Darüber hinaus müssen sie ihre Verlaufsdaten bearbeiten, um sie zu korrigieren, was nicht unbedingt etwas für schwache Nerven ist.</p>
+</div>
+<div class="paragraph">
+<p>Die Antwort auf dieses Dilemma ist, einige clientseitige Hooks bereitzustellen, die Benutzer ausführen können, um sie darüber zu informieren, dass sie etwas unternehmen, das der Server wahrscheinlich ablehnen wird.
+Auf diese Weise können sie mögliche Probleme vor dem Commit klären, bevor es schwieriger wird sie zu beheben.
+Da Hooks nicht mit einem Klon eines Projekts übertragen werden, müssen Sie diese Skripte auf andere Weise bereitstellen. Dann müssen Ihre Benutzer sie in ihr  <code>.git/hooks</code> Verzeichnis kopieren und sie ausführbar machen.
+Sie können diese Hooks innerhalb des Projekts oder in einem separaten Projekt weitergeben, aber Git wird sie nicht automatisch einrichten.</p>
+</div>
+<div class="paragraph">
+<p>Am Anfang sollten Sie Ihre Commit-Beschreibung kurz vor jeder Übertragung überprüfen, damit Sie sich sicher sind, dass der Server Ihre Änderungen nicht aufgrund schlecht formatierter Commit-Beschreibungen ablehnt.
+Dazu können Sie den <code>commit-msg</code> Hook hinzufügen.
+Wenn Sie die Nachricht aus der als erstes Argument übergebenen Datei lesen und mit dem Patternmuster vergleichen lassen, können Sie Git zwingen, die Übertragung abzubrechen, wenn es keine Übereinstimmung gibt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+message_file = ARGV[0]
+message = File.read(message_file)
+
+$regex = /\[ref: (\d+)\]/
+
+if !$regex.match(message)
+  puts "[POLICY] Your message is not formatted correctly"
+  exit 1
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn dieses Skript (in <code>.git/hooks/commit-msg</code>) vorhanden und ausführbar ist und Sie mit einer Beschreibung committen, die nicht korrekt formatiert ist, sehen Sie das hier:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git commit -am 'Test'
+[POLICY] Your message is not formatted correctly</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In diesem Fall wurde kein Commit durchgeführt.
+Wenn Ihre Beschreibung jedoch das richtige Muster enthält, erlaubt Ihnen Git die Übertragung:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git commit -am 'Test [ref: 132]'
+[master e05c914] Test [ref: 132]
+ 1 file changed, 1 insertions(+), 0 deletions(-)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als nächstes sollten Sie sicherstellen, dass Sie keine Dateien ändern, die sich außerhalb Ihres ACL-Bereichs befinden.
+Wenn das <code>.git</code> Verzeichnis Ihres Projekts eine Kopie der ACL-Datei enthält, die Sie zuvor verwendet haben, dann wird das folgende <code>pre-commit</code> Skript diese Einschränkungen für Sie durchsetzen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+$user    = ENV['USER']
+
+# [ insert acl_access_data method from above ]
+
+# only allows certain users to modify certain subdirectories in a project
+def check_directory_perms
+  access = get_acl_access_data('.git/acl')
+
+  files_modified = `git diff-index --cached --name-only HEAD`.split("\n")
+  files_modified.each do |path|
+    next if path.size == 0
+    has_file_access = false
+    access[$user].each do |access_path|
+    if !access_path || (path.index(access_path) == 0)
+      has_file_access = true
+    end
+    if !has_file_access
+      puts "[POLICY] You do not have access to push to #{path}"
+      exit 1
+    end
+  end
+end
+
+check_directory_perms</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das ist ungefähr das gleiche Skript wie der serverseitige Teil, allerdings mit zwei wichtigen Unterschieden.
+Erstens befindet sich die ACL-Datei an einer anderen Stelle, da dieses Skript aus Ihrem Arbeitsverzeichnis und nicht aus Ihrem <code>.git</code> Verzeichnis läuft.
+Sie müssen den Pfad zur ACL-Datei ändern, von:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">access = get_acl_access_data('acl')</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>zu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">access = get_acl_access_data('.git/acl')</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der andere wichtige Unterschied ist die Art und Weise, wie Sie eine Liste der Dateien erhalten, die geändert wurden.
+Da die serverseitige Methode das Protokoll der Commits betrachtet und der Commit an dieser Stelle noch nicht aufgezeichnet wurde, müssen Sie stattdessen Ihre Dateiliste aus dem Staging-Area holen.
+Anstelle von:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">files_modified = `git log -1 --name-only --pretty=format:'' #{ref}`</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>müssen Sie das benutzen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">files_modified = `git diff-index --cached --name-only HEAD`</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Aber das sind die einzigen beiden Unterschiede – ansonsten funktioniert das Skript wie gehabt.
+Ein Nachteil ist, dass es erwartet, dass Sie lokal mit dem gleichen Benutzer arbeiten, den Sie auf dem Remotesystem verwenden.
+Wenn das anders ist, müssen Sie die Variable <code>$user</code> manuell setzen.</p>
+</div>
+<div class="paragraph">
+<p>Außerdem können wir hier sicherstellen, dass der Benutzer keine „non-fast-forwarded“ Referenzen pusht.
+Um eine Referenz zu erhalten, die kein „fast-forward“ ist, müssen Sie entweder über einen Commit hinaus rebasieren, den Sie bereits hochgeladen haben oder versuchen, einen anderen lokalen Branch auf den gleichen Remote-Branch zu pushen.</p>
+</div>
+<div class="paragraph">
+<p>Wahrscheinlich ist der Server bereits mit <code>receive.denyDeletes</code> und <code>receive.denyNonFastForwards</code> konfiguriert, um diese Richtlinie zu erzwingen. Somit ist die einzige unbeabsichtigte Aktion, die sie abfangen können ein Rebase-Commit, welcher bereits gepusht wurde.</p>
+</div>
+<div class="paragraph">
+<p>Hier folgt ein Beispiel für ein Pre-Rebase-Skript, das das überprüft.
+Es erhält eine Liste aller Commits, die Sie gerade neu schreiben wollen, und prüft, ob sie in einer Ihrer Remote-Referenzen vorhanden sind.
+Wenn es einen findet, der von einer Ihrer Remote-Referenzen aus erreichbar ist, bricht es den Rebase ab.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+base_branch = ARGV[0]
+if ARGV[1]
+  topic_branch = ARGV[1]
+else
+  topic_branch = "HEAD"
+end
+
+target_shas = `git rev-list #{base_branch}..#{topic_branch}`.split("\n")
+remote_refs = `git branch -r`.split("\n").map { |r| r.strip }
+
+target_shas.each do |sha|
+  remote_refs.each do |remote_ref|
+    shas_pushed = `git rev-list ^#{sha}^@ refs/remotes/#{remote_ref}`
+    if shas_pushed.split("\n").include?(sha)
+      puts "[POLICY] Commit #{sha} has already been pushed to #{remote_ref}"
+      exit 1
+    end
+  end
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dieses Skript verwendet eine Syntax, die in Kapitel 7, <a href="{{< relurl "book/de/v2/ch00/_revision_selection" >}}">Revisions-Auswahl</a> nicht behandelt wurde.
+Sie erhalten eine Liste der Commits, die bereits gepusht wurden, wenn Sie diese Anweisung aufrufen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">`git rev-list ^#{sha}^@ refs/remotes/#{remote_ref}`</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die <code>SHA^@</code> Syntax löst alle Vorgänger (engl. parents) dieses Commits auf.
+Sie suchen nach jedem Commit, der vom letzten Commit auf dem Remote aus erreichbar ist und der von keinem Parent einer der SHA-1s, die Sie hochladen möchten, erreichbar ist – was bedeutet, dass es ein „fast-forward“ ist.</p>
+</div>
+<div class="paragraph">
+<p>Der größte Nachteil dieses Ansatzes ist, dass er sehr langsam sein kann und oft unnötig ist – wenn Sie nicht versuchen, den Push mit <code>-f</code> zu erzwingen, wird der Server Sie warnen und den Push nicht akzeptieren.
+Es ist aber ein interessanter Test und kann Ihnen theoretisch helfen, einen Rebase zu vermeiden, den Sie später vielleicht wieder zurücknehmen und reparieren müssen.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

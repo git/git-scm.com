@@ -1,0 +1,449 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: nl
+  chapter:
+    title: Git aanpassen
+    number: 8
+  section:
+    title: Git attributen
+    number: 2
+    cs_number: '8.2'
+    previous: book/nl/v2/Git-aanpassen-Git-configuratie
+    next: book/nl/v2/Git-aanpassen-Git-Hooks
+title: Git - Git attributen
+
+---
+<h2 id="_git_attributen">Git attributen</h2>
+<div class="paragraph">
+<p>
+Een aantal van deze settings kunnen ook worden ingericht voor een pad, zodat Git deze instellingen alleen zal gebruiken voor een subdirectory of een subset van bestanden.
+Deze pad-specifieke instellingen worden Git attributen genoemd, en worden bewaard in een <code>.gitattributes</code> bestand in een van je directories (normaal gesproken de root van je project) of in het <code>.git/info/attribures</code> bestand als je dit attributen bestand niet met je project wilt committen.</p>
+</div>
+<div class="paragraph">
+<p>Met het gebruik van attributen, kan je dingen doen als het specificeren van separate merge strategieën voor individuele bestanden of directories in je project, Git vertellen hoe niet-tekst bestanden moeten worden gedifft, of Git inhoud laten filteren voordat je het naar of van Git in- of uitcheckt.
+In deze paragraaf zullen we je een en ander vertellen over de attributen die je kunt inrichten op je paden in je Git project en je zult een aantal voorbeelden zien hoe deze mogelijkheden in de praktijk gebruikt kunnen worden.</p>
+</div>
+<div class="sect3">
+<h3 id="_binaire_bestanden">Binaire bestanden</h3>
+<div class="paragraph">
+<p>
+Een aardig voorbeeld waar je Git attributen voor kunt gebruiken is Git vertellen welke bestanden binair zijn (in die gevallen waar het niet zelf kan bepalen) en Git speciale instructies te geven over hoe deze bestanden te behandelen.
+Bijvoorbeeld, sommige tekst bestanden kunnen door applicaties zijn gegenereerd en daarmee niet diff-baar, terwijl sommige binaire bestanden juist wel kunnen worden gedifft.
+We zullen je laten zien hoe je Git kunt vertellen het onderscheid te maken.</p>
+</div>
+<div class="sect4">
+<h4 id="_binaire_bestanden_herkennen">Binaire bestanden herkennen</h4>
+<div class="paragraph">
+<p>Sommige bestanden zien er uit als tekst bestanden, maar moeten praktisch gezien gewoon behandeld worden als binaire gegevens.
+Als voorbeeld, Xcode projecten op de macOS bevatten een bestand dat eindigt op <code>.pbxproj</code>, wat eigenlijk gewoon een JSON (platte tekst Javascript gegevens formaat) dataset is die door de IDE naar schijf geschreven wordt, waarin je bouwinstellingen staan en zo voorts.
+Alhoewel het technisch gesproken een tekst bestand is (omdat het allemaal UTF-8 is), wil je het niet als dusdanig behandelen omdat het eigenlijk een lichtgewicht database is - je kunt de inhoud niet mergen als twee personen het wijzigen, en diffs zijn over het algemeen niet echt nuttig.
+De bedoeling van dit bestand is om door een machine te worden verwerkt.
+Het komt erop neer dat je het wilt behandelen als een binair bestand.</p>
+</div>
+<div class="paragraph">
+<p>Om Git te vertellen om alle <code>pbxproj</code> bestanden als binaire gegevens te behandelen, voeg je de volgende regel to aan je <code>.gitattributes</code> bestand:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>*.pbxproj binary</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu zal Git niet proberen om CRLF gevallen te converteren of te repareren, en ook zal het niet proberen om een diff te bepalen of af te drukken voor wijzigingen in dit bestand als je <code>git show</code> of <code>git diff</code> op je project aanroept.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_binaire_bestanden_diffen">Binaire bestanden diffen</h4>
+<div class="paragraph">
+<p>Je kunt de Git attributen functionaliteit ook gebruiken om binaire bestanden feitelijk te diffen.
+Je kunt dit doen door Git te vertellen hoe het je binaire gegevens moet converteren naar een tekst formaat die weer via een normale diff kan worden vergeleken.</p>
+</div>
+<div class="paragraph">
+<p>Allereerst zal je deze techniek gebruiken om een van de meest ergerlijke problemen die er voor de mensheid bestaan op te lossen: het onder versie beheer plaatsen van Microsoft Word documenten.
+Iedereen weet dat Word een van de afschuwwekkendste tekstverwerkers is die bestaat maar, die vreemd genoeg, nog steeds door iedereen gebruikt wordt.
+Als je Word documenten onder versie beheer wilt brengen, kan je ze in een Git repository stoppen en eens in de zoveel tijd committen, maar wat is het nut hiervan?
+Als je <code>git diff</code> gewoon zou aanroepen, zou je alleen maar iets als dit zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --git a/chapter1.docx b/chapter1.docx
+index 88839c4..4afcb7c 100644
+Binary files a/chapter1.docx and b/chapter1.docx differ</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt twee versies niet rechtstreeks vergelijken tenzij je ze uitcheckt en dan handmatig vergelijkt, toch?
+We zullen laten zien dat je dit redelijk goed kunt doen met Git attributen.
+Zet de volgende regel in je <code>.gitattributes</code> bestand:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>*.docx diff=word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit vertelt Git dat elk bestand dat past in het patroon (<code>.docx</code>) het “word” filter moet gebruiken als je een diff probeert te bekijken waar verschillen in zitten.
+Wat is het “word” filter?
+Je moet het zelf inrichten.
+Hier ga je Git configureren om het <code>docx2txt</code> programma te gebruiken om Word documenten in leesbare tekstbestanden te converteren, die vervolgens juist kunnen worden gedifft.</p>
+</div>
+<div class="paragraph">
+<p>Allereerst moet je <code>docx2txt</code> installeren, je kunt het downloaden van <a href="https://sourceforge.net/projects/docx2txt" class="bare">https://sourceforge.net/projects/docx2txt</a>.
+Volg de instructies in het <code>INSTALL</code> bestand om het ergens neer te zetten waar je shell het kan vinden.
+Vervolgens, schrijf je een wrapper script om de uitvoer te converteren naar het formaat dat Git verwacht.
+Maak een bestand ergens in je pad en noem dezer <code>docx2txt</code> en zet dit hierin:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">#!/bin/bash
+docx2txt.pl "$1" -</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vergeet dit niet op dit bestand <code>chmod a+x</code> aan te roepen.
+Tot slot kan je Git configureren om dit script te gebruiken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config diff.word.textconv docx2txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nu weet Git dat als het een diff probeert uit te voeren tussen twee snapshots, en een van de bestandsnamen eindigt op <code>.docx</code>, dat het deze bestanden door het “word” filter moet halen die als het <code>docx2txt</code> programma gedefinieerd is.
+Effectief maakt dit mooie tekst-gebaseerde versies van je Word bestanden voordat het probeert deze te diffen.</p>
+</div>
+<div class="paragraph">
+<p>Hier is een voorbeeld: Hoofdstuk 1 van di boek was geconverteerd naar een Word formaat en gecommit in een Git repository.
+Toen is er een nieuwe sectie toegevoegd.
+Dit is wat <code>git diff</code> laat zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --git a/chapter1.docx b/chapter1.docx
+index 0b013ca..ba25db5 100644
+--- a/chapter1.docx
++++ b/chapter1.docx
+@@ -2,6 +2,7 @@
+ This chapter will be about getting started with Git. We will begin at the beginning by explaining some background on version control tools, then move on to how to get Git running on your system and finally how to get it setup to start working with. At the end of this chapter you should understand why Git is around, why you should use it and you should be all setup to do so.
+ 1.1. About Version Control
+ What is "version control", and why should you care? Version control is a system that records changes to a file or set of files over time so that you can recall specific versions later. For the examples in this book you will use software source code as the files being version controlled, though in reality you can do this with nearly any type of file on a computer.
++Testing: 1, 2, 3.
+ If you are a graphic or web designer and want to keep every version of an image or layout (which you would most certainly want to), a Version Control System (VCS) is a very wise thing to use. It allows you to revert files back to a previous state, revert the entire project back to a previous state, compare changes over time, see who last modified something that might be causing a problem, who introduced an issue and when, and more. Using a VCS also generally means that if you screw things up or lose files, you can easily recover. In addition, you get all this for very little overhead.
+ 1.1.1. Local Version Control Systems
+ Many people's version-control method of choice is to copy files into another directory (perhaps a time-stamped directory, if they're clever). This approach is very common because it is so simple, but it is also incredibly error prone. It is easy to forget which directory you're in and accidentally write to the wrong file or copy over files you don't mean to.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git vertelt ons succesvol en bondig dat we de tekenreeks “Testing: 1, 2, 3,” hebben toegevoegd, wat juist is.
+Het is niet perfect - wijzigingen in formattering worden niet zichtbaar - maar het werkt wel.</p>
+</div>
+<div class="paragraph">
+<p>Een ander interessant probleem wat je op deze manier kunt oplossen betreft het diffen van bestanden met afbeeldingen.
+Een manier om dit te doen is om afbeeldingen door een filter te halen die hun EXIF informatie extraheert - metadata die bij de meeste grafische bestanden worden vastgelegd.
+Als je het <code>exiftool</code> downloadt en installeert, kan je deze gebruiken om je afgeeldingen naar tekst over de metadata te converteren, zodat de diff je in elk geval een tekstuele representatie van wijzigingen kan laten zien:
+Zet de volgende regel in je <code>.gitattributes</code> bestand:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">*.png diff=exif</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Configureer Git om dit tool te gebruiken:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config diff.exif.textconv exiftool</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je een afbeelding in je project vervangt en dan <code>git diff</code> aanroept, zie je iets als dit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-diff" data-lang="diff">diff --git a/image.png b/image.png
+index 88839c4..4afcb7c 100644
+--- a/image.png
++++ b/image.png
+@@ -1,12 +1,12 @@
+ ExifTool Version Number         : 7.74
+-File Size                       : 70 kB
+-File Modification Date/Time     : 2009:04:21 07:02:45-07:00
++File Size                       : 94 kB
++File Modification Date/Time     : 2009:04:21 07:02:43-07:00
+ File Type                       : PNG
+ MIME Type                       : image/png
+-Image Width                     : 1058
+-Image Height                    : 889
++Image Width                     : 1056
++Image Height                    : 827
+ Bit Depth                       : 8
+ Color Type                      : RGB with Alpha</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt eenvoudig zien dat de bestandsgrootte en de dimensies van je afbeelding beide zijn veranderd.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_keyword_expansion">Sleutelwoord expansie (Keyword expansion)</h3>
+<div class="paragraph">
+<p>
+Keyword expansion zoals je dit kan vinden bij SVN of CVS wordt vaak gewenst door ontwikkelaars die gewend zijn aan die systemen.
+Het grote probleem met dit is in Git is dat je een bestand niet kunt aanvullen met informatie over de commit nadat je het hebt gecommit, omdat Git eerst een checksum van het bestand maakt.
+Je kunt echter tekst in een bestand injecteren als het uitgecheckt wordt en het weer verwijderen voordat het aan een commit wordt toegevoegd.
+Git attributen geven je twee manieren om dit te bereiken.</p>
+</div>
+<div class="paragraph">
+<p>Als eerste kan je automatisch de SHA-1 checksum van een blob in een <code>$Id$</code> veld injecteren.
+Als je dit attribuut op een bestand of een aantal bestanden zet dan zal Git, als je die branch een volgende keer
+ uitcheckt. dat veld vervangen met de SHA-1 van de blob.
+Het is belangrijk om op te merken dat het niet de SHA-1 van de commit is, maar van de blob zelf:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '*.txt ident' &gt;&gt; .gitattributes
+$ echo '$Id$' &gt; test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De volgende keer als je dit bestand uitcheckt, zal Git de SHA-1 van de blob injecteren:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ rm test.txt
+$ git checkout -- test.txt
+$ cat test.txt
+$Id: 42812b7653c7b88933f8a9d6cad0ca16714b9bb3 $</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit resultaat is echter van beperkt nut.
+Als je keyword substitutie in CVS of Subversion gebruikt hebt, kan je een datestamp bijsluiten - de SHA-1 is eigenlijk niet zo nuttig, omdat het redelijk willekeurig is en je kunt aan een SHA-1 niet zien of het ouder of jonger is dan een andere door alleen er naar te kijken.</p>
+</div>
+<div class="paragraph">
+<p>Je kunt echter je eigen filters schrijven om substituties in bestanden doen bij commit/checkout.
+Dit worden “clean” (kuis) en “smudge” (besmeur) filters genoemd.
+In het <code>.gitattributes</code> bestand kan je een filter instellen voor specifieke paden en scripts maken die de bestanden bewerken vlak voordat ze worden uitgechecked (“smudge”, zie <a href="{{< relurl "book/nl/v2/ch00/filters_a" >}}">Het “smudge” filter wordt bij checkout aangeroepen.</a>) en vlak voordat ze worden gestaged (“clean”, zie <a href="{{< relurl "book/nl/v2/ch00/filters_b" >}}">Het “clean” filter wordt aangeroepen als bestanden worden gestaged.</a>).
+Deze filters kunnen worden verteld om allerhande leuke dingen te doen.</p>
+</div>
+<div id="filters_a" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/smudge.png" >}}" alt="Het ``smudge'' filter wordt bij checkout aangeroepen.">
+</div>
+<div class="title">Figuur 144. Het “smudge” filter wordt bij checkout aangeroepen.</div>
+</div>
+<div id="filters_b" class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/nl/v2/images/clean.png" >}}" alt="Het ``clean'' filter wordt aangeroepen als bestanden worden gestaged.">
+</div>
+<div class="title">Figuur 145. Het “clean” filter wordt aangeroepen als bestanden worden gestaged.</div>
+</div>
+<div class="paragraph">
+<p>Het orginele commit bericht voor deze functionaliteit geeft een simpel voorbeeld van al je C broncode door het <code>indent</code> programma te laten bewerken voor het committen.
+Je kunt het inrichten door het filter attribuut in je <code>.gitattributes</code> bestand <code>*.c</code> bestanden te laten filteren met het “indent” filter:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">*.c filter=indent</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Daarna vertel je Git wat het “indent” filter moet doen bij smudge en clean:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global filter.indent.clean indent
+$ git config --global filter.indent.smudge cat</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In dit geval, als je bestanden commit die lijken op <code>*.c</code>, zal Git deze door het indent programma halen voordat het deze staget en ze door het <code>cat</code> programma halen voordat het ze weer naar schijf uitcheckt.
+Het <code>cat</code> programma doet eigenlijk niets: het geeft de gegevens die binnenkomen ongewijzigd door.
+Deze combinatie zal effectief alle C broncode door <code>indent</code> laten filteren voor het te committen.</p>
+</div>
+<div class="paragraph">
+<p>Een ander interessant voorbeeld veroorzaakt <code>$Date$</code> keyword expansie, zoals bij RCS.
+Om dit goed te doen heb je een klein scriptje nodig dat een bestandsnaam neemt, de laatste commit datum vindt voor dit project en dan de datum in dat bestand injecteren.
+Hier is een kort Ruby script dat precies dit doet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+data = STDIN.read
+last_date = `git log --pretty=format:"%ad" -1`
+puts data.gsub('$Date$', '$Date: ' + last_date.to_s + '$')</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Al wat dit script doet is de laatste commit datum van het <code>git log</code> commando uitlezen, en dat in elke <code>$Date$</code> tekenreeks die het in stdin ziet zetten, en drukt het resultaat af - het zou eenvoudig moeten zijn om dit te doen in een taal waar je het meest vertrouwd mee bent.
+Je kunt dit bestand <code>expand_date</code> noemen en het op je pad plaatsen.
+Nu moet je een filter opzetten in Git (noem het <code>dater</code>) en het vertellen om je <code>expand_date</code> filter te gebruiken om de bestanden te besmeuren bij uitchecken.
+Je kunt een Perl expressie gebruiken om dat bij commit weer op te kuisen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config filter.dater.smudge expand_date
+$ git config filter.dater.clean 'perl -pe "s/\\\$Date[^\\\$]*\\\$/\\\$Date\\\$/"'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Dit stukje Perl haalt alles weg wat het ziet in een <code>$Date$</code> tekenreeks, om terug te halen waar je mee was begonnen.
+Nu je filter gereed is, kan je het uitproberen door een bestand te maken met je <code>$Date$</code> keyword en daarna een Git attribuut op te zetten voor dat bestand die je nieuwe filter activeert:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">date*.txt filter=dater</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '# $Date$' &gt; date_test.txt</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je deze wijzigingen commit en het bestand weer uitcheckt, zal je het keyword correct vervangen zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add date_test.txt .gitattributes
+$ git commit -m "Testing date expansion in Git"
+$ rm date_test.txt
+$ git checkout date_test.txt
+$ cat date_test.txt
+# $Date: Tue Apr 21 07:26:52 2009 -0700$</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Je kunt zien hoe krachtig deze techniek kan zijn voor eigen toepassingen.
+Je moet echter wel voorzichtig zijn, omdat het <code>.gitattributes</code> bestand gecommit wordt en met het project wordt verspreid, maar dat het uitvoerende element (in dit geval <code>dater</code>) dat niet wordt, zodat het niet overal zal werken.
+Als je deze filters ontwerpt, moeten ze in staat zijn om netjes te falen en het project nog steeds goed te laten werken.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_je_repository_exporteren">Je repository exporteren</h3>
+<div class="paragraph">
+<p>
+De Git attribute gegevens staan je ook toe om interessante dingen te doen als je een archief van je project exporteert.</p>
+</div>
+<div class="sect4">
+<h4 id="_export_ignore"><code>export-ignore</code></h4>
+<div class="paragraph">
+<p>Je kunt Git vertellen dat sommige bestanden of directories niet geëxporteerd moeten worden bij het genereren van een archief.
+Als er een subdirectory of bestand is waarvan je niet wilt dat het wordt meegenomen in je archief bestand, maar dat je wel in je project ingecheckt wil hebben, kan je die bestanden benoemen met behulp van het <code>export-ignore</code> attribuut.</p>
+</div>
+<div class="paragraph">
+<p>Bijvoorbeeld, stel dat je wat testbestanden in een <code>test/</code> subdirectory hebt, en dat het geen zin heeft om die in de tarball export van je project mee te nemen.
+Dan kan je de volgende regel in je Git attributes bestand toevoegen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">test/ export-ignore</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je nu <code>git archive</code> uitvoert om een tarball van je project te maken, zal die directory niet meegenomen worden in het archief.</p>
+</div>
+</div>
+<div class="sect4">
+<h4 id="_export_subst"><code>export-subst</code></h4>
+<div class="paragraph">
+<p>Als je bestanden exporteert voor deployment kan je de formattering en sleutelwoord expansie van <code>git log</code> toepassen om delen van bestanden selecteren die met het <code>export-subst</code> attribuut zijn gemarkeerd.</p>
+</div>
+<div class="paragraph">
+<p>Bijvoorbeeld, als je een bestand genaamd <code>LAST_COMMIT</code> wilt meenemen in je project, waarin de laatste commit datum op van het moment dat <code>git archive</code> liep automatisch wordt geïnjecteerd, kan je het bestand als volgt instellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">LAST_COMMIT export-subst</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo 'Last commit date: $Format:%cd by %aN$' &gt; LAST_COMMIT
+$ git add LAST_COMMIT .gitattributes
+$ git commit -am 'adding LAST_COMMIT file for archives'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je <code>git archive</code> uitvoert, zal de inhoud van dat bestand er zo uit zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git archive HEAD | tar xCf ../deployment-testing -
+$ cat ../deployment-testing/LAST_COMMIT
+Last commit date: Tue Apr 21 08:38:48 2009 -0700 by Scott Chacon</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>De vervangingen kunnen bijvoorbeeld het commit bericht en elke <code>git note</code> omvatten, en <code>git log</code> kan eenvoudige word-wrapping uitvoeren:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ echo '$Format:Last commit: %h by %aN at %cd%n%+w(76,6,9)%B$' &gt; LAST_COMMIT
+$ git commit -am 'export-subst uses git log'\''s custom formatter
+
+git archive uses git log'\''s `pretty=format:` processor
+directly, and strips the surrounding `$Format:` and `$`
+markup from the output.
+'
+$ git archive @ | tar xfO - LAST_COMMIT
+Last commit: 312ccc8 by Jim Hill at Fri May 8 09:14:04 2015 -0700
+       export-subst uses git log's custom formatter
+
+         git archive uses git log's `pretty=format:` processor directly, and
+         strips the surrounding `$Format:` and `$` markup from the output.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Het archief wat hieruit komt is bruikbaar voor deployment werkzaamheden, maar zoals elk geëxporteerd archief is het niet echt toepasbaar voor verdere ontwikkel werk.</p>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_merge_strategieën">Merge strategieën</h3>
+<div class="paragraph">
+<p>
+Je kunt Git attributen ook gebruiken om Git te vertellen dat het verschillende merge strategieën moet gebruiken voor specifieke bestanden in je project.
+Een erg handige toepassing is Git te vertellen dat het bepaalde bestanden niet moet proberen te mergen als ze conflicten hebben, maar jouw versie moeten gebruiken in plaats van die van de ander.</p>
+</div>
+<div class="paragraph">
+<p>Dit is handig als een branch in jouw project uiteen is gelopen of gespecialiseerd is, maar je wel in staat wilt zijn om veranderingen daarvan te mergen, en je wilt bepaalde bestanden negeren.
+Stel dat je een database instellingen-bestand hebt dat <code>database.xml</code> heet en tussen twee branches verschilt, en je wilt de andere branch mergen zonder jouw database bestand overhoop te halen.
+Je kunt dan een attribuut als volgt instellen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">database.xml merge=ours</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>En daarna een loze <code>ours</code> merge strategie definiëren met:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global merge.ours.driver true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Als je in de andere branch merget, dan zul je in plaats van merge conflicten met het <code>database.xml</code> bestand zoiets als dit zien:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git merge topic
+Auto-merging database.xml
+Merge made by recursive.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In dit geval blijft database.xml staan op de versie die je oorspronkelijk al had.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

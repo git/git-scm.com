@@ -1,0 +1,192 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: be
+  chapter:
+    title: Git on the Server
+    number: 4
+  section:
+    title: Setting Up the Server
+    number: 4
+    cs_number: '4.4'
+    previous: book/be/v2/Git-on-the-Server-Generating-Your-SSH-Public-Key
+    next: book/be/v2/Git-on-the-Server-Git-Daemon
+title: Git - Setting Up the Server
+
+---
+<h2 id="_setting_up_server">Setting Up the Server</h2>
+<div class="paragraph">
+<p>Let’s walk through setting up SSH access on the server side.
+In this example, you’ll use the <code>authorized_keys</code> method for authenticating your users.
+We also assume you’re running a standard Linux distribution like Ubuntu.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Заўвага</div>
+</td>
+<td class="content">
+<div class="paragraph">
+<p>A good deal of what is described here can be automated by using the <code>ssh-copy-id</code> command, rather than manually copying and installing public keys.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>First, you create a <code>git</code> user account and a <code>.ssh</code> directory for that user.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo adduser git
+$ su git
+$ cd
+$ mkdir .ssh &amp;&amp; chmod 700 .ssh
+$ touch .ssh/authorized_keys &amp;&amp; chmod 600 .ssh/authorized_keys</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Next, you need to add some developer SSH public keys to the <code>authorized_keys</code> file for the <code>git</code> user.
+Let’s assume you have some trusted public keys and have saved them to temporary files.
+Again, the public keys look something like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat /tmp/id_rsa.john.pub
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCB007n/ww+ouN4gSLKssMxXnBOvf9LGt4L
+ojG6rs6hPB09j9R/T17/x4lhJA0F3FR1rP6kYBRsWj2aThGw6HXLm9/5zytK6Ztg3RPKK+4k
+Yjh6541NYsnEAZuXz0jTTyAUfrtU3Z5E003C4oxOj6H0rfIF1kKI9MAQLMdpGW1GYEIgS9Ez
+Sdfd8AcCIicTDWbqLAcU4UpkaX8KyGlLwsNuuGztobF8m72ALC/nLF6JLtPofwFBlgc+myiv
+O7TCUSBdLQlgMVOFq1I2uPWQOkOWQAHukEOmfjy2jctxSDBQ220ymjaNsHT4kgtZg2AYYgPq
+dAv8JggJICUvax2T9va5 gsg-keypair</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You just append them to the <code>git</code> user’s <code>authorized_keys</code> file in its <code>.ssh</code> directory:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat /tmp/id_rsa.john.pub &gt;&gt; ~/.ssh/authorized_keys
+$ cat /tmp/id_rsa.josie.pub &gt;&gt; ~/.ssh/authorized_keys
+$ cat /tmp/id_rsa.jessica.pub &gt;&gt; ~/.ssh/authorized_keys</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, you can set up an empty repository for them by running <code>git init</code> with the <code>--bare</code> option, which initializes the repository without a working directory:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cd /srv/git
+$ mkdir project.git
+$ cd project.git
+$ git init --bare
+Initialized empty Git repository in /srv/git/project.git/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then, John, Josie, or Jessica can push the first version of their project into that repository by adding it as a remote and pushing up a branch.
+Note that someone must shell onto the machine and create a bare repository every time you want to add a project.
+Let’s use <code>gitserver</code> as the hostname of the server on which you’ve set up your <code>git</code> user and repository.
+If you’re running it internally, and you set up DNS for <code>gitserver</code> to point to that server, then you can use the commands pretty much as is (assuming that <code>myproject</code> is an existing project with files in it):</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console"># on John's computer
+$ cd myproject
+$ git init
+$ git add .
+$ git commit -m 'Initial commit'
+$ git remote add origin git@gitserver:/srv/git/project.git
+$ git push origin master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>At this point, the others can clone it down and push changes back up just as easily:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git clone git@gitserver:/srv/git/project.git
+$ cd project
+$ vim README
+$ git commit -am 'Fix for README file'
+$ git push origin master</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With this method, you can quickly get a read/write Git server up and running for a handful of developers.</p>
+</div>
+<div class="paragraph">
+<p>You should note that currently all these users can also log into the server and get a shell as the <code>git</code> user.
+If you want to restrict that, you will have to change the shell to something else in the <code>/etc/passwd</code> file.</p>
+</div>
+<div class="paragraph">
+<p>You can easily restrict the <code>git</code> user account to only Git-related activities with a limited shell tool called <code>git-shell</code> that comes with Git.
+If you set this as the <code>git</code> user account’s login shell, then that account can’t have normal shell access to your server.
+To use this, specify <code>git-shell</code> instead of <code>bash</code> or <code>csh</code> for that account’s login shell.
+To do so, you must first add the full pathname of the <code>git-shell</code> command to <code>/etc/shells</code> if it’s not already there:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat /etc/shells   # see if git-shell is already in there. If not...
+$ which git-shell   # make sure git-shell is installed on your system.
+$ sudo -e /etc/shells  # and add the path to git-shell from last command</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now you can edit the shell for a user using <code>chsh &lt;username&gt; -s &lt;shell&gt;</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ sudo chsh git -s $(which git-shell)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, the <code>git</code> user can still use the SSH connection to push and pull Git repositories but can’t shell onto the machine.
+If you try, you’ll see a login rejection like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ ssh git@gitserver
+fatal: Interactive git shell is not enabled.
+hint: ~/git-shell-commands should exist and have read and execute access.
+Connection to gitserver closed.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>At this point, users are still able to use SSH port forwarding to access any host the git server is able to reach.
+If you want to prevent that, you can edit the <code>authorized_keys</code> file and prepend the following options to each key you’d like to restrict:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The result should look like this:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat ~/.ssh/authorized_keys
+no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-rsa
+AAAAB3NzaC1yc2EAAAADAQABAAABAQCB007n/ww+ouN4gSLKssMxXnBOvf9LGt4LojG6rs6h
+PB09j9R/T17/x4lhJA0F3FR1rP6kYBRsWj2aThGw6HXLm9/5zytK6Ztg3RPKK+4kYjh6541N
+YsnEAZuXz0jTTyAUfrtU3Z5E003C4oxOj6H0rfIF1kKI9MAQLMdpGW1GYEIgS9EzSdfd8AcC
+IicTDWbqLAcU4UpkaX8KyGlLwsNuuGztobF8m72ALC/nLF6JLtPofwFBlgc+myivO7TCUSBd
+LQlgMVOFq1I2uPWQOkOWQAHukEOmfjy2jctxSDBQ220ymjaNsHT4kgtZg2AYYgPqdAv8JggJ
+ICUvax2T9va5 gsg-keypair
+
+no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-rsa
+AAAAB3NzaC1yc2EAAAADAQABAAABAQDEwENNMomTboYI+LJieaAY16qiXiH3wuvENhBG...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now Git network commands will still work just fine but the users won’t be able to get a shell.
+As the output states, you can also set up a directory in the <code>git</code> user’s home directory that customizes the <code>git-shell</code> command a bit.
+For instance, you can restrict the Git commands that the server will accept or you can customize the message that users see if they try to SSH in like that.
+Run <code>git help shell</code> for more information on customizing the shell.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

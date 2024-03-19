@@ -1,0 +1,125 @@
+git-annotate(1)
+===============
+
+名称
+--
+git-annotate - 用提交信息注释文件行
+
+概述
+--
+[verse]
+'git annotate' [<options>] [<rev-opts>] [<rev>] [--] <file>
+
+描述
+--
+用引入该行的提交信息来注释给定文件中的每一行。也可以选择从给定的修订版中进行注释。
+
+这个命令和 linkgit:git-blame[1] 的唯一区别是，它们使用的输出格式略有不同，这个命令的存在只是为了向后兼容，以支持现有的脚本，并为来自其他 SCM 系统的人提供一个更熟悉的命令名称。
+
+选项
+--
+-b::
+	Show blank SHA-1 for boundary commits. This can also be controlled via the `blame.blankBoundary` config option.
+
+--root::
+	Do not treat root commits as boundaries. This can also be controlled via the `blame.showRoot` config option.
+
+--show-stats::
+	在历史追溯输出的结尾处包括额外的统计数据。
+
+-L <start>,<end>::
+-L :<funcname>::
+	Annotate only the line range given by '<start>,<end>', or by the function name regex '<funcname>'. May be specified multiple times. Overlapping ranges are allowed.
++
+'<start>' 和 '<end>' 是可选的 `-L <start>` 或 `-L <start>,` 范围从 '<start>' 到文件末尾。 `-L ,<end>` 从文件开始到 '<end>'.
++
+'<开始>' 和 '<结束>' 可以采取这些形式之一：
+
+- 数目
++
+如果'<开始>'或'<结束>'是一个数字，它指定了一个绝对行数（行数从1开始计算）。
++
+
+- `/正则表达式/`
++
+This form will use the first line matching the given POSIX regex. If '<start>' is a regex, it will search from the end of the previous `-L` range, if any, otherwise from the start of file. If '<start>' is `^/regex/`, it will search from the start of file. If '<end>' is a regex, it will search starting at the line given by '<start>'.
++
+
+- +offset或-offset
++
+这只对'<end>'有效，将指定'<start>'所给的行前或行后的数量。
+
++
+如果`:<funcname>`代替了'<start>'和'<end>'，它是一个正则表达式，表示从第一个匹配'<funcname>'的funcname行开始，直到下一个funcname行的范围。`:<funcname>`从上一个`-L'范围的末尾开始搜索，如果有的话，则从文件的开始搜索。`^:<funcname>`从文件的开始搜索。函数名的确定方式与 `git diff`确定补丁组头的方式相同（见 linkgit:gitattributes[5] 中的'定义自定义组头'）。
+[]
+
+-l::
+	显示长转（默认值：关闭）。
+
+-t::
+	显示原始时间戳（默认值：关闭）。
+
+-S <修订文件>::
+	使用revs-file中的修订，而不是调用 linkgit:git-rev-list[1]。
+
+--reverse <修订>..<修订>::
+	Walk history forward instead of backward. Instead of showing the revision in which a line appeared, this shows the last revision in which a line has existed. This requires a range of revision like START..END where the path to blame exists in START. `git blame --reverse START` is taken as `git blame --reverse START..HEAD` for convenience.
+
+--first-parent::
+	在看到合并提交时只关注第一个父提交。这个选项可以用来确定某一行何时被引入某个特定的集成分支，而不是何时被引入整个历史中。
+
+-p::
+--porcelain::
+	以适合机器使用的格式显示。
+
+--line-porcelain::
+	Show the porcelain format, but output commit information for each line, not just the first time a commit is referenced. Implies --porcelain.
+
+--incremental::
+	以适合机器使用的格式逐步显示结果。
+
+--encoding=<编码>::
+	指定用于输出作者姓名和提交摘要的编码。设置为 `none` 会使历史追溯输出未转换的数据。更多信息见 linkgit:git-log[1] 手册页中关于编码的讨论。
+
+--contents <文件>::
+	使用指定文件中的内容进行注释，如果指定了 <rev>，则从 <rev> 开始，否则从 HEAD 开始。你可以指定 '-' 来使命令从标准输入中读取文件内容。
+
+--date <格式>::
+	指定用于输出日期的格式。如果没有提供 --date，则使用 blame.date 配置变量的值。如果 blame.date 配置变量也没有设置，则使用 iso 格式。关于支持的值，请参见 linkgit:git-log[1] 中关于 --date 选项的讨论。
+
+--[no-]progress::
+	当它连接到一个终端时，默认情况下进度状态会在标准错误流中报告。这个标志可以使进度报告即使没有连接到终端。`--porcelain`或`--incremental` 不能与 `--progress` 一起使用。
+
+-M[<数量>]::
+	Detect moved or copied lines within a file. When a commit moves or copies a block of lines (e.g. the original file has A and then B, and the commit changes it to B and then A), the traditional 'blame' algorithm notices only half of the movement and typically blames the lines that were moved up (i.e. B) to the parent and assigns blame to the lines that were moved down (i.e. A) to the child commit. With this option, both groups of lines are blamed on the parent by running extra passes of inspection.
++
+<num> 是可选的，但它是 Git 必须检测到的在文件中移动或复制的字母数字字符的数量的下限，以便它将这些行与父提交相关联。默认值是20。
+
+-C[<数量>]::
+	In addition to `-M`, detect lines moved or copied from other files that were modified in the same commit. This is useful when you reorganize your program and move code around across files. When this option is given twice, the command additionally looks for copies from other files in the commit that creates the file. When this option is given three times, the command additionally looks for copies from other files in any commit.
++
+<num>是 可选的，但它是 Git 必须检测到的在文件之间移动或复制的字母数字字符的数量的下限，以便它将这些行与父提交关联起来。而默认值是 40。如果有一个以上的 `-C ` 选项，只有最后一个 `-C `的 <num> 参数起作用。
+
+--ignore-rev <修订>::
+	Ignore changes made by the revision when assigning blame, as if the change never happened. Lines that were changed or added by an ignored commit will be blamed on the previous commit that changed that line or nearby lines. This option may be specified multiple times to ignore more than one revision. If the `blame.markIgnoredLines` config option is set, then lines that were changed by an ignored commit and attributed to another commit will be marked with a `?` in the blame output. If the `blame.markUnblamableLines` config option is set, then those lines touched by an ignored commit that we could not attribute to another revision are marked with a '*'.
+
+--ignore-revs-file <文件>::
+	Ignore revisions listed in `file`, which must be in the same format as an `fsck.skipList`. This option may be repeated, and these files will be processed after any files specified with the `blame.ignoreRevsFile` config option. An empty file name, `""`, will clear the list of revs from previously processed files.
+
+--color-lines::
+	在默认格式下，如果行注释与前一行来自同一提交，则颜色不同。这可以让我们更容易区分不同提交的代码块。颜色默认为青色，可以使用 `color.blame.repeatedLines` 配置选项进行调整。
+
+--color-by-age::
+	Color line annotations depending on the age of the line in the default format. The `color.blame.highlightRecent` config option controls what color is used for each range of age.
+
+-h::
+	显示帮助信息。
+[]
+
+参见
+--
+linkgit:git-blame[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

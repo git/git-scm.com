@@ -1,0 +1,185 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: es
+  chapter:
+    title: Herramientas de Git
+    number: 7
+  section:
+    title: Buscando
+    number: 5
+    cs_number: '7.5'
+    previous: book/es/v2/Herramientas-de-Git-Firmando-tu-trabajo
+    next: book/es/v2/Herramientas-de-Git-Reescribiendo-la-Historia
+title: Git - Buscando
+
+---
+<h2 id="r_searching">Buscando</h2>
+<div class="paragraph">
+<p>Con casi cualquier tamaño de código de base, a menudo necesitará encontrar en dónde se llama o define una función, o encontrar el historial de un método. Git proporciona un par de herramientas útiles para examinar el código y hacer <em>commit</em> a las instantáneas almacenadas en su base de datos de forma rápida y fácil. Vamos a revisar algunas de ellas.</p>
+</div>
+<div class="sect3">
+<h3 id="r_git_grep">Git Grep</h3>
+<div class="paragraph">
+<p>Git se envía con un comando llamado <code>grep</code> que le permite buscar fácilmente a través de cualquier árbol o directorio de trabajo con <em>commit</em> por una cadena o expresión regular. Para estos ejemplos, veremos el código fuente de Git.</p>
+</div>
+<div class="paragraph">
+<p>Por defecto, mirará a través de los archivos en su directorio de trabajo. Puedes pasar <code>-n</code> para imprimir los números de línea donde Git ha encontrado coincidencias.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git grep -n gmtime_r
+compat/gmtime.c:3:#undef gmtime_r
+compat/gmtime.c:8:      return git_gmtime_r(timep, &amp;result);
+compat/gmtime.c:11:struct tm *git_gmtime_r(const time_t *timep, struct tm *result)
+compat/gmtime.c:16:     ret = gmtime_r(timep, result);
+compat/mingw.c:606:struct tm *gmtime_r(const time_t *timep, struct tm *result)
+compat/mingw.h:162:struct tm *gmtime_r(const time_t *timep, struct tm *result);
+date.c:429:             if (gmtime_r(&amp;now, &amp;now_tm))
+date.c:492:             if (gmtime_r(&amp;time, tm)) {
+git-compat-util.h:721:struct tm *git_gmtime_r(const time_t *, struct tm *);
+git-compat-util.h:723:#define gmtime_r git_gmtime_r</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hay una serie de opciones interesantes que puede proporcionar el comando <code>grep</code>.</p>
+</div>
+<div class="paragraph">
+<p>Por ejemplo, en lugar de la llamada anterior, puedes hacer que Git resuma el resultado simplemente mostrándote qué archivos coinciden y cuántas coincidencias hay en cada archivo con la opción <code>--count</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git grep --count gmtime_r
+compat/gmtime.c:4
+compat/mingw.c:1
+compat/mingw.h:1
+date.c:2
+git-compat-util.h:2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si quieres ver en qué método o función piensa Git que ha encontrado una coincidencia, puedes pasar <code>-p</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git grep -p gmtime_r *.c
+date.c=static int match_multi_number(unsigned long num, char c, const char *date, char *end, struct tm *tm)
+date.c:         if (gmtime_r(&amp;now, &amp;now_tm))
+date.c=static int match_digit(const char *date, struct tm *tm, int *offset, int *tm_gmt)
+date.c:         if (gmtime_r(&amp;time, tm)) {</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Así que aquí podemos ver que se llama a <code>gmtime_r</code> en las funciones <code>match_multi_number</code> y <code>match_digit</code> en el archivo date.c.</p>
+</div>
+<div class="paragraph">
+<p>También puedes buscar combinaciones complejas de cadenas con el indicador <code>--and</code>, que asegura que múltiples coincidencias estén en la misma línea. Por ejemplo, busquemos cualquier línea que defina una constante con las cadenas “LINK” o “BUF_MAX” en ellas en la base del código de Git en una versión 1.8.0 anterior.</p>
+</div>
+<div class="paragraph">
+<p>Aquí también usaremos las opciones <code>--break</code> y <code>--heading</code> que ayudan a dividir el resultado en un formato más legible.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git grep --break --heading \
+    -n -e '#define' --and \( -e LINK -e BUF_MAX \) v1.8.0
+v1.8.0:builtin/index-pack.c
+62:#define FLAG_LINK (1u&lt;&lt;20)
+
+v1.8.0:cache.h
+73:#define S_IFGITLINK  0160000
+74:#define S_ISGITLINK(m)       (((m) &amp; S_IFMT) == S_IFGITLINK)
+
+v1.8.0:environment.c
+54:#define OBJECT_CREATION_MODE OBJECT_CREATION_USES_HARDLINKS
+
+v1.8.0:strbuf.c
+326:#define STRBUF_MAXLINK (2*PATH_MAX)
+
+v1.8.0:symlinks.c
+53:#define FL_SYMLINK  (1 &lt;&lt; 2)
+
+v1.8.0:zlib.c
+30:/* #define ZLIB_BUF_MAX ((uInt)-1) */
+31:#define ZLIB_BUF_MAX ((uInt) 1024 * 1024 * 1024) /* 1GB */</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>El comando <code>git grep</code> tiene algunas ventajas sobre los comandos de búsqueda normales como <code>grep</code> y <code>ack</code>. La primera es que es realmente rápido, la segunda es que puedes buscar a través de cualquier árbol en Git, no solo en el directorio de trabajo. Como vimos en el ejemplo anterior, buscamos términos en una versión anterior del código fuente de Git, no en la versión que estaba actualmente verificada.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_búsqueda_de_registro_de_git">Búsqueda de Registro de Git</h3>
+<div class="paragraph">
+<p>Quizás no estás buscando <strong>dónde</strong> existe un término, sino <strong>cuándo</strong> existió o se introdujo. El comando <code>git log</code> tiene varias herramientas potentes para encontrar <em>commits</em> específicos por el contenido de sus mensajes o incluso el contenido de las diferencias que introducen.</p>
+</div>
+<div class="paragraph">
+<p>Si queremos saber, por ejemplo, cuándo se introdujo originalmente la constante <code>ZLIB_BUF_MAX</code>, podemos decirle a Git que sólo nos muestre los <em>commits</em> que agregaron o eliminaron esa cadena con la opción <code>-S</code>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -SZLIB_BUF_MAX --oneline
+e01503b zlib: allow feeding more than 4GB in one go
+ef49a7a zlib: zlib can only process 4GB at a time</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si miramos la diferencia de esos <em>commits</em>, podemos ver que en <code>ef49a7a</code> se introdujo la constante y en <code>e01503b</code> se modificó.</p>
+</div>
+<div class="paragraph">
+<p>Si necesitas ser más específico, puedes proporcionar una expresión regular para buscar con la opción <code>-G</code>.</p>
+</div>
+<div class="sect4">
+<h4 id="_búsqueda_de_registro_de_línea">Búsqueda de Registro de Línea</h4>
+<div class="paragraph">
+<p>Otra búsqueda de registro bastante avanzada que es increíblemente útil es la búsqueda del historial de línea. Esta es una adición bastante reciente y no muy conocida, pero puede ser realmente útil. Se llama con la opción <code>-L</code> a <code>git log</code> y te mostrará el historial de una función o línea de código en tu base de código.</p>
+</div>
+<div class="paragraph">
+<p>Por ejemplo, si quisiéramos ver cada cambio realizado en la función <code>git_deflate_bound</code> en el archivo <code>zlib.c</code>, podríamos ejecutar <code>git log -L :git_deflate_bound:zlib.c</code>. Esto intentará descubrir cuáles son los límites de esa función y luego examinará el historial y nos mostrará cada cambio que se hizo a la función como una serie de parches de cuando se creó la función por primera vez.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -L :git_deflate_bound:zlib.c
+commit ef49a7a0126d64359c974b4b3b71d7ad42ee3bca
+Author: Junio C Hamano &lt;gitster@pobox.com&gt;
+Date:   Fri Jun 10 11:52:15 2011 -0700
+
+    zlib: zlib can only process 4GB at a time
+
+diff --git a/zlib.c b/zlib.c
+--- a/zlib.c
++++ b/zlib.c
+@@ -85,5 +130,5 @@
+-unsigned long git_deflate_bound(z_streamp strm, unsigned long size)
++unsigned long git_deflate_bound(git_zstream *strm, unsigned long size)
+ {
+-       return deflateBound(strm, size);
++       return deflateBound(&amp;strm-&gt;z, size);
+ }
+
+
+commit 225a6f1068f71723a910e8565db4e252b3ca21fa
+Author: Junio C Hamano &lt;gitster@pobox.com&gt;
+Date:   Fri Jun 10 11:18:17 2011 -0700
+
+    zlib: wrap deflateBound() too
+
+diff --git a/zlib.c b/zlib.c
+--- a/zlib.c
++++ b/zlib.c
+@@ -81,0 +85,5 @@
++unsigned long git_deflate_bound(z_streamp strm, unsigned long size)
++{
++       return deflateBound(strm, size);
++}
++</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Si Git no puede encontrar la forma de relacionar una función o método en tu lenguaje de programación, también puedes proporcionarle una expresión regular. Por ejemplo, esto habría hecho lo mismo: <code>git log -L '/unsigned long git_deflate_bound/',/^}/:zlib.c</code>. También podrías darle un rango de líneas o un único número de línea y obtendrás el mismo tipo de salida.</p>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>
