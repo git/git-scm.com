@@ -62,3 +62,42 @@ runs:
     - name: deploy
       id: deploy
       uses: actions/deploy-pages@v3
+
+    - name: construct `--remap` option
+      id: remap
+      shell: bash
+      run: |
+        base_url='${{ steps.pages.outputs.base_url }}'
+        echo "result=$(echo "$base_url" |
+          sed 's|^\(.*\)\(/git-scm\.com\)$|(\1)?\2(.*)|') file://$PWD/public\$2" \
+          >>$GITHUB_OUTPUT
+
+    - name: check for broken links
+      id: lychee
+      uses: dscho/lychee-action@master
+      with:
+        args: >-
+          --offline
+          --fallback-extensions html
+          --base '${{ steps.pages.outputs.base_url }}'
+          --remap '${{ steps.remap.outputs.result }}'
+          --exclude file:///path/to/repo.git/
+          --exclude file:///caminho/para/o/reposit%C3%B3rio.git/
+          --exclude file:///ruta/a/repositorio.git/
+          --exclude file:///sl%C3%B3%C3%B0/til/hirsla.git/
+          --exclude file:///Pfad/zum/Repo.git/
+          --exclude file:///chemin/du/d%C3%A9p%C3%B4t.git/
+          --exclude file:///srv/git/project.git
+          public/
+        output: lychee.md
+        jobSummary: true
+        fail: false
+        failIfEmpty: false # needed because its default overrides `fail = false`
+
+    - name: report broken link(s) in a new issue
+      if: steps.lychee.outputs.exit_code != '0'
+      uses: peter-evans/create-issue-from-file@v5
+      with:
+        title: Link Checker Report
+        content-filepath: ./lychee.md
+        labels: lychee
