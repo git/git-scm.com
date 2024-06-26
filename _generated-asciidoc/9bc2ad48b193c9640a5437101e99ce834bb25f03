@@ -1,0 +1,227 @@
+git-pack-objects(1)
+===================
+
+NOME
+----
+git-pack-objects - Crie um arquivo compactado dos objetos
+
+
+RESUMO
+------
+[verse]
+'git pack-objects' [-q | --progress | --all-progress] [--all-progress-implied]
+	[--no-reuse-delta] [--delta-base-offset] [--non-empty]
+	[--local] [--incremental] [--window=<n>] [--depth=<n>]
+	[--revs [--unpacked | --all]] [--keep-pack=<nome-do-pacote>]
+	[--cruft] [--cruft-expiration=<tempo>]
+	[--stdout [--filter=<filter-spec>] | <nome-base>]
+	[--shallow] [--keep-true-parents] [--[no-]sparse] < <lista-do-objeto>
+
+
+DESCRIÇÃO
+---------
+Lê a lista dos objetos da entrada padrão e grava um ou mais arquivos compactados com o nome da base informada no disco ou num arquivo compactado na saída padrão.
+
+Um arquivo compactado é uma maneira eficiente de transferir um conjunto de objetos entre dois repositórios, bem como um formato de arquivamento de acesso eficiente. Em um arquivo compactado, ou um objeto é armazenado como um todo de forma compactada ou como uma diferença de um outro objeto. O último é frequentemente chamado de delta.
+
+O formato do arquivo compactado (.pack) foi projetado para ser independente, para que possa ser descompactado sem nenhuma informação adicional. Portanto, cada objeto onde um delta seja dependente, deve estar presente no pacote.
+
+Um arquivo do índice do pacote (.idx) é gerado para ter um acesso rápido e aleatório aos objetos no pacote. Colocando ambos os arquivo do índice (.idx) e o arquivo compactado (.pack) no subdiretório do pack/ `$GIT_OBJECT_DIRECTORY` (ou qualquer um dos diretórios em `$GIT_ALTERNATE_OBJECT_DIRECTORIES`) permite que o Git leia o arquivo compactado.
+
+O comando 'git unpack-objects' pode ler o arquivo compactado e expandir os objetos existentes no pacote no formato "um-arquivo, um-objeto"; isso geralmente é feito pelos comandos 'smart-pull' quando um pacote é criado em tempo real por um transporte de rede eficiente pelos seus pares.
+
+
+OPÇÕES
+------
+base-name::
+	Escreva em pares de arquivos (.pack e .idx), utilizando <nome-base> para determinar o nome do arquivo que foi criado. Quando essa opção é utilizada, os dois arquivos num par são gravados nos arquivos <nome-base>-<SHA-1>.{pack,idx}. O <SHA-1> é um hash baseado no conteúdo do pacote e é gravado na saída padrão do comando.
+
+--stdout::
+	Escreva o conteúdo do pacote (o que teria sido gravado no arquivo .pack) na saída padrão.
+
+--revs::
+	Leia os argumentos da revisão da entrada padrão em vez dos nomes dos objetos individuais. Os argumentos da revisão são processados da mesma maneira que o comando 'git rev-list' faz com o comando `--objects`, utiliza no seus argumentos `commit` para construir a lista dos objetos que ele gera. Os objetos na lista resultante são compactados. Além das revisões, as linhas `--not` ou `--shallow <SHA-1>` também são aceitas.
+
+--unpacked::
+	Implica no uso da opção `--revs`. Ao processar a lista dos argumentos da revisão lidos a partir da entrada padrão, limite os objetos compactados àqueles que ainda não foram compactados.
+
+--all::
+	Implica no uso da opção `--revs`. Além da lista de argumentos da revisão lidos na entrada padrão, finja que todas as refs em `refs/` estão definidas para serem incluídas.
+
+--include-tag::
+	Inclua as anotações das tags que não foram solicitadas caso o objeto a que se referirem tenha sido incluído no arquivo do pacote resultante. Pode ser útil para enviar as novas tags para os clientes nativos do Git.
+
+--stdin-packs::
+	Leia os nomes base dos "packfiles" (por exemplo, `pack-1234abcd.pack`) a partir da entrada predefinida, em vez de nomes dos objetos ou das opções da revisão. O pacote resultante contém todos os objetos listados nos pacotes incluídos (aqueles que não comecem com `^`), excluindo quaisquer objetos listados nos pacotes excluídos (que comecem com `^`).
++
+É incompatível com a opção `--revs`, ou opções que impliquem no uso de `--revs` (como `--all`), menos com a opção `--unpacked`, que é compatível.
+
+--cruft::
+	Empacota objetos inacessíveis num pacote "cruft" (simples) separado, denotado pela existência de um arquivo `.mtimes`. É normalmente é utilizado por `git repack --cruft`. Aqueles que os invocam fornecem uma lista dos nomes dos pacotes e indicam quais os pacotes permanecerão no repositório, juntamente com quais pacotes serão excluídos (indicado pelo prefixo `-`). O conteúdo do pacote "cruft" são todos os objetos não contidos nos pacotes sobreviventes que não excederam o período de carência (consulte `--cruft-expiration` abaixo), ou que excederam o período de carência, mas são acessíveis a partir de um outro objeto que não o tem.
++
+Quando a entrada listar um pacote contendo todos os objetos alcançáveis (e listar todos os outros pacotes como exclusão pendente), o pacote "cruft" correspondente conterá todos os objetos inalcançáveis (com mtime mais recente que `--cruft-expiration`) junto com quaisquer objetos inalcançáveis cujos mtime seja mais antigo que o `--cruft-expiration`, e seja acessível a partir de um objeto inacessível cujo mtime seja mais recente que `--cruft-expiration`).
++
+É incompatível com as opções `--unpack-unreachable`, `--keep-unreachable`, `--pack-loose-unreachable`, `--stdin-packs`, bem como quaisquer outras opções que impliquem `--revs`.
+
+--cruft-expiration=<aproximado>::
+	Se definido, os objetos são eliminados do pacote "cruft" caso tenham um mtime mais antigo que `<aproximado>`. Se não for definido (e for usado `--cruft`), nenhum objeto será eliminado.
+
+--window=<n>::
+--depth=<n>::
+	Essas duas opções afetam como os objetos existentes no pacote são armazenados utilizando a compactação delta. Os objetos primeiro são classificados internamente pelo tipo, tamanho e opcionalmente os nomes e comparados com os outros objetos existentes da opção `--window` para ver se a utilização da compactação delta economiza espaço. A opção --depth limita a profundidade máxima do delta; torná-lo muito profundo afeta o desempenho do lado do desempacotador, porque os dados delta precisam ser aplicados muitas vezes para chegar ao objeto necessário.
++
+O valor predefinido para a opção `--window` é 10 e o `--depth` é 50. O valor da profundidade máxima é 4095.
+
+--window-memory=<n>::
+	Esta opção fornece um limite adicional em cima da opção `--window`; o tamanho da janela será reduzido dinamicamente para não ocupar mais do que '<n>' bytes na memória. É útil nos repositórios com uma mistura de objetos grandes e pequenos para não ficar sem memória com uma janela grande, mas ainda assim pode tirar proveito da janela grande para os objetos menores. O tamanho pode ter o sufixo "k", "m" ou "g". A opção `--window-memory=0` torna o uso da memória ilimitado. A predefinição é obtido da variável de configuração `pack.windowMemory`.
+
+--max-pack-size=<n>::
+	Em cenários incomuns, talvez você não consiga criar arquivos maiores que um determinado tamanho no seu sistema de arquivos, esta opção pode ser utilizada para dizer ao comando para dividir o arquivo de pacotes que for gerado em vários outros arquivos de pacotes menores, cada um não maior que um tamanho determinado. O tamanho pode ter o sufixo "k", "m" ou "g". O tamanho mínimo permitido é limitado a 1 MiB. A predefinição é ilimitada, a menos que a variável de configuração `pack.packSizeLimit` esteja definida. Observe que esta opção pode criar um repositório maior e mais lento; consulte a discussão em `pack.packSizeLimit`.
+
+--honor-pack-keep::
+	Esta opção faz com que um objeto que já esteja num pacote local que possua um arquivo '.keep' seja ignorado, mesmo que já tivesse sido compactado.
+
+--keep-pack=<nome-do-pacote>::
+	Esta opção faz com que um objeto que já esteja no pacote informado seja ignorado, mesmo que ele tivesse sido compactado. O `<nome-do-pacote>` é o nome do arquivo do pacote sem o diretório principal (por exemplo, `pack-123.pack`). A opção pode ser utilizada várias vezes para manter os vários pacotes.
+
+--incremental::
+	Esta opção faz com que um objeto que já esteja num pacote seja ignorado, mesmo que ele tenha sido compactado.
+
+--local::
+	Esta opção faz com que um objeto emprestado de um armazenamento de objetos alternativo seja ignorado, mesmo que já tivesse sido compactado.
+
+--non-empty::
+        Crie apenas um arquivo compactado caso ele contenha pelo menos um objeto.
+
+--progress::
+	É predefinido que a condição geral do progresso seja relatada no fluxo de erros quando estiver conectado num terminal, a menos que `-q` seja utilizado. Esta opção impõem a condição geral do progresso, mesmo que o fluxo de erro predefinido não seja direcionado para um terminal.
+
+--all-progress::
+	Quando o `--stdout` é utilizado, o relatório do progresso é exibido durante as fases da contagem e da compactação dos objetos, porém inibido durante a fase de gravação. A razão é que em alguns casos, o fluxo da saída está diretamente vinculada a um outro comando que possa querer exibir a sua própria condição do progresso à medida que os dados do pacote vão sendo processados. Esta opção é semelhante ao `--progress`, exceto que impõem também que um relatório do progresso seja feito na fase de gravação, mesmo que a opção `--stdout` seja utilizado.
+
+--all-progress-implied::
+	Isso é utilizado para impor a opção `--all-progress` sempre que a exibição do progresso estiver ativo. Ao contrário da opção `--all-progress`, esta opção por si só não impõem que a exibição do progresso seja exibida.
+
+-q::
+	Esta opção faz com que o comando não relate o seu progresso em meio ao fluxo de erros já predefinido.
+
+--no-reuse-delta::
+	Ao criar um arquivo compactado num repositório que possua pacotes existentes, o comando reutiliza os deltas ja existentes. Às vezes, isso resulta num pacote ligeiramente abaixo do ideal. Esta opção informa ao comando para não reutilizar os deltas já existentes, mas calcule-os do zero.
+
+--no-reuse-object::
+	Esta opção informa ao comando para não reutilizar os dados já existentes do objeto, incluindo os objetos não "deltificados", forçando a recompressão de tudo. Implica no uso da opção `--no-reuse-delta`. Útil apenas no caso obscuro onde seja desejada a imposição de um nível de compactação seja diferente dos dados compactados.
+
+--compression=<n>::
+	Define o nível de compactação para dados que foram recentemente compactados no pacote que foi gerado. Caso não seja utilizado, o nível de compactação do pacote será determinado primeiro pelo `pack.compression`, depois pelo `core.compression` onde a predefinição retorna para -1, a predefinição do zlib, caso nenhum estiver definido. Adicione `--no-reuse-object` quando quiser impor um nível de compactação uniforme em todos os dados, independentemente da origem.
+
+--[no-]sparse::
+	Use o algoritmo "esparso" para determinar quais objetos incluir no pacote, quando combinado com a opção "--revs". Esse algoritmo apenas percorre as árvores que aparecem nos caminhos que introduzem os novos objetos. Isso pode trazer benefícios significativos no desempenho para o cálculo do pacote para envio com uma pequena alteração. No entanto, é possível que os objetos extras sejam adicionados ao arquivo do pacote caso os commits inclusos contenham certos tipos de renomeações diretas. Caso esta opção não esteja inclusa, retorna ao valor predefinido em `pack.useSparse`, que é verdadeiro a menos que se defina o contrário.
+
+--thin::
+	Crie um pacote "magro" ao omitir objetos comuns entre o remetente e o destinatário visando a redução do tráfego de rede. Esta opção só faz sentido se utilizado em conjunto com `--stdout`.
++
+Observação: Um pacote leve viola o formato do arquivo compactado por omitir os objetos necessários e portanto, não pode ser utilizado pelo Git sem torná-lo independente. Para restaurar as propriedades deste pacote utilize o comando `git index-pack --fix-thin` (consulte linkgit:git-index-pack[1]).
+
+--shallow::
+	Otimize um pacote que será providenciado ao cliente com um repositório superficial. Esta opção, combinada com `--thin`, pode resultar num pacote menor ao custo da velocidade.
+
+--delta-base-offset::
+	Um arquivo compactado pode expressar o objeto base de um delta como um nome do objeto com 20 bytes ou como uma compensação no fluxo, porém as versões mais antigas do Git não entendem este último. É predefinido que o comando 'git pack-objects' utilize apenas o formato anterior visando uma melhor compatibilidade. Esta opção permite que o comando utilize o último formato para compactação. Dependendo do comprimento médio da cadeia delta, esta opção normalmente reduz o pacote gerado em 3-5%.
++
+Observação: É predefinido que os comandos porcelânicos como os `git gc` (consulte linkgit:git-gc[1]), `git repack` (consulte linkgit:git-repack[1]) encaminhem estas opções nas versões mais recentes do Git ao colocar os objetos em seu repositório dentro dos arquivos de pacotes. O mesmo acontece com a opção `git bundle` (consulte linkgit:git-bundle[1]) quando é criado um pacote.
+
+--threads=<n>::
+	Especifica a quantidade de threads a serem gerados durante a pesquisa das melhores correspondências delta. Isso requer que os objetos do pacote sejam compilados com pthreads, caso contrário esta opção será ignorada e exibindo um aviso. Isso visa reduzir o tempo do empacotamento em máquinas com multiprocessados. A quantidade de memória necessária para a janela de pesquisa delta é multiplicada pela quantidade de threads. Definindo como 0 faz com que o Git detecte automaticamente a quantidade de CPUs e defina a quantidade de threads proporcionalmente.
+
+--index-version=<version>[,<offset>]::
+	Isso foi pensado para ser utilizado apenas pelo conjunto de testes. Ele permite impor a versão do índice do pacote gerado e impor as entradas no índice com 64 bits nos objetos localizados acima da compensação informada.
+
+--keep-true-parents::
+	Com esta opção, as origens são ocultas pelos enxertos são embalados mesmo assim.
+
+--filter=<filter-spec>::
+	Omite certos objetos (em geral, bolhas) do pacote resultante. Para formas válidas de `<filter-spec>` consulte linkgit:git-rev-list[1].
+
+--no-filter::
+	Desliga qualquer argumento `--filter=` anterior.
+
+--missing=<missing-action>::
+	Uma opção de depuração para ajudar no desenvolvimento futuro do "clone parcial". Esta opção especifica como os objetos ausentes são manipulados.
++
+A opção `--missing=error` solicita que os objetos do pacote parem com um erro caso um objeto perdido seja encontrado. Caso o repositório seja um clone parcial, uma tentativa será feita para buscar os objetos desaparecidos antes de declará-los como desaparecidos. Esta é a ação predefinida.
++
+O formulário '--missing=allow-any' permitirá que a travessia do objeto continue caso um objeto ausente seja encontrado. Não ocorrerá nenhuma busca em um objeto ausente. Os objetos ausentes serão omitidos silenciosamente dos resultados.
++
+A opção '--missing=allow-promisor' é como um `allow-any`, porém só será permitido que a travessia dos objetos continue para os objetos ausentes que forem PREVISTOS. Não ocorrerá nenhuma busca em um objeto ausente. Um objeto que se perdeu de forma inesperada irão provocar um erro.
+
+--exclude-promisor-objects::
+	Omite os objetos que se sabe estar no ramo remoto. (Esta opção tem o objetivo de operar apenas nos objetos criados localmente, para que, quando forem reempacotados, ainda mantenhamos uma distinção entre os objetos que foram criados localmente [sem .promisor] e os objetos "promisor" remoto [com .promisor].) Isso é utilizado com clone parcial.
+
+--keep-unreachable::
+	Os objetos inacessíveis das refs nos pacotes informado com a opção `--unpacked=` são adicionados ao pacote gerado, além dos objetos acessíveis que não estão nos pacotes marcados com arquivos '*.keep'. Implica no uso da opção `--revs`.
+
+--pack-loose-unreachable::
+	Embale os objetos soltos que estejam inacessíveis (e as suas contrapartes soltas que foram removidas). Implica no uso da opção `--revs`.
+
+--unpack-unreachable::
+	Mantenha os objetos inacessíveis de forma solta. Implica no uso da opção `--revs`.
+
+--delta-islands::
+	Restrinja a coincidência delta com base nas "ilhas". Consulte ILHAS DELTA abaixo.
+
+
+ILHAS DELTA
+-----------
+
+Quando possível, o `pack-objects` tenta reutilizar os deltas existentes no disco para evitar ter que procurar por novos em tempo real. Esta é uma otimização importante a serviço das buscas (fetch), significa que o servidor pode evitar inflar a maioria dos objetos e enviar os bytes diretamente do disco. Esta otimização pode não funcionar quando um objeto é armazenado como um delta numa base onde o destinatário não o possua (e que não estamos enviando ainda). Nesse caso, o servidor "quebra" o delta e precisa encontrar um novo, ao custo de um alto processamento. Portanto, é importante para o desempenho que o conjunto dos objetos delta nos relacionamentos com o disco corresponda ao que um cliente buscaria.
+
+Em um repositório normal, isso tende a funcionar de forma automática. Os objetos são acessíveis principalmente a partir dos ramos e tags e é isso que os clientes buscam. Qualquer delta que encontrarmos no servidor, provavelmente estará entre os objetos que o cliente possui ou terá.
+
+Porém em algumas configurações do repositório, é possível ter vários grupos relacionados, mas separados, das dicas de referência, com os clientes tendendo a buscar estes grupos de forma independente. Por exemplo, imagine que você esteja hospedando várias "bifurcações" de um repositório num único armazenamento dos objetos compartilhados e permitindo que os clientes os visualizem como repositórios separados por meio de `GIT_NAMESPACE` ou repositórios separados, utilizando o mecanismo alternativo. Um um simples reempacotamento pode achar que o delta ideal para um objeto está contra uma base que é encontrada apenas em outra bifurcação. Porém quando um cliente realiza uma busca, ele não terá o objeto base e teremos que encontrar um novo delta em tempo real.
+
+Uma situação semelhante pode existir caso você tenha muitos refs fora de `refs/heads/` e `refs/tags/` que apontam para os objetos relacionados (por exemplo, `refs/pull` ou `refs/changes` utilizados por alguns provedores de hospedagem). É predefinido que os clientes busquem apenas os cabeçalhos e tags, os deltas nos objetos encontrados apenas nesses outros grupos não podem ser enviados como estão.
+
+As ilhas Delta resolvem este problema, permitindo que você agrupe as suas refs em "ilhas" distintas. Os pacotes de objetos calcula quais os objetos estão acessíveis a partir das ilhas e recusando-se a fazer um delta de um objeto `A` contra uma base que não está presente em todas as ilhas `A`. Isso resulta em pacotes um pouco maiores (porque perdemos algumas oportunidades delta), mas garante que uma busca por uma ilha não tenha que recalcular os deltas em tempo real, devido ao cruzamento dos limites da ilha.
+
+Ao realizar um reempacotamento com ilhas delta, a janela delta tende a ficar entupida com os candidatos barrados pela configuração. O reempacotamento com uma grande `--window` ajuda (e não leva tanto tempo quanto poderia, porque podemos rejeitar alguns pares de objetos com base nas ilhas antes de realizar qualquer cálculo no conteúdo).
+
+As ilhas são configuradas através da opção `pack.island`, que pode ser utilizada várias vezes. Cada valor é uma expressão regular ancorada à esquerda que coincidam com "refnames". Por exemplo:
+
+-------------------------------------------
+[pack]
+island = refs/heads/
+island = refs/tags/
+-------------------------------------------
+
+coloca os cabeçalhos e as tags numa ilha (cujo nome é um texto vazio; veja abaixo para conhecer mais nomenclaturas). Qualquer refs que não coincida com estas expressões regulares (`refs/pull/123` por exemplo) não está em nenhuma ilha. Qualquer objeto acessível apenas a partir do `refs/pull/` (mas não nos cabeçalhos ou nas tags) não é portanto, um candidato a ser utilizado como base para `refs/heads/`.
+
+Os árbitros são agrupados em ilhas com base nos seus "nomes" e duas expressões regulares que produzam o mesmo nome, são consideradas para estarem na mesma ilha. Os nomes são calculados a partir das expressões regulares concatenando quaisquer grupos de captura da expressão regular, com um traço '-' no meio. (E caso não haja grupos de captura, o nome será uma sequência de texto vazia, como no exemplo acima.) Isso permite criar números arbitrários das ilhas. Apenas até 14 desses grupos de captura são compatíveis.
+
+Por exemplo, imagine que você armazene as refs para cada bifurcação em `refs/virtual/ID`, onde o `ID` é um identificador numérico. Você pode então configurar:
+
+-------------------------------------------
+[pack]
+island = refs/virtual/([0-9]+)/heads/
+island = refs/virtual/([0-9]+)/tags/
+island = refs/virtual/([0-9]+)/(pull)/
+-------------------------------------------
+
+Coloca os cabeçalhos e as tags de cada bifurcação na sua própria ilha (chamada "1234" ou similar), e as refs do "pull" de cada um entram no seu próprio "1234-pull".
+
+Observe que escolhemos uma única ilha para cada regex, utilizando a ordem "last one wins" ou "o último vence" (que permite que determinada configuração do repo tenha precedência sobre a configuração do usuário e assim por diante).
+
+
+CONFIGURAÇÃO
+------------
+
+As várias variáveis de configuração afetam o empacotamento, consulte linkgit:git-config[1] (pesquise por "pack" e "delta").
+
+Notavelmente, a compressão delta não é usada nos objetos maiores que a variável de configuração `core.bigFileThreshold` e nos arquivos com o atributo` delta` definido como falso.
+
+VEJA TAMBÉM
+-----------
+linkgit:git-rev-list[1] linkgit:git-repack[1] linkgit:git-prune-packed[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

@@ -1,0 +1,175 @@
+git-merge-base(1)
+=================
+
+NOME
+----
+git-merge-base - Encontre o melhor ancestral comum possível para uma mesclagem
+
+
+RESUMO
+------
+[verse]
+'git merge-base' [-a | --all] <commit> <commit>...
+'git merge-base' [-a | --all] --octopus <commit>...
+'git merge-base' --is-ancestor <commit> <commit>
+'git merge-base' --independent <commit>...
+'git merge-base' --fork-point <ref> [<commit>]
+
+DESCRIÇÃO
+---------
+
+O comando 'git merge-base' encontra os melhores ancestrais comuns entre dois commits para utiliza-lo numa mesclagem de três vias. Um ancestral comum é 'melhor' que um outro ancestral comum caso o último seja um ancestral do primeiro. Um ancestral comum que não possua um melhor ancestral comum, será o 'melhor ancestral comum', ou seja, será uma 'base para a mesclagem'. Observe que pode haver mais de uma base para mesclagem para um par de commits.
+
+MODOS DE OPERAÇÃO
+-----------------
+
+No caso especial mais comum, utilizar apenas dois commits na linha de comando significa calcular a base de mesclagem entre os dois commits informados.
+
+De maneira mais geral, entre os dois commits para fazer cálculo na base de mesclagem, um é definido pelo primeiro argumento do commit na linha de comando; o outro commit é um commit (possivelmente hipotético) que é uma mesclagem entre todos os demais commits na linha de comando.
+
+Como consequência, o 'merge base' (a base da mesclagem) não está necessariamente contida em cada uma das opções do commit caso mais de dois commits forem informadas. Isso é diferente do linkgit:git-show-branch[1] quando utilizado com a opção `--merge-base`.
+
+--octopus::
+	Calcule os melhores ancestrais comuns de todos commits informados, em preparação para uma mesclagem "n-way". Imita o comportamento do comando 'git show-branch --merge-base'.
+
+--independent::
+	Em vez de exibir as bases de mesclagem, exiba um subconjunto mínimo dos commits informados com os mesmos ancestrais. Em outras palavras, entre os commits informados, liste aqueles que não podem ser alcançados por nenhum outro. Imita o comportamento do comando 'git show-branch --independent'.
+
+--is-ancestor::
+	Verifique se o primeiro <commit> é um ancestral do segundo <commit> e encerre com a condição 0, se for verdadeiro, ou com a condição 1 se não for. Os erros são sinalizados através de uma condição diferente de zero que não seja 1.
+
+--fork-point::
+	Encontre o ponto onde uma ramificação (ou qualquer histórico que leve ao <commit>) bifurque-se da outra ramificação (ou qualquer outra referência) <ref>. Isso não procura apenas pelo ancestral comum dos dois commits, mas também leva em consideração o reflog de <ref> para ver se o histórico que levou ao <commit> bifurcou-se de uma encarnação anterior do ramo <ref> (consulte a discussão deste modo abaixo).
+
+OPÇÕES
+------
+-a::
+--all::
+	Gere todas as bases da mesclagem para os commits em vez de apenas um.
+
+DISCUSSÃO
+---------
+
+Dado dois commits 'A' e 'B', o `git merge-base A B` produzirá um commit que pode ser acessado a partir de 'A' e 'B' através do relacionamento com a origem.
+
+Por exemplo, com esta topologia:
+
+....
+	 o---o---o---B
+	/
+---o---1---o---o---o---A
+....
+
+a base de mesclagem entre 'A' e 'B' é '1'.
+
+Dados três commits 'A', 'B' e 'C', `git merge-base A B C` irá calcular a base de fusão entre 'A' e um hipotético commit 'M', que é uma fusão entre 'B' e 'C'. Por exemplo, com esta topologia:
+
+....
+       o---o---o---o---C
+      /
+     /   o---o---o---B
+    /   /
+---2---1---o---o---o---A
+....
+
+o resultado do `git merge-base A B C` é '1'. Isso ocorre porque a topologia equivalente com uma consolidação de mesclagem 'M' entre 'B' e 'C' é:
+
+
+....
+       o---o---o---o---o
+      /                 \
+     /   o---o---o---o---M
+    /   /
+---2---1---o---o---o---A
+....
+
+e o resultado do `git merge-base A M` é '1'. O commit '2' também é um ancestral comum entre 'A' e 'M', porém '1' é um melhor ancestral comum, porque '2' é um ancestral de '1'. Portanto, '2' não é uma base de mesclagem.
+
+O resultado do `git merge-base --octopus A B C` é '2', porque '2' é o melhor ancestral comum de todos os commits.
+
+Quando a história envolve mesclagens cruzadas, pode haver mais de um "melhor" ancestral comum para dois commits. Por exemplo, com esta topologia:
+
+....
+---1---o---A
+    \ /
+     X
+    / \
+---2---o---o---B
+....
+
+ambos os '1' e '2' são bases de mesclagem de A e B. Nenhum é melhor que o outro (ambos são 'melhores' bases de mesclagem). Quando a opção `--all` não é utilizado, não da para saber qual é a melhor saída.
+
+Um idioma comum para verificar o "avanço rápido" entre os dois commits 'A' e 'B' seja (ou pelo menos costumava ser) calcular a base da mesclagem entre 'A' e 'B' e verificar se é o mesmo que 'A'; nesse caso, 'A' é um ancestral de 'B'. Você verá este idioma utilizado frequentemente com scripts mais antigos.
+
+....
+A=$(git rev-parse --verify A)
+if test "$A" = "$(git merge-base A B)"
+then
+	... A é um ancestral do B ...
+fi
+....
+
+No git moderno, você pode dizer isso de uma maneira mais direta:
+
+....
+if git merge-base --is-ancestor A B
+then
+	... A é um ancestral do B ...
+fi
+....
+
+em vez disso.
+
+Discussão sobre o modo do ponto de forquilha
+--------------------------------------------
+
+Depois de trabalhar no ramo `topic` criado com o comando `git switch -c topic origin/master`, o histórico do ramo monitorado remotamente `origin/master` pode ter sido retrocedido e reconstruído, levando a um histórico desta forma:
+
+....
+		 o---B2
+		/
+---o---o---B1--o---o---o---B (origin/master)
+	\
+	 B0
+	  \
+	   D0---D1---D (topic)
+....
+
+onde `origin/master` costumava apontar para os commits 'B0', 'B1', 'B2' e agora aponta para 'B', e o seu ramo `topic` foi iniciada sobre ela quando `origin/master` estava em 'B0' e você construiu três commits, 'D0', 'D1' e 'D' em cima dele. Imagine que agora você quer refazer o trabalho realizado no tópico sobre o `origin/master` atualizado.
+
+Nesse caso o comando `git merge-base origin/master topic' retornaria a inicial do 'B0' na imagem acima, porém 'B0^..D' *não é* o intervalo dos commits que você deseja reproduzir em cima do 'B' ( inclui 'B0', que não é o que você escreveu; é um commit que o outro lado descartou quando mudou o seu cume de 'B0' para 'B1').
+
+O comando `git merge-base --fork-point origin/master topic` foi projetado para ajudar nesse caso. Ele leva não apenas B, mas também B0, B1 e B2 (ou seja, dicas antigas do monitoramento dos ramos remotos onde o seu reflog conhece) para ver em qual commit o tópico do seu ramo foi construído e encontra o B0, permitindo a reprodução de apenas os commits no seu tópico, excluindo os commits que o outro lado descartou posteriormente.
+
+Consequentemente
+
+    $ fork_point=$(git merge-base --fork-point origin/master topic)
+
+irá encontrar 'B0' e
+
+    $ git rebase --onto origin/master $fork_point topic
+
+repetirá 'D0', 'D1' e 'D' em cima do 'B' para criar um novo histórico dessa forma:
+
+....
+		 o---B2
+		/
+---o---o---B1--o---o---o---B (origin/master)
+	\                   \
+	 B0                  D0'--D1'--D' (topic - updated)
+	  \
+	   D0---D1---D (topic - old)
+....
+
+Uma ressalva é que as entradas antigas do reflog no seu repositório podem ser reveladas através do comando `git gc`. Caso 'B0' não apareça mais no reflog do ramo monitorado remotamente `origin/master`, o modo `--fork-point` obviamente não poderá encontrá-lo e irá falhar evitando dar um resultado aleatório e inútil (como a inicial do 'B0', como o mesmo comando sem a opção `--fork-point` oferece).
+
+Além disso, o ramo monitorado remotamente com o qual você utiliza o modo `--fork-point` deve ser aquele onde seu tópico foi extraído. Caso você bifurque a partir de um commit mais antigo que o cume, este modo não encontrou o ponto de bifurcação (imagine no histórico de amostra acima do 'B0' não exista, o `origin/master` iniciado com 'B1', movido para o 'B2' e depois 'B', você bifurcou o seu tópico na `origin/master^` quando a `origin/master` era o 'B1'; o formato do histórico seria o mesmo que o acima, sem o 'B0', e a inicial do 'B1' é o que o `git merge-base origin/master topic` encontra corretamente, porém o modo `--fork-point` não será, porque não é um dos commits que costumava estar no cume de `origin/master`).
+
+
+Consulte também
+---------------
+linkgit:git-rev-list[1], linkgit:git-show-branch[1], linkgit:git-merge[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

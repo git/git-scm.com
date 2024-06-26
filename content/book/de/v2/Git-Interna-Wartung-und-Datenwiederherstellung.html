@@ -1,0 +1,721 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: de
+  chapter:
+    title: Git Interna
+    number: 10
+  section:
+    title: Wartung und Datenwiederherstellung
+    number: 7
+    cs_number: '10.7'
+    previous: book/de/v2/Git-Interna-Transfer-Protokolle
+    next: book/de/v2/Git-Interna-Zusammenfassung
+title: Git - Wartung und Datenwiederherstellung
+
+---
+<h2 id="_wartung_und_datenwiederherstellung">Wartung und Datenwiederherstellung</h2>
+<div class="paragraph">
+<p>Möglicherweise müssen sie hin und wieder Bereinigungen durchführen. Bspw. müssen sie ein Repository komprimieren, ein importiertes Repository bereinigen oder verlorene Arbeit wiederherstellen.
+In diesem Abschnitt werden einige dieser Szenarien behandelt.</p>
+</div>
+<div class="sect3">
+<h3 id="_git_gc">Wartung</h3>
+<div class="paragraph">
+<p>Gelegentlich führt Git automatisch einen Befehl namens „auto gc“ aus.
+Meistens macht dieser Befehl gar nichts.
+Wenn sich jedoch zu viele lose Objekte (Objekte, die nicht in einem Packfile enthalten sind) oder zu viele Packfiles gibt, startet Git einen vollständigen <code>git gc</code> Befehl.
+Das „gc“ steht für Garbage Collect und der Befehl führt eine Reihe von Aktionen aus: Er sammelt alle losen Objekte und legt sie in Packfiles ab. Er fasst Packfiles zu einem großen Packfile zusammen. Außerdem entfernt er Objekte, die nicht von einem Commit erreichbar und ein paar Monate alt sind.</p>
+</div>
+<div class="paragraph">
+<p>Sie können <code>auto gc</code> folgendermaßen manuell ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc --auto</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Auch dies tut im Allgemeinen nichts.
+Sie müssen ungefähr 7.000 lose Objekte oder mehr als 50 Packfiles haben, damit Git einen echten gc-Befehl ausführt.
+Sie können diese Grenzwerte mit den Konfigurationseinstellungen <code>gc.auto</code> und <code>gc.autopacklimit</code> ändern.</p>
+</div>
+<div class="paragraph">
+<p>Die andere Aktion, die <code>gc</code> durchführt, ist Ihre Referenzen in eine einzige Datei zu packen.
+Angenommen, Ihr Repository enthält die folgenden Branches und Tags:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ find .git/refs -type f
+.git/refs/heads/experiment
+.git/refs/heads/master
+.git/refs/tags/v1.0
+.git/refs/tags/v1.1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie <code>git gc</code> ausführen, befinden sich diese Dateien nicht mehr im Verzeichnis <code>refs</code>.
+Git verschiebt sie aus Gründen der Effizienz in eine Datei mit dem Namen <code>.git/packed-refs</code>, die so aussieht:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ cat .git/packed-refs
+# pack-refs with: peeled fully-peeled
+cac0cab538b970a37ea1e769cbbde608743bc96d refs/heads/experiment
+ab1afef80fac8e34258ff41fc1b867c702daa24b refs/heads/master
+cac0cab538b970a37ea1e769cbbde608743bc96d refs/tags/v1.0
+9585191f37f7b0fb9444f35a9bf50de191beadc2 refs/tags/v1.1
+^1a410efbd13591db07496601ebc7a059dd55cfe9</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Wenn Sie eine Referenz aktualisieren, bearbeitet Git diese Datei nicht, sondern schreibt eine neue Datei in <code>refs/heads</code>.
+Um das passende SHA-1 für eine angegebene Referenz zu erhalten, prüft Git diese Referenz im <code>refs</code> Verzeichnis und prüft dann die <code>packed-refs</code> Datei als Fallback.
+Wenn Sie jedoch keine Referenz im <code>refs</code> Verzeichnis finden können, befindet sich diese wahrscheinlich in Ihrer <code>packed-refs</code> Datei.</p>
+</div>
+<div class="paragraph">
+<p>Beachten Sie die letzte Zeile der Datei, die mit einem <code>^</code> beginnt.
+Dies bedeutet, dass das darüberliegende Tag ein annotiertes Tag ist und dass diese Zeile das Commit ist, auf das das annotierte Tag verweist.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_data_recovery">Datenwiederherstellung</h3>
+<div class="paragraph">
+<p>Es wird der Punkt auf Ihrer Git-Reise kommen, an dem Sie versehentlich einen oder mehrere Commits verlieren.
+Im Allgemeinen geschieht dies, weil Sie einen Branch mittels <code>force</code> Option löschen und es sich herausstellt, dass Sie den Branch doch noch benötigten. Oder aber es passiert, dass Sie einen Branch hart zurückgesetzt haben und noch benötigte Commits verworfen haben.
+Was können sie tun, um ihre Commits zurückzuerhalten?</p>
+</div>
+<div class="paragraph">
+<p>In diesem Beispiel wird der <code>master</code> Branch in Ihrem Test-Repository auf einen älteren Commit zurückgesetzt und die verlorenen Commits wiederhergestellt.
+Lassen Sie uns zunächst überprüfen, wo sich Ihr Repository zu diesem Zeitpunkt befindet:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --pretty=oneline
+ab1afef80fac8e34258ff41fc1b867c702daa24b Modify repo.rb a bit
+484a59275031909e19aadb7c92262719cfcdf19a Create repo.rb
+1a410efbd13591db07496601ebc7a059dd55cfe9 Third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d Second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Verschieben Sie nun den 'master'-Branch zurück zum mittleren Commit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard 1a410efbd13591db07496601ebc7a059dd55cfe9
+HEAD is now at 1a410ef Third commit
+$ git log --pretty=oneline
+1a410efbd13591db07496601ebc7a059dd55cfe9 Third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d Second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie haben die beiden obersten Commits verloren. Sie haben jetzt keinen Branch, von dem aus diese Commits erreichbar sind.
+Sie müssen das letzte Commit-SHA-1 finden und anschließend einen Branch hinzufügen, der darauf verweist.
+Der Trick ist, das letzte Commit SHA-1 zu finden. Leider ist es nicht so, als hätten Sie es auswendig gelernt, oder?</p>
+</div>
+<div class="paragraph">
+<p>Oft ist der schnellste Weg die Nutzung eines Tools namens <code>git reflog</code>.
+Während sie arbeiten, zeichnet Git lautlos im Hintergrund auf, was ihr HEAD ist und worauf es zeigt.
+Jedes Mal, wenn Sie Branches commiten oder ändern, wird das Reflog aktualisiert.
+Das reflog wird auch durch den Befehl <code>git update-ref</code> aktualisiert. Dies ist ein weiterer Grund, warum Sie diesen Befehl verwenden sollten, anstatt nur den SHA-1-Wert in Ihre ref-Dateien zu schreiben, wie in <a href="{{< relurl "book/de/v2/ch00/_git_refs" >}}">Git Referenzen</a> beschrieben.
+Sie können jederzeit sehen, wo Sie waren, indem Sie <code>git reflog</code> ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reflog
+1a410ef HEAD@{0}: reset: moving to 1a410ef
+ab1afef HEAD@{1}: commit: Modify repo.rb a bit
+484a592 HEAD@{2}: commit: Create repo.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hier sehen wir die beiden Commits, die wir ausgecheckt haben, jedoch gibt es hier nicht viele Informationen.
+Um die gleichen Informationen auf eine viel nützlichere Weise anzuzeigen, können wir <code>git log -g</code> ausführen, wodurch Sie eine normale Logausgabe für Ihr Reflog erhalten.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log -g
+commit 1a410efbd13591db07496601ebc7a059dd55cfe9
+Reflog: HEAD@{0} (Scott Chacon &lt;schacon@gmail.com&gt;)
+Reflog message: updating HEAD
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:22:37 2009 -0700
+
+		Third commit
+
+commit ab1afef80fac8e34258ff41fc1b867c702daa24b
+Reflog: HEAD@{1} (Scott Chacon &lt;schacon@gmail.com&gt;)
+Reflog message: updating HEAD
+Author: Scott Chacon &lt;schacon@gmail.com&gt;
+Date:   Fri May 22 18:15:24 2009 -0700
+
+       Modify repo.rb a bit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Es sieht so aus, als ob Sie das unterste Commit verloren haben. Sie können es also wiederherstellen, indem Sie bei diesem Commit einen neuen Branch erstellen.
+Beispielsweise können Sie einen Branch mit dem Namen <code>recover-branch</code> bei diesem Commit (ab1afef) starten:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch recover-branch ab1afef
+$ git log --pretty=oneline recover-branch
+ab1afef80fac8e34258ff41fc1b867c702daa24b Modify repo.rb a bit
+484a59275031909e19aadb7c92262719cfcdf19a Create repo.rb
+1a410efbd13591db07496601ebc7a059dd55cfe9 Third commit
+cac0cab538b970a37ea1e769cbbde608743bc96d Second commit
+fdf4fc3344e67ab068f836878b6c4951e3b15f3d First commit</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sehr gut - jetzt haben Sie einen Branch namens <code>recover-branch</code>, in dem sich früher Ihr <code>master</code> Branch befand, wodurch die ersten beiden Commits wieder erreichbar sind.
+Angenommen, Ihr Verlust war aus irgendeinem Grund nicht im Reflog - Sie können dies simulieren, indem Sie <code>recover-branch</code> entfernen und das Reflog löschen.
+Jetzt sind die ersten beiden Commits nicht mehr erreichbar:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git branch -D recover-branch
+$ rm -Rf .git/logs/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Da sich die Reflog-Daten im Verzeichnis <code>.git/logs/</code> befinden, haben Sie praktisch kein Reflog.
+Wie können Sie dieses Commit zu diesem Zeitpunkt wiederherstellen?
+Eine Möglichkeit ist die Verwendung des Hilfsprogramms <code>git fsck</code>, mit dem Ihre Datenbank auf Integrität überprüft wird.
+Wenn Sie es mit der Option <code>--full</code> ausführen, werden alle Objekte angezeigt, auf die kein anderes Objekt zeigt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git fsck --full
+Checking object directories: 100% (256/256), done.
+Checking objects: 100% (18/18), done.
+dangling blob d670460b4b4aece5915caf5c68d12f560a9fe3e4
+dangling commit ab1afef80fac8e34258ff41fc1b867c702daa24b
+dangling tree aea790b9a58f6cf6f2804eeac9f0abbe9631e4c9
+dangling blob 7108f7ecb345ee9d0084193f147cdad4d2998293</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In diesem Fall können Sie Ihr fehlendes Commit nach dem String „Dangling Commit“ sehen.
+Sie können es auf die gleiche Weise wiederherstellen, indem Sie einen Branch hinzufügen, der auf diesen SHA-1 verweist.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_removing_objects">Objekte löschen</h3>
+<div class="paragraph">
+<p>Es gibt viele großartige Dinge an Git. Eine Funktion, die jedoch Probleme verursachen kann, ist die Tatsache, dass ein Git-Klon den gesamten Verlauf des Projekts herunterlädt, einschließlich jeder Version jeder Datei.
+Dies ist in Ordnung, wenn das Ganze Quellcode ist. Git ist stark darin, diese Daten effizient zu komprimieren.
+Wenn jedoch zu einem beliebigen Zeitpunkt im Verlauf Ihres Projekts eine einzelne große Datei hinzugefügt wird, muss jeder Klon für alle Zeiten diese große Datei herunterladen, auch wenn sie beim nächsten Commit aus dem Projekt entfernt wurde.
+Weil sie von der Historie aus erreichbar ist, wird sie immer da sein.</p>
+</div>
+<div class="paragraph">
+<p>Dies kann ein großes Problem sein, wenn Sie Subversion- oder Perforce-Repositorys nach Git konvertieren.
+Da Sie in diesen Systemen nicht den gesamten Verlauf herunterladen, hat dieses Model des Hinzufügens nur wenige Konsequenzen.
+Wenn Sie einen Import von einem anderen System durchgeführt haben oder auf andere Weise feststellen, dass Ihr Repository viel größer ist, als es sein sollte, können Sie große Objekte folgendermaßen finden und entfernen.</p>
+</div>
+<div class="paragraph">
+<p><strong>Seien Sie gewarnt: Diese Technik wirkt sich zerstörerisch auf Ihren Commit-Verlauf aus.</strong>
+Es schreibt jedes Commitobjekt neu, seit dem frühesten Baum, den Sie ändern müssen, um einen Verweis auf eine große Datei zu entfernen.
+Wenn Sie dies unmittelbar nach einem Import tun, bevor jemand damit begonnen hat, sich auf das Commit zu stützen, ist alles in Ordnung. Andernfalls müssen Sie alle Mitwirkenden benachrichtigen, dass sie ihre Arbeit auf Ihre neuen Commits rebasen müssen.</p>
+</div>
+<div class="paragraph">
+<p>Zur Veranschaulichung fügen Sie Ihrem Test-Repository eine große Datei hinzu, entfernen Sie sie beim nächsten Commit. Anschließend suchen Sie sie und entfernen sie dauerhaft aus dem Repository.
+Fügen Sie Ihrer Historie zunächst ein großes Objekt hinzu:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ curl -L https://www.kernel.org/pub/software/scm/git/git-2.1.0.tar.gz &gt; git.tgz
+$ git add git.tgz
+$ git commit -m 'Add git tarball'
+[master 7b30847] Add git tarball
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 git.tgz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Hoppla - Sie wollten Ihrem Projekt keinen riesigen Tarball hinzufügen.
+Besser wäre, es loszuwerden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rm git.tgz
+rm 'git.tgz'
+$ git commit -m 'Oops - remove large tarball'
+[master dadf725] Oops - remove large tarball
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ delete mode 100644 git.tgz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nun wenden sie <code>gc</code> auf Ihre Datenbank an und sehen sie, wie viel Speicherplatz Sie verwenden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git gc
+Counting objects: 17, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (13/13), done.
+Writing objects: 100% (17/17), done.
+Total 17 (delta 1), reused 10 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie können den Befehl <code>count-objects</code> ausführen, um schnell zu sehen, wie viel Speicherplatz Sie verwenden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git count-objects -v
+count: 7
+size: 32
+in-pack: 17
+packs: 1
+size-pack: 4868
+prune-packable: 0
+garbage: 0
+size-garbage: 0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Der <code>size-pack</code> Eintrag gibt die Größe Ihrer Packdateien in Kilobyte an. Somit verwenden Sie fast 5 MB an Speicherplatz.
+Vor dem letzten Commit haben Sie einen Wert von ungefähr 2 KB belegt. Wenn Sie die Datei aus dem vorherigen Commit entfernen, würde sie offensichtlich nicht aus Ihrem Verlauf entfernt.
+Jedes Mal, wenn jemand dieses Repository klont, muss er 5 MB klonen, um dieses winzige Projekt zu erhalten, da Sie versehentlich eine große Datei hinzugefügt haben.
+Lass sie es uns loswerden.</p>
+</div>
+<div class="paragraph">
+<p>Als erstes müssen wir es finden.
+In diesem Fall wissen Sie bereits, um welche Datei es sich handelt.
+Angenommen, Sie wissen es nicht. Wie würden Sie feststellen, welche Datei oder welche Dateien so viel Speicherplatz beanspruchen?
+Wenn Sie <code>git gc</code> ausführen, befinden sich alle Objekte in einer Packdatei. Sie können die großen Objekte identifizieren, indem Sie einen anderen Installationsbefehl namens <code>git verify-pack</code> ausführen und die Ausgabe nach dem dritte Feld sortieren, das die Dateigröße ist.
+Sie können es auch über den Befehl <code>tail</code> pipen, da Sie nur an den letzten, großen Dateien interessiert sind:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git verify-pack -v .git/objects/pack/pack-29…69.idx \
+  | sort -k 3 -n \
+  | tail -3
+dadf7258d699da2c8d89b09ef6670edb7d5f91b4 commit 229 159 12
+033b4468fa6b2a9547a70d88d1bbe8bf3f9ed0d5 blob   22044 5792 4977696
+82c99a3e86bb1267b236a4b6eff7868d97489af1 blob   4975916 4976258 1438</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Das große Objekt befindet sich unten: 5 MB.
+Um herauszufinden, um welche Datei es sich handelt, verwenden Sie den Befehl <code>rev-list</code>, den Sie kurz in <a href="{{< relurl "book/de/v2/ch00/_enforcing_commit_message_format" >}}">Ein bestimmtes Commit-Message-Format erzwingen</a> verwendet haben.
+Wenn Sie <code>--objects</code> an <code>rev-list</code> übergeben, werden alle festgeschriebenen SHA-1s und auch die BLOB-SHA-1s mit den ihnen zugeordneten Dateipfaden aufgelistet.
+Sie können dies verwenden, um den Namen Ihres Blobs zu finden:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rev-list --objects --all | grep 82c99a3
+82c99a3e86bb1267b236a4b6eff7868d97489af1 git.tgz</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Jetzt müssen Sie diese Datei von allen Bäumen in Ihrer Historie entfernen.
+Sie können leicht sehen, welche Commits diese Datei geändert haben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git log --oneline --branches -- git.tgz
+dadf725 Oops - remove large tarball
+7b30847 Add git tarball</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sie müssen alle Commits hinter <code>7b30847</code> neu schreiben, um diese Datei vollständig aus Ihrem Git-Verlauf zu entfernen.
+Verwenden Sie dazu <code>filter-branch</code>, den Sie in <a href="{{< relurl "book/de/v2/ch00/_rewriting_history" >}}">Den Verlauf umschreiben</a> verwendet haben:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git filter-branch --index-filter \
+  'git rm --ignore-unmatch --cached git.tgz' -- 7b30847^..
+Rewrite 7b30847d080183a1ab7d18fb202473b3096e9f34 (1/2)rm 'git.tgz'
+Rewrite dadf7258d699da2c8d89b09ef6670edb7d5f91b4 (2/2)
+Ref 'refs/heads/master' was rewritten</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die Option <code>--index-filter</code> ähnelt der Option <code>--tree-filter</code>, die in <a href="{{< relurl "book/de/v2/ch00/_rewriting_history" >}}">Den Verlauf umschreiben</a> verwendet wurde. Jedoch ändern sie jedes Mal Ihren Staging-Bereich oder Index anstatt daß sie einen Befehl zum Modifizieren von ausgecheckten Dateien auf ihrer Platte übergeben.</p>
+</div>
+<div class="paragraph">
+<p>Anstatt eine bestimmte Datei mit etwas wie <code>rm file</code> zu entfernen, müssen Sie sie mit <code>git rm --cached</code> entfernen - Sie müssen sie aus dem Index entfernen, nicht von der Festplatte.
+Der Grund dafür ist die Geschwindigkeit - da Git nicht jede Revision auf der Festplatte auschecken muss, bevor der Filter ausgeführt wird, kann der Prozess sehr viel schneller sein.
+Sie können die gleiche Aufgabe mit <code>--tree-filter</code> ausführen, wenn Sie möchten.
+Die Option <code>--ignore-unmatch</code> für <code>git rm</code> weist an, dass keine Fehler auftreten, wenn das zu entfernende Muster nicht vorhanden ist.
+Schließlich fordern Sie <code>filter-branch</code> auf, Ihre Historie erst ab dem Commit <code>7b30847</code> neu zu schreiben, da Sie wissen, wo dieses Problem begann.
+Andernfalls wird es von vorne beginnen und unnötig länger dauern.</p>
+</div>
+<div class="paragraph">
+<p>Ihr Verlauf enthält nun keinen Verweis mehr auf diese Datei.
+Ihr Reflog und eine neue Gruppe von Refs, die Git hinzugefügt hat, als Sie den <code>filter-branch</code> unter <code>.git/refs/original</code> ausgeführt haben, enthält jedoch weiterhin Verweise, sodass Sie sie entfernen und die Datenbank neu packen müssen.
+Sie müssen alles loswerden, das einen Zeiger auf diese alten Commits enthält, bevor Sie neu packen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ rm -Rf .git/refs/original
+$ rm -Rf .git/logs/
+$ git gc
+Counting objects: 15, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (11/11), done.
+Writing objects: 100% (15/15), done.
+Total 15 (delta 1), reused 12 (delta 0)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Mal sehen, wie viel Platz Sie gespart haben.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git count-objects -v
+count: 11
+size: 4904
+in-pack: 15
+packs: 1
+size-pack: 8
+prune-packable: 0
+garbage: 0
+size-garbage: 0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Die Größe des gepackten Repositorys beträgt nur noch 8 KB, was viel besser als 5 MB ist.
+Sie können anhand der Größe erkennen, dass sich das große Objekt noch in Ihren losen Objekten befindet, sodass es nicht verschwunden ist. Es wird jedoch nicht auf einen Push oder nachfolgenden Klon übertragen, was wichtig ist.
+Wenn Sie es wirklich wollten, können Sie das Objekt vollständig entfernen, indem Sie <code>git prune</code> mit der Option <code>--expire</code> ausführen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git prune --expire now
+$ git count-objects -v
+count: 0
+size: 0
+in-pack: 15
+packs: 1
+size-pack: 8
+prune-packable: 0
+garbage: 0
+size-garbage: 0</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>` === Umgebungsvariablen</p>
+</div>
+<div class="paragraph">
+<p>Git läuft immer in einer <code>bash</code> Shell und verwendet eine Reihe von Shell-Umgebungsvariablen, über die man steuern kann, wie es sich verhält.
+Gelegentlich ist es hilfreich zu wissen, welche diese sind und wie Sie Git dazu bringen können, sich so zu verhalten, wie Sie es möchten.
+Dies ist keine vollständige Liste aller Umgebungsvariablen auf die Git achtet, aber wir werden die nützlichsten behandeln.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_globals_verhalten">Globals Verhalten</h3>
+<div class="paragraph">
+<p>Einige der generellen Eigenschaften von Git als Computerprogramm hängen von Umgebungsvariablen ab.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_EXEC_PATH</code></strong> bestimmt, wo Git nach seinen Unterprogrammen sucht (wie <code>git-commit</code>, <code>git-diff</code> und andere).
+  Sie können die aktuelle Einstellung überprüfen, indem Sie <code>git --exec-path</code> ausführen.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>HOME</code></strong> wird normalerweise nicht als anpassbar angesehen (zu viele andere Dinge hängen davon ab), aber hier sucht Git nach der globalen Konfigurationsdatei.
+  Wenn Sie eine wirklich portable Git-Installation mit globaler Konfiguration wünschen, können Sie <code>HOME</code> im portablen Git Shell-Profil überschreiben.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>PREFIX</code></strong> ist ähnlich, jedoch für die systemweite Konfiguration.
+  Git sucht nach dieser Datei unter <code>$PREFIX/etc/gitconfig</code>.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_CONFIG_NOSYSTEM</code></strong>, falls gesetzt, deaktiviert die Verwendung der systemweiten Konfigurationsdatei.
+  Dies ist nützlich, wenn Ihre Systemkonfiguration Ihre Befehle beeinträchtigt, Sie jedoch keinen Zugriff haben, um diese zu ändern oder zu entfernen.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_PAGER</code></strong> steuert das Programm, mit dem mehrseitige Ausgaben in der Befehlszeile angezeigt werden.
+Ist dies nicht gesetzt, wird <code>PAGER</code> als Fallback verwendet.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_EDITOR</code></strong> ist der Editor, den Git startet, wenn der Benutzer Text bearbeiten muss (z.B. eine Commit-Nachricht).
+Wenn nicht gesetzt, wird <code>EDITOR</code> verwendet.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_speicherort_des_repositorys">Speicherort des Repositorys</h3>
+<div class="paragraph">
+<p>Git verwendet mehrere Umgebungsvariablen, um die Verbindung zum aktuellen Repository herzustellen.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_DIR</code></strong> ist der Speicherort des Ordners <code>.git</code>.
+Wenn dies nicht angegeben ist, geht Git nach oben durch den Verzeichnisbaum, bis es zu <code>~</code> oder <code>/</code> gelangt, und sucht bei jedem Schritt nach einem <code>.git</code> Verzeichnis.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_CEILING_DIRECTORIES</code></strong> steuert das Verhalten bei der Suche nach einem <code>.git</code> Verzeichnis.
+Wenn Sie auf Verzeichnisse zugreifen, die nur langsam geladen werden können (z.B. auf einem Bandlaufwerk oder über eine langsame Netzwerkverbindung), möchten Sie möglicherweise, dass Git den Versuch vorzeitig abbricht, insbesondere wenn Git in der Kommandozeile aufgerufen wird.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_WORK_TREE</code></strong> ist der Speicherort des Stammverzeichnisses eines Arbeitsverzeichnisses für ein non-bare Repository.
+Wenn <code>--git-dir</code> oder <code>GIT_DIR</code> angegeben ist, jedoch nicht <code>--work-tree</code>, <code>GIT_WORK_TREE</code> oder <code>core.worktree</code>, wird das aktuelle Arbeitsverzeichnis als oberste Ebene Ihres Arbeitsbaums betrachtet.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_INDEX_FILE</code></strong> ist der Pfad zur Indexdatei (nur für non-bare Repositorys).</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_OBJECT_DIRECTORY</code></strong> kann verwendet werden, um den Speicherort des Verzeichnisses anzugeben, das sich normalerweise in <code>.git/objects</code> befindet.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_ALTERNATE_OBJECT_DIRECTORIES</code></strong> ist eine durch Doppelpunkte getrennte Liste (also im Format <code>/dir/one:/dir/two:… `), die Git mitteilt, wo nach Objekten gesucht werden soll, wenn sie sich nicht in</code> GIT_OBJECT_DIRECTORY` befinden.
+Wenn Sie viele Projekte mit großen Dateien haben, die genau den gleichen Inhalt haben, können Sie damit vermeiden, dass zu viele Kopien davon gespeichert werden.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_pfadspezifikation_engl_pathspec">Pfadspezifikation (engl. Pathspec)</h3>
+<div class="paragraph">
+<p>„Pathspec“ bezieht sich darauf, wie Sie Pfade in Git angeben, einschließlich der Verwendung von Platzhaltern.
+Diese werden in der Datei <code>.gitignore</code> aber auch in der Befehlszeile (<code>git add *.c</code>) verwendet.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_GLOB_PATHSPECS</code></strong> und <strong><code>GIT_NOGLOB_PATHSPECS</code></strong> steuern das Standardverhalten von Platzhaltern in Pfadangaben.
+Wenn <code>GIT_GLOB_PATHSPECS</code> auf 1 gesetzt ist, werden Platzhalterzeichen als Platzhalter verwendet (dies ist die Standardeinstellung). Wenn <code>GIT_NOGLOB_PATHSPECS</code> auf 1 gesetzt ist, stimmen Platzhalterzeichen nur mit sich selbst überein. Dies bedeutet, dass <code><strong>.c</strong></code> nur mit einer Datei namens „ .c“ übereinstimmt und nicht mit einer Datei, deren Name mit <code>.c</code> endet.
+Sie können dies in Einzelfällen überschreiben, indem Sie die Pfadangabe mit <code>:(glob)</code> oder <code>:(literal)</code> beginnen, wie in <code>:(glob)*.c</code>.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_LITERAL_PATHSPECS</code></strong> deaktiviert beide oben genannten Verhaltensweisen. Es können keine Platzhalterzeichen verwendet werden, und die Präfixe zum Überschreiben sind ebenfalls deaktiviert.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_ICASE_PATHSPECS</code></strong> setzt alle Pfadangaben so, dass zwischen Groß- und Kleinschreibung nicht unterschieden wird.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_committen">Committen</h3>
+<div class="paragraph">
+<p>Die endgültige Erstellung eines Git-Commit-Objekts erfolgt normalerweise über <code>git-commit-tree</code>, das diese Umgebungsvariablen als primäre Informationsquelle verwendet und nur dann auf Konfigurationswerte zurückgreift, wenn diese nicht vorhanden sind.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_AUTHOR_NAME</code></strong> ist der für Menschen lesbare Name im Feld „author“.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_AUTHOR_EMAIL</code></strong> ist die E-Mail-Adresse für das Feld „author“.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_AUTHOR_DATE</code></strong> ist der Zeitstempel für das Feld „author“.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_COMMITTER_NAME</code></strong> legt den für Menschen lesbaren Namen für das Feld „Committer“ fest.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_COMMITTER_EMAIL</code></strong> ist die E-Mail-Adresse für das Feld „Committer“.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_COMMITTER_DATE</code></strong> wird für den Zeitstempel im Feld „Committer“ verwendet.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>EMAIL</code></strong> ist die Ersatz-E-Mail-Adresse für den Fall, dass der Konfigurationswert <code>user.email</code> nicht festgelegt ist.
+Wenn <em>this</em> nicht festgelegt ist, greift Git auf die Systembenutzer und Hostnamen zurück.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_netzwerk">Netzwerk</h3>
+<div class="paragraph">
+<p>Git verwendet die Bibliothek <code>curl</code>, um Netzwerkoperationen über HTTP durchzuführen. <strong><code>GIT_CURL_VERBOSE</code></strong> weist Git an, alle von dieser Bibliothek generierten Nachrichten auszugeben.
+Dies ähnelt dem Ausführen von <code>curl -v</code> in der Befehlszeile.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_SSL_NO_VERIFY</code></strong> weist Git an, SSL-Zertifikate nicht zu verifizieren.
+Dies kann manchmal erforderlich sein, wenn Sie ein selbstsigniertes Zertifikat verwenden, um Git-Repositorys über HTTPS bereitzustellen, oder wenn Sie gerade einen Git-Server einrichten, aber noch kein vollständiges Zertifikat installiert haben.</p>
+</div>
+<div class="paragraph">
+<p>Wenn die Datenrate einer HTTP-Operation unter <strong><code>GIT_HTTP_LOW_SPEED_LIMIT</code></strong> Bytes pro Sekunde und länger als <strong><code>GIT_HTTP_LOW_SPEED_TIME</code></strong> Sekunden anhält, bricht Git diese Operation ab.
+Diese Werte überschreiben die Konfigurationswerte <code>http.lowSpeedLimit</code> und <code>http.lowSpeedTime</code>.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_HTTP_USER_AGENT</code></strong> legt die User-Agent-Zeichenfolge fest, die von Git bei der Kommunikation über HTTP verwendet wird.
+Der Standardwert ist ein Wert wie <code>git/2.0.0</code>.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_vergleichen_und_zusammenführen">Vergleichen und Zusammenführen</h3>
+<div class="paragraph">
+<p><strong><code>GIT_DIFF_OPTS</code></strong> ist eigentlich ein unzutreffender Name.
+Die einzigen gültigen Werte sind <code>-u&lt;n&gt;</code> oder <code>--unified=&lt;n&gt;</code>, wodurch die Anzahl der in einem <code>git diff</code> Befehl angezeigten Kontextzeilen konfiguriert wird.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_EXTERNAL_DIFF</code></strong> überschreibt den Konfigurationswert <code>diff.external</code>.
+Wenn diese Variable gesetzt ist, ruft Git dieses Programm auf, wenn <code>git diff</code> aufgerufen wird.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_DIFF_PATH_COUNTER</code></strong> und <strong><code>GIT_DIFF_PATH_TOTAL</code></strong> sind innerhalb des durch <code>GIT_EXTERNAL_DIFF</code> oder <code>diff.external</code> angegebenen Programms nützlich.
+Ersteres gibt an, welche Datei in einer Reihe von Dateien verglichen wird (beginnend mit 1), und Letzteres gibt die Gesamtzahl der Dateien im Stapel an.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_MERGE_VERBOSITY</code></strong> steuert die Ausgabe für die rekursive Merge-Strategie.
+Folgende Werte sind zulässig:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>0 gibt nichts aus, außer einer einzelnen Fehlermeldung (möglicherweise).</p>
+</li>
+<li>
+<p>1 zeigt nur Konflikte.</p>
+</li>
+<li>
+<p>2 zeigt auch Dateiänderungen an.</p>
+</li>
+<li>
+<p>3 zeigt an, wann Dateien übersprungen werden, weil sie sich nicht geändert haben.</p>
+</li>
+<li>
+<p>4 zeigt alle Pfade, während sie verarbeitet werden.</p>
+</li>
+<li>
+<p>5 und höher zeigen detaillierte Debugging-Informationen.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Der Standardwert ist 2.</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_debugging">Debugging</h3>
+<div class="paragraph">
+<p>Möchten Sie wirklich wissen, was in Git abgeht?
+In Git ist eine umfangreiche Sammlung von Traces eingebettet, alles was Sie tun müssen, ist sie einzuschalten.
+Die möglichen Werte dieser Variablen lauten wie folgt:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>„true“, „1“ oder „2“ - die Trace-Kategorie wird nach stderr geschrieben.</p>
+</li>
+<li>
+<p>Ein absoluter Pfad, der mit <code>/</code> beginnt - die Trace-Ausgabe wird in diese Datei geschrieben.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_TRACE</code></strong> steuert allgemeine Traces, die keiner bestimmten Kategorie zugeordnet werden können.
+Dies umfasst die Erweiterung von Aliasen und die Delegierung an andere Unterprogramme.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ GIT_TRACE=true git lga
+20:12:49.877982 git.c:554               trace: exec: 'git-lga'
+20:12:49.878369 run-command.c:341       trace: run_command: 'git-lga'
+20:12:49.879529 git.c:282               trace: alias expansion: lga =&gt; 'log' '--graph' '--pretty=oneline' '--abbrev-commit' '--decorate' '--all'
+20:12:49.879885 git.c:349               trace: built-in: git 'log' '--graph' '--pretty=oneline' '--abbrev-commit' '--decorate' '--all'
+20:12:49.899217 run-command.c:341       trace: run_command: 'less'
+20:12:49.899675 run-command.c:192       trace: exec: 'less'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_TRACE_PACK_ACCESS</code></strong> steuert das Tracing der Packfile-Zugriffe.
+Das erste Feld ist die Packdatei, auf die zugegriffen wird, das zweite Feld ist der Offset in dieser Datei:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ GIT_TRACE_PACK_ACCESS=true git status
+20:10:12.081397 sha1_file.c:2088        .git/objects/pack/pack-c3fa...291e.pack 12
+20:10:12.081886 sha1_file.c:2088        .git/objects/pack/pack-c3fa...291e.pack 34662
+20:10:12.082115 sha1_file.c:2088        .git/objects/pack/pack-c3fa...291e.pack 35175
+# […]
+20:10:12.087398 sha1_file.c:2088        .git/objects/pack/pack-e80e...e3d2.pack 56914983
+20:10:12.087419 sha1_file.c:2088        .git/objects/pack/pack-e80e...e3d2.pack 14303666
+On branch master
+Your branch is up-to-date with 'origin/master'.
+nothing to commit, working directory clean</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_TRACE_PACKET</code></strong> aktiviert die Paketverfolgung für Netzwerkoperationen.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ GIT_TRACE_PACKET=true git ls-remote origin
+20:15:14.867043 pkt-line.c:46           packet:          git&lt; # service=git-upload-pack
+20:15:14.867071 pkt-line.c:46           packet:          git&lt; 0000
+20:15:14.867079 pkt-line.c:46           packet:          git&lt; 97b8860c071898d9e162678ea1035a8ced2f8b1f HEAD\0multi_ack thin-pack side-band side-band-64k ofs-delta shallow no-progress include-tag multi_ack_detailed no-done symref=HEAD:refs/heads/master agent=git/2.0.4
+20:15:14.867088 pkt-line.c:46           packet:          git&lt; 0f20ae29889d61f2e93ae00fd34f1cdb53285702 refs/heads/ab/add-interactive-show-diff-func-name
+20:15:14.867094 pkt-line.c:46           packet:          git&lt; 36dc827bc9d17f80ed4f326de21247a5d1341fbc refs/heads/ah/doc-gitk-config
+# […]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_TRACE_PERFORMANCE</code></strong> steuert die Protokollierung von Performancedaten.
+Die Ausgabe zeigt, wie lange jeder einzelne Aufruf von <code>git</code> dauert.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ GIT_TRACE_PERFORMANCE=true git gc
+20:18:19.499676 trace.c:414             performance: 0.374835000 s: git command: 'git' 'pack-refs' '--all' '--prune'
+20:18:19.845585 trace.c:414             performance: 0.343020000 s: git command: 'git' 'reflog' 'expire' '--all'
+Counting objects: 170994, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (43413/43413), done.
+Writing objects: 100% (170994/170994), done.
+Total 170994 (delta 126176), reused 170524 (delta 125706)
+20:18:23.567927 trace.c:414             performance: 3.715349000 s: git command: 'git' 'pack-objects' '--keep-true-parents' '--honor-pack-keep' '--non-empty' '--all' '--reflog' '--unpack-unreachable=2.weeks.ago' '--local' '--delta-base-offset' '.git/objects/pack/.tmp-49190-pack'
+20:18:23.584728 trace.c:414             performance: 0.000910000 s: git command: 'git' 'prune-packed'
+20:18:23.605218 trace.c:414             performance: 0.017972000 s: git command: 'git' 'update-server-info'
+20:18:23.606342 trace.c:414             performance: 3.756312000 s: git command: 'git' 'repack' '-d' '-l' '-A' '--unpack-unreachable=2.weeks.ago'
+Checking connectivity: 170994, done.
+20:18:25.225424 trace.c:414             performance: 1.616423000 s: git command: 'git' 'prune' '--expire' '2.weeks.ago'
+20:18:25.232403 trace.c:414             performance: 0.001051000 s: git command: 'git' 'rerere' 'gc'
+20:18:25.233159 trace.c:414             performance: 6.112217000 s: git command: 'git' 'gc'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_TRACE_SETUP</code></strong> zeigt Informationen darüber an, was Git über das Repository und die Umgebung, mit denen es interagiert, herausfindet.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ GIT_TRACE_SETUP=true git status
+20:19:47.086765 trace.c:315             setup: git_dir: .git
+20:19:47.087184 trace.c:316             setup: worktree: /Users/ben/src/git
+20:19:47.087191 trace.c:317             setup: cwd: /Users/ben/src/git
+20:19:47.087194 trace.c:318             setup: prefix: (null)
+On branch master
+Your branch is up-to-date with 'origin/master'.
+nothing to commit, working directory clean</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_sonstiges">Sonstiges</h3>
+<div class="paragraph">
+<p><strong><code>GIT_SSH</code></strong>, falls angegeben, ist ein Programm, das anstelle von <code>ssh</code> aufgerufen wird, um eine Verbindung zu einem SSH-Host herzustellen.
+Es wird folgendermaßen aufgerufen: <code>$GIT_SSH [username@]host [-p &lt;port&gt;] &lt;befehl&gt;</code>.
+Beachten Sie, dass dies nicht der einfachste Weg ist, um zu konfigurieren, wie <code>ssh</code> aufgerufen wird. Es werden keine zusätzlichen Befehlszeilenparameter unterstützt, daher müssen Sie ein Wrapper-Skript schreiben und <code>GIT_SSH</code> so einstellen, dass es darauf verweist.
+Es ist wahrscheinlich einfacher, dafür einfach die Datei <code>~/.ssh/config</code> zu verwenden.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_ASKPASS</code></strong> dient zur Überschreibung des Konfigurationswertes <code>core.askpass</code>.
+Dies ist das Programm, das immer dann aufgerufen wird, wenn Git den Benutzer nach Anmeldeinformationen fragen muss, wobei eine Eingabeaufforderung als Befehlszeilenargument erwartet wird und die eine Antwort auf <code>stdout</code> zurückgeben soll. Weitere Informationen zu diesem Subsystem finden Sie unter <a href="{{< relurl "book/de/v2/ch00/_credential_caching" >}}">Anmeldeinformationen speichern</a>.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_NAMESPACE</code></strong> steuert den Zugriff auf namenspaced refs und entspricht dem Flag <code>--namespace</code>.
+Dies ist vor allem auf der Serverseite nützlich, wo Sie möglicherweise mehrere Forks eines einzelnen Repositorys in einem Repository speichern möchten, wobei nur die Refs getrennt bleiben.</p>
+</div>
+<div class="paragraph">
+<p><strong><code>GIT_FLUSH</code></strong> kann verwendet werden, um Git zu zwingen, nicht gepuffertes I/O zu verwenden, wenn inkrementell in stdout geschrieben wird.
+Ein Wert von 1 bewirkt, dass Gits Puffer öfter geleert wird. Ein Wert von 0 bewirkt, dass alle Ausgaben gepuffert werden.
+Der Standardwert (falls diese Variable nicht festgelegt ist) ist die Auswahl eines geeigneten Pufferschemas abhängig von Aktivität und Ausgabemodus.</p>
+</div>
+<div class="paragraph">
+<p>Mit <strong><code>GIT_REFLOG_ACTION</code></strong> können Sie den beschreibenden Text angeben, der in das Reflog geschrieben wird.
+Hier ein Beispiel:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ GIT_REFLOG_ACTION="my action" git commit --allow-empty -m 'My message'
+[master 9e3d55a] My message
+$ git reflog -1
+9e3d55a HEAD@{0}: my action: My message</code></pre>
+</div>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

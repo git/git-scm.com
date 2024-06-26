@@ -1,0 +1,307 @@
+git-worktree(1)
+===============
+
+名称
+--
+git-worktree - 管理多个工作区
+
+
+概述
+--
+[verse]
+'git worktree add' [-f] [--detach] [--checkout] [--lock [--reason <字符串>]]
+		   [--orphan] [(-b | -B) <新分支>] <路径> [<提交号>]
+'git worktree list' [-v | --porcelain [-z]]
+'git worktree lock' [--reason <字符串>] <工作区>
+'git worktree move' <工作区> <新分支>
+'git worktree prune' [-n] [-v] [--expire <到期>]
+'git worktree remove' [-f] <工作区>
+'git worktree repair' [<路径>...]
+'git worktree unlock' <工作区>
+
+描述
+--
+
+管理附属于同一仓库的多个工作区。
+
+一个 git 仓库可以支持多个工作区，允许你一次签出多个分支。 通过`git worktree add`，一个新的工作区与仓库相关联，同时还有额外的元数据，以区分该工作区与同一仓库中的其他工作区。 工作区目录树，连同这些元数据，被称为 "工作区"。
+
+这个新的工作区被称为 "链接工作区"，与 linkgit:git-init[1] 或 linkgit:git-clone[1] 所准备的 "主工作区 "相对应。 一个仓库有一个主工作区（如果它不是一个裸仓库）和零个或多个链接工作区。当你用完一个链接工作区后，用 `git worktree remove` 删除它。
+
+在其最简单的形式中，`git worktree add <路径>`自动创建一个新的分支，其名称是`<路径>`的最后一个组成部分，如果你计划在一个新的主题上工作，这很方便。例如，`git worktree add .../hotfix`创建了新的分支`hotfix`，并在路径`.../hotfix`处签出它。如果要在一个新的工作区中处理现有的分支，可以使用`git worktree add <路径> <分支>`。另一方面，如果你只是打算做一些实验性的修改，或者在不影响现有开发的情况下进行测试，创建一个不与任何分支相关联的 "抛弃式 "工作区通常是很方便的。例如，`git worktree add -d <路径>`在与当前分支相同的提交中，创建一个带有分离`HEAD`的新工作区。
+
+如果没有使用 `git worktree remove` 就删除了工作区，那么它的相关管理文件，即驻扎在仓库中的文件（见下面的 "详细说明"），最终会被自动删除（见 linkgit:git-config[1] 中的 `gc.worktreePruneExpire`），或者你可以在主工作区或任何链接工作区中运行`git worktree prune` 来清理任何过时的管理文件。
+
+如果一个链接的工作区存储在便携设备或网络共享上，而这些设备并不总是被挂载，你可以通过发布`git worktree lock`命令来防止其管理文件被修剪，可以使用选项`--reason`来解释为什么工作树被锁定。
+
+命令
+--
+add <路径> [<提交号>]::
+
+在`<路径>`创建一个工作树，并将`<提交号>`签入其中。新的工作区被链接到当前仓库，共享除每个工作区文件（如`HEAD`、`index`等）之外的一切。为了方便起见，`<提交号>`可以是一个光秃秃的"`-`"，它与`@{-1}`同义。
++
+如果`<提交号>`是一个分支名称（称其为`<分支>`），并且没有找到，也没有使用`-b`或`-B`或`--detach`，但确实在正好一个远程仓库（称其为`<远程仓库>`）中存在一个名称匹配的跟踪分支，则视为等同于：
++
+------------
+$ git worktree add --track -b <分支> <路径> <远程仓库>/<分支>
+------------
++
+如果该分支存在于多个远程仓库，并且其中一个是由`checkout.defaultRemote`配置变量命名的，为了消除歧义，我们将使用该变量，即使`<分支>`在所有远程中并不唯一。将其设置为例如 `checkout.defaultRemote=origin`，以便在`<分支>`不明确但存在于'origin'远程时，总是从那里签出远程分支。参见 linkgit:git-config[1] 中的 `checkout.defaultRemote`。
++
+如果省略了 `<提交号>`，也没有使用 `-b` 或 `-B` 或 `--detach` ，那么作为一种方便，新的工作区将与一个以 `$(basename <路径>)` 命名的分支（称为 `<分支>` ）相关联。 如果 `<分支>` 不存在，一个基于 `HEAD` 的新分支将被自动创建，就像给出 `-b <分支>` 一样。 如果 `<分支>` 确实存在，它将在新的工作区中被签出，如果它没有在其他地方被签出，否则命令将拒绝创建工作区（除非使用 `--force`）。
++
+如果省略了 `<commit-ish>`，既没有使用 `--detach`，也没有使用 `--orphan`，并且没有有效的本地分支（或远程分支，如果指定了 `--guess-remote`），那么为了方便起见，新的工作树会与一个名为 `<branch>` 的未出生分支关联（如果没有使用 `-b` 或 `-B`，则在 `$(basename <path>)`之后），就像向命令传递了 `--orphan`一样。如果仓库有远程分支，并且使用了 `--guess-remote`，但不存在远程或本地分支，则命令会失败，并发出警告，提醒用户先从远程获取（或使用 `-f/--force` 覆盖）。
+
+list::
+
+列出每个工作区的细节。 主工作区被首先列出，接着是每个链接工作区。 输出的细节包括该工作区是否为裸树，当前签出的修订版，当前检出的分支（如果没有则为 "分离的HEAD"），如果工作树被锁定则为 "锁定"，如果工作树可以被`prune`命令修剪则为 "可修剪"。
+
+lock::
+
+如果一个工作区在便携式设备或网络共享上，而这个设备或网络共享并不总是被挂载，请锁定它以防止其管理文件被自动修剪。这也可以防止它被移动或删除。 可以选择用`--reason`选项来指定锁定的原因。
+
+move::
+
+将一个工作区移动到一个新的位置。注意，主工作区或包含子模块的链接工作区不能用此命令移动。(然而，如果你手动移动主工作区，`git worktree repair`命令可以重新建立与链接工作区的连接。）
+
+prune::
+
+修剪`$GIT_DIR/worktrees`中的工作区信息。
+
+remove::
+
+移除一个工作区。只有干净的工作区（没有未跟踪的文件和未修改的跟踪文件）可以被删除。脏工作区或有子模块的工作区可以用 `--force` 删除。主工作区不能被删除。
+
+repair [<路径>...]::
+
+如果可能的话，修复工作区的管理文件，如果它们由于外部因素而变得损坏或过时。
++
+例如，如果主工作区（或裸仓库）被移动，链接工作区将无法找到它。在主工作区中运行 `repair` 将重新建立从链接工作区到主工作区的连接。
++
+同样地，如果没有使用 `git worktree move` 就移动了链接工作区，主工作区（或裸仓库）将无法定位它。在最近移动的工作区中运行`repair`将重新建立连接。如果多个链接工作区被移动，在任何工作区中运行`repair`，以每个树的新`<路径>`作为参数，将重新建立与所有指定路径的连接。
++
+如果主工作区和链接工作区都被手动移动，那么在主工作区中运行`repair`并指定每个链接工作树的新`<路径>`将重新建立两个方向的所有连接。
+
+unlock::
+
+解锁一个工作区，允许它被修剪、移动或删除。
+
+选项
+--
+
+-f::
+--force::
+	默认情况下，当`<提交号>`是一个分支名称，并且已经被另一个工作树签出，或者`<路径>`已经被分配给某个工作树，但丢失了（例如，如果`<路径>`被手动删除），`add`拒绝创建一个新的工作树。这个选项覆盖了这些保护措施。要添加一个缺失但锁定的工作区路径，请指定`--force`两次。
++
+`move`拒绝移动一个被锁定的工作区，除非`--force`被指定两次。如果目的地已经被分配给其他工作区，但没有找到（例如，如果`<新路径>`被手动删除），那么`--force`允许移动；如果目的地被锁定，则使用`--force`两次。
++
+`remove`拒绝删除一个脏工作区，除非使用`--force`。 要删除一个锁定的工作区，需要指定`--force`两次。
+
+-b <新分支>::
+-B <新分支>::
+	通过`add`，创建一个名为`<新分支>`的新分支，从`<提交号>`开始，并将`<新分支>`检出到新的工作树。 如果省略了`<提交号>`，则默认为`HEAD`。 默认情况下，如果一个新的分支已经存在，`-b`会拒绝创建它。`-B`则不会拒绝创建，将`<新分支>`重置为`<提交号>`。
+
+-d::
+--detach::
+	通过 `add`，在新的工作树中分离出 `HEAD`。参见 linkgit:git-checkout[1] 中的 “分离式 HEAD”。
+
+--[no-]checkout::
+	默认情况下，`add`会检出`<提交号>`，然而，`--no-checkout`可以用来抑制检出，以便进行定制，比如配置稀疏检出。参见 linkgit:git-read-tree[1] 中的 "稀疏检出"。
+
+--[no-]guess-remote::
+	在`worktree add <路径>`下，如果没有`<提交号>`，则不从`HEAD`创建新的分支，而是在正好有一个与`<路径>`的基名相匹配的远程跟踪分支的情况下，将新的分支建立在远程跟踪分支上，并将远程跟踪分支标记为新分支的 "上游"。
++
+这也可以通过使用`worktree.guessRemote`配置选项设置为默认行为。
+
+--[no-]track::
+	当创建一个新的分支时，如果 `<提交号>` 是一个分支，则将其标记为新分支的 "上游"。 默认认为 `<提交号>` 是一个远程跟踪分支。 详情见 linkgit:git-branch[1] 中的 `--track`。
+
+--lock::
+	在创建后保持工作区的锁定。这相当于在`git worktree add`之后执行`git worktree lock`，但没有资源竞争。
+
+-n::
+--dry-run::
+	在使用`prune`时，不会删除任何文件；只会报告它要删除的东西。
+
+--orphan::
+	使用 `add` 使新的工作区和索引为空，并将工作树与名为 `<new-branch>` 的新孤儿/未出生分支关联起来。
+
+--porcelain::
+	使用 `list` 时，脚本会以易于解析的格式输出。 这种格式在不同的 Git 版本和用户配置下都会保持稳定。 建议与 `-z` 搭配使用。 详见下文。
+
+-z::
+	当`--porcelain`与`list`一起指定时，用NUL而不是换行来结束每一行。这使得在工作区路径包含换行符时，可以解析输出。
+
+-q::
+--quiet::
+	用`add`，抑制反馈信息。
+
+-v::
+--verbose::
+	使用`prune`，报告所有的移除情况。
++
+用`list`，输出关于工作区的额外信息（见下文）。
+
+--expire <时间>::
+	使用 `prune`，只对超过`<时间>`未使用的工作区进行淘汰。
++
+使用`list`，如果丢失的工作区比`<时间>`早，则将其注释为可修剪。
+
+--reason <字符串>::
+	用`lock`或用`add --lock`，解释为什么工作区被锁定。
+
+<工作区>::
+	工作区可以通过相对或绝对路径来识别。
++
+如果工作区路径中的后几个层次在工作树中是唯一的，则它可以用来识别一个工作树。例如，如果你只有两个工作区，在`/abc/def/ghi`和`/abc/def/ggg`，那么使用`ghi`或`def/ghi`就足以指向前一个工作区。
+
+引用
+--
+当使用多个工作区时，一些引用在所有工作区之间共享，但其他引用是特定于单个工作区的。比如：`HEAD`，它对每个工作树都是不同的。本节是关于共享规则，以及如何从另一个工作区访问一个工作区的引用。
+
+一般来说，所有伪引用都是按工作区划分的，而所有以 `refs/` 开头的引用都是共享的。伪引用与 `HEAD` 类似，直接位于 `$GIT_DIR` 下，而不是 `$GIT_DIR/refs` 内。但也有例外：`refs/bisect`、`refs/worktree` 和`refs/rewitten` 中的引用不共享。
+
+每个工作区的引用仍然可以通过两个特殊的路径，即 `主工作区`和 `从工作区`，从另一个工作区访问。前者可以访问主工作区的每个工作区的引用，而后者可以访问所有链接的工作区。
+
+例如，`main-worktree/HEAD`或`main-worktree/refs/bisect/good`分别解析到与主工作区的`HEAD`和`refs/bisect/good`相同的值。类似地，`worktrees/foo/HEAD`或`worktrees/bar/refs/bisect/bad`与`$GIT_COMMON_DIR/worktrees/foo/HEAD`和`$GIT_COMMON_DIR/worktrees/bar/refs/bisect/bad`相同。
+
+要访问引用，最好不要直接在 `$GIT_DIR` 中查找。相反，使用 linkgit:git-rev-parse[1] 或 linkgit:git-update-ref[1] 这样的命令可以正确处理引用。
+
+配置文件
+----
+默认情况下，资源库的`config`文件在所有工作区上共享。 如果配置变量`core.bare`或`core.worktree`存在于公共配置文件中，并且`extensions.worktreeConfig`被禁用，那么它们将只应用于主工作区。
+
+为了对工作区进行特定配置，你可以打开`worktreeConfig`扩展，例如：
+
+------------
+$ git config extensions.worktreeConfig true
+------------
+
+在这种模式下，特定的配置保持在`git rev-parse --git-path config.worktree`所指向的路径中。你可以用`git config --worktree`添加或更新该文件中的配置。旧版本的Git会拒绝访问带有这个扩展的仓库。
+
+注意，在这个文件中，`core.bare`和`core.worktree`的例外情况已经消失。如果它们存在于`$GIT_DIR/config`中，你必须把它们移到主工作区的`config.worktree`中。你也可以借此机会审查和移动其他你不想共享到所有工作区的配置：
+
+ - `core.worktree`不应该被共享。
+
+ - 如果`core.bare`的值为`core.bare=true`，则不应共享。
+
+ - `core.sparseCheckout`不应该被共享，除非你确信你总是对所有工作区使用稀疏检出。
+
+更多细节请参见 linkgit:git-config[1] 中的 `extensions.worktreeConfig` 文档。
+
+详细信息
+----
+每个链接工作区在仓库的`$GIT_DIR/worktrees`目录下都有一个私有子目录。 私有子目录的名称通常是被链接的工作树路径的基本名称，但可能加上一个数字以使成为唯一目录。 例如，当`$GIT_DIR=/path/main/.git`时，命令`git worktree add /path/other/test-next next`会在`/path/other/test-next`中创建链接工作区，同时创建一个`$GIT_DIR/worktrees/test-next`目录（如果`test-next`已经被占用，则创建`$GIT_DIR/worktrees/test-next1`）。
+
+在一个链接工作区中，`$GIT_DIR`设置为指向这个私有目录（例如，例子中的`/path/main/.git/worktrees/test-next`），`$GIT_COMMON_DIR`会被设置为指向主工作区的`$GIT_DIR`（例如，`/path/main/.git`）。这些设置是在位于链接工作区顶级目录的`.git`文件中进行的。
+
+通过 `git rev-parse --git-path` 进行路径解析时，会根据路径使用 `$GIT_DIR` 或 `$GIT_COMMON_DIR`。例如，在链接的工作区中，`git rev-parse --git-path HEAD` 返回 `/path/main/.git/worktrees/test-next/HEAD` （而不是 `/path/other/test-next/.git/HEAD` 或 `/path/main/.git/HEAD`），而 `git rev-parse --git-path refs/heads/master` 使用 `$GIT_COMMON_DIR`，并返回 `/path/main/.git/refs/heads/master`，因为除了 `refs/bisect`、`refs/worktree` 和 `refs/rewitten`，所有工作区都共享引用。
+
+更多信息见 linkgit:gitrepository-layout[5]。经验法则是，当你需要直接访问`$GIT_DIR`或`$GIT_COMMON_DIR`内的东西时，不要对路径是否属于`$GIT_DIR`做出任何假设。使用`git rev-parse --git-path`来获得最终路径。
+
+如果你手动移动一个链接工作区，你需要更新该条目目录下的`gitdir`文件。例如，如果一个链接工作区被移到`/newpath/test-next`，而它的`.git`文件指向`/path/main/.git/worktrees/test-next`，那么更新`/path/main/.git/worktrees/test-next/gitdir`以引用`/newpath/test-next`。除此之外，更好的选择是，运行`git worktree repair`来自动重新建立连接。
+
+为了防止`$GIT_DIR/worktrees`条目被修剪（这在某些情况下很有用，比如该条目的工作区存储在便携设备上），使用`git worktree lock`命令，它会在条目的目录中添加一个名为`locked`的文件。该文件包含纯文本的原因。例如，如果一个链接工作区的`.git`文件指向`/path/main/.git/worktrees/test-next`，那么一个名为`/path/main/.git/worktrees/test-next/locked`的文件将阻止`test-next`条目被剪除。 详情见linkgit:gitrepository-layout[5]。
+
+当`extensions.worktreeConfig`被启用时，在`.git/config`之后会读取`.git/worktrees/<id>/config.worktree`的配置文件。
+
+列表输出格式
+------
+`worktree list` 命令有两种输出格式。默认的格式是在单行上显示细节，并带有列。 例如：
+
+------------
+$ git worktree list
+/path/to/bare-source            (裸)
+/path/to/linked-worktree        abcd1234 [master]
+/path/to/other-linked-worktree  1234abc  (分离式HEAD)
+------------
+
+该命令还根据每个工作区的状态，显示其注释。 这些注释是：
+
+ * `locked`，如果工作区被锁定。
+ * `prunable`，如果工作区可以通过`git worktree prune`进行修剪。
+
+------------
+$ git worktree list
+/path/to/bare-source            (裸)
+/path/to/linked-worktree        abcd1234 [master]
+/path/to/other-linked-worktree  1234abc  (分离式HEAD)
+------------
+
+对于这些注释，也可能有一个原因，这可以通过verbose模式看到。然后注释被移到下一行缩进，后面是附加信息。
+
+------------
+$ git worktree list --verbose
+/path/to/linked-worktree                           abcd1234 [master]
+/path/to/locked-worktree-no-reason    abcd5678 (分离的 HEAD) locked
+/path/to/locked-worktree-with-reason  1234abcd (brancha)
+	锁定：工作区路径被安装在一个可移动设备上
+/path/to/prunable-worktree            5678abc1 (分离的 HEAD)
+	可修剪：gitdir 文件指向不存在的位置
+------------
+
+注意，如果有额外的信息，注释将被移到下一行，否则它将与工作区本身保持在同一行。
+
+上层命令格式
+~~~~~~
+上层命令的每个属性有一行。 如果给了`-z`，那么这几行将以NUL（空字符）而不是换行来结束。 属性以标签和值的形式列出，用一个空格隔开。 布尔属性（如`bare`和`detached`）仅作为标签列出，并且仅在值为真时出现。 一些属性（如`locked'）可以只作为标签列出，也可以根据是否有理由列出一个值。 工作区的第一个属性总是`工作树'，一个空行表示记录的结束。 比如说：
+
+------------
+$ git worktree list --porcelain
+worktree /path/to/bare-source
+bare
+
+worktree /path/to/linked-worktree
+HEAD abcd1234abcd1234abcd1234abcd1234abcd1234
+branch refs/heads/master
+
+worktree /path/to/other-linked-worktree
+HEAD 1234abc1234abc1234abc1234abc1234abc1234a
+detached
+
+worktree /path/to/linked-worktree-locked-no-reason
+HEAD 5678abc5678abc5678abc5678abc5678abc5678c
+branch refs/heads/locked-no-reason
+locked
+
+worktree /path/to/linked-worktree-locked-with-reason
+HEAD 3456def3456def3456def3456def3456def3456b
+branch refs/heads/locked-with-reason
+locked reason why is locked
+
+worktree /path/to/linked-worktree-prunable
+HEAD 1233def1234def1234def1234def1234def1234b
+detached
+修剪的gitdir文件指向不存在的位置
+
+------------
+
+除非使用`-z`，否则锁定的原因中任何 "不寻常"的字符，如换行，都会被转义，并且整个原因被引用为配置变量`core.quotePath`（见linkgit:git-config[1]）。 举例来说：
+
+------------
+$ git worktree list --porcelain
+…
+locked "reason\nwhy is locked"
+…
+------------
+
+实例
+--
+你正在进行重构工作，你的老板进来了，要求你立即修复一些东西。你通常会使用linkgit:git-stash[1]来暂时存储你的修改，然而你的工作树处于如此混乱的状态（有新的、被移动的、被删除的文件，以及其他散落的碎片），你不想冒险去打扰它。相反，你创建了一个临时的链接工作树来进行紧急修复，完成后将其删除，然后继续你先前的重构会话。
+
+------------
+$ git worktree add -b emergency-fix ../temp master
+$ pushd ../temp
+# ... 嗨骇害 ...
+$ git commit -a -m '老板让我赶紧修复的问题'
+$ popd
+$ git worktree remove ../temp
+------------
+
+漏洞
+--
+多重检出总体上仍处于试验阶段，对子模块的支持也不完整。我们 ⌈不⌋ 建议对一个父项目进行多重检出。
+
+GIT
+---
+属于 linkgit:git[1] 文档

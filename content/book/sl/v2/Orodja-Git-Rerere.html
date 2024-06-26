@@ -1,0 +1,308 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: sl
+  chapter:
+    title: Orodja Git
+    number: 7
+  section:
+    title: Rerere
+    number: 9
+    cs_number: '7.9'
+    previous: book/sl/v2/Orodja-Git-Napredno-združevanje
+    next: book/sl/v2/Orodja-Git-Razhroščevanje-z-Gitom
+title: Git - Rerere
+
+---
+<h2 id="ref_rerere">Rerere</h2>
+<div class="paragraph">
+<p>Funkcionalnost <code>git rerere</code> je nekoliko skrita značilnost.
+Ime izhaja iz »reuse recorded resolution« (»ponovno uporabi posneto rešitev«) in vam, kot že samo ime nakazuje, omogoča, da si Git zapomni, kako ste rešili konflikt med kosi, tako da vam lahko prihodnjič pomaga in konflikt reši avtomatično.</p>
+</div>
+<div class="paragraph">
+<p>Obstaja več scenarijev, kjer je ta funkcionalnost zelo priročna.
+Eden izmed primerov, ki ga omenjajo v dokumentaciji, je, ko želite zagotoviti, ali se bo dolgotrajna tematska veja na koncu gladko združila brez konfliktov, vendar pa v svoji zgodovini ne želite imeti veliko vmesnih potrditev združitev.
+Z vklopljenim <code>rerere</code> lahko občasno poskusite združiti, rešite konflikte, nato pa izstopite iz združitve.
+Če to počnete neprestano, bi morala biti končna združitev enostavna, saj lahko <code>rerere</code> vse naredi za vas avtomatično.</p>
+</div>
+<div class="paragraph">
+<p>Enako taktiko lahko uporabite, če želite ohraniti vejo ponovno bazirano, da se vam ne bo treba ukvarjati z istimi konflikti pri vsakem ponovnem baziranju.
+Ali pa, če želite vzeti vejo, ki ste jo združili in rešili veliko konfliktov, in se odločite, da jo boste raje ponovno bazirali — verjetno vam ni treba znova reševati vseh istih konfliktov.</p>
+</div>
+<div class="paragraph">
+<p>Druga uporaba <code>rerere</code> je, ko združujete več tematskih vej, ki se razvijajo, skupaj v testno glavo, kar uporablja občasno tudi sam projekt Git.
+Če testi niso uspešni, lahko izbrišete združitve in jih ponovno izvedete brez tiste tematske veje, ki je naredila težave, ne da bi se morali ponovno spopasti s konflikti.</p>
+</div>
+<div class="paragraph">
+<p>Za vklop funkcionalnosti <code>rerere</code> morate samo nastaviti to nastavitev konfiguracije:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global rerere.enabled true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To lahko omogočite tudi tako, da v določenem repozitoriju ustvarite direktorij <code>.git/rr-cache</code>, vendar je nastavitev konfiguracije bolj jasna in vam omogoča, da to funkcionalnost omogočite globalno.</p>
+</div>
+<div class="paragraph">
+<p>Zdaj si poglejmo preprost primer podoben prejšnjemu.
+Recimo, da imamo datoteko z imenom <code>hello.rb</code>, ki je videti tako:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hello world'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>V eni veji spremenimo besedo »hello« v »hola«, nato pa v drugi veji spremenimo »world« v »mundo«, tako kot prej.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/rerere1.png" >}}" alt="Dve veji spreminjata isti del iste datoteke na različen način">
+</div>
+<div class="title">Slika 160. Dve veji spreminjata isti del iste datoteke na različen način</div>
+</div>
+<div class="paragraph">
+<p>Ko združimo dve veji skupaj, bomo dobili konflikt združevanja:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console?prompt=$" data-lang="console?prompt=$">$ git merge i18n-world
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Recorded preimage for 'hello.rb'
+Automatic merge failed; fix conflicts and then commit the result.</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Opaziti bi morali novo vrstico <code>Recorded preimage for FILE</code>.
+Sicer bi morala biti videti enako kot običajen konflikt med združevanjem.
+V tem trenutku nam lahko <code>rerere</code> pove nekaj stvari.
+Običajno bi zdaj zagnali ukaz <code>git status</code>, da bi videli, kaj vse je povzročilo konflikt:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git status
+# On branch master
+# Unmerged paths:
+#   (use "git reset HEAD &lt;file&gt;..." to unstage)
+#   (use "git add &lt;file&gt;..." to mark resolution)
+#
+#	both modified:      hello.rb
+#</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Z <code>git rerere status</code> pa vam bo <code>git rerere</code> tudi povedal, kaj je posnel v stanje pred-združevanja:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere status
+hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Z ukazom <code>git rerere diff</code> lahko prikažete trenutno stanje reševanja — s čim ste začeli, da bi rešili konflikt, in s čim ste ga rešili.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console?prompt=$" data-lang="console?prompt=$">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,11 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
++&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+   puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++=======
++  puts 'hello mundo'
++&gt;&gt;&gt;&gt;&gt;&gt;&gt; i18n-world
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Prav tako (in to ni povezano z <code>rerere</code>) lahko uporabite ukaz <code>git ls-files -u</code>, da vidite datoteke, ki so povzročile konflikt, in predhodno, leve in desne različice:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git ls-files -u
+100644 39804c942a9c1f2c03dc7c5ebcd7f3e3a6b97519 1	hello.rb
+100644 a440db6e8d1fd76ad438a49025a9ad9ce746f581 2	hello.rb
+100644 54336ba847c3758ab604876419607e9443848474 3	hello.rb</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sedaj lahko konflikt rešite tako, da spremenite vsebino datoteke na <code>puts 'hola mundo'</code>, in nato lahko znova zaženete ukaz <code>git rerere diff</code>, da vidite, kaj si bo <code>rerere</code> zapomnil:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere diff
+--- a/hello.rb
++++ b/hello.rb
+@@ -1,11 +1,7 @@
+ #! /usr/bin/env ruby
+
+ def hello
+-&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+-  puts 'hello mundo'
+-=======
+-  puts 'hola world'
+-&gt;&gt;&gt;&gt;&gt;&gt;&gt;
++  puts 'hola mundo'
+ end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To pomeni, da bo Git ob zaznavi konflikta med kosom kode v datoteki <code>hello.rb</code>, kjer je na eni strani »hello mundo« in na drugi strani »hola world«, konflikt rešil s »hola mundo«.</p>
+</div>
+<div class="paragraph">
+<p>Sedaj lahko označimo konflikt kot rešen in ga potrdimo:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git commit
+Recorded resolution for 'hello.rb'.
+[master 68e16e5] Merge branch 'i18n'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Vidite lahko, da se prikaže sporočilo »Recorded resolution for FILE«, kar pomeni, da je bila rešitev konflikta uspešno posneta.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/rerere2.png" >}}" alt="Uspešno posneta rešitev za datoteko">
+</div>
+<div class="title">Slika 161. Uspešno posneta rešitev za datoteko</div>
+</div>
+<div class="paragraph">
+<p>Zdaj pa razveljavimo to združitev in namesto tega ponovno bazirajmo na vrh naše veje <code>master</code>.
+To lahko storimo z ukazom <code>git reset</code>, kot smo videli v razdelku <a href="{{< relurl "book/sl/v2/ch00/_git_reset" >}}">Demistifikacija ponastavitve</a>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git reset --hard HEAD^
+HEAD is now at ad63f15 i18n the hello</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Naša združitev je razveljavljena.
+Sedaj ponovno bazirajmo tematsko vejo.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout i18n-world
+Switched to branch 'i18n-world'
+
+$ git rebase master
+First, rewinding head to replay your work on top of it...
+Applying: i18n one word
+Using index info to reconstruct a base tree...
+Falling back to patching base and 3-way merge...
+Auto-merging hello.rb
+CONFLICT (content): Merge conflict in hello.rb
+Resolved 'hello.rb' using previous resolution.
+Failed to merge in the changes.
+Patch failed at 0001 i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Sedaj smo dobili enak konflikt združevanja, kot smo pričakovali, vendar oglejte si vrstico <code>Resolved FILE using previous resolution</code>.
+Če si ogledamo datoteko, bomo videli, da je bila že rešena in da v njej ni označb konfliktov združevanja.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Tudi <code>git diff</code> vam bo prikazal, kako je bilo avtomatično ponovno rešeno:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git diff
+diff --cc hello.rb
+index a440db6,54336ba..0000000
+--- a/hello.rb
++++ b/hello.rb
+@@@ -1,7 -1,7 +1,7 @@@
+  #! /usr/bin/env ruby
+
+  def hello
+-   puts 'hola world'
+ -  puts 'hello mundo'
+++  puts 'hola mundo'
+  end</code></pre>
+</div>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="{{< relurl "book/sl/v2/images/rerere3.png" >}}" alt="Avtomatsko rešen konflikt združevanja z uporabo prejšnje rešitve">
+</div>
+<div class="title">Slika 162. Avtomatsko rešen konflikt združevanja z uporabo prejšnje rešitve</div>
+</div>
+<div class="paragraph">
+<p>Z <code>git checkout</code> lahko tudi ponovno kreirate stanje konfliktne datoteke:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git checkout --conflict=merge hello.rb
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours
+  puts 'hola world'
+=======
+  puts 'hello mundo'
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>V razdelku <a href="{{< relurl "book/sl/v2/ch00/_advanced_merging" >}}">Napredno združevanje</a> smo videli primer tega.
+Za zdaj pa ga ponovno rešimo samo z ukazom <code>git rerere</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git rerere
+Resolved 'hello.rb' using previous resolution.
+$ cat hello.rb
+#! /usr/bin/env ruby
+
+def hello
+  puts 'hola mundo'
+end</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Datoteko smo ponovno rešili samodejno s pomočjo predpomnjenja rešitve <code>rerere</code>.
+Sedaj lahko dodate in nadaljujete ponovno baziranje, da ga dokončate.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git add hello.rb
+$ git rebase --continue
+Applying: i18n one word</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Če torej pogosto ponovno združujete veje, ali želite imeti tematsko vejo posodobljeno z vejo <code>master</code> brez veliko združevanj, ali pogosto ponovno bazirate, lahko vklopite <code>rerere</code> in si tako olajšajte življenje.</p>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

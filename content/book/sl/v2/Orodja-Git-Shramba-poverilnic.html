@@ -1,0 +1,358 @@
+---
+category: book
+section: documentation
+subsection: book
+sidebar: book
+book:
+  language_code: sl
+  chapter:
+    title: Orodja Git
+    number: 7
+  section:
+    title: Shramba poverilnic
+    number: 14
+    cs_number: '7.14'
+    previous: book/sl/v2/Orodja-Git-Zamenjava
+    next: book/sl/v2/Orodja-Git-Povzetek
+title: Git - Shramba poverilnic
+
+---
+<h2 id="_credential_caching">Shramba poverilnic</h2>
+<div class="paragraph">
+<p>
+
+Če uporabljate prenos SSH za povezovanje z oddaljenimi strežniki, je možno, da imate ključ brez gesla, kar vam omogoča varno prenašanje podatkov brez vpisovanja uporabniškega imena in gesla.
+Vendar to ni mogoče pri protokolih HTTP — vsaka povezava potrebuje uporabniško ime in geslo.
+To postane še težje za sisteme z dvostopenjskim overjanjem, kjer je žeton, ki ga uporabite za geslo, naključno generiran in neizgovorljiv.</p>
+</div>
+<div class="paragraph">
+<p>Na srečo ima Git sistem poverilnic, ki lahko pomaga pri tem.
+Git ima vgrajenih nekaj možnosti:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Privzeto je, da ni nič shranjeno v predpomnilniku.
+Vsaka povezava vas bo pozvala k vpisu uporabniškega imena in gesla.</p>
+</li>
+<li>
+<p>Način »cache« shrani poverilnice v pomnilnik za določen čas.
+Gesla nikoli niso shranjena na disku in iz predpomnilnika se izbrišejo po 15 minutah.</p>
+</li>
+<li>
+<p>Način »store« shrani poverilnice v besedilno datoteko na disku in nikoli ne potečejo.
+To pomeni, da gesla ne boste več mogli vnesti, dokler ne spremenite gesla za gostitelja Git.
+Slabost tega pristopa je, da so vaša gesla shranjena v čisti besedilni datoteki v vaši domači mapi.</p>
+</li>
+<li>
+<p>Če uporabljate macOS, ima Git način »osxkeychain«, ki poverilnice shrani v varni ključavnici, povezani z vašim sistemskim računom.
+Ta metoda poverilnice shrani na disk in ne potečejo, vendar so šifrirane s sistemom, ki shranjuje certifikate HTTPS, ter Safari jih samodejno izpolnjuje.</p>
+</li>
+<li>
+<p>Če uporabljate Windows, lahko omogočite funkcijo <strong>Git Credential Manager</strong> pri namestitvi <a href="https://gitforwindows.org/">Git za Windows</a> ali ločeno namestite <a href="https://github.com/git-ecosystem/git-credential-manager/releases/latest">najnovejši GCM</a> kot samostojno storitev.
+To je podobno pomočniku »osxkeychain« opisanem zgoraj, vendar uporablja shrambo poverilnic sistema Windows za nadzor občutljivih informacij.
+Ponuja lahko tudi poverilnice za WSL1 ali WSL2.
+Za več informacij glejte <a href="https://github.com/git-ecosystem/git-credential-manager#readme">navodila za namestitev GCM</a>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Izmed teh metod lahko izberete eno z nastavitvijo konfiguracijske vrednosti Git:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper cache</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nekateri od teh pomočnikov imajo možnosti.
+Pomočnik »store« lahko sprejme argument <code>--file &lt;path&gt;</code>, ki prilagodi, kje se shrani besedilna datoteka (privzeto je <code>~/.git-credentials</code>).
+Pomočnik <code>cache</code> sprejme možnost <code>--timeout &lt;seconds&gt;</code>, ki spremeni čas delovanja njegovega prikritega procesa (privzeto je <code>900</code>, ali 15 minut).
+Tukaj je primer, kako bi konfigurirali pomočnika »store« z lastnim imenom datoteke:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper 'store --file ~/.my-credentials'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Git vam celo omogoča, da konfigurirate več pomočnikov.
+Ko Git išče poverilnice za določenega gostitelja, bo naredil na njih poizvedbe v vrstnem redu in se ustavil po prvem prejetem odgovoru.
+Pri shranjevanju poverilnic bo Git poslal uporabniško ime in geslo vsem pomočnikom na seznamu in vsak od njih se lahko odloči, kaj želi storiti z njimi.
+Tukaj je primer datoteke <code>.gitconfig</code>, če imate datoteko s poverilnicami na ključu USB, vendar želite uporabiti predpomnilnik v pomnilniku, da prihranite nekaj tipkanja, če ključ ni priključen:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">[credential]
+    helper = store --file /mnt/thumbdrive/.git-credentials
+    helper = cache --timeout 30000</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_pod_pokrovom">Pod pokrovom</h3>
+<div class="paragraph">
+<p>Kako to sploh deluje?
+Gitov vrhnji ukaz za sistem pomočnika za poverilnice je <code>git credential</code>, ki kot argument sprejme ukaz in nato več vnosov preko stdin.</p>
+</div>
+<div class="paragraph">
+<p>Morda bo lažje razumeti s primerom.
+Recimo, da je bil konfiguriran pomočnik za poverilnice in da je pomočnik shranil poverilnice za <code>mygithost</code>.
+Tukaj je seja, ki uporablja ukaz »fill«, ki se sproži, ko Git poskuša najti poverilnice za gostitelja:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential fill <b class="conum">(1)</b>
+protocol=https <b class="conum">(2)</b>
+host=mygithost
+<b class="conum">(3)</b>
+protocol=https <b class="conum">(4)</b>
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential fill <b class="conum">(5)</b>
+protocol=https
+host=unknownhost
+
+Username for 'https://unknownhost': bob
+Password for 'https://bob@unknownhost':
+protocol=https
+host=unknownhost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>To je ukazna vrstica, ki sproži interakcijo.</p>
+</li>
+<li>
+<p>Git-credential nato čaka na vhod na stdin.
+Podamo mu stvari, ki jih poznamo: protokol in gostiteljsko ime.</p>
+</li>
+<li>
+<p>Prazna vrstica označuje, da je vnos zaključen, in sistem za poverilnice naj bi odgovoril s tistim, kar pozna.</p>
+</li>
+<li>
+<p>Git-credential prevzame nadzor in piše na stdout s podrobnostmi, ki jih je našel.</p>
+</li>
+<li>
+<p>Če poverilnice niso najdene, Gitovega uporabnika prosi za uporabniško ime in geslo ter ju posreduje nazaj prek stdout (tukaj sta priložena isti konzoli).</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Sistem za poverilnice dejansko kliče program, ki je ločen od samega Gita; kateri program in kako, je odvisno od konfiguracijske vrednosti <code>credential.helper</code>.
+Obstaja več oblik, ki jih lahko vzame:</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Konfiguracijska vrednost</th>
+<th class="tableblock halign-left valign-top">Obnašanje</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Požene <code>git-credential-foo</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>foo -a --opt=bcd</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Požene <code>git-credential-foo -a --opt=bcd</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/absolute/path/foo -xyz</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Požene <code>/absolute/path/foo -xyz</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>!f() { echo "password=s3cre7"; }; f</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Koda za <code>!</code> se izvede v lupini</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Zgoraj opisani pomočniki so dejansko poimenovani <code>git-credential-cache</code>, <code>git-credential-store</code> in tako naprej ter lahko jih konfiguriramo tako, da sprejmejo argumente ukazne vrstice.
+Splošna oblika za to je <code>git-credential-foo [args] &lt;action&gt;</code>.
+Protokol stdin/stdout je enak kot pri git-credential, vendar uporablja nekoliko drugačen nabor akcij:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>get</code> je zahteva za par uporabniškega imena in gesla.</p>
+</li>
+<li>
+<p><code>store</code> je zahteva za shranjevanje nabora poverilnic v pomnilniku tega pomočnika.</p>
+</li>
+<li>
+<p><code>erase</code> izbriše poverilnice za določene lastnosti iz pomnilnika tega pomočnika.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Za akciji <code>store</code> in <code>erase</code> ni zahtevan noben odziv (Git ga vseeno ignorira).
+Za akcijo <code>get</code> pa je Git zelo zainteresiran, za kar ima pomočnik sporočiti.
+Če pomočnik ne ve ničesar uporabnega, lahko preprosto izstopi brez izhoda, če pa ve, bi moral ponuditi informacije, ki jih ima shranjene, in jih združiti s podatki, ki jih je Git že vedel.
+Izhod se obravnava kot niz dodelitvenih stavkov; karkoli je podano, bo nadomestilo, kar Git že ve.</p>
+</div>
+<div class="paragraph">
+<p>Tukaj je isti primer kot zgoraj, vendar preskočimo <code>git-credential</code> in gremo naravnost na <code>git-credential-store</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-store --file ~/git.store store <b class="conum">(1)</b>
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7
+$ git credential-store --file ~/git.store get <b class="conum">(2)</b>
+protocol=https
+host=mygithost
+
+username=bob <b class="conum">(3)</b>
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Tukaj povemo <code>git-credential-store</code>, naj shrani nekaj poverilnic: uporabniško ime <code>bob</code> in geslo <code>s3cre7</code> bosta uporabljena, ko se bo dostopalo do <code><a href="https://mygithost" class="bare">https://mygithost</a></code>.</p>
+</li>
+<li>
+<p>Sedaj bomo pridobili te poverilnice.
+Posredujemo dele povezave, ki jih že poznamo (<code><a href="https://mygithost" class="bare">https://mygithost</a></code>), in prazen vrstični prelom.</p>
+</li>
+<li>
+<p><code>git-credential-store</code> vrne uporabniško ime in geslo, ki smo ju shranili zgoraj.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Takole izgleda datoteka <code>~/git.store</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ini" data-lang="ini">https://bob:s3cre7@mygithost</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To je le niz vrstic, od katerih vsaka vsebuje URL s podatki okrašenimi s poverilnicami.
+Pomočnika <code>osxkeychain</code> in <code>wincred</code> uporabljata domači format svojih shramb, <code>cache</code> pa uporablja lasten pomnilniški format (ki ga noben drug proces ne more prebrati).</p>
+</div>
+</div>
+<div class="sect3">
+<h3 id="_predpomnilnik_poverilnic_po_meri">Predpomnilnik poverilnic po meri</h3>
+<div class="paragraph">
+<p>Ker so <code>git-credential-store</code> in njegovi prijatelji ločeni programi od Gita, ni veliko skokov do spoznanja, da <em>kateri koli</em> program lahko deluje kot pomočnik pri preverjanju pristnosti v Gitu.
+Pomočniki, ki jih Git ponuja, pokrivajo veliko pogostih primerov uporabe, vendar ne vseh.
+Recimo, da ima vaša ekipa nekaj poverilnic, ki si jih deli vsa ekipa, morda za postavitev.
+Ti so shranjeni v skupni mapi, vendar jih ne želite kopirati v lastno shrambo poverilnic, ker se pogosto spreminjajo.
+Nobeden od obstoječih pomočnikov ne pokriva tega primera; poglejmo, kaj bi bilo potrebno, da napišemo svojega.
+Obstaja več ključnih funkcij, ki jih mora ta program imeti:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Edina akcija, na katero moramo biti pozorni, je <code>get</code>; <code>store</code> in <code>erase</code> sta pisni operaciji, zato bomo ob njihovem prejemu gladko zaključili izvajanje.</p>
+</li>
+<li>
+<p>Oblika datoteke skupne poverilnice je enaka kot tista, ki jo uporablja <code>git-credential-store</code>.</p>
+</li>
+<li>
+<p>Lokacija te datoteke je dokaj standardna, vendar bi morali uporabniku omogočiti, da vnese lastno pot, če je to potrebno.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Ponovno bomo napisali razširitev v Rubyju, vendar bo delovala v katerem koli jeziku, ki ga Git lahko izvede.
+Tukaj je celotna izvorna koda našega novega pomočnika za overjanje:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">#!/usr/bin/env ruby
+
+require 'optparse'
+
+path = File.expand_path '~/.git-credentials' # <b class="conum">(1)</b>
+OptionParser.new do |opts|
+    opts.banner = 'USAGE: git-credential-read-only [options] &lt;action&gt;'
+    opts.on('-f', '--file PATH', 'Specify path for backing store') do |argpath|
+        path = File.expand_path argpath
+    end
+end.parse!
+
+exit(0) unless ARGV[0].downcase == 'get' # <b class="conum">(2)</b>
+exit(0) unless File.exists? path
+
+known = {} # <b class="conum">(3)</b>
+while line = STDIN.gets
+    break if line.strip == ''
+    k,v = line.strip.split '=', 2
+    known[k] = v
+end
+
+File.readlines(path).each do |fileline| # <b class="conum">(4)</b>
+    prot,user,pass,host = fileline.scan(/^(.*?):\/\/(.*?):(.*?)@(.*)$/).first
+    if prot == known['protocol'] and host == known['host'] then
+        puts "protocol=#{prot}"
+        puts "host=#{host}"
+        puts "username=#{user}"
+        puts "password=#{pass}"
+        exit(0)
+    end
+end</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<ol>
+<li>
+<p>Tukaj razčlenjujemo možnosti ukazne vrstice in omogočamo uporabniku, da določi vhodno datoteko.
+Privzeto je <code>~/.git-credentials</code>.</p>
+</li>
+<li>
+<p>Ta program odgovarja samo, če dejanje <code>get</code> in datoteka s podatkovno shrambo obstajata.</p>
+</li>
+<li>
+<p>Ta zanka bere iz stdin-a, dokler se ne doseže prazna vrstica.
+Vhodi so shranjeni v zgoščeni vrednosti <code>known</code> za kasnejšo referenco.</p>
+</li>
+<li>
+<p>Ta zanka bere vsebino datoteke za shranjevanje in išče ujemanja.
+Če se protokol, gostitelj in uporabniško ime iz <code>known</code> ujemajo s to vrstico, program natisne rezultate na stdout in se zaključi.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Pomožni pripomoček bomo shranili kot <code>git-credential-read-only</code>, ga postavili kamor koli v naš <code>PATH</code> in označili kot izvršljivega.
+Takole je videti interaktivna seja:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git credential-read-only --file=/mnt/shared/creds get
+protocol=https
+host=mygithost
+username=bob
+
+protocol=https
+host=mygithost
+username=bob
+password=s3cre7</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Ker se ime začne z »git-«, lahko uporabimo preprosto sintakso za nastavitveno vrednost konfiguracije:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-console" data-lang="console">$ git config --global credential.helper 'read-only --file /mnt/shared/creds'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Kot lahko vidite, je razširjanje tega sistema precej preprosto in lahko reši nekatere pogoste težave za vas in vašo ekipo.</p>
+</div>
+</div>
+<div id="nav"><a href="{{< previous-section >}}">prev</a> | <a href="{{< next-section >}}">next</a></div>

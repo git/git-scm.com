@@ -1,0 +1,172 @@
+---
+category: manual
+section: documentation
+subsection: manual
+title: Git - packfile-uri Documentation
+docname: packfile-uri
+version: 2.33.0
+aliases:
+- "/docs/packfile-uri/2.33.0/index.html"
+- "/docs/packfile-uri/2.33.1/index.html"
+- "/docs/packfile-uri/2.33.2/index.html"
+- "/docs/packfile-uri/2.33.3/index.html"
+- "/docs/packfile-uri/2.33.4/index.html"
+- "/docs/packfile-uri/2.33.5/index.html"
+- "/docs/packfile-uri/2.33.6/index.html"
+- "/docs/packfile-uri/2.33.7/index.html"
+- "/docs/packfile-uri/2.33.8/index.html"
+- "/docs/packfile-uri/2.34.0/index.html"
+- "/docs/packfile-uri/2.34.1/index.html"
+- "/docs/packfile-uri/2.34.2/index.html"
+- "/docs/packfile-uri/2.34.3/index.html"
+- "/docs/packfile-uri/2.34.4/index.html"
+- "/docs/packfile-uri/2.34.5/index.html"
+- "/docs/packfile-uri/2.34.6/index.html"
+- "/docs/packfile-uri/2.34.7/index.html"
+- "/docs/packfile-uri/2.34.8/index.html"
+- "/docs/packfile-uri/2.35.0/index.html"
+- "/docs/packfile-uri/2.35.1/index.html"
+- "/docs/packfile-uri/2.35.2/index.html"
+- "/docs/packfile-uri/2.35.3/index.html"
+- "/docs/packfile-uri/2.35.4/index.html"
+- "/docs/packfile-uri/2.35.5/index.html"
+- "/docs/packfile-uri/2.35.6/index.html"
+- "/docs/packfile-uri/2.35.7/index.html"
+- "/docs/packfile-uri/2.35.8/index.html"
+- "/docs/packfile-uri/2.36.0/index.html"
+- "/docs/packfile-uri/2.36.1/index.html"
+- "/docs/packfile-uri/2.36.2/index.html"
+- "/docs/packfile-uri/2.36.3/index.html"
+- "/docs/packfile-uri/2.36.4/index.html"
+- "/docs/packfile-uri/2.36.5/index.html"
+- "/docs/packfile-uri/2.36.6/index.html"
+- "/docs/packfile-uri/2.37.0/index.html"
+- "/docs/packfile-uri/2.37.1/index.html"
+- "/docs/packfile-uri/2.37.2/index.html"
+- "/docs/packfile-uri/2.37.3/index.html"
+- "/docs/packfile-uri/2.37.4/index.html"
+- "/docs/packfile-uri/2.37.5/index.html"
+- "/docs/packfile-uri/2.37.6/index.html"
+- "/docs/packfile-uri/2.37.7/index.html"
+
+---
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This feature allows servers to serve part of their packfile response as URIs.
+This allows server designs that improve scalability in bandwidth and CPU usage
+(for example, by serving some data through a CDN), and (in the future) provides
+some measure of resumability to clients.</p>
+</div>
+<div class="paragraph">
+<p>This feature is available only in protocol version 2.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_protocol"><a class="anchor" href="#_protocol"></a>Protocol</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The server advertises the <code>packfile-uris</code> capability.</p>
+</div>
+<div class="paragraph">
+<p>If the client then communicates which protocols (HTTPS, etc.) it supports with
+a <code>packfile-uris</code> argument, the server MAY send a <code>packfile-uris</code> section
+directly before the <code>packfile</code> section (right after <code>wanted-refs</code> if it is
+sent) containing URIs of any of the given protocols. The URIs point to
+packfiles that use only features that the client has declared that it supports
+(e.g. ofs-delta and thin-pack). See protocol-v2.txt for the documentation of
+this section.</p>
+</div>
+<div class="paragraph">
+<p>Clients should then download and index all the given URIs (in addition to
+downloading and indexing the packfile given in the <code>packfile</code> section of the
+response) before performing the connectivity check.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_server_design"><a class="anchor" href="#_server_design"></a>Server design</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The server can be trivially made compatible with the proposed protocol by
+having it advertise <code>packfile-uris</code>, tolerating the client sending
+<code>packfile-uris</code>, and never sending any <code>packfile-uris</code> section. But we should
+include some sort of non-trivial implementation in the Minimum Viable Product,
+at least so that we can test the client.</p>
+</div>
+<div class="paragraph">
+<p>This is the implementation: a feature, marked experimental, that allows the
+server to be configured by one or more <code>uploadpack.blobPackfileUri=
+&lt;object-hash&gt; &lt;pack-hash&gt; &lt;uri&gt;</code> entries. Whenever the list of objects to be
+sent is assembled, all such blobs are excluded, replaced with URIs. As noted
+in "Future work" below, the server can evolve in the future to support
+excluding other objects (or other implementations of servers could be made
+that support excluding other objects) without needing a protocol change, so
+clients should not expect that packfiles downloaded in this way only contain
+single blobs.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_client_design"><a class="anchor" href="#_client_design"></a>Client design</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The client has a config variable <code>fetch.uriprotocols</code> that determines which
+protocols the end user is willing to use. By default, this is empty.</p>
+</div>
+<div class="paragraph">
+<p>When the client downloads the given URIs, it should store them with "keep"
+files, just like it does with the packfile in the <code>packfile</code> section. These
+additional "keep" files can only be removed after the refs have been updated -
+just like the "keep" file for the packfile in the <code>packfile</code> section.</p>
+</div>
+<div class="paragraph">
+<p>The division of work (initial fetch + additional URIs) introduces convenient
+points for resumption of an interrupted clone - such resumption can be done
+after the Minimum Viable Product (see "Future work").</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_future_work"><a class="anchor" href="#_future_work"></a>Future work</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The protocol design allows some evolution of the server and client without any
+need for protocol changes, so only a small-scoped design is included here to
+form the MVP. For example, the following can be done:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>On the server, more sophisticated means of excluding objects (e.g. by
+specifying a commit to represent that commit and all objects that it
+references).</p>
+</li>
+<li>
+<p>On the client, resumption of clone. If a clone is interrupted, information
+could be recorded in the repository&#8217;s config and a "clone-resume" command
+can resume the clone in progress. (Resumption of subsequent fetches is more
+difficult because that must deal with the user wanting to use the repository
+even after the fetch was interrupted.)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>There are some possible features that will require a change in protocol:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Additional HTTP headers (e.g. authentication)</p>
+</li>
+<li>
+<p>Byte range support</p>
+</li>
+<li>
+<p>Different file formats referenced by URIs (e.g. raw object)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
