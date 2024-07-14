@@ -1,0 +1,1048 @@
+git-format-patch(1)
+===================
+
+NOM
+---
+git-format-patch - Prépare les rustines pour la soumission par courriel
+
+
+SYNOPSIS
+--------
+[verse]
+'git format-patch' [-k] [(-o|--output-directory) <rép.> | --stdout]
+		   [--no-thread | --thread[=<style>]]
+		   [(--attach|--inline)[=<limite>] | --no-attach]
+		   [-s | --signoff]
+		   [--signature=<signature> | --no-signature]
+		   [--signature-file=<fichier>]
+		   [-n | --numbered | -N | --no-numbered]
+		   [--start-number <n>] [--numbered-files]
+		   [--in-reply-to=<id-message >] [--suffix=.<sfx>]
+		   [--ignore-if-in-upstream] [--always]
+		   [--cover-from-description=<mode>]
+		   [--rfc] [--subject-prefix=<préfixe-sujet >]
+		   [(--reroll-count|-v) <n>]
+		   [--to=<email>] [--cc=<courriel>]
+		   [--[no-]cover-letter] [--quiet]
+		   [--[no-]encode-email-headers]
+		   [--no-notes | --notes[=<réf>]]
+		   [--interdiff=<précédent>]
+		   [--range-diff=<précédent> [--creation-factor=<pourcent>]]
+		   [--filename-max-length=<n>]
+		   [--progress]
+		   [<options-diff-communes>]
+		   [ <depuis> | <plage-de-révisions> ]
+
+DESCRIPTION
+-----------
+
+Prépare chaque commit non fusionné avec sa "rustine" dans un "message" par commit, formaté pour ressembler à une boîte aux lettres UNIX. La sortie de cette commande est pratique pour la soumission par courriel ou pour l'utilisation de 'git am'.
+
+Un « message » généré par la commande se compose de trois parties :
+
+* Un bref en-tête de métadonnées qui commence par `From <commit>` avec un horodatage fixe `Mon Sep 17 00:00:00 2001` pour aider des programmes comme "file(1)" à reconnaître que le fichier est une sortie de cette commande, des champs qui enregistrent l'identité de l'auteur, la date de l'auteur, et le titre de la modification (le premier paragraphe du message du journal de validation).
+
+* Le deuxième paragraphe et les suivants du message du journal de validation.
+
+* La "rustine", qui est la sortie "diff -p --stat" (voir linkgit:git-diff[1]) entre le commit et son parent.
+
+Le message du journal et la rustine sont séparés par une ligne à trois tirets.
+
+Il existe deux façons de spécifier les commits sur lesquels opérer.
+
+1. Un seul commit, <depuis>, spécifie que les commits menant au sommet de la branche courante qui ne sont pas dans l'historique qui mène à <depuis> doivent être émis.
+
+2. L'expression générique <plage-de-révisions> (voir la section "SPECIFIER LES REVISIONS" dans linkgit:gitrevisions[7]) sélectionne les commits dans la plage spécifiée.
+
+La première règle est prioritaire dans le cas d'un seul <commit>. Pour appliquer la deuxième règle, c'est-à-dire tout formater depuis le début de l'historique jusqu'à <commit>, utilisez l'option `--root` : `git format-patch --root <commit>`. Si vous souhaitez formater uniquement <commit> lui-même, vous pouvez le faire avec `git format-patch -1 <commit>`.
+
+Par défaut, chaque fichier de sortie est numéroté séquentiellement à partir de 1, et utilise la première ligne du message de validation (traité pour la sécurité des chemins) comme nom de fichier. Avec l'option `--numbered-files`, les noms des fichiers de sortie ne seront que des numéros, sans la première ligne du message de livraison ajoutée. Les noms des fichiers de sortie sont affichés sur la sortie standard, sauf si l'option `--stdout` est spécifiée.
+
+Si `-o` est spécifié, les fichiers de sortie sont créés dans <rép.>. Sinon, ils sont créés dans le répertoire de travail actuel. Le chemin par défaut peut être défini avec l'option de configuration `format.outputDirectory`. L'option `-o` est prioritaire sur `format.outputDirectory`. Pour stocker les rustines dans le répertoire de travail actuel même si `format.outputDirectory` pointe ailleurs, utilisez `-o .`. Tous les composants du répertoire seront créés.
+
+Par défaut, le sujet d'une rustine unique est "[PATCH]" suivi de la concaténation des lignes du message de validation jusqu'à la première ligne vide (voir la section DISCUSSION de linkgit:git-commit[1]).
+
+Lorsque plusieurs rustines sont émises, le préfixe du sujet sera plutôt "[PATCH n/m]". Pour forcer l'ajout de 1/1 pour une seule rustine, utilisez `-n`. Pour omettre les numéros de rustine dans le sujet, utilisez `-N`.
+
+Avec `--thread`, `git-format-patch` générera les en-têtes `In-Reply-To` et `References` pour que le deuxième courrier de rustine et les suivants apparaissent comme des réponses au premier courrier ; cela génère aussi un en-tête `Message-ID` pour référence ultérieure.
+
+OPTIONS
+-------
+:git-format-patch: 1
+// Please don't remove this comment as asciidoc behaves badly when
+// the first non-empty line is ifdef/ifndef. The symptom is that
+// without this comment the <git-diff-core> attribute conditionally
+// defined below ends up being defined unconditionally.
+// Last checked with asciidoc 7.0.2.
+
+ifndef::git-format-patch[]
+ifndef::git-diff[]
+ifndef::git-log[]
+:git-diff-core: 1
+endif::git-log[]
+endif::git-diff[]
+endif::git-format-patch[]
+
+ifdef::git-format-patch[]
+-p::
+--no-stat::
+	Générer des correctifs normaux sans aucun diffstat.
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+-p::
+-u::
+--patch::
+	Générer la rustine (voir <<generate_patch_text_with_p>>).
+ifdef::git-diff[]
+	C'est l'option par défaut.
+endif::git-diff[]
+
+-s::
+--no-patch::
+	Supprimer la sortie de la machinerie diff. Utile pour éliminer la sortie des commandes telles que `git show` qui affichent la rustine par défaut, ou pour supprimer l'effet d'options telles que `--patch`, `--stat`qui auraient pu être incluse plus tôt sur la ligne de commande via un alias.
+
+endif::git-format-patch[]
+
+ifdef::git-log[]
+-m::
+	Afficher les diffs pour les commits de fusion dans le format par défaut. Ceci est semblable à '--diff-merges=on', sauf que `-m` ne produira pas de sortie sauf si `-p` est donné aussi.
+
+-c::
+	Produire la sortie diff combinée pour les commits de fusion. Raccourcis pour '--diff-merges=combined -p'.
+
+--cc::
+	Produire la sortie diff combinée dense pour les commits de fusion. Raccourcis pour '--diff-merges=dense-combined -p'.
+
+--dd::
+	Produire un diff par rapport au premier parent pour les commits réguliers et de fusion. Raccourcis pour '--diff-merges=first-parent -p'.
+
+--remerge-diff::
+	Produire la sortie remerge-diff pour les commits de fusion. Raccourcis pour '--diff-merges=remerge -p'.
+
+--no-diff-merges::
+	Synonyme pour '--diff-merges=off'.
+
+--diff-merges=<format>::
+	Préciser le format de diff à utiliser pour les commits de fusion. La valeur par défaut est {diff-merges-default} sauf si `--first-parent` est utilisé, auquel cas `first-parent` est la valeur par défaut.
++
+Les formats suivants sont pris en charge :
++
+--
+off, none::
+	Désactive la sortie des diffs pour des commits de fusion. Utile pour passer outre la valeur sous-entendue.
++
+on, m::
+	Permettre d'afficher la sortie diff pour les commits de fusion dans le format par défaut. Le format par défaut peut être modifié en utilisant le paramètre de configuration `log.diffMerges`, dont la valeur par défaut est `separate`.
++
+first-parent, 1::
+	Afficher la diff complète par rapport au premier parent. C'est le même format que `--patch` produit pour les commits réguliers.
++
+separate::
+	Montrer la différence complète par rapport à chacun des parents. Une entrée de journal et une différence séparées sont générées pour chaque parent.
++
+combined, c::
+	Montrer les différences de chacun des parents vers le résultat de la fusion simultanément au lieu de montrer une à une les différences par paires entre un parent et le résultat. De plus, il ne répertorie que les fichiers qui ont été modifiés par tous les parents.
++
+dense-combined, cc::
+	Compresser encore plus la sortie produite par `--diff-merges=combined` en omettant les sections inintéressantes dont le contenu dans les parents n'a que deux variantes et le résultat de la fusion choisit l'une d'entre elles sans modification.
++
+remerge, r::
+	Fusionner les commits de fusion biparentaux pour créer un objet arbre temporaire -- contenant potentiellement des fichiers avec des marqueurs de conflit et autres. Une différence est ensuite affichée entre cet arbre temporaire et le commit de fusion actuel.
++
+La sortie émise lorsque cette option est utilisée est sujette à modification, ainsi que son interaction avec les autres options (sauf si elle est explicitement documentée).
+--
+
+--combined-all-paths::
+	Cet drapeau fait en sorte que les diffs combinés (utilisés pour les commits de fusion) listent le nom du fichier de tous les parents. Il n'a donc d'effet que lorsque `--diff-merges=[dense-]combined` est utilisé, et n'est probablement utile que si des changements de nom de fichier sont détectés (c.-à-d. lorsque la détection de renommage ou de copie a été demandée).
+endif::git-log[]
+
+-U<n>::
+--unified=<n>::
+	Générer des diffs avec <n> lignes de contexte au lieu des trois habituelles.
+ifndef::git-format-patch[]
+	Implique `--patch`.
+endif::git-format-patch[]
+
+--output=<fichier>::
+	Sortie vers un fichier spécifique au lieu de stdout.
+
+--output-indicator-new=<caractère>::
+--output-indicator-old=<caractère>::
+--output-indicator-context=<caractère>::
+	Spécifier le caractère utilisé pour indiquer les lignes nouvelles, anciennes ou contextuelles dans la rustine générée. Normalement, il s'agit de '+', '-' et ' ' respectivement.
+
+ifndef::git-format-patch[]
+--raw::
+ifndef::git-log[]
+	Genérer la diff en format brut.
+ifdef::git-diff-core[]
+	C'est l'option par défaut.
+endif::git-diff-core[]
+endif::git-log[]
+ifdef::git-log[]
+	Pour chaque commit, afficher un résumé des modifications en
+	format de diff brut. Voir la section « FORMAT DE SORTIE BRUT »
+	de linkgit:git-diff[1]. C'est différent de l'affichage du
+	journal en format brut, que vous pouvez obtenir avec
+	`--format=raw`.
+endif::git-log[]
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+--patch-with-raw::
+	Synonyme de `-p --raw`.
+endif::git-format-patch[]
+
+ifdef::git-log[]
+-t::
+	Afficher les objets arbres dans la sortie diff.
+endif::git-log[]
+
+--indent-heuristic::
+	Activer l'heuristique qui décale les limites des sections de diff pour rendre les rustines plus faciles à lire. C'est l'option par défaut.
+
+--no-indent-heuristic::
+	Désactiver l'heuristique d'indentation.
+
+--minimal::
+	Passer plus de temps pour s'assurer que le diff le plus petit possible est produit.
+
+--patience::
+	Générer un diff en utilisant l'algorithme « patience diff ».
+
+--histogram::
+	Générer un diff en utilisant l'algorithme « diff histogramme ».
+
+--anchored=<texte>::
+	Générer un diff en utilisant l'algorithme « diff ancré ».
++
+Cette option peut être spécifiée plus d'une fois.
++
+Si une ligne existe dans la source et la destination, n'existe qu'une seule fois, et démarre avec ce texte, cet algorithme tente d'empêcher qu'elle apparaisse comme une suppression ou une addition dans la sortie. L'algorithme « patience diff » est utilisé en interne.
+
+--diff-algorithm={patience|minimal|histogram|myers}::
+	Choisir un algorithme de diff. Les variantes sont comme suit :
++
+--
+`default`, `myers`;;
+	L'algorithme de diff avide. C'est actuellement celui par défaut.
+`minimal`;;
+	Passer plus de temps pour s'assurer que le diff le plus petit possible est produit.
+`patience`;;
+	Utiliser l'algorithme « patience diff » pour la génération de rustine.
+`histogram`;;
+	Cet algorithme étend l'algorithme patience pour « supporter les éléments communs de faible fréquence ».
+--
++
+Par exemple, si vous avez configuré la variable `diff.algorithm` à une valeur autre que celle par défaut et souhaitez utiliser la valeur par défaut, alors vous devez utiliser l'option `--diff-algorithm=default`.
+
+--stat[=<largeur>[,<largeur-de-nom>[,<nombre>]]]::
+	Générer un diffstat. Par défaut, autant d'espace que nécessaire sera utilisé pour la partie du nom de fichier et le reste pour la partie de graphe. La largeur maximum est par défaut la largeur du terminal, ou 80 colonnes si non connecté à un terminal, et peut être outrepassé avec `<largeur>`. La largeur du nom de fichier peut être limitée en fournissant une autre largeur `<largeur-de-nom>` après une virgule ou en réglant `diff.statNameWidth=<largeur>`. La largeur de la partie du graphe peut être limitée en utilisant `--stat-graph-width=<largeur> ou en réglant `diff.statGraphWidth=<largeur>`. L'utilisation de `--stat` ou `--stat-graph-width` affecte toutes les commandes qui génèrent un graphique de stat, tandis que régler `diff.statNameWidth` or `diff.statGraphWidth` n'affecte pas `git format-patch`. En ajoutant un troisième paramètre `<nombre>`, vous pouvez limiter la sortie aux premières `<nombre>` lignes, suivies de `...` s'il y en a plus.
++
+Ces paramètres peuvent aussi être positionnés individuellement avec `--stat-width=<largeur>`, `--stat-name-width=<largeur-de-nom>` et `--stat-count=<nombre>`.
+
+--compact-summary::
+	Afficher un résumé condensé de l'information d'entête étendu telle que les créations ou les suppressions de fichier (« nouveau » ou « disparu », optionnellement « +l » si c'est un lien symbolique) et les modifications de mode (« +x » ou « -x » pour l'ajout et la suppression du bit exécutable respectivement) dans le diffstat. L'information est affichée entre la partie nom de fichier et la partie graphe. Implique `--stat`.
+
+--numstat::
+	Similaire à `--stat`, mais afficher le nombre de lignes ajoutées ou supprimées en notation décimale et le nom de chemin sans abréviation, pour le rendre plus facile à traiter automatiquement. Pour les fichiers binaires, affiche deux `-` au lieu de `0 0`.
+
+--shortstat::
+	N'affiche que la dernière ligne du format `--stat` contenant le nombre total de fichiers modifiés, de même que le nombre de lignes ajoutées et supprimées.
+
+-X[<param1,param2,...>]::
+--dirstat[=<param1,param2,...>]::
+	Afficher la distribution de la quantité relative de modifications pour chaque sous-répertoire. Le comportement de `--dirstat` peut être personnalisé en lui passant une liste de paramètres séparés par des virgules. Les valeurs par défaut sont contrôlées par la variable de configuration `diff.dirstat` (voir linkgit:git-config[1]). Les paramètres suivants sont disponibles :
++
+--
+`changes`;;
+	Calculer les valeurs de dirstat en comptant les lignes supprimées de la source ou ajoutées dans la destination. Ceci ignore la quantité de purs mouvements de code dans un fichier. En d'autres termes, le réarrangement de lignes dans un fichier n'est pas compté autant que les autres modifications. C'est le comportement par défaut quand aucun paramètre n'est fourni.
+`lines`;;
+	Calculer les valeurs dirstat en faisant l'analyse diff normal par ligne, et en additionnant les totaux de lignes ajoutées/supprimées. (Pour les fichiers binaires, compter plutôt les sections de 64 octets, puisque les fichiers binaires n'ont pas de concept de ligne). C'est un comportement de `--dirstat` plus onéreux que le comportement `changes`, mais il compte les lignes réarrangées dans un fichier autant que les autres modifications. La sortie résultante est cohérente avec ce que vous obtiendriez avec d'autres options `--*stat`.
+`files`;;
+	Calculer les valeurs dirstat en comptant le nombre de fichiers changés. Chaque fichier modifié compte de façon égale dans l'analyse dirstat. C'est le comportement `--dirstat` le moins cher en termes de calcul, puisqu'il n'a pas du tout besoin d'analyser le contenu du fichier.
+`cumulative`;;
+	Compter les modifications dans un répertoire enfant pour le répertoire parent. Notez qu'en utilisant `cumulative`, la somme des pourcentages constatés peut dépasser 100 %. Le comportement par défaut (non cumulatif) peut être spécifié avec le paramètre `noncumulative`.
+<limite>;;
+	Un paramètre entier qui spécifie un pourcentage limite (3% par défaut). Les répertoires contribuant moins que ce pourcentage de modifications ne sont pas affichés dans la sortie.
+--
++
+Exemple : ce qui suit va compter les fichiers modifiés, tout en ignorant les répertoires qui contiennent moins de 10 % de la quantité totale de fichiers modifiés et en accumulant les totaux des répertoires enfants dans les répertoires parents : `--dirstat=files,10,cumulative`.
+
+--cumulative::
+	Synonyme de --dirstat=cumulative
+
+--dirstat-by-file[=<param1,param2>...]::
+	Synonyme de --dirstat=files,<param1>,<param2>....
+
+--summary::
+	Afficher un résumé condensé d'information d'entête étendu tel que les créations, les renommages et les modifications de mode.
+
+ifndef::git-format-patch[]
+--patch-with-stat::
+	Synonyme de `-p --stat`.
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+
+-z::
+ifdef::git-log[]
+	Séparer les commits avec des NULs au lieu de retours chariot.
++
+Aussi, quand `--raw` ou `--numstat` ont été fournis, ne pas modifier les noms de chemins et utiliser des NULs comme terminateurs de champs.
+endif::git-log[]
+ifndef::git-log[]
+	Quand `--raw`, `--numstat`, `--name-only` ou `--name-status` a été fourni,
+	ne pas modifier les noms de chemin et utiliser des NULs comme terminateurs de champs.
+endif::git-log[]
++
+Sans cette option, les noms de chemin avec des caractères « inhabituels » sont cités comme expliqué pour la variable de configuration `core.quotePath` (voir linkgit:git-config[1]).
+
+--name-only::
+	Afficher uniquement les noms des fichiers modifiés. Les noms de fichiers sont souvent encodés en UTF-8. Le définir sur `none` rend la sortie de blâme des données non converties. Pour plus d’informations, voir la discussion sur l’encodage dans la page manuelle linkgit:git-log[1].
+
+--name-status::
+	N'afficher que les noms et statuts des fichiers modifiés. Voir la description de l'option `--diff-filter` pour la signification des lettres de statut. Tout comme `--name-only`, les noms de fichiers sont souvent encodés en UTF-8.
+
+--submodule[=<format>]::
+	Spécifier comment les différences dans les sous-modules sont affichées. Lorsque vous spécifiez `--submodule=short`, le format 'short' (court) est utilisé. Ce format n'affiche que le nom des commits du début et de la fin de la plage. Quand `--submodule` ou `--submodule=log` est spécifié, le format 'log' (journal) est utilisé. Ce format liste les commits dans la plage comme le fait `summary` de linkgit:git-submodule[1]. Quand `--submodule=diff` est spécifié, le format 'diff' est utilisé. Ce format affiche une diff en ligne des modifications dans le sous-module pour la plage de commits. Vaut par défaut `diff.submodule` ou le format 'short' si l'option de configuration n'est pas renseignée.
+
+--color[=<quand>]::
+	Afficher des diff colorés. `--color` (sans '=<quand>') est identique à `--color=always`. '<quand>' peut être `always`, `never` ou `auto`.
+ifdef::git-diff[]
+	Ceci peut être changé par les réglages de configuration
+	`color.ui` et `color.diff`.
+endif::git-diff[]
+
+--no-color::
+	Désactiver les diff colorés.
+ifdef::git-diff[]
+	Ceci peut être utilisé pour outrepasser les réglages de configuration.
+endif::git-diff[]
+	C'est identique à `--color=never`.
+
+--color-moved[=<mode>]::
+	Les lignes de code déplacées sont colorées différemment.
+ifdef::git-diff[]
+	Ceci peut être modifié par le réglage de configuration `diff.colorMoved`.
+endif::git-diff[]
+	Le <mode> vaut par défaut 'no' si l'option n'est pas fournie
+	et 'zebra' si l'option est fournie sans mode.
+	Le mode est une valeur parmi :
++
+--
+no::
+	Les lignes déplacées ne sont pas surlignées.
+default::
+	C'est un synonyme de `zebra`. Cela peut changer pour un mode plus raisonnable dans le futur.
+plain::
+	Toute ligne qui est ajoutée à un endroit et supprimée à un autre endroit sera colorée avec 'color.diff.newMoved'. Similairement 'color.diff.oldMoved' sera utilisé pour les lignes retirées qui ont été ajoutées ailleurs dans le diff. Ce mode prend n'importe quelle ligne déplacée, mais il n'est pas très utile dans une revue pour déterminer si un bloc de code a été déplacé sans permutation.
+blocks::
+	Les blocs de texte déplacé d'au moins 20 caractères alphanumériques sont détectés avidement. Les blocs détectés sont peints avec les couleurs 'color.diff.oldMoved' pour l'ancienne place et 'color.diff.newMoved' pour la nouvelle place. Les blocs adjacents ne peuvent pas être différenciés.
+zebra::
+	Les blocs de texte déplacé sont détectés comme dans le mode 'blocks'. Les blocs sont peints en utilisant la couleur 'color.diff.{old,new}Moved' ou 'color.diff.{old,new}MovedAlternative'. La différence entre les deux couleurs indique qu'un nouveau bloc a été détecté.
+dimmed-zebra::
+	Similaire à 'zebra', mais avec une limitation supplémentaire des parties inintéressantes du code déplacé. Les lignes de frontière de deux blocs adjacents sont considérées intéressantes, le reste est inintéressant. `dimmed_zebra` est un synonyme déconseillé.
+--
+
+--no-color-moved::
+	Désactiver la détection de déplacement. Ce peut être utilisé pour outrepasser les réglages de configuration. C'est comme `--color-moved=no`.
+
+--color-moved-ws=<modes>::
+	Ceci configure comment les espaces sont ignorés lors de la détection de déplacement par `--color-moved`.
+ifdef::git-diff[]
+	Le réglage de configuration `diff.colorMovedWS` permet de le modifier.
+endif::git-diff[]
+	Ces modes peuvent être fournis comme une liste séparée par des virgules :
++
+--
+no::
+	Ne pas ignorer les espaces lors de la détection de déplacement.
+ignore-space-at-eol::
+	Ignorer les modifications d'espaces en fin de ligne.
+ignore-space-change::
+	Ignorer les modifications de nombre d'espaces. Cela ignore les espaces en fin de ligne et considère toutes les autres séquences d'un caractère blanc ou plus comme équivalentes.
+ignore-all-space::
+	Ignorer les espaces lors de la comparaison de lignes. Ceci ignore les différences même si une ligne a des espaces quand l'autre n'en a aucun.
+allow-indentation-change::
+	Ignorer initialement tout espace lors de la détection de déplacement, puis grouper les blocs de code déplacé dans un bloc si la modification de blancs est identique par ligne. C'est incompatible avec les autres modes.
+--
+
+--no-color-moved-ws::
+	Ne pas ignorer les blancs lors de la détection de déplacement. Ceci peut être utilisé pour outrepasser les réglages de configuration. C'est identique à `--color-moved-ws=no`.
+
+--word-diff[=<mode>]::
+	Afficher un diff par mot, en utilisant le <mode> pour délimiter les mots modifiés. Par défaut, les mots sont délimités par des espaces ; voir `--word-diff-regex` ci-dessous. Le <mode> vaut par défaut 'plain', et peut valoir :
++
+--
+color::
+	Surligner les mots modifiés en n'utilisant que des couleurs. Implique `--color`.
+plain::
+	Afficher les mots comme `[-supprimé-]` et `{+ajouté+}`. Ne pas tenter d'échapper ces délimiteurs s'ils apparaissent dans l'entrée, donc la sortie peut être ambigüe.
+porcelain::
+	Utiliser un format spécial ligne par ligne destiné à la consommation par script. Les séquences ajoutées/supprimées/non-modifiées sont affichées dans le format diff unifié habituel, commençant par un caractère `+`/`-`/` ` en début de ligne et en étendant en fin de ligne. Les retours chariot dans l'entrée sont représentés par un tilde `~` sur une ligne à part.
+none::
+	Désactiver à nouveau la diff par mots.
+--
++
+Notez qu'en dépit du nom du premier mode, la couleur est utilisée pour surligner les parties modifiées dans tous les modes, si activée.
+
+--word-diff-regex=<regex>::
+	Utiliser <regex> pour décider ce qu'est un mot, au lieu de définir un mot comme une séquence continue de caractères non blancs. Implique aussi `--word-diff` à moins qu'elle ait déjà été spécifiée.
++
+Toutes correspondances de <regex> qui ne se chevauchent pas sont considérées comme des mots. Tout ce qui se situe entre ces correspondances est considéré comme de l'espace blanc et ignoré (!) lors du calcul de différences. Vous voudrez peut-être ajouter `|[^[:space:]]` à l'expression régulière pour être sûr qu'elle englobe tous les caractères non blancs. Une correspondance qui contient un retour à la ligne est tronquée silencieusement (!) au retour à la ligne.
++
+Par exemple, `--word-diff-regex=.` va traiter chaque caractère comme un mot et de ce fait présenter les différences caractère par caractère.
++
+La regex peut aussi être indiquée par un pilote de diff ou une option de configuration, voir linkgit:gitattributes[5] ou linkgit:git-config[1]. La ligne de commande a précédence sur le pilote de diff ou la configuration. Le pilote de diff a précédence sur l'option de configuration.
+
+--color-words[=<regex>]::
+	Équivalent à `--word-diff=color` plus (si une regex a été spécifiée) `--word-diff-regex=<regex>`.
+endif::git-format-patch[]
+
+--no-renames::
+	Désactiver la détection de renommage, même si le fichier de configuration indique de le faire par défaut.
+
+--[no-]rename-empty::
+	S'il faut utiliser les blobs vides comme source de renommage.
+
+ifndef::git-format-patch[]
+--check::
+	Avertir si les modifications introduisent des marqueurs de conflit ou des erreurs d'espaces. Les erreurs d'espaces sont définies par l'option de configuration `core.whitespace`. Par défaut, les espaces en fin de ligne (incluant les lignes ne contenant que des espaces) et le caractère espace suivi immédiatement par une tabulation lors d'une indentation initiale de ligne sont considérés comme des erreurs d'espace. Le code d'erreur de sortie est non nul en cas de problèmes trouvés. Non compatible avec `--exit-code`.
+
+--ws-error-highlight=<sorte>::
+	Surligner les erreurs d'espace dans les lignes `context` (contexte), `old` (ancien) et `new` (nouveau) du diff. Des valeurs multiples sont séparées par des virgules, `none` réinitialise les valeurs précédentes, `default` réinitialise la liste à `new` et `all` est un raccourci pour `old,new,context`. Quand cette option n'est pas fournie et que la variable de configuration `diff.wsErrorHighlight` n'est pas assignée, seules les erreurs d'espace dans les lignes `new` sont surlignées. Les erreurs d'espace sont colorées avec `color.diff.whitespace`.
+
+endif::git-format-patch[]
+
+--full-index::
+	Au lieu de montrer quelques-uns des premiers caractères, montrer les noms complets des objets blob des images pré et post sur la ligne d'index lors de la génération de la sortie au format patch.
+
+--binary::
+	En plus de `--full-index`, afficher un diff binaire qui peut être appliqué avec `git-apply`.
+ifndef::git-format-patch[]
+	Implique `--patch`.
+endif::git-format-patch[]
+
+--abbrev[=<n>]::
+	Au lieu de montrer le nom de l'objet avec les 40 caractères hexadécimaux dans le format de diff brut et les lignes d'entête de l'arbre de diff, montrer le préfixe le plus court, d'une longueur d'au moins '<n>' chiffres hexadécimaux, qui renvoie à l'objet de manière unique. Dans le format de sortie de rustine de correctif, `--full-index` a une priorité plus élevée, c'est-à-dire si `--full-index` est spécifié, les noms de blob complets seront affichés indépendamment de `--abbrev`. Un nombre de chiffres différent de celui par défaut peut être spécifié avec `--abbrev=<n>`.
+
+-B[<n>][/<m>]::
+--break-rewrites[=[<n>][/<m>]]::
+	Casser les modifications de réécriture complète en paires de suppression et création. Cela sert deux objectifs :
++
+Cela affecte la façon dont un changement qui équivaut à une réécriture totale d'un fichier apparaît non pas comme une série de suppressions et d'insertions mélangées avec quelques lignes qui (par hasard) correspondent entre les deux versions comme contexte, mais comme une simple suppression de tout ce qui est ancien suivi d'une simple insertion de tout ce qui est nouveau, et le nombre `m` contrôle cet aspect de l'option -B (par défaut 60 %). `-B/70%` spécifie que moins de 30 % de l'original doit rester dans le résultat pour que Git le considère comme une réécriture totale (autrement, la rustine résultante sera une série de suppressions et d'insertions mélangées avec des lignes de contexte).
++
+Utilisé avec -M, un fichier complètement réécrit est aussi considéré comme la source d'un renommage (habituellement -M ne considère que les fichiers qui ont disparu comme source de renommage), et le nombre `n` contrôle le niveau de l'option -B (par défaut, 50 %). `-B20%` signifie qu'une modification avec des additions et des suppressions représentant 20 % ou plus du contenu du fichier est considérée pour être utilisée comme une source possible pour un renommage en un autre fichier.
+
+-M[<n>]::
+--find-renames[=<n>]::
+ifndef::git-log[]
+	Détecter les renommages.
+endif::git-log[]
+ifdef::git-log[]
+	Si des diffs sont générés, détecter et afficher les renommages
+	pour chaque commit. Pour suivre les fichiers au fil des renommages
+	qui apparaissent dans l'historique, voir `--follow`.
+endif::git-log[]
+	Si `n` est spécifié, c'est un seuil d'index de similarité
+	(c-à-d la quantité d'addition/suppression comparé à la taille
+	du fichier). Par exemple, `-M90%` signifie que Git considérera 
+	un couple suppression/ajout comme renommage si plus de 90 %
+	du fichier n'a pas changé. Sans le signe `%`, le nombre doit être
+	lu comme une fraction précédée du point décimal. `-M5` devient
+	0,5, tout comme `-M50%`. De même, `-M05` est identique à
+	`-M5%`.  Pour limiter la détection à des renommages exacts,
+	utilisez `-M100%`. L'index de similarité par défaut est `50%`.
+
+-C[<n>]::
+--find-copies[=<n>]::
+	Détecter les copies aussi bien que les renommages. Voir aussi `--find-copies-harder`. Si `n` est spécifié, il a la même signification que pour `-M<n>`.
+
+--find-copies-harder::
+	Pour des raisons de performance, par défaut, l'option `-C` trouve des copies seulement si le fichier original de la copie a été modifié dans le même ensemble de modifications. Ce drapeau fait inspecter à la commande les fichiers non modifiés comme candidats comme source de copie. C'est une opération très chère pour des projets importants, donc à utiliser avec précaution. Spécifier plusieurs fois l'option `-C` a le même effet.
+
+-D::
+--irreversible-delete::
+	Omettre la pré-image pour des suppressions, c-à-d n'afficher que l'entête mais pas la diff entre la pré-image et `/dev/null`. La rustine résultante n'est pas destinée à être appliquée avec `patch` ou `git apply`  ; C'est seulement pour les personnes qui veulent juste se concentrer sur une revue des modifications. De plus, la sortie manque clairement d'assez d'information pour appliquer la rustine en inverse, même manuellement, d'où le nom de l'option.
++
+Lorsqu'utilisé conjointement avec `-B`, omettre aussi la pré-image dans la partie suppression d'une paire suppression/création.
+
+-l<num>::
+	Les options `-M` et `-C` impliquent quelques étapes préliminaires qui peuvent détecter des sous-ensembles de renommages/copies à moindre coût, suivies d'une partie pour le reste qui compare toutes les destinations non appariées restantes à toutes les sources pertinentes. (Pour les renommages, seules les sources non appariées restantes sont pertinentes ; pour les copies, toutes les sources originales sont pertinentes). Pour N sources et destinations, cette vérification exhaustive est en O(N^2). Cette option empêche la partie exhaustive de la détection des renommages/copies de s'exécuter si le nombre de fichiers source/destination impliqués dépasse le nombre spécifié. La valeur par défaut est diff.renameLimit. Notez qu'une valeur de 0 est traitée comme illimitée.
+
+ifndef::git-format-patch[]
+--diff-filter=[(A|C|D|M|R|T|U|X|B)...[*]]::
+	Sélectionner seulement les fichiers qui sont Ajoutés (`A`), Copiés (`C`), supprimés (Deleted `D`), Modifiés (`M`), Renommés (`R`), ont eu un changement de Type (`T`) (c-à-d fichier normal, lien symbolique, sous-module …), sont non fusionnés (Unmerged `U`), sont inconnus (Unknown `X`) ou ont eu leur appairage cassé (Broken `B`). Toute combinaison de caractères de filtre (incluant aucun) peut être utilisée. Quand `*` (Tout-ou-rien) est ajouté à la combinaison, tous les chemins sont sélectionnés s'il y a des fichiers qui correspondent aux autres critères dans la comparaison ; s'il n'y a aucun fichier qui correspond aux autres critères, rien n'est sélectionné.
++
+Aussi, ces lettres majuscules peuvent être spécifiées en minuscules pour exclure. Par exemple, `--diff-filter=ad` exclut les chemins ajoutés et supprimés.
++
+Notez que toutes les diffs ne peuvent pas présenter tous les types. Par exemple, les entrées copiées et renommées ne peuvent pas apparaître si la détection de ces types est désactivée.
+
+-S<chaîne>::
+	Trouver des différences qui modifient le nombre d'occurrences de la chaîne spécifiée (par ex. addition/suppression) dans un fichier. Destiné à l'usage dans des scripts.
++
+C'est utile lorsqu'on cherche un bloc exact de code (comme une struct), et qu'on veut connaître l'historique de ce bloc depuis son apparition : utiliser cette fonctionnalité itérativement pour fournir le bloc d'une pré-image à `-S` et continuer jusqu'à obtenir la toute première version du bloc.
++
+Les fichiers binaires sont aussi analysés.
+
+-G<regex>::
+	Rechercher des différences dont le texte de rustine contient les lignes ajoutées/supprimées correspondant à <regex>.
++
+Pour illustrer la différence entre `-S<regex> --pickaxe-regex` et `-G<regex>`, considérons un commit contenant la diff suivante dans un même fichier :
++
+----
++    return frotz(nitfol, two->ptr, 1, 0);
+...
+-    hit = frotz(nitfol, mf2.ptr, 1, 0);
+----
++
+Alors que `git log -G"frotz\(nitfol"` affichera ce commit, `git log -S"frotz\(nitfol" --pickaxe-regex` ne l'affichera pas (parce que le nombre d'occurrences de cette chaîne n'a pas changé).
++
+À moins que `--text` soit fourni, les rustines de fichiers binaires sans filtre textconv seront ignorées.
++
+Voir l'entrée 'pickaxe' dans linkgit:gitdiffcore[7] pour plus d'information.
+
+--find-object=<id-objet>::
+	Rechercher les différences qui modifient le nombre d'occurrences de l'objet indiqué. Similaire à `-S`, juste que l'argument est différent en ce qu'elle ne cherche pas une chaîne particulière mais un identifiant d'objet particulier.
++
+L'objet peut être un commit de blob ou de sous-module. Cela implique l'option `-t` dans `git-log` pour trouver aussi des arbres.
+
+--pickaxe-all::
+	Quand `-S` ou `-G` trouvent une modification, afficher toutes les modifications dans l'ensemble de modifications, pas seulement les fichiers qui contiennent la modification dans <chaîne>.
+
+--pickaxe-regex::
+	Traiter la <chaîne> fournie à `-S` comme une expression régulière POSIX étendue à faire correspondre.
+
+endif::git-format-patch[]
+
+-O<fichier-d-ordre>::
+	Contrôler l'ordre dans lequel les fichiers apparaissent dans la sortie. Ceci passe outre la variable de configuration `diff.orderFile` (voir linkgit:git-config[1]). Pour annuler `diff.orderFile`, utiliser `-O/dev/null`.
++
+L'ordre en sortie est déterminé par l'ordre des motifs glob dans <fichier-d-ordre>. Tous les fichiers dont le nom de chemin correspond au premier motif sont affichés en premier, tous les fichiers dont le nom de chemin correspond au second motif (mais pas au premier) sont affichés ensuite, et ainsi de suite. Tous les fichiers dont les noms de chemin qui ne correspondent à aucun motif sont affichés en dernier, comme s'il y avait un motif ramasse-tout à la fin du fichier. Si de multiples noms de chemin ont le même rang (ils correspondent avec le même motif mais pas de motifs antérieurs), leur ordre relatif d'affichage est l'ordre normal.
++
+<fichier-d-ordre> est analysé comme suit :
++
+--
+ - Les lignes blanches sont ignorées, de sorte qu'elles peuvent être utilisées comme séparateurs pour la lisibilité.
+
+ - Les lignes commençant par un dièse ("`#`") sont ignorées, elles peuvent donc être utilisées comme commentaires. Ajoutez une barre oblique inverse ("`\`") au début du motif s'il doit commencer par un dièse.
+
+ - Toutes les autres lignes contiennent un motif unique.
+--
++
+Les motifs ont la même syntaxe et sémantique que les motifs utilisés pour fnmatch(3) sans le drapeau FNM_PATHNAME, sauf qu'un nom de chemin correspond aussi à un motif si la suppression de n'importe quel nombre de composants finaux du nom de chemin correspond au motif. Par exemple, le motif "`foo*bar`" correspond à "`fooasdfbar`" et "`foo/bar/baz/asdf`" mais pas à "`foobarx`".
+
+--skip-to=<fichier>::
+--rotate-to=<fichier>::
+	Supprimer les noms des fichiers avant <fichier> dans la sortie (c'est-à-dire "skip to"), ou les déplacer à la fin de la sortie (c'est-à-dire "rotate to"). Ces options servent principalement lors de la commande `git difftool`, et peuvent ne pas être très utiles ailleurs.
+
+ifndef::git-format-patch[]
+-R::
+	Échanger deux entrées ; c'est-à-dire afficher les différences depuis l'index ou avec un fichier sur disque avec le contenu de l'arbre.
+endif::git-format-patch[]
+
+--relative[=<chemin>]::
+--no-relative::
+	Lorsque lancé depuis un sous-répertoire du projet, il peut lui être indiqué d'exclure les modifications hors du répertoire et d'afficher les noms de chemins relativement à lui avec cette option. Quand vous n'êtes pas dans un sous-répertoire (par ex. dans un dépôt nu), vous pouvez nommer quel sous-répertoire par rapport auquel afficher la sortie en fournissant un argument <chemin>. L'option `--no-relative` peut être utilisée pour annuler l'option de configuration `diff.relative` et l'option `--relative` précédente.
+
+-a::
+--text::
+	Traiter tous les fichiers comme texte.
+
+--ignore-cr-at-eol::
+	Ignorer les retours chariot en fin de ligne lors de la comparaison.
+
+--ignore-space-at-eol::
+	Ignorer les modifications d'espaces en fin de ligne.
+
+-b::
+--ignore-space-change::
+	Ignorer les modifications de nombre d'espaces. Cela ignore les espaces en fin de ligne et considère toutes les autres séquences d'un caractère blanc ou plus comme équivalentes.
+
+-w::
+--ignore-all-space::
+	Ignorer les espaces lors de la comparaison de lignes. Ceci ignore les différences même si une ligne a des espaces quand l'autre n'en a aucun.
+
+--ignore-blank-lines::
+	Ignorer les modifications dont les lignes sont blanches.
+
+-I<regex>::
+--ignore-matching-lines=<regex>::
+	Ignorer les modifications dont toutes les lignes correspondent à <regex>. Cette option peut être spécifiée plusieurs fois.
+
+--inter-hunk-context=<lignes>::
+	Afficher le contexte entre des sections de diff, jusqu'au nombre spécifié de lignes, fusionnant de ce fait les sections qui sont proches. Par défaut, `diff.interHunkContext` ou 0 si l'option de configuration n'est pas configurée.
+
+-W::
+--function-context::
+	Afficher l’ensemble de la fonction comme lignes de contexte pour chaque modification. Les noms de fonction sont déterminés de la même manière que 'git diff' génère sur les en-têtes de sections de rustines(voir 'Définir un en-tête personnalisé' dans linkgit:gitattributes[5]).
+
+ifndef::git-format-patch[]
+ifndef::git-log[]
+--exit-code::
+	Faire sortir le programme avec un code similaire à diff(1). Autrement dit, il sort avec 1 s'il y avait des différences et 0 signifie aucune différence.
+
+--quiet::
+	Désactiver toute sortie du programme. Implique `--exit-code`.
+endif::git-log[]
+endif::git-format-patch[]
+
+--ext-diff::
+	Permettre l'exécution d'un assistant externe de différence. Si vous définissez un pilote externe de différence avec linkgit:gitattributes[5], vous avez besoin d'utiliser cette option avec linkgit:git-log[1] et compagnie.
+
+--no-ext-diff::
+	Désactiver les pilotes de diff externes.
+
+--textconv::
+--no-textconv::
+	Permettre (ou désactiver) le lancement des filtres externes de conversion en texte lors de la comparaison de fichiers binaires. Voir linkgit:gitattributes[5] pour plus de détails. Comme les filtres textconv sont typiquement des conversions à sens unique, la diff résultante est adaptée à la consommation humaine, mais ne peut pas être appliquée. Pour cette raison, les filtres textconv sont activés par défaut seulement pour linkgit:git-diff[1] et linkgit:git-log[1], mais pas pour linkgit:git-format-patch[1] ou les commandes de plomberie de diff.
+
+--ignore-submodules[=<quand>]::
+	Ignorer les modifications à des sous-modules lors de la génération du diff. <quand> peut valoir "none" (aucun), "untracked" (non-suivi), "dirty" (sale) ou "all" (tout) qui est la valeur par défaut. L'utilisation de "none" va considérer comme modifiés les sous-modules quand ils contiennent soit des fichiers non-suivis ou modifiés, ou si sa HEAD diffère du commit enregistré dans le super-projet, et peut être utilisé pour passer outre tout réglage de l'option 'ignore' dans linkgit:git-config[1] ou linkgit:gitmodules[5]. Quand "untracked" est utilisé, les sous-modules ne sont pas considérés sales quand ils ne contiennent que du contenu non suivi (mais ils sont quand même scannés pour trouver du contenu modifié). L'utilisation de "dirty" ignore toutes les modifications à l'arbre de travail des sous-modules ; seules les modifications aux commits stockés dans le super-projet sont affichées (c'était le comportement jusqu'à 1.7.0). La valeur "all" cache toutes les modifications des sous-modules.
+
+--src-prefix=<préfixe>::
+	Afficher le préfixe de source fourni au lieu de "a/".
+
+--dst-prefix=<préfixe>::
+	Afficher le préfixe de destination fourni au lieu de "b/".
+
+--no-prefix::
+	N'afficher aucun préfixe ni de source, ni de destination.
+
+--default-prefix::
+	Utiliser les préfixes source et destination par défaut ("a/" et "b/"). C'est généralement déjà le cas par défaut, mais peut être utilisé pour surcharger une configuration telle que `diff.noprefix`.
+
+--line-prefix=<préfixe>::
+	Préfixer avec une chaîne additionnelle chaque ligne de la sortie.
+
+--ita-invisible-in-index::
+	Par défaut, une entrée ajoutée par "git add -N" apparaît comme un fichier vide existant dans "git diff" et un nouveau fichier dans "git diff --cached". Cette option fait apparaître l'entrée comme un fichier nouveau dans "git diff" et non existant dans "git diff --cached". Cette option peut être inversée avec `--ita-visible-in-index`. Les deux options sont expérimentales et peuvent être retirées dans le futur.
+
+Pour une explication plus détaillée sur ces options communes, voir aussi linkgit:gitdiffcore[7].
+[]
+
+-<n>::
+	Préparer les rustines à partir des <n> commits les plus récents.
+
+-o <rép.>::
+--output-directory <rép.>::
+	Utiliser <rép.> pour stocker les fichiers résultants, au lieu du répertoire de travail actuel.
+
+-n::
+--numbered::
+	Nommer la sortie au format '[PATCH n/m]', même avec une seule rustine.
+
+-N::
+--no-numbered::
+	Nommer la sortie au format '[PATCH]'.
+
+--start-number <n>::
+	démarrer la numérotation des patchs à <n> au lieu de 1.
+
+--numbered-files::
+	Les noms des fichiers de sortie seront une simple séquence de nombres sans la première ligne par défaut du commit ajouté.
+
+-k::
+--keep-subject::
+	Ne pas enlever/ajouter '[PATCH]' de la première ligne du message du journal de validation.
+
+-s::
+--signoff::
+	Ajouter une ligne terminale `Signed-off-by` au message de commit, en utilisant votre identité pour validateur. Référez-vous à l'option de contre-signature dans linkgit:git-commit[1] pour plus d'information.
+
+--stdout::
+	Afficher tous les commits sur la sortie standard au format mbox, au lieu de créer un fichier pour chacun d'entre eux.
+
+--attach[=<séparateur>]::
+	Créer une pièce jointe multipart/mixte, dont la première partie est le message de validation et la deuxième partie la rustine elle-même, avec `Content-Disposition : attachment`.
+
+--no-attach::
+	Désactiver la création d'une pièce jointe, en remplaçant le paramètre de configuration.
+
+--inline[=<séparateur>]::
+	Créer une pièce jointe multipart/mixte, dont la première partie est le message de validation et la deuxième partie la rustine elle-même, avec `Content-Disposition : inline`.
+
+--thread[=<style>]::
+--no-thread::
+	Contrôle l'ajout des en-têtes `In-Reply-To` et `References` pour que le deuxième courrier et les suivants apparaissent comme des réponses au premier. Contrôle également la génération de l'en-tête `Message-ID` à référencer.
++
+L'argument optionnel <style> peut être soit `shallow` soit `deep`. Le filage 'shallow' fait de chaque courrier une réponse à la tête de la série, où la tête est choisie parmi la lettre d'accompagnement, le `--in-reply-to`, et le premier courrier de correction, dans cet ordre. Le filage 'deep' fait de chaque courrier une réponse au précédent.
++
+La valeur par défaut est `--no-thread`, sauf si la configuration `format.thread` est définie. `--thread` sans argument est équivalent à `--thread=shallow`.
++
+Attention, le comportement par défaut de 'git send-email' est d'arranger les emails en enfilade lui-même. Si vous voulez que `git format-patch` s'occupe de la mise en fil, vous devrez vous assurer que le la mise en file est désactivée pour `git send-email`.
+
+--in-reply-to=<id-message>::
+	Faire en sorte que le premier message (ou tous les messages si `--no-thread` est spécifié) apparaisse comme une réponse au <id-message> donné, ce qui évite de casser les fils de discussion lors d'une nouvelle série de patchs.
+
+--ignore-if-in-upstream::
+	Ne pas inclure une rustine qui correspond à un commit dans <jusque>..<depuis>. Ceci examinera tous les commits atteignables depuis <depuis> mais pas depuis <jusque> et les comparera avec les rustines en cours de génération, et toute rustine qui correspond sera ignorée.
+
+--always::
+	Inclure les rustines pour les commits qui n'introduisent aucun changement, qui sont ignorés par défaut.
+
+--cover-from-description=<mode>::
+	Contrôle les parties de la lettre d'introduction qui seront automatiquement remplies à l'aide de la description de la branche.
++
+Si `<mode>` est `message` ou `default`, le sujet de la lettre d'introduction sera rempli avec un texte de remplacement. Le corps de la lettre d'introduction sera rempli avec la description de la branche. C'est le mode par défaut lorsqu'aucune configuration ou option de ligne de commande n'est spécifiée.
++
+Si `<mode>` est `subject`, le premier paragraphe de la description de la branche alimentera le sujet de la lettre d'introduction. Le reste de la description constituera le corps de la lettre d'introduction.
++
+Quand `<mode>` est `auto`, si le premier paragraphe de la description de la branche est supérieur à 100 octets, alors le mode sera `message`, sinon `subject` sera utilisé.
++
+Si `<mode>` est `none`, le sujet et le corps de la lettre d'introduction seront remplis avec du texte de remplacement.
+
+--description-file=<fichier>::
+	Utiliser le contenu de <fichier> au lieu de la description de la branche pour générer la lettre de d'introduction.
+
+--subject-prefix=<préfixe-de-sujet>::
+	Au lieu du préfixe standard '[PATCH]' dans la ligne d'objet, utiliser plutôt '[<préfixe-de-sujet>]. Cela peut être utilisé pour nommer une série de rustines, et peut être combiné avec l'option `--numbered`.
++
+La variable de configuration `format.subjectPrefix` peut également être utilisée pour configurer un préfixe de sujet à appliquer à un dépôt donné pour toutes les rustine . Ceci est souvent utile pour les listes de diffusion qui reçoivent des rustines pour plusieurs dépôts et peut être utilisé pour lever l’ambiguïté des rustines(avec une valeur de par exemple "PATCH mon-projet").
+
+--filename-max-length=<n>::
+	Au lieu de la longueur standard de 64 octets, les noms de fichiers de sortie générés sont réduits à environ '<n>' octets (une valeur trop courte sera augmentée silencieusement à une longueur raisonnable). La valeur par défaut est la valeur de la variable de configuration `format.filenameMaxLength`, ou 64 si non configuré.
+
+--rfc::
+	Préfixe "RFC" au préfixe de sujet (créant "RFC PATCH" par défaut) . RFC signifie "Request For Comments" (demande de commentaires) ; utilisez ceci lorsque vous envoyez une rustine expérimentale pour une discussion plutôt que pour une application.
+
+-v <n>::
+--reroll-count=<n>::
+	Marquer la série comme la <n>ième itération du sujet. Les noms des fichiers de sortie sont précédés de `v<n>`, et le préfixe du sujet ("PATCH" par défaut, mais configurable via l'option `--subject-prefix`) a ` v<n>` ajouté. Par exemple, `--reroll-count=4` peut produire le fichier `v4-0001-add-makefile.patch` qui a "Subject : [PATCH v4 1/20] Add makefile". `<n>` n'a pas besoin d'être un nombre entier (par exemple, "--reroll-count=4.4", ou "--reroll-count=4rev2" sont autorisés), mais l'inconvénient d'utiliser un tel nombre de rerolls est que le range-diff/interdiff avec la version précédente n'indique pas exactement à quelle version la nouvelle iteration est comparée.
+
+--to=<courriel>::
+	Ajoute un en-tête `To:` aux en-têtes du courriel. Ceci s'ajoute à tous les en-têtes configurés, et peut être utilisé plusieurs fois. La forme négative `--no-to` élimine tous les en-têtes `To:` ajoutés jusqu'à présent (depuis la configuration ou la ligne de commande).
+
+--cc=<courriel>::
+	Ajoute un en-tête `Cc:` aux en-têtes du courriel. Ceci s'ajoute à tous les en-têtes configurés, et peut être utilisé plusieurs fois. La forme négative `--no-cc` élimine tous les en-têtes `Cc:` ajoutés jusqu'à présent (depuis la configuration ou la ligne de commande).
+
+--from::
+--from=<ident>::
+	Utiliser `ident` dans l'en-tête `From:` de chaque courriel de commit. Si l'identifiant de l'auteur du commit n'est pas textuellement identique au `ident` fourni, placer un en-tête `From:` dans le corps du message avec l'auteur original. Si aucun `ident` n'est fourni, utiliser l'identifiant du validateur.
++
+Notez que cette option n'est utile que si vous envoyez réellement les courriel et que vous voulez vous identifier comme l'expéditeur, mais conserver l'auteur original (et `git am` récupérera correctement l'en-tête in-body). Notez également que `git send-email` gère déjà cette transformation pour vous, et cette option ne devrait pas être utilisée si vous envoyez le résultat à `git send-email`.
+
+--[no-]force-in-body-from::
+	Avec l'expéditeur du courriel spécifié par l'option `--from`, par défaut, un "From :" dans le corps du message pour identifier l'auteur réel du commit est ajouté en haut du message du journal des validations si l'expéditeur est différent de l'auteur. Avec cette option, le "From :" dans le corps du message est ajouté même si l'expéditeur et l'auteur ont le même nom et la même adresse, ce qui peut aider si le logiciel de liste de diffusion confond l'identité de l'expéditeur. La valeur par défaut est la valeur de la variable de configuration `format.forceInBodyFrom`.
+
+--add-header=<entête>::
+	Ajoute un entête arbitraire aux entêtes du courriel. Ceci s'ajoute à tous les entêtes configurés, et peut être utilisé plusieurs fois. Par exemple, `--add-header="Organisation : git-foo"`. La forme négative `--no-add-header` élimine *tous* les entêtes (`To:`, `Cc:`, et personnalisés) ajoutés jusqu'ici depuis la configuration ou la ligne de commande.
+
+--[no-]cover-letter::
+	En plus des rustine, générer un fichier de lettre d'introduction contenant la description de la branche, le shortlog et le diffstat global. Vous pouvez remplir une description dans le fichier avant de l'envoyer.
+
+--encode-email-headers::
+--no-encode-email-headers::
+	Encoder les entêtes de courriel qui contiennent des caractères non ASCII avec le "Q-encoding" (décrit dans la RFC 2047), au lieu d'afficher les entêtes textuellement. La valeur par défaut est la valeur de la variable de configuration `format.encodeEmailHeaders`.
+
+--interdiff=<précédent>::
+	Pour aider à la revue, insérer un interdiff dans la lettre d'introduction, ou comme commentaire de la rustine d'une série d'une seule rustine, montrant les différences entre la version précédente de la série de rustines et la série en cours de formatage. `précédent` est une révision unique nommant la pointe de la série précédente qui partage une base commune avec la série en cours de formatage (par exemple `git format-patch --cover-letter --interdiff=feature/v1 -3 feature/v2`).
+
+--range-diff=<précédent>::
+	Pour aider à la revue, insérer un range-diff (voir linkgit:git-range-diff[1]) dans la lettre d'introduction, ou comme commentaire de la rustine d'une série d'une seule rustine, montrant les différences entre la version précédente de la série de rustines et la série en cours de formatage. `précédent` peut être une révision unique nommant la pointe de la série précédente si elle partage une base commune avec la série en cours de formatage (par exemple `git format-patch --cover-letter --range-diff=feature/v1 -3 feature/v2`), ou une plage de révisions si les deux versions de la série sont disjointes (par exemple `git format-patch --cover-letter --range-diff=feature/v1~3..feature/v1 -3 feature/v2`).
++
+Notez que les options diff passées à la commande affectent la façon dont le produit principal de `format-patch` est généré, mais qu'elles ne sont pas passées à la machinerie sous-jacente de `range-diff` utilisée pour générer le matériel de la lettre d'introduction (ceci pourrait changer dans le futur).
+
+--creation-factor=<pourcentage>::
+	Utilisé avec `--range-diff`, modifie l'heuristique qui fait correspondre les commits entre la série précédente et la série actuelle de rustines en ajustant le facteur de correction du coût de création/suppression. Voir linkgit:git-range-diff[1]) pour plus de détails.
+
+--notes[=<ref>]::
+--no-notes::
+	Ajouter les notes (voir linkgit:git-notes[1]) pour le commit après la ligne à trois tirets.
++
+Le cas d'utilisation attendu de ceci est d'écrire une explication de soutien pour le commit qui n'appartient pas au message de journal de commit proprement dit, et de l'inclure avec la soumission de la rustine. Alors que l'on peut simplement écrire ces explications après l'exécution de `format-patch` mais avant l'envoi, les conserver sous forme de notes Git permet de les maintenir entre les versions de la série de patchs (mais voir la discussion sur les options de configuration `notes.rewrite` dans linkgit:git-notes[1] pour utiliser ce flux de travail).
++
+La valeur par défaut est `--no-notes`, sauf si la configuration `format.notes` est définie.
+
+--[no-]signature=<signature>::
+	Ajouter une signature à chaque message produit. Selon la RFC 3676, la signature est séparée du corps du message par une ligne avec '--'. Si l'option signature est omise, la signature est par défaut le numéro de version de Git.
+
+--signature-file=<fichier>::
+	Fonctionne comme --signature, sauf que la signature est lue depuis un fichier.
+
+--suffix=.<sfx>::
+	Au lieu d'utiliser `.patch` comme suffixe pour les noms de fichiers générés, utiliser le suffixe spécifié. Une alternative courante est `--suffix=.txt`. Si cette option est laissée vide, le suffixe `.patch` sera supprimé.
++
+Notez que le caractère de tête ne doit pas nécessairement être un point ; par exemple, vous pouvez utiliser `--suffix=-patch` pour obtenir `0001-description-de-ma-modification-patch`.
+
+-q::
+--quiet::
+	Ne pas afficher les noms des fichiers générés sur la sortie standard.
+
+--no-binary::
+	Ne pas afficher le contenu des modifications dans les fichiers binaires, mais plutôt un avis que ces fichiers ont été modifiés. Les rustines générées à l'aide de cette option ne peuvent pas être appliquées correctement, mais elles sont toujours utiles pour une revue du code.
+
+--zero-commit::
+  Affiche une empreinte entièrement nulle dans l'en-tête From de chaque rustine au lieu de l'empreinte du commit.
+
+--[no-]base[=<commit>]::
+	Enregistrer les informations sur l'arbre de base pour identifier l'état auquel la série de rustines s'applique. Voir la section INFORMATION SUR L'ARBRE DE BASE ci-dessous pour plus de détails. Si <commit> est "auto", un commit de base est automatiquement choisi. L'option `--no-base` remplace la valeur configurée dans `format.useAutoBase`.
+
+--root::
+	Traiter l'argument révision comme une <plage de révisions>, même s'il ne s'agit que d'un seul commit (qui serait normalement traité comme un <depuis>). Notez que les commits racines inclus dans l'intervalle spécifié sont toujours formatés comme des rustines de création, indépendamment de ce drapeau.
+
+--progress::
+	Afficher des rapports de progression sur stderr au fur et à mesure que les rustines sont générées.
+
+CONFIGURATION
+-------------
+Vous pouvez spécifier des lignes d'en-tête supplémentaires à ajouter à chaque message, des valeurs par défaut pour le préfixe de l'objet et le suffixe du fichier, numéroter les rustines lorsque vous en produisez plusieurs, ajouter des en-têtes "To :" ou "Cc :", configurer les pièces jointes, changer le répertoire de sortie des rustines et signer les rustines avec des variables de configuration.
+
+------------
+[format]
+	headers = "Organization: git-foo\n"
+	subjectPrefix = CHANGE
+	suffix = .txt
+	numbered = auto
+	to = <courriel>
+	cc = <courriel>
+	attach [ = mime-boundary-string ]
+	signOff = true
+	outputDirectory = <répertoire>
+	coverLetter = auto
+	coverFromDescription = auto
+------------
+
+
+DISCUSSION
+----------
+
+La rustine produite par 'git format-patch' est au format d'une boîte aux lettres UNIX, avec un horodatage "magique" fixe pour indiquer que le fichier est produit par format-patch plutôt que par une vraie boîte aux lettres, comme ceci :
+
+------------
+From 8f72bad1baf19a53459661343e21d6491c3908d3 Mon Sep 17 00:00:00 2001
+From: Tony Luck <tony.luck@intel.com>
+Date: Tue, 13 Jul 2010 11:42:54 -0700
+Subject: [PATCH] =?UTF-8?q?[IA64]=20Put=20ia64=20config=20files=20on=20the=20?=
+ =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig=20diet?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Les fichiers de configuration arch/arm ont été allégés à l'aide d'un script python.
+(Voir le commentaire du commit c2330e286f68f1c408b4aa6515ba49d57f05beae)
+
+Faire la même chose pour ia64 afin que nous puissions avoir un look élégant et soigné.
+...
+------------
+
+Typiquement, elles sera placée dans le dossier des brouillons d'un MUA, éditée pour ajouter des commentaires opportuns qui ne devraient pas aller dans le changelog après les trois tirets, et ensuite envoyée comme un message dont le corps, dans notre exemple, commence par "arch/arm les fichiers de configuration...". À la réception, les lecteurs peuvent enregistrer les rustines intéressantes dans une boîte aux lettres UNIX et les appliquer avec linkgit:git-am[1].
+
+Lorsqu'une rustine fait partie d'une discussion en cours, la rustine générée par "git format-patch" peut être modifiée pour tirer parti de la fonctionnalité "git am --scissors". Après votre réponse à la discussion vient une ligne qui consiste uniquement en "`-- >8 --`" (ciseaux et perforation), suivie par la rustine avec les champs d'en-tête inutiles supprimés :
+
+------------
+...
+> Il faut donc faire telle ou telle chose.
+
+C'est logique pour moi.  Et cette rustine ?
+
+-- >8 --
+Sujet : [IA64] Mettre les fichiers de configuration ia64 sur le régime Uwe Kleine-König
+
+Les fichiers de configuration arch/arm ont été allégés à l'aide d'un script python
+...
+------------
+
+Lorsque vous envoyez une rustine de cette manière, le plus souvent vous envoyez votre propre rustine, donc en plus du marqueur "`From $SHA1 $magic_timestamp`" vous devez omettre les lignes `From:` et `Date:` du fichier de rustine. Le titre de la rustine est susceptible d'être différent du sujet de la discussion à laquelle la rustine répond, il est donc probable que vous souhaitiez conserver la ligne Subject :, comme dans l'exemple ci-dessus.
+
+Vérification de la corruption des rustines
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+S'ils ne sont pas configurés correctement, de nombreux outils de courriel corrompent les espaces blancs. Voici deux types courants de corruption :
+
+* Lignes de contexte vides qui ne comportent pas d'espace.
+
+* Lignes de contexte non vides qui ont un espace blanc supplémentaire au début.
+
+Une façon de tester si votre MUA est correctement configuré est :
+
+* Envoyez le patch à vous-même, exactement comme vous le feriez, à l'exception des lignes To : et Cc : qui ne contiennent pas l'adresse de la liste et du mainteneur.
+
+* Enregistrez cette rustine dans un fichier au format boîte aux lettres UNIX. Appelez-la a.patch, par exemple.
+
+* Appliquez-le :
+
+    $ git fetch <projet> master:test-apply
+    $ git switch test-apply
+    $ git restore --source=HEAD --staged --worktree :/
+    $ git am a.patch
+
+Si elle ne s'applique pas correctement, il peut y avoir plusieurs raisons.
+
+* La rustine elle-même ne s'applique pas proprement. C'est _mauvais signe_ mais cela n'a pas grand chose à voir avec votre MUA. Vous pourriez vouloir rebaser la rustine avec linkgit:git-rebase[1] avant de la régénérer dans ce cas.
+
+* Le MUA a corrompu votre rustine ; "am" se plaint que la rustine ne s'applique pas. Regardez dans le sous-répertoire .git/rebase-apply/ et voyez ce que contient le fichier 'patch' et vérifiez les modèles de corruption courants mentionnés ci-dessus.
+
+* Pendant que vous y êtes, vérifiez également les fichiers 'info' et 'final-commit'. Si ce qui se trouve dans 'final-commit' n'est pas exactement ce que vous voulez voir dans le message du journal de validation, il est très probable que le destinataire finisse par modifier manuellement le message du journal en appliquant votre rustine. Des éléments tels que "Hi, this is my first patch.\n" dans le courriel de rustine doivent figurer après la ligne à trois tirets qui signale la fin du message de validation.
+
+CONSEILS SPÉCIFIQUES À CHAQUE OUTIL DE COURRIEL
+-----------------------------------------------
+Voici quelques conseils pour réussir à soumettre des rustines en ligne en utilisant différents outils de courriel.
+
+GMail
+~~~~~
+GMail ne dispose d'aucun moyen de désactiver le retour à la ligne dans l'interface Web, ce qui fait que les courriels que vous envoyez seront tronqués. Vous pouvez cependant utiliser "git send-email" et envoyer vos correctifs par le biais du serveur SMTP de GMail, ou utiliser n'importe quel client de messagerie IMAP pour vous connecter au serveur IMAP de Google et transférer les courriels par ce biais.
+
+Pour des conseils sur l'utilisation de "git send-email" pour envoyer vos rustines via le serveur SMTP GMail, consultez la section EXEMPLE de linkgit:git-send-email[1].
+
+Pour des conseils sur la soumission en utilisant l'interface IMAP, voir la section EXEMPLE de linkgit:git-imap-send[1].
+
+Thunderbird
+~~~~~~~~~~~
+Par défaut, Thunderbird enveloppe les courriels et les signale comme étant 'format=flowed', ce qui rend le courriel résultant inutilisable par Git.
+
+Il existe trois approches différentes : utiliser un module complémentaire pour désactiver les retours à la ligne, configurer Thunderbird pour qu'il n'altère pas les rustine, ou utiliser un éditeur externe pour empêcher Thunderbird d'altérer les rustines.
+
+Approche n°1 (add-on)
+^^^^^^^^^^^^^^^^^^^^^
+
+Installez le module complémentaire Toggle Word Wrap disponible sur https://addons.mozilla.org/thunderbird/addon/toggle-word-wrap/. Il ajoute une entrée de menu "Enable Word Wrap" dans le menu "Options" du compositeur que vous pouvez cocher. Vous pouvez maintenant composer le message comme vous le feriez normalement (couper + coller, 'git format-patch' | 'git imap-send', etc.), mais vous devez insérer manuellement des sauts de ligne dans tout texte que vous tapez.
+
+Approche n°2 (configuration)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Trois étapes :
+
+1. Configurez la composition de votre serveur de messagerie en texte brut : Editer...Paramètres du compte...Composition et adressage, décocher "Composer les messages en HTML".
+
+2. Configurez votre fenêtre de composition générale pour qu'elle n'introduise pas automatiquement des retours chariot.
++
+Dans Thunderbird 2 : Edition..Préférences..Composition, envelopper les messages en texte brut à 0
++
+Dans Thunderbird 3 : Editer...Préférences...Avancé...Editeur de configuration. Recherchez l'entrée "mail.wrap_long_lines". Basculez-la pour vous assurer qu'elle est réglée sur `false`. Recherchez également "mailnews.wraplength" et mettez la valeur à 0.
+
+3. Désactiver l'utilisation de format=flowed : Édition..Préférences..Avancé..Éditeur de configuration. Recherchez l'entrée "mailnews.send_plaintext_flowed". Basculez-la pour vous assurer qu'elle est définie sur `false`.
+
+Une fois que c'est fait, vous devriez être en mesure de composer un courriel comme vous le feriez normalement (couper + coller, 'git format-patch' | 'git imap-send', etc), et les rustines ne seront pas altérées.
+
+Approche n°3 (éditeur externe)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Les extensions Thunderbird suivantes sont nécessaires : AboutConfig de https://mjg.github.io/AboutConfig/ et External Editor de https://globs.org/articles.php?lng=en&pg=8
+
+1. Préparer la rustine sous forme de fichier texte à l’aide de la méthode de votre choix.
+
+2. Avant d'ouvrir une fenêtre de composition, utilisez Edit->Account Settings pour décocher le paramètre "Compose messages in HTML format" dans le panneau "Composition & Addressing" du compte qui sera utilisé pour envoyer la rustine.
+
+3. Dans la fenêtre principale de Thunderbird, 'avant' d'ouvrir la fenêtre de composition de la rustine, utilisez Tools->about:config pour définir les éléments suivants aux valeurs indiquées :
++
+----------
+	mailnews.send_plaintext_flowed  => false
+	mailnews.wraplength             => 0
+----------
+
+4. Ouvrez une fenêtre de composition et cliquez sur l’icône de l’éditeur externe.
+
+5. Dans la fenêtre de l'éditeur externe, lisez le fichier de rustine et quittez l'éditeur normalement.
+
+Remarque : il est peut-être possible de réaliser l'étape 2 avec about:config et les paramètres suivants, mais personne n'a encore essayé.
+
+----------
+	mail.html_compose                       => false
+	mail.identity.default.compose_html      => false
+	mail.identity.id?.compose_html          => false
+----------
+
+Il existe un script dans contrib/thunderbird-patch-inline qui peut vous aider à inclure des rustines dans Thunderbird de manière simple. Pour l'utiliser, suivez les étapes ci-dessus et utilisez le script comme éditeur externe.
+
+KMail
+~~~~~
+Cela devrait vous aider à soumettre des rustine en ligne en utilisant KMail.
+
+1. Préparez la rustine sous forme de fichier texte.
+
+2. Cliquez sur Nouveau courrier.
+
+3. Allez sous "Options" dans la fenêtre Composer et assurez-vous que l'option "Word wrap" n'est pas activée.
+
+4. Utilisez Message -> Insérer un fichier... et insérez la rustine.
+
+5. De retour dans la fenêtre de composition : ajoutez tout autre texte que vous souhaitez au message, complétez les champs "adresse" et "objet", puis appuyez sur "envoyer".
+
+INFORMATION D'ARBRE DE BASE
+---------------------------
+
+Le bloc d'informations de l'arbre de base est utilisé par les mainteneurs ou les testeurs tiers pour connaître l'état exact auquel s'applique la série de rustines. Il se compose du "base commit", qui est un commit bien connu faisant partie de la partie stable de l'historique du projet sur lequel tout le monde travaille, et de zéro ou plus "rustines prérequises", qui sont des rustines bien connues en cours de développement qui ne font pas encore partie du "base commit" et qui doivent être appliquées au-dessus du "base commit" dans un ordre topologique avant que les rustines puissent être appliquées.
+
+Le "commit de base" est affiché sous la forme "base-commit : " suivi de l'indice 40-hex du nom de l'objet commit. Une 'rustine pré-requise' est affichée sous la forme "prerequisite-patch-id : " suivi de l'identifiant 40-hex de la rustine, qui peut être obtenu en passant la rustine par la commande `git patch-id --stable`.
+
+Imaginez qu'en plus du commit public P, vous appliquiez des rustines X, Y et Z bien connues de quelqu'un d'autre, et que vous construisiez ensuite votre série de trois rustines A, B, C, l'historique serait le suivant :
+
+................................................
+---P---X---Y---Z---A---B---C
+................................................
+
+Avec `git format-patch --base=P -3 C` (ou ses variantes, par exemple avec `--cover-letter` ou en utilisant `Z..C` au lieu de `-3 C` pour spécifier l'intervalle), le bloc d'information de l'arbre de base est affiché à la fin du premier message que la commande produit (soit la première rustine, soit la lettre d'introduction), comme ceci :
+
+------------
+base-commit: P
+prerequisite-patch-id: X
+prerequisite-patch-id: Y
+prerequisite-patch-id: Z
+------------
+
+Pour une topologie non linéaire, telle que
+
+................................................
+---P---X---A---M---C
+    \         /
+     Y---Z---B
+................................................
+
+Vous pouvez également utiliser `git format-patch --base=P -3 C` pour générer des rustines pour A, B et C, et les identifiants de P, X, Y, Z sont ajoutés à la fin du premier message.
+
+Si vous mettez `--base=auto` dans la ligne de commande, le commit de base sera calculé automatiquement comme étant la base de fusion du commit sommet de la branche de suivi à distance et de l'intervalle de révision spécifié dans la ligne de commande. Pour une branche locale, vous devez la faire suivre une branche distante par `git branch --set-upstream-to` avant d'utiliser cette option.
+
+EXEMPLES
+--------
+
+* Extraire les commits entre les révisions R1 et R2, et les appliquer sur la branche courante en utilisant 'git am' pour les sélectionner :
++
+------------
+$ git format-patch -k --stdout R1..R2 | git am -3 -k
+------------
+
+* Extrait tous les commits qui sont dans la branche actuelle mais pas dans la branche d'origine :
++
+------------
+$ git format-patch origin
+------------
++
+Pour chaque commit, un fichier séparé est créé dans le répertoire actuel.
+
+* Extrait tous les commits qui mènent à 'origin' depuis le début du projet :
++
+------------
+$ git format-patch --root origin
+------------
+
+* Pareil que précédemment :
++
+------------
+$ git format-patch -M -B origin
+------------
++
+En outre, la commande détecte et traite intelligemment les renommages et les réécritures complètes pour produire une rustine de renommage. Une rustine de renommage réduit la quantité de texte produit, et facilite la revue. Notez que les programmes "patch" non-Git ne comprendront pas les rustines de renommage, aussi ne l'utilisez que si vous savez que le destinataire utilise Git pour appliquer votre rustine.
+
+* Extraire les trois commits les plus élevés de la branche actuelle et les formater comme des rustines pouvant être envoyées par courriel :
++
+------------
+$ git format-patch -3
+------------
+
+MISES EN GARDE
+--------------
+
+Notez que `format-patch` omettra les commits de fusion dans la sortie, même s'ils font partie de la plage demandée. Un simple "patch" n'inclut pas assez d'informations pour que le destinataire puisse reproduire le même commit de fusion.
+
+VOIR AUSSI
+----------
+linkgit:git-am[1], linkgit:git-send-email[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

@@ -1,0 +1,123 @@
+git-credential(1)
+=================
+
+NOM
+---
+git-credential - Récupère et stocke les informations d'identification de l'utilisateur
+
+SYNOPSIS
+--------
+------------------
+'git credential' (fill|approve|reject)
+------------------
+
+DESCRIPTION
+-----------
+
+Git possède une interface interne pour stocker et récupérer les informations d'identification à partir d'assistants spécifiques au système, ainsi que pour demander à l'utilisateur des noms d'utilisateur et des mots de passe. La commande git-credential expose cette interface aux scripts qui peuvent vouloir récupérer, stocker ou demander des informations d'identification de la même manière que Git. La conception de cette interface scriptable modélise l'API C interne ; voir credential.h pour plus de détails sur les concepts.
+
+git-credential prend une option "action" sur la ligne de commande (une parmi `fill`, `approve`, ou `reject`) et lit une description de credential sur stdin (voir <<IOFMT, FORMAT D'ENTRÉE/SORTIE>>).
+
+Si l'action est `fill`, git-credential tentera d'ajouter les attributs "username" et "password" à la description en lisant les fichiers de configuration, en contactant les assistants d'authentification configurés, ou en demandant à l'utilisateur. Les attributs "username" et "password" de la description de l'authentification sont ensuite imprimés sur stdout avec les attributs déjà fournis.
+
+Si l'action est `approve`, git-credential enverra la description à tout assistant d'accréditation configuré, qui peut stocker l'accréditation pour une utilisation ultérieure.
+
+Si l'action est `reject`, git-credential enverra la description à tous les assistants d'authentification configurés, qui peuvent effacer toutes les authentifications stockées correspondant à la description.
+
+Si l'action est `approve` ou `reject`, aucune sortie ne doit être émise.
+
+UTILISATION TYPIQUE DE L'AUTHENTIFICATION GIT
+---------------------------------------------
+
+Une application utilisant git-credential utilisera typiquement `git credential` en suivant ces étapes :
+
+  1. Générer une description d'authentification basée sur le contexte.
++
+Par exemple, si nous voulons un mot de passe pour `https://example.com/foo.git`, nous pourrions générer la description d'authentification suivante (n'oubliez pas la ligne blanche à la fin ; elle indique à `git credential` que l'application a fini de fournir toutes les informations dont elle dispose) :
+
+	 protocol=https
+	 host=example.com
+	 path=foo.git
+
+  2. Demander à git-credential de nous donner un nom d'utilisateur et un mot de passe pour cette description. Ceci est fait en exécutant `git credential fill`, en fournissant la description de l'étape (1) à son entrée standard. La description complète des identifiants (incluant l'identification elle-même, c'est-à-dire le nom d'utilisateur et le mot de passe) sera produite sur la sortie standard, comme :
+
+	protocol=https
+	host=example.com
+	username=bob
+	password=secr3t
++
+Dans la plupart des cas, cela signifie que les attributs donnés en entrée seront répétés en sortie, mais Git peut aussi modifier la description des identifiants, par exemple en supprimant l'attribut `path` lorsque le protocole est HTTP(s) et que `credential.useHttpPath` est faux.
++
+Si le `git credential` connaissait le mot de passe, cette étape peut ne pas avoir impliqué que l'utilisateur tape réellement ce mot de passe (l'utilisateur peut avoir tapé un mot de passe pour déverrouiller le trousseau à la place, ou aucune interaction de l'utilisateur n'a été faite si le trousseau était déjà déverrouillé) avant de retourner `password=secr3t`.
+
+  3. Utiliser le justificatif d'identité (par exemple, accéder à l'URL avec le nom d'utilisateur et le mot de passe de l'étape (2)), et voir s'il est accepté.
+
+  4. Rapporter sur le succès ou l'échec du mot de passe. Si l'identifiant a permis à l'opération de se terminer avec succès, il peut être marqué avec une action "approve" pour dire à `git credential` de le réutiliser dans sa prochaine invocation. Si l'identifiant a été rejeté pendant l'opération, utiliser l'action "reject" pour que `git credential` demande un nouveau mot de passe lors de sa prochaine invocation. Dans les deux cas, `git credential` doit être alimenté avec la description de l'identifiant obtenue à l'étape (2) (qui contient également les champs fournis à l'étape (1)).
+
+[[IOFMT]]
+FORMAT D'ENTRÉE/SORTIE
+----------------------
+
+`git credential` lit et/ou écrit (en fonction de l'action utilisée) des informations d'identification dans son entrée/sortie standard. Ces informations peuvent correspondre soit à des clés pour lesquelles `git credential` obtiendra les informations de connexion (par exemple, hôte, protocole, chemin), soit aux données d'identification réelles à obtenir (nom d'utilisateur/mot de passe).
+
+L'identifiant est divisé en un ensemble d'attributs nommés, avec un attribut par ligne. Chaque attribut est spécifié par une paire clé-valeur, séparée par un signe `=` (égal), suivi d'une nouvelle ligne.
+
+La clé peut contenir n'importe quel octet sauf `=`, newline ou NUL. La valeur peut contenir n'importe quel octet, à l'exception de newline ou NUL.
+
+Les attributs dont les clés se terminent par des parenthèses de style tableau C `[]` peuvent avoir plusieurs valeurs. Chaque instance d'un attribut multi-valué forme une liste ordonnée de valeurs - l'ordre des attributs répétés définit l'ordre des valeurs. Un attribut multivalué vide (`clé[]=\n`) efface toutes les entrées précédentes et réinitialise la liste.
+
+Dans tous les cas, tous les octets sont traités tels quels (c'est-à-dire qu'il n'y a pas de guillemets et qu'on ne peut pas transmettre une valeur contenant une nouvelle ligne ou NUL). La liste des attributs se termine par une ligne blanche ou une fin de fichier.
+
+Git comprend les attributs suivants :
+
+`protocol`::
+
+	Le protocole sur lequel l'identifiant sera utilisé (par exemple, `https`).
+
+`host`::
+
+	Le nom d'hôte distant pour un identifiant réseau. Cela inclut le numéro de port s'il a été spécifié (par exemple, "exemple.com:8088").
+
+`path`::
+
+	Le chemin avec lequel l'identifiant sera utilisé. Par exemple, pour accéder à un dépôt https distant, ce sera le chemin du dépôt sur le serveur.
+
+`username`::
+
+	Le nom d'utilisateur de l'identifiant, si nous en avons déjà un (par exemple, à partir d'une URL, de la configuration, de l'utilisateur ou d'une aide précédemment exécutée).
+
+`password`::
+
+	Le mot de passe de l'identifiant, si nous demandons qu'il soit stocké.
+
+`password_expiry_utc`::
+
+	Les mots de passe générés tels que les jetons d'accès OAuth peuvent avoir une date d'expiration. Lors de la lecture des informations d'identification depuis les assistants, `git credential fill` ignore les mots de passe expirés. Représenté en temps Unix UTC, en secondes depuis 1970.
+
+`oauth_refresh_token`::
+
+	Un jeton de rafraîchissement OAuth peut accompagner un mot de passe qui est un jeton d'accès OAuth. Les assistants doivent traiter cet attribut comme confidentiel, au même titre que l'attribut password. Git lui-même n'a pas de comportement particulier pour cet attribut.
+
+`url`::
+
+	Lorsque cet attribut spécial est lu par `git credential`, la valeur est analysée comme une URL et traitée comme si ses parties constitutives étaient lues (par exemple, `url=https://example.com` se comporterait comme si `protocol=https` et `host=example.com` avaient été fournis). Cela peut aider les appelants à éviter d'analyser eux-mêmes les URL.
++
+Notez que la spécification d'un protocole est obligatoire et que si l'URL ne spécifie pas de nom d'hôte (par exemple, "cert:///chemin/vers/un/fichier"), l'identifiant contiendra un attribut de nom d'hôte dont la valeur est une chaîne vide.
++
+Les composants qui manquent dans l'URL (par exemple, il n'y a pas de nom d'utilisateur dans l'exemple ci-dessus) ne seront pas définis.
+
+`wwwauth[]`::
+
+	Lorsque Git reçoit une réponse HTTP contenant un ou plusieurs en-têtes d'authentification "WWW-Authenticate", ceux-ci sont transmis par Git aux assistants d'authentification.
++
+Chaque valeur de l'en-tête "WWW-Authenticate" est transmise sous la forme d'un attribut à valeurs multiples "wwwauth[]", l'ordre des attributs étant le même que celui dans lequel ils apparaissent dans la réponse HTTP. Cet attribut est "à sens unique" à partir de Git pour transmettre des informations supplémentaires aux assistants d'authentification.
+
+Les attributs non reconnus sont ignorés en silence.
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

@@ -1,0 +1,1040 @@
+git-format-patch(1)
+===================
+
+名称
+--
+git-format-patch - 为提交电子邮件准备补丁
+
+
+概述
+--
+[verse]
+'git format-patch' [-k] [(-o|--output-directory) <dir> | --stdout]
+		   [--no-thread | --thread[=<风格>]]
+		   [(--attach|--inline)[=<boundary>] | --no-attach]
+		   [-s | --signoff]
+		   [--signature=<signature> | --no-signature]
+		   [--signature-file=<文件>]
+		   [-n | --numbered | -N | --no-numbered]
+		   [--start-number <n>] [--numbered-files]
+		   [--in-reply-to=<message id>] [--suffix=.<sfx>]
+		   [--ignore-if-in-upstream] [--always]
+		   [--cover-from-description=<模式>]
+		   [--rfc] [--subject-prefix=<主题前缀>]
+		   [(--reroll-count|-v) <n>]
+		   [--to=<e-mail>] [--cc=<e-mail>]
+		   [--[no-]cover-letter] [--quiet]
+		   [--[no-]encode-email-headers]
+		   [--no-notes | --notes[=<引用>]]
+		   [--interdiff=<以前的>]
+		   [--range-diff=<以前的> [--creation-factor=<百分比>]]
+		   [--filename-max-length=<n>]
+		   [--progress]
+		   [<普通差异选项>]
+		   [ <从> | <修订范围> ]
+
+描述
+--
+
+将每个非合并提交及其 “补丁” 准备在每个提交的一个 “消息” 中，格式类似于 UNIX 邮箱。 这条命令的输出便于提交电子邮件或与 "git am" 一起使用。
+
+命令产生的 "信息" 由三部分组成：
+
+* 一个简短的元数据头，以 "From <提交>" 开始，带有固定的 "Mon Sep 17 00:00:00 2001" 的日期，以帮助 "file(1)" 等程序识别该文件是该命令的输出，记录作者身份、作者日期和修改标题的字段（取自提交日志信息的第一段）。
+
+* 提交日志信息的第二段和后续段落。
+
+* “补丁”，也就是该提交和其父辈之间的 "diff -p --stat" 输出（见 linkgit:git-diff[1]）。
+
+日志信息和补丁之间用三条虚线隔开。
+
+有两种方法可以指定要对哪些提交进行操作。
+
+1. 单一的提交，<从>，指定导致当前分支顶端的提交不在导致 <从> 的历史中，要被输出。
+
+2. 通用的 <修订范围> 表达式（见 linkgit:gitrevisions[7]中的 "指定修订" 一节）表示指定范围内的提交。
+
+在只有一个 <提交> 的情况下，第一条规则具有优先权。 要应用第二条规则，即格式化从历史开始到 <提交> 为止的所有内容，使用 `--root` 选项：`git format-patch --root <提交>`。 如果你只想格式化 <提交> 本身，你可以用`git format-patch -1 <提交>`来做。
+
+默认情况下，每个输出文件从 1 开始依次编号，并使用提交信息的第一行（为保证路径名的安全而进行了调整）作为文件名。使用 `--numbered-files` 选项，输出文件名将只有数字，而没有附加提交信息的第一行。 除非指定 `--stdout` 选项，否则输出文件的名称将被打印到标准输出。
+
+如果指定了 `-o`，输出文件将在<目录>创建。 否则，它们将在当前工作目录下创建。默认路径可以通过 `format.outputDirectory` 配置选项来设置。 `-o` 选项优先于 `format.outputDirectory`。 要在当前工作目录下存储补丁，即使 `format.outputDirectory` 指向其他地方，使用 `-o .`。所有的目录组件都将被创建。
+
+默认情况下，单个补丁的主题是 "[PATCH]"，后面是提交信息到第一个空行的串联（见 linkgit:git-commit[1] 的讨论部分）。
+
+当输出多个补丁时，主题前缀将改为 "[PATCH n/m] "。 要强制为单个补丁添加 1/1，使用 `-n`。 要从主题中省略补丁编号，使用 `-N`。
+
+如果给出 `--thread`，`git-format-patch` 将生成 `In-Reply-To` 和 `References` 头，使第二封和随后的补丁邮件显示为对第一封邮件的回复；这也会生成一个 `Message-ID` 头供参考。
+
+选项
+--
+:git-format-patch: 1
+// Please don't remove this comment as asciidoc behaves badly when
+// the first non-empty line is ifdef/ifndef. The symptom is that
+// without this comment the <git-diff-core> attribute conditionally
+// defined below ends up being defined unconditionally.
+// Last checked with asciidoc 7.0.2.
+
+ifndef::git-format-patch[]
+ifndef::git-diff[]
+ifndef::git-log[]
+:git-diff-core: 1
+endif::git-log[]
+endif::git-diff[]
+endif::git-format-patch[]
+
+ifdef::git-format-patch[]
+-p::
+--no-stat::
+	生成没有任何差异状态 (diffstats) 的普通补丁。
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+-p::
+-u::
+--patch::
+	生成补丁（请参阅 <<generate_patch_text_with_p>> ）。
+ifdef::git-diff[]
+	这是默认设置。
+endif::git-diff[]
+
+-s::
+--no-patch::
+	抑制差异（diff）工具的所有输出。 对于默认显示补丁的 `git show` 等命令，可以压制其输出，或在别名中取消命令行中的 `--patch`、`--stat` 等选项的效果。
+
+endif::git-format-patch[]
+
+ifdef::git-log[]
+-m::
+	以默认格式显示合并提交的差异。这与 '--diff-merges=on' 类似，但除非同时给出 `-p`，否则 `-m` 不会产生任何输出。
+
+-c::
+	生成合并提交的合并差异输出。 '--diff-merges=combined -p' 的快捷方式。
+
+--cc::
+	生成合并提交的密集合并差异输出。 '--diff-merges=dense-combined -p' 的快捷方式。
+
+--dd::
+	为合并提交和常规提交生成与第一父提交的差异。 '--diff-merges=first-parent -p' 的快捷方式。
+
+--remerge-diff::
+	生成合并提交的 remerge-diff 输出。 '--diff-merges=remerge -p' 的快捷方式。
+
+--no-diff-merges::
+	'--diff-merges=off' 的同义词。
+
+--diff-merges=<格式>::
+	指定合并提交时使用的差异格式。默认为 {diff-merges-default}，但当使用 `--first-parent` 选项时，默认为 `first-parent`。
++
+支持以下格式：
++
+--
+off, none::
+	禁用合并提交时的差异输出。对覆盖隐含值很有用。
++
+on, m::
+	该选项使合并提交的差异输出以默认格式显示。`-m` 只有在 `-p` 的情况下才会产生输出。默认格式可以通过 `log.diffMerges` 配置参数改变，默认值为 `separate` 。
++
+first-parent, 1::
+	显示与第一个父提交的完整差异。这与 `--patch` 为非合并提交生成的格式相同。
++
+separate::
+	显示每个父代的完整差异。 每个父代都会生成单独的日志条目和差异。
++
+combined, c::
+	同时显示每个父文件与合并结果之间的差异，而不是逐个显示父文件与合并结果之间的成对差异。此外，它只列出从所有父文件修改过的文件。
++
+dense-combined, cc::
+	使用该选项，通过省略不感兴趣的块，进一步压缩 `--diff-merges=combined` 产生的输出，这类块在父提交中的内容只有两个变体，并且合并结果选择了其中一个而没有修改。 `--cc` 选项暗含 `-p`。
++
+remerge, r::
+	重合双亲合并提交以创建临时目录树对象——可能包含冲突标记等文件。 然后会显示临时目录树与实际合并提交之间的差异。
++
+使用该选项时发出的输出是可以改变的，它与其他选项的互动也是可以改变的（除非有明确的记录）。
+--
+
+--combined-all-paths::
+	这个标志会使合并后的差异文件（用于合并提交）列出所有父提交的名称。，因此它只在使用 `--diff-merges=[dense-]combined` 时有效。其可能在检测到文件名变化时有用（例如，当要求检测重命名或复制时）。
+endif::git-log[]
+
+-U<n>::
+--unified=<n>::
+	生成带有 <n> 行上下文的差异，而不是通常的 3 行。暗含 `--patch` 选项。
+ifndef::git-format-patch[]
+	暗含 `--patch` 选项。
+endif::git-format-patch[]
+
+--output=<文件>::
+	输出到一个特定的文件，而不是标准输出。
+
+--output-indicator-new=<字符>::
+--output-indicator-old=<字符>::
+--output-indicator-context=<字符>::
+	指定在生成的补丁中用来表示新、旧或上下文行的字符。通常它们分别是 '+'、'-' 和 ' '（空格）。
+
+ifndef::git-format-patch[]
+--raw::
+ifndef::git-log[]
+	生成原始格式的差异。
+ifdef::git-diff-core[]
+	这是默认设置。
+endif::git-diff-core[]
+endif::git-log[]
+ifdef::git-log[]
+	对于每一个提交，使用原始的差异格式
+	请参见 linkgit:git-diff[1] 中
+	“原始输出格式” 一节 。
+	这与显示日志中的本身的原始格式不同
+	你可以用 `--format=raw` 来实现。
+endif::git-log[]
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+--patch-with-raw::
+	`-p--raw` 的同义词。
+endif::git-format-patch[]
+
+ifdef::git-log[]
+-t::
+	在差异输出中显示目录树对象。
+endif::git-log[]
+
+--indent-heuristic::
+	启用启发式的缩进区块的方法，使得补丁更易读。这是默认选项。
+
+--no-indent-heuristic::
+	禁用启发式缩进。
+
+--minimal::
+	花费额外的时间以确保生成尽可能小的差异。
+
+--patience::
+	使用 "patience diff" 算法生成差异。
+
+--histogram::
+	使用 "histogram diff" 算法生成差异。
+
+--anchored=<文本>::
+	使用 "anchored diff" 算法生成差异。
++
+这个选项可以被指定多次。
++
+如果某一个行同时存在于来源和目标中，各只出现一次，以这个文本开头，这个算法试图防止它在输出中以删除或添加的形式出现。它在内部使用了 "patience diff" 算法。
+
+--diff-algorithm={patience|minimal|histogram|myers}::
+	选择差异算法。有如下可选项：
++
+--
+`default`, `myers`;;
+	基本的贪婪差异算法。当前是默认设置。
+`minimal`;;
+	花费额外的时间以确保生成尽可能小的差异。
+`patience`;;
+	使用 "patience diff" 算法时产生的补丁。
+`histogram`;;
+	该算法将耐心算法扩展为 “支持低发生率的常见元素”。
+--
++
+例如，如果你将 `diff.algorithm` 变量配置为非默认值，但希望使用默认值，那么你必须使用 `--diff-algorithm=default` 选项。
+
+--stat[=<宽度>[,<名称宽度>[,<数值>]]]::
+	生成差异统计（diffstat）。默认情况下，文件名部分将使用尽可能多的空间，其余空间用于图表部分。最大宽度默认为终端宽度，如果未连接终端，则为 80 列，可以用 `<最大宽度>`覆盖。文件名部分的宽度可以通过在逗号后另加宽度 `<文件名宽度>`或设置 `diff.statNameWidth=<文件名宽度>`来限制。图形部分的宽度可以通过使用 `--stat-graph-width=<图形宽度>`或设置 `diff.statGraphWidth=<图像宽度>` 来限制。使用 `--stat` 或 `--stat-graph-width` 选项会影响所有生成统计图的命令，而设置 `diff.statNameWidth` 或 `diff.statGraphWidth` 则不会影响 `git format-patch`。 通过给出第三个参数 `<行数>`，可以将输出限制在前 `<行数>`行，如果行数更多，则在后面加上 `...`。
++
+这些参数也可以用 `--stat-width=<宽度>`，`--stat-name-width=<名称宽度>` 和 `--stat-count=<数量>` 单独设置。
+
+--compact-summary::
+	在差异状态中输出扩展头信息的压缩摘要，如文件的创建或删除（"new" 或 "good"。如果是符号链接，则为 "+l"）和模式变化（"+x" 或 "-x" 分别用于添加或删除可执行位）。这些信息被放在文件名部分和图形部分之间。暗含 `--stat` 选项。
+
+--numstat::
+	类似于 `--stat`，但是使用小数点和不含缩写的路径名显示添加和删除的行数，使其对程序更友好。对于二进制文件，输出两个 `-`，而不是 `0 0`。
+
+--shortstat::
+	只输出使用 `--stat` 选项输出的最后一行，包含修改的文件总数，添加和删除的行数。
+
+-X[<参数1,参数2,...>]::
+--dirstat[=<参数1,参数2,...>]::
+	输出每个子目录的相对变化量的分布。`--dirstat` 的行为可以通过传递一个以逗号分隔的参数列表来自定义。默认值由`diff.dirstat` 配置变量控制 (参见 linkgit:git-config[1])。以下是可用的参数：
++
+--
+`changes`;;
+	通过计算从源文件中删除的行数或添加到目标文件中的行数来计算分布状态的数字。这忽略了文件内的代码移动行为。也就是说，在文件中重新排列的行不会像其他变化一样被计算在内。这是在没有给出参数时的默认行为。
+`lines`;;
+	通过做常规基于行的差异分析，计算分布状态的数字，并将删除/添加的行数相加。(对于二进制文件，用 64 字节的块来计算，因为二进制文件没有行的概念)。在使用 `--dirstat` 时这个选项的行为开销比 `changes` 更大，但会对文件中重新排列的行进行计数。其得到的输出结果与其他的 `--*stat` 选项一致。
+`files`;;
+	通过计算被改变的文件数量来计算分布状态的数字。在分布状态分析中，每一个被改变的文件都会被平等地计算。这是计算上开销最小的 `--dirstat` 行为，因为它无需查看文件内容。
+`cumulative`;;
+	子目录中的变化计算到父目录中。 注意，当使用 `cumulative` 选项时，报告的百分比之和可能超过 100%。默认的（非累积）行为可以用 `noncumulative` 参数指定。
+<limit>;;
+	一个整数参数，其指定一个截止百分比（默认为 3%）。贡献值小于这个百分比的目录不显示在输出中。
+--
++
+例如：下面的参数会统计更改的文件，同时忽略占更改文件总数 10% 以下的目录，并累积父目录中的子目录计数：`--dirstat=files,10,cumulative`。
+
+--cumulative::
+	--dirstat=cumulative 同义
+
+--dirstat-by-file[=<参数1,参数2>...]::
+	与 --dirstat=files,<参数 1>,<参数 2> 同义
+
+--summary::
+	输出扩展头信息，如创建、重命名和模式变化等，的压缩摘要。
+
+ifndef::git-format-patch[]
+--patch-with-stat::
+	同义词 `-p --stat`。
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+
+-z::
+ifdef::git-log[]
+	用 NUL 而不是用换行来分隔提交。
++
+另外，当给出 `--raw` 或 `--numstat` 时，不合并路径名，并使用 NUL 作为输出字段终止符。
+endif::git-log[]
+ifndef::git-log[]
+	另外，当给出 `--raw`、`--numstat`、 `--name-only` 或 `--name-status` 选项时，
+	不合并路径名，并使用 NUL 作为输出字段终止符。
+endif::git-log[]
++
+如果没有这个选项，带 “不常见” 字符的路径名会被引用，正如配置变量 `core.quotePath` 所解释的那样（参见 linkgit:git-config[1]）。
+
+--name-only::
+	只显示更改过的文件的名称。文件名通常以 UTF-8 编码。 更多信息见 linkgit:git-log[1] 手册页中关于编码的讨论。
+
+--name-status::
+	仅显示已更改文件的名称和状态。有关状态字母的含义，请参阅 `--diff-filter` 选项的说明。 与 `--name-only` 一样，文件名通常使用 UTF-8 编码。
+
+--submodule[=<格式>]::
+	指定子模块中的差异如何显示。当指定 `--submodule=short` 选项时，会使用 'short' 格式。这种格式只显示范围的开头和结尾处的提交名称。当指定了 `--submodule` 或 `--submodule=log` 时，会使用 'log' 格式。这种格式会像 linkgit:git-submodule[1] `summary` 那样，列出该范围内的提交。当指定了 `--submodule=diff` 时，会使用 'diff' 格式。这个格式显示的是子模块内在提交范围之间的变化差异。默认为 `diff.submodule`，如果配置选项未设置， 则为 `short` 格式。
+
+--color[=<when>]::
+	显示有颜色的差异。`--color`（即不含 '=<何时>'）与 `--color=always` 相同。'<何时>' 可以是 `always`、`never` 或 `auto`。
+ifdef::git-diff[]
+	它可以通过 `color.ui` 和 `color.diff` 来改变
+	配置设置。
+endif::git-diff[]
+
+--no-color::
+	关掉带彩色显示的差异。
+ifdef::git-diff[]
+	这可以用来覆盖配置设置。
+endif::git-diff[]
+	这和 `--color=never` 相同。
+
+--color-moved[=<模式>]::
+	移动的代码行的颜色不同。
+ifdef::git-diff[]
+	它可以通过 `diff.colorMoved` 配置设置来改变。
+endif::git-diff[]
+	如果没有给出该选项，<模式> 默认为 'no'
+	如果没有给定模式选项，则为 'zebra'。
+	该模式必须以下其中之一：
++
+--
+no::
+	被移动的行不突出显示。
+default::
+	是 `zebra` 的同义词。今后可能会改成更合理的模式。
+plain::
+	任何在某个位置被添加，且在另一个位置被删除的行，都会被用 'color.diff.newMoved' 着色。同样的，在差异中在某处删除且在其它地方添加的行会使用 'color.diff.oldMoved' 着色。这种模式可以读取任何被移动的行，但在代码审查中，它不能确定一个代码块是否未经排列而进行了移动。
+blocks::
+	使用贪心方法检测含至少 20 个字母数字字符的移动文本块。检测到的区块使用 'color.diff.{old,new}Moved' 的颜色。相邻的区块不能被区分开。
+zebra::
+	在 ‘块’ 模式下检测到移动的文本块。块使用 'color.diff.{old,new}Moved' 颜色或 'color.diff.{old,new}MovedAlternative' 颜色。这两种颜色之间的变化表示检测到了新的块。
+dimmed-zebra::
+	类似于 'zebra' 模式，但对使移动的代码中不关注的部分变暗。相邻两个区块的边界线被认为是重要，其余的部分是无关紧要的。`dimmed_zebra` 是一个被废弃的同义词。
+--
+
+--no-color-moved::
+	关闭移动检测。这可以用来覆盖配置设置。它与 `--color-moved=no` 相同。
+
+--color-moved-ws=<模式>::
+	这将配置在执行 `--color-moved` 选项的移动检测时如何忽略空格。
+ifdef::git-diff[]
+	可以通过 `diff.colorMovedWS` 来设置。
+endif::git-diff[]
+	这些模式可以通过以逗号分隔的列表给出：
++
+--
+no::
+	执行移动检测时不忽略空格。
+ignore-space-at-eol::
+	忽略行尾空格的变化。
+ignore-space-change::
+	忽略空格数量的变化。这会忽略行尾的空格，并认为包含一个或多个空格字符的其他序列都是等同的。
+ignore-all-space::
+	比较行时忽略空格。即使一行有空格而另一行没有空格，也会忽略差异。
+allow-indentation-change::
+	在最初移动检测中忽略的任何空格，然后只在每行的空格变化相同的情况下，将移动的代码块归为一个块。这与其他模式是不兼容的。
+--
+
+--no-color-moved-ws::
+	执行移动检测时，不忽略空格。这可以用来覆盖配置。它与 `--color-moved-ws=no` 相同。
+
+--word-diff[=<模式>]::
+	显示词的差异，用 <模式> 来分隔已更改的词。默认情况下，单词是以空格分隔；请参考 `--word-diff-regex`。<模式> 默认为 `plain`，并且必须是以下其中之一：
++
+--
+color::
+	只用颜色突出显示已更改的单词。暗含 `--color` 选项。
+plain::
+	显示更改的词为 `[-removed-]` 和 `{+added+}`。如果在输入中出现定界符，则不尝试转义，所以输出可能是多义的。
+porcelain::
+	使用一种特殊的、基于行的格式，供脚本使用。添加/删除/未更改的运行数据以通常的统一的差异格式输出，行的开头以 `+` / `-` / ` ` 字符开始，一直到行的结尾。输入中的新行用单行上的 `~`表示。
+none::
+	再次禁用单词差异模式。
+--
++
+请注意，无论第一个模式的名称是什么，如果启用该选项，将在所有模式中使用颜色，以高亮显示更改的部分。
+
+--word-diff-regex=<正则表达式>::
+	使用 <正则表达式> 来确定单词的格式，而不是将一串非空白行视为单词。除非已启用，否则还暗含 `--word-diff` 选项。
++
+<正则表达式> 匹配的的每一个非重叠的匹配都被视为一个单词。在这些匹配项之间的任何内容都被认为是空白，并且在查找差异时被忽略(!)。您可能需要在您的正则表达式中附加 `|[^[:space:]]`，以确保它匹配所有非空格字符。包含换行的匹配会在换行处被截断(!)。
++
+例如，`--word-diff-regex=.` 将把每个字符当作一个单词，并相应地逐个字符显示差异。
++
+正则表达式也可以通过差异程序或配置选项来设置，参见 linkgit:gitattributes[5] 或 linkgit:git-config[1]。显式指明会覆盖任何程序或配置。差异程序会覆盖配置。
+
+--color-words[=<正则表达式>]::
+	与 `--word-diff=color` 和（如果指明了正则表达式）`--word-diff-regex=<正则表达式>` 两个选项含义相同。
+endif::git-format-patch[]
+
+--no-renames::
+	关闭重命名检测，即使配置文件给出的默认是这样做。
+
+--[no-]rename-empty::
+	是否使用空的数据对象作为重命名源。
+
+ifndef::git-format-patch[]
+--check::
+	如果更改引入冲突标记或空格错误，则发出警告。哪些被认为是空格错误是由 `core.whitespace` 配置控制的。默认情况下，行尾部的空格字符（包括仅由空格字符组成的行）和紧跟在行初缩进内 tab 字符后的空格字符，都被认为是空格字符错误。如果发现问题，则以非零状态退出。与 --exit-code 选项不兼容。
+
+--ws-error-highlight=<种类>::
+	突出显示差异中 `context`（上下文）、`old`（旧）或 `new`（新）行中的空格错误。多个值用逗号隔开，`none` 选项会重置以前的值，`default` 重置列表为 `new`，`all` 是 `old,new,context` 的简写。当没有给定这个选项，并且配置变量 `diff.wsErrorHighlight` 没有设置时，只有 `new` 行中的空格错误会被高亮显示。空格错误会用 `color.diff.whitespace` 配置进行着色。
+
+endif::git-format-patch[]
+
+--full-index::
+	在生成补丁格式输出时，在 `index`（索引）行上显示完整的图像前和图像后数据对象名称，而不仅是前几个字符。
+
+--binary::
+	除了 `--full-index` 输出的差异之外，输出二进制的差异。其可以用 `git-apply` 命令来应用。暗含 `--patch` 选项。
+ifndef::git-format-patch[]
+	暗含 `--patch` 选项。
+endif::git-format-patch[]
+
+--abbrev[=<n>]::
+	在 diff-raw 格式输出和 diff-tree 头文件行中，不显示完整的 40 字节十六进制对象名称，而是显示唯一指向对象的最短前缀，长度至少为 '<n>' 位十六进制数字。 在 diff-patch 输出格式中，`--full-index` 优先，也就是说，如果指定了 `--full-index`，则无论 `--abbrev` 如何，都会显示完整的 blob 名称。 可以使用 `--abbrev=<n>` 指定非默认位数。
+
+-B[<n>][/<m>]::
+--break-rewrites[=[<n>][/<m>]]::
+	将完整的重写更改切分成删除和创建对（pair）。这有两个目的：
++
+它会影响决定更改形式的阈值，当单个文件内修改总量达到一定值时，会认为该文件进行了完全重写，而不是将一系列删除和插入操作视为修改。如果视为多个删除和插入修改，修改中的行可能会碰巧在文本上与原文一致，从而被当作上下文。选项中的数字 `m` 控制 -B 选项的这一方面（默认为 60％）。`-B/70％` 表示，如果在结果中保留的原始内容少于原始内容的 30％，则 Git 认为它是完全重写的（否则，生成的补丁将是一系列删除和插入，并与上下文行混合在一起）。
++
+使用 -M 选项时，一个完全改写的文件也被认为是重命名文件的来源（通常 -M 只考查一个消失文件作为重命名的来源)。选项中的数量 `n` 控制 -B 选项的这一方面（默认为 50％)。`-B20%` 表明，当插入与删除比 20％ 的文件大小更多，该文件可作为重命名到另一文件的可能来源。
+
+-M[<n>]::
+--find-renames[=<n>]::
+ifndef::git-log[]
+	重命名检测。
+endif::git-log[]
+ifdef::git-log[]
+	如果制成差异，检测并报告每个提交中的重命名。
+	对于每个在遍历历史时重命名的文件，参见
+	`--follow`。
+endif::git-log[]
+	如果指定了 `n`，则其为相似度指数阈值（即相比于文件大小的增/删量）。
+	例如，`-M90％` 表示如果文件90％以上的内容没有更改，则 Git 应将删除/添加对视为重命名。
+	如果没有 `％` 符号，则该数字应作为小数读取，并在其前面加上小数点。
+ 	即 `-M5` 变为 0.5，因此与 `-M50％` 相同。 同样，`-M05` 与 `-M5％` 相同。
+ 	要将检测限制为精确的重命名，请使用 `-M100％`。 默认相似度指数为50％。
+
+-C[<n>]::
+--find-copies[=<n>]::
+	检测复制与重命名。参见 `--find-copies-harder`。如果指定了 `n`，则其与 `-M<n>` 含义相同。
+
+--find-copies-harder::
+	出于性能考虑，默认情况下，`-C` 选项只在复制的原始文件在相同的变更集中被修改时才会查找复制。这个标志使命令检查未修改的文件作为复制源的候选文件。 对于大型项目来说，这是一个非常耗时的操作，所以要谨慎使用。 给出一个以上的 `-C` 选项有同样的效果。
+
+-D::
+--irreversible-delete::
+	删除时省略原内容，即只打印头信息，而不打原内容和 `/dev/null` 之间的差异。所产生的补丁并不是要用于 `patch` 或 `git apply`；这只是为了让人们只专注于审查修改后的文本。此外，输出结果显然缺乏足够的信息来反转，或手动应用这样一个补丁，因此这个选项的名称如此。
++
+当与 `-B` 一起使用时，也省略删除/创建对中删除部分的原内容。
+
+-l<数量>::
+	`-M` 和 `-C` 选项涉及一些初步步骤，可以廉价地检测重命名/副本的子集，然后是详尽的后备部分，将所有剩余的未配对目的地与所有相关源进行比较。 （对于重命名，只有剩余的未配对源是相关的；对于副本，所有原始源都是相关的。）对于 N 个源和目的地，这个详尽的检查是 O(N^2)。如果涉及的源/目标文件数量超过指定数量，则此选项可防止重命名/复制检测的详尽部分运行。默认为 diff.renameLimit。请注意，值 0 被视为无限制。
+
+ifndef::git-format-patch[]
+--diff-filter=[(A|C|D|M|R|T|U|X|B)...[*]]::
+	只选择添加（`A`）、复制（`C`）、删除（`D`）、修改（`M`）、重命名（`R`）、类型（即常规文件、符号链接、子模块......）改变（`T`）、未合并（`U`）、未知（`X`）或配对被破坏（`B`）的文件。可以使用过滤字符的任何组合（包括空）。当组合中加入 `*`（全部或空）时，如果在比较中有任何文件与其他条件匹配，则选择所有路径；如果没有符合其他条件的文件，则不会选择任何内容。
++
+另外，这些大写字母也可以通过使用小写排除。例如：`--diff-filter=ad` 排除添加和删除的路径。
++
+请注意，并非所有差异都能显示所有类型。例如，如果禁用了复制和重命名条目类型的检测，这些条目就不会出现。
+
+-S<string>::
+	寻找改变文件中指定字符串出现次数的差异（即增加/删除）。供脚本编写者使用。
++
+当您正在寻找确切的代码块（如结构体），并且想知道该块自首次出现以来的历史记录时，这将非常有用：通过 `-S` 选项迭代，将原文件中的感兴趣的块显示出，并继续进行，直到获得该块的第一个版本。
++
+二进制文件也会被搜索到。
+
+-G<正则表达式>::
+	查找其补丁文本包含与 <正则表达式> 匹配的添加/删除行的差异。
++
+为了说明 `-S<正则表达式> --pickaxe-regex` 和 `-G<正则表达式>` 之间的区别，假设某次提交在同一文件中有以下差异：
++
+----
++    return frotz(nitfol, two->ptr, 1, 0);
+...
+-    hit = frotz(nitfol, mf2.ptr, 1, 0);
+----
++
+`git log -G "frotz\(nitfol"` 会显示这次提交，但 `git log -S "frotz\(nitfol" --pickaxe-regex` 不会显示（因为该字符串的出现次数没有改变）。
++
+除非提供 `--text`，否则没有 textconv 过滤器的二进制文件补丁将被忽略。
++
+更多信息请参见 linkgit:gitdiffcore[7] 中的 'pickaxe' 条目。
+
+--find-object=<对象ID>::
+	查找指定对象出现次数的差异。与 `-S` 类似，只是参数不同：它不搜索特定的字符串，而是搜索特定的对象 id。
++
+该对象可以是一个 blob 或一个子模块提交。它意味着 `git-log` 中的 `-t` 选项也能找到工作树。
+
+--pickaxe-all::
+	当使用 `-S` 或 `-G` 选项找到一个更改时，显示该更改集中的所有更改，而不仅仅是显示包含 <string> 更改的文件。
+
+--pickaxe-regex::
+	将 `-S` 选项的 <string> 参数当作扩展的 POSIX 正则表达式来匹配。
+
+endif::git-format-patch[]
+
+-O<顺序控制文件>::
+	控制文件在输出中出现的顺序。这将覆盖 `diff.orderFile` 配置变量（参见 linkgit:git-config[1]）。要取消 `diff.orderFile`，请使用 `-O/dev/null`。
++
+输出顺序由 <顺序控制文件> 中的 glob 模式的顺序决定。所有路径名与第一个模式匹配的文件首先输出，路径名与第二个模式匹配（但不与第一个模式匹配）的文件其次输出，以此类推。所有路径名与任何模式匹配的文件会最后输出，就像在文件末尾有一个隐含的全部匹配模式。如果多个路径名具有相同的等级（它们匹配相同的模式，但没有匹配先前的模式），它们相对于彼此的输出顺序是正常的。
++
+<顺序控制文件> 格式如下：
++
+--
+ - 空白行会被忽略，因此可以用它们作为分隔符，以保证可读性。
+
+ - 以井号（"`#`"）开头的行会被忽略，所以它们可以用来做注释。如果模式以井号开头，则需要在模式的开头加上反斜杠（"`\`"）。
+
+ - 每一行都包含一个模式。
+--
++
+模式的语法和语义与 fnmatch(3) 中使用的相同，不包括 FNM_PATHNAME 标志，但在删除路径名中结尾任意几个成分后匹配的情况下例外。例如，模式 "`foo*bar`" 匹配 "`fooasdfbar`" 和 "`foo/bar/baz/asdf`"，但不匹配 "`foobarx`"。
+
+--skip-to=<文件>::
+--rotate-to=<文件>::
+	从输出中丢弃命名 <文件> 之前的文件（即 'skip to'），或将它们移到输出的末尾（即 'rotate to'）。 这些选项主要是为使用 `git difftool` 命令而发明的，在其他情况下可能用处不大。
+
+ifndef::git-format-patch[]
+-R::
+	交换两个输入；即显示从索引或磁盘文件到目录树内容的差异。
+endif::git-format-patch[]
+
+--relative[=<路径>]::
+--no-relative::
+	当从项目的子目录中运行时，可以排除目录外的变化，并通过这个选项显示相对于它的路径名。当你不在子目录中时（例如在纯仓库中），你可以通过 <路径> 参数来指明要使输出相对于哪个子目录。`--no-relative` 可以用来取消 `diff.relative`配置选项和之前的 `--relative` 选项。
+
+-a::
+--text::
+	将一切输入文件视为文本。
+
+--ignore-cr-at-eol::
+	在进行比较时，忽略行末的回车。
+
+--ignore-space-at-eol::
+	忽略行尾空格的变化。
+
+-b::
+--ignore-space-change::
+	忽略空格数量的变化。这会忽略行尾的空格，并认为包含一个或多个空格字符的其他序列都是等同的。
+
+-w::
+--ignore-all-space::
+	比较行时忽略空格。即使一行有空格而另一行没有空格，也会忽略差异。
+
+--ignore-blank-lines::
+	忽略空白行的变化。
+
+-I<正则表达式>::
+--ignore-matching-lines=<正则表达式>::
+	忽略所有行均匹配 <正则表达式> 的更改。 此选项可指定多次。
+
+--inter-hunk-context=<行数>::
+	显示块差异之间的上下文，最多显示指定的行数，从而合并彼此接近的块。 默认认为 `diff.interHunkContext`，如果配置选项未设置，则默认为0。
+
+-W::
+--function-context::
+	在每个修改中的上下文行显示整个函数。函数名称的确定方式与 `git diff` 计算补丁头的方式相同（参见 linkgit:gitattributes[5] 中的 '自定义区块头' ）。
+
+ifndef::git-format-patch[]
+ifndef::git-log[]
+--exit-code::
+	让程序以类似 diff(1) 的代码退出。也就是说，如果有差异则返回1，否则返回0。
+
+--quiet::
+	禁用程序的所有输出。暗含 `--exit-code`。
+endif::git-log[]
+endif::git-format-patch[]
+
+--ext-diff::
+	允许执行外部差异器。如果你用 linkgit:gitattributes[5] 设置了一个外部差异驱动程序，你需要在 linkgit:git-log[1] 和相关命令中使用这个选项。
+
+--no-ext-diff::
+	禁止使用外部差异器。
+
+--textconv::
+--no-textconv::
+	允许（或不允许）在比较二进制文件时运行外部文本转换过滤器。详情请参见 linkgit:gitattributes[5] 。由于文本转换过滤器通常是单向转换，因此产生的差异适合人类用户使用，但不能应用（apply）。因此默认情况下，只有 linkgit:git-diff[1] 和 linkgit:git-log[1] 启用文本转换过滤器，而 linkgit:git-format-patch[1] 或 diff plumbing 命令则不启用。
+
+--ignore-submodules[=<when>]::
+	在生成差异时忽略子模块的修改。<when> 可以是 "none"、"untracked"、"dirty " 或 "all"，"all" 是默认选项。使用 "none" 会在子模块包含未跟踪或修改的文件，或者它的HEAD 与上级项目中记录的提交不同时，认为它被修改了，并且可以用来覆盖 linkgit:git-config[1] 或 linkgit:gitmodules[5] 中 '忽略' 选项的设置。当使用 "untracked" 时，当子模块只包含未跟踪的内容时，它们不会被认为是有改动的（但它们仍然会被扫描是否有被修改的内容）。使用 "dirty" 会忽略所有对子模块工作树的修改，只有存储在上级项目中的提交的修改才会被显示出来（这是在1.7.0之前的行为）。使用 "all" 会隐藏所有对子模块的修改。
+
+--src-prefix=<前缀>::
+	显示给定的源前缀而不是 "a/"。
+
+--dst-prefix=<前缀>::
+	显示给定的目标前缀，而不是“b/”。
+
+--no-prefix::
+	不显示任何源或目的前缀。
+
+--default-prefix::
+	使用默认的源和目标前缀（"a/"和 "b/"）。 这通常已经是默认的，但可以用来覆盖配置，如 `diff.noprefix`。
+
+--line-prefix=<prefix>::
+	在每一行输出前加上一个额外的前缀。
+
+--ita-invisible-in-index::
+	默认情况下，通过 "git add -N" 添加的条目在 "git diff" 中显示为现有的空文件，在 "git diff --cached" 中显示为新文件。这个选项使得条目在 "git diff" 中显示为一个新文件，而在 "git diff --cached" 中显示为不存在的文件。这个选项可以用 `--ita-visible-in-index` 来还原。这两个选项都是试验性的，将来可能会被删除。
+
+关于这些常用选项的更多解释，请参见 linkgit:gitdiffcore[7]。
+[]
+
+-<n>::
+	从最上面的 <n> 个提交中准备补丁。
+
+-o <目录>::
+--output-directory <目录>::
+	使用 <目录> 来存储结果文件，而不是当前工作目录。
+
+-n::
+--numbered::
+	以 '[PATCH n/m]' 的格式输出名称，即使只有一个补丁。
+
+-N::
+--no-numbered::
+	以 '[PATCH]' 格式输出名称。
+
+--start-number <n>::
+	从<n>开始个给补丁编号，替代默认从1开始。
+
+--numbered-files::
+	输出文件名将是一个简单的数字序列，没有附加默认的第一行提交。
+
+-k::
+--keep-subject::
+	不要从提交日志信息的第一行剥离/添加 '[PATCH]'。
+
+-s::
+--signoff::
+	在提交信息中加入 `Signed-off-by` 的尾注，使用自己的提交者身份。 更多信息见 linkgit:git-commit[1] 中的 signoff 选项。
+
+--stdout::
+	以 mbox 格式将所有的提交打印到标准输出，而不是为每个提交创建一个文件。
+
+--attach[=<边界>]::
+	创建多部分/混合附件，第一部分是提交信息，第二部分是补丁本身，`Content-Disposition: attachment`。
+
+--no-attach::
+	禁用附件的创建，覆盖配置设置。
+
+--inline[=<边界>]::
+	创建 multipart/mixed 附件，第一部分是提交信息，第二部分是补丁本身，使用 `Content-Disposition: inline`。
+
+--thread[=<样式>]::
+--no-thread::
+	控制添加 `In-Reply-To` 和 `References` 标头，使第二封及以后的邮件显示为对第一封邮件的回复。 还控制生成 `Message-ID` 头，以便参考。
++
+可选的 <风格> 参数可以是 `shallow` 或 `deep`。 ‘浅’ 线程使每封邮件都是对该系列的头的回复，其中头是从封面信、`--in-reply-to` 和第一个补丁邮件中选择的，按这个顺序。 ‘深’ 线程使每封邮件都是对前一封的回复。
++
+默认是 `--no-thread`，除非设置了 `format.thread` 配置。 没有参数的 `--thread` 等同于 `--thread=shallow`。
++
+请注意，'git send-email' 的默认设置是对邮件本身进行线程处理。 如果你想让 `git format-patch` 负责线程，你要确保 `git send-email` 的线程被禁用。
+
+--in-reply-to=<消息 ID>::
+	使第一封邮件（或所有带有 `--no-thread` 的邮件）作为给定的 <消息 id> 的回复出现，这可以避免破坏线程以提供一个新的补丁系列。
+
+--ignore-if-in-upstream::
+	不包括与 <until>...<since> 中的提交相匹配的补丁。 这将检查所有可从 <since> 到达但不在 <until> 的补丁，并将它们与正在生成的补丁进行比较，任何匹配的补丁都将被忽略。
+
+--always::
+	包括那些没有引入任何变化的提交的补丁，这些补丁默认是省略的。
+
+--cover-from-description=<模式>::
+	控制求职信的哪些部分将使用分支机构的描述自动填充。
++
+如果 `<模式>` 是 `message` 或 `default`，求职信的主题将被填充为占位符文本。信函的正文将被填入分支的描述。这是没有指定配置或命令行选项时的默认模式。
++
+如果 `<模式>` 是 `subject`，分支描述的第一段将填入求职信的主题。描述的其余部分将填充到求职信的正文中。
++
+如果 `<模式>` 是 `auto`，如果分支描述的第一段大于100字节，那么模式将是 `message`，否则将使用 `subject`。
++
+如果 `<模式>` 为 `none`，求职信的主题和正文都将被填充为占位符文本。
+
+--description-file=<文件>::
+	使用 <文件> 的内容而不是分支说明来生成求职信。
+
+--subject-prefix=<主题前缀>::
+	在主题行中不要使用标准的 '[PATCH]' 前缀，而应使用 '[<主题前缀>]'。这可用于命名补丁系列，并可与 `--numbered` 选项结合使用。
++
+配置变量 `format.subjectPrefix` 也可用于配置主题前缀，以适用于指定仓库的所有补丁。这在接收多个仓库补丁的邮件列表中通常很有用，可用于消除补丁的歧义（例如值为 "PATCH my-project"）。
+
+--filename-max-length=<n>::
+	代替标准的 64 字节，将生成的输出文件名压缩到 '<n>' 字节左右（太短的值会被默默提升到合理的长度）。 默认为 `format.filenameMaxLength` 配置变量的值，如果没有配置，则为 64。
+
+--rfc::
+	在主题前缀前加上 "RFC"（默认为 "RFC PATCH"）。RFC 的意思是 “征求意见”；在发送实验性补丁供讨论而非应用时使用。
+
+-v <n>::
+--reroll-count=<n>::
+	将该系列标记为该主题的第 <n> 次迭代。输出的文件名有 `v<n>`，主题前缀（默认为 "PATCH"，但可通过 `--subject-prefix` 选项配置）有 `v<n>` 附加在上面。 例如，`--reroll-count=4` 可能产生 `v4-0001-add-makefile.patch` 文件，其中有 "Subject： [PATCH v4 1/20] Add makefile"。 `<n>` 不一定是整数（例如，"--reroll-count=4.4"，或 "--reroll-count=4rev2 "都可以），但使用这种 reroll-count 的缺点是，与前一版本的 range-diff/interdiff 并没有准确说明新的 interation 是与哪个版本比较。
+
+--to=<e-mail>::
+	在邮件标题中增加一个 `To: ` 头。这是在任何配置的头信息之外的，可以多次使用。 否定的形式 `--no-to` 会丢弃到目前为止添加的所有 `To:` 头信息（来自配置或命令行）。
+
+--cc=<email>::
+	在邮件标题中添加 `Cc: ` 标头。这是在任何配置的头信息之外的，可以多次使用。 否定的形式 `--no-cc` 会丢弃到目前为止添加的所有 `Cc:` 头信息（来自配置或命令行）。
+
+--from::
+--from=<身份>::
+	在每封提交邮件的`From:` 标头中使用 `ident`。如果提交的作者身份与所提供的 `ident` 在文字上不一致，则在邮件正文中放置一个 `From: ` 头，注明原作者。如果没有给出 `ident`，则使用提交者的身份。
++
+注意，这个选项只有在你实际发送邮件时才有用，并且想把你自己确定为发件人，但保留原作者（`git am` 会正确接收正文头）。还要注意的是，`git send-email` 已经为你处理了这种转换，如果你将结果反馈给 `git send-email`，就不应该使用这个选项。
+
+--[no-]force-in-body-from::
+	对于通过 `--from` 选项指定的电子邮件发件人，默认情况下，如果发件人与作者不同，会在提交日志信息的顶部添加一个内文 "From:"，以确定提交的真正作者。 有了这个选项，即使发件人和作者的名字和地址相同，也会在正文中加入 "From："，这在邮件列表软件混淆发件人身份时可能会有帮助。 默认为 `format.forceInBodyFrom` 配置变量的值。
+
+--add-header=<头部>::
+	在邮件头中添加一个任意的头。 这是在任何配置的头文件之外的，并且可以多次使用。 例如，`--add-header="Organization: git-foo"`。 否定的形式 `--no-add-header` 会丢弃 *所有*（`To:`, `Cc:`, 和自定义）从配置或命令行添加的头信息。
+
+--[no-]cover-letter::
+	除了补丁之外，还要生成一个包含分支描述、短日志和整体差异状态的封面文件。 你可以在发送之前在文件中填写描述。
+
+--encode-email-headers::
+--no-encode-email-headers::
+	用 "Q-encoding"（在RFC 2047中描述）对有非 ASCII 字符的邮件头进行编码，而不是逐字输出邮件头。默认为 `format.encodeEmailHeaders` 配置变量的值。
+
+--interdiff=<以前>::
+	作为审查员的帮助，在封面信中插入一个 interdiff，或者作为1个补丁系列中唯一一个补丁的注释，显示补丁系列的前一个版本与当前被格式化的系列之间的差异。`previous` 是一个单一的修订，命名了与被格式化的系列有共同基础的前一个系列的提示（例如 `git format-patch --cover-letter --interdiff=feature/v1 -3 feature/v2`）。
+
+--range-diff=<以前>::
+	作为审查员的辅助工具，在封面信中插入一个 range-diff（见 linkgit:git-range-diff[1]），或者作为1个补丁系列中唯一一个补丁的注释，显示该补丁系列的前一个版本与当前被格式化的系列之间的差异。 `previous` 可以是一个单一的修订版，如果它与被格式化的系列有共同的基础，则命名为前一个系列的提示（例如 `git format-patch --cover-letter --range-diff=feature/v1 -3 feature/v2`），如果两个系列的版本不相干，则是一个修订范围（例如 `git format-patch --cover-letter --range-diff=feature/v1~3.feature/v1 -3 feature/v2`）。
++
+请注意，传递给命令的差异选项会影响 `format-patch` 的主要产品如何生成，它们不会传递给用于生成封面材料的基础 `range-diff ` 机器（这在将来可能会改变）。
+
+--creation-factor=<百分比>::
+	与 `--range-diff` 一起使用，通过调整创建/删除成本的模糊系数，来调整匹配上一个和当前系列补丁之间提交的启发式方法。详情见 linkgit:git-range-diff[1]）。
+
+--notes[=<引用>]::
+--no-notes::
+	在三折线之后添加该提交的注释（见 linkgit:git-notes[1]）。
++
+预期的用例是为提交编写不属于提交日志信息本身的支持性解释，并将其包含在补丁提交中。虽然我们可以在 `format-patch` 运行后但在发送前简单地写下这些解释，但将其保留为 Git 笔记，可以在补丁系列的不同版本之间进行维护（但要使用这种工作流程，请参考 linkgit:git-notes[1] 中关于`notes.rewrite` 配置选项的讨论）。
++
+默认为`--no-notes`，除非设置了 `format.notes` 配置。
+
+--[no-]signature=<签名>::
+	给每个产生的信息添加一个签名。根据 RFC 3676，签名与正文之间用一行 '--' 分隔。如果签名选项被省略，则签名默认为 Git 版本号。
+
+--signature-file=<文件>::
+	工作原理与 --signature 相同，只是签名是从文件中读取的。
+
+--suffix=.<后缀>::
+	不使用 `.patch` 作为生成文件名的后缀，而使用指定的后缀。 一个常见的选择是 `--suffix=.txt`。 将此留空将删除 `.patch` 后缀。
++
+请注意，前导字符不一定是点；例如，你可以使用 `--suffix=-patch` 来获得 `0001-description-of-my-change-patch`。
+
+-q::
+--quiet::
+	不要将生成的文件名打印到标准输出。
+
+--no-binary::
+	不输出二进制文件中的变化内容，而是显示这些文件变化的通知。 使用该选项生成的补丁不能被正确应用，但它们对代码审查仍然有用。
+
+--zero-commit::
+  在每个补丁的 From 头中输出一个全零的哈希值，而不是提交的哈希值。
+
+--[no-]base[=<提交>]::
+	记录基树信息，以确定该补丁系列所适用的状态。 详见下面的基树信息部分。如果 <提交> 是 "auto"，就会自动选择一个基数提交。`--no-base` 选项会覆盖 `format.useAutoBase` 配置。
+
+--root::
+	将修订版参数视为 <revision range>，即使它只是一个单一的提交（通常会被视为 <since>）。 注意，包含在指定范围内的根提交总是被格式化为创建补丁，与此标志无关。
+
+--progress::
+	在生成补丁时在标准错误流上显示进度报告。
+
+配置
+--
+你可以指定额外的邮件标题行添加到每封邮件中，主题前缀和文件后缀的默认值，在输出多个补丁时对补丁进行编号，添加 "To: " 或 "Cc: " 标题，配置附件，更改补丁输出目录，以及用配置变量签署补丁。
+
+------------
+[format]
+	headers = "Organization: git-foo\n"
+	subjectPrefix = CHANGE
+	suffix = .txt
+	numbered = auto
+	to = <电子邮箱地址>
+	cc = <电子邮箱地址>
+	attach [ = mime-boundary-string ]
+	signOff = true
+	outputDirectory = <目录>
+	coverLetter = auto
+	coverFromDescription = auto
+------------
+
+
+讨论
+--
+
+由 'git format-patch' 产生的补丁是 UNIX 邮箱格式，有一个固定的 "magic" 时间戳，以表明该文件是由 format-patch 输出的，而不是一个真正的邮箱，像这样：
+
+------------
+From 8f72bad1baf19a53459661343e21d6491c3908d3 Mon Sep 17 00:00:00 2001
+From: Tony Luck <tony.luck@intel.com>
+Date: Tue, 13 Jul 2010 11:42:54 -0700
+Subject: [PATCH] =?UTF-8?q?[IA64]=20Put=20ia64=20config=20files=20on=20the=20?=
+ =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig=20diet?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+arch/arm config files were slimmed down using a python script
+(见提交 c2330e286f68f1c408b4aa6515ba49d57f05beae 评论)
+
+为 ia64 做同样的事情，这样我们就可以有光滑和修长的外观了。
+...
+------------
+
+通常情况下，它会被放在 MUA 的 drafts 文件夹中，被编辑以添加及时的评论，这些评论不应该被放在 changelog 中的三个破折号之后，然后以消息的形式发送，在我们的例子中，其正文以 "arch/arm config files were..." 开始。 在接收端，读者可以将有趣的补丁保存在 UNIX 邮箱中，并通过 linkgit:git-am[1] 应用它们。
+
+当一个补丁是正在进行的讨论的一部分时，由 'git format-patch' 生成的补丁可以进行调整，以利用 'git am --scissors' 功能。 在你对讨论的回应之后，有一行只由 "`-- >8 --`"（剪刀和打孔）组成，后面是去除不必要的头域的补丁：
+
+------------
+...
+> 所以，我们应该做这样那样的事情。
+
+对我来说是有意义的。 这个补丁怎么样？
+
+-- >8 --
+Subject: [IA64] 将 ia64 配置文件放在 Uwe Kleine-König diet 上
+
+使用 python 脚本对 arch/arm 配置文件进行了精简
+...
+------------
+
+当用这种方式发送补丁时，大多数情况下是发送你自己的补丁，所以除了 "`From $SHA1 $magic_timestamp`" 标记外，你应该从补丁文件中省略 `From: ` 和 `Date: ` 行。 补丁的标题很可能与补丁所回应的讨论主题不同，所以很可能要保留 Subject: 这一行，就像上面的例子一样。
+
+检查补丁是否损坏
+~~~~~~~~
+许多邮件如果设置不当就会破坏空白。 以下是两种常见的损坏类型：
+
+* 没有「任何」空格的空的上下文行。
+
+* 非空的上下文行，在开头有一个额外的空白。
+
+测试你的 MUA 是否设置正确的一个方法是：
+
+* 将补丁发送给自己，完全按照你的方式，只是在 To: 和 Cc: 行中不包含列表和维护者地址。
+
+* 将该补丁保存为 UNIX 邮箱格式的文件。 称之为 a.patch，例如。
+
+* 应用它：
+
+    $ git fetch <project> master:test-apply
+    $ git switch test-apply
+    $ git restore --source=HEAD --staged --worktree :/
+    $ git am a.patch
+
+如果它不能正确应用，可能有各种原因。
+
+* 补丁本身不能干净地应用。 这很糟糕，但与你的 MUA 没有多大关系。 在这种情况下，你可能要先用 linkgit:git-rebase[1] 把补丁重新归位，再重新生成。
+
+* MUA 损坏了你的补丁；"am" 会抱怨补丁不适用。 查看 .git/rebase-apply/ 子目录，看看 "补丁" 文件包含哪些内容，并检查上面提到的常见损坏模式。
+
+* 同时，还要检查 'info' 和 'final-commit' 文件。 如果 'final-commit' 中的内容与你希望在提交日志信息中看到的不完全一样，那么很可能接收者在应用你的补丁时最终会手工编辑日志信息。 补丁邮件中的 "Hi, this is my first patch.\n" 等内容应该出现在提交信息末尾的三折线之后。
+
+针对 Mua 的提示
+----------
+这里有一些关于如何使用各种邮件工具成功地在线提交补丁的提示。
+
+GMail
+~~~~~
+GMail 没有办法在网页界面上关闭换行，所以它会把你发送的任何邮件弄得一团糟。 然而，你可以使用 "git send-email"，通过 GMail 的 SMTP 服务器发送你的补丁，或者使用任何 IMAP 电子邮件客户端连接到谷歌的 IMAP 服务器，并通过它转发电子邮件。
+
+关于使用 'git send-email' 通过 GMail SMTP 服务器发送补丁的提示，请参见 linkgit:git-send-email[1] 的案例部分。
+
+关于使用 IMAP 接口提交的提示，请参见 linkgit:git-imap-send[1] 的案例部分。
+
+Thunderbird
+~~~~~~~~~~~
+默认情况下，Thunderbird 会将邮件包裹起来，并将其标记为 'format=flowed'，这两种情况都会使 Git 无法使用这些邮件。
+
+有三种不同的方法：使用插件来关闭换行，配置 Thunderbird 使其不纠缠补丁，或者使用外部编辑器来防止 Thunderbird 纠缠补丁。
+
+办法1（附加的）
+^^^^^^^^
+
+安装 Toggle Word Wrap 插件，该插件可从 https://addons.mozilla.org/thunderbird/addon/toggle-word-wrap/。它在作曲家的 "选项" 菜单中增加了一个 "启用换行符" 的菜单项，你可以将其勾掉。现在你可以像其他方式一样编写信息（剪切+粘贴，'git format-patch'|'git imap-send'，等等），但你必须在你输入的任何文本中手动插入换行符。
+
+方法#2（配置）
+^^^^^^^^
+三个步骤：
+
+1. 将你的邮件服务器组成配置为纯文本： 编辑......账户设置......组成和地址，取消勾选 "以HTML编写邮件"。
+
+2. 配置你的一般组成窗口，使其不被包裹。
++
+在 Thunderbird 2 中：编辑...偏好...组成，将纯文本信息包在 0 处
++
+在 Thunderbird 3 中：编辑...偏好...高级...配置编辑器。 搜索 "mail.wrap_long_lines"。 切换它，确保它被设置为 "false"。另外，搜索 "mailnews.wraplength" 并将其设置为 0。
+
+3. 禁止使用 format=flowed： 编辑...偏好...高级...配置编辑器。 搜索 "mailnews.send_plaintext_flowed"。 拨动它，确保它被设置为 `false`。
+
+完成后，你应该能够像其他方式一样编写电子邮件（剪切+粘贴，'git format-patch' | 'git imap-send'，等等），而且补丁不会被弄乱。
+
+方法三（外部编辑）
+^^^^^^^^^
+
+需要以下 Thunderbird 扩展： https://mjg.github.io/AboutConfig/ 中的 AboutConfig 和 https://globs.org/articles.php?lng=en&pg=8 中的 External Editor
+
+1. 用你选择的方法把补丁准备成一个文本文件。
+
+2. 在打开撰写窗口之前，使用 Edit->Account Settingd 取消勾选要用来发送补丁的账户的 "Composition & Addressing" 面板中的 "Compose messages in HTML format" 设置。
+
+3. 在 Thunderbird 主窗口中，在你打开补丁的撰写窗口之前，使用 Tools->about:config 将以下内容设置为指定值：
++
+----------
+	mailnews.send_plaintext_flowed  => false
+	mailnews.wraplength             => 0
+----------
+
+4. 打开一个作曲窗口，点击外部编辑器图标。
+
+5. 在外部编辑器窗口，读入补丁文件并正常退出编辑器。
+
+题外话：也许可以用 about:config 和以下设置来完成第二步，但还没有人试过。
+
+----------
+	mail.html_compose                       => false
+	mail.identity.default.compose_html      => false
+	mail.identity.id?.compose_html          => false
+----------
+
+contrib/thunderbird-patch-inline 中有一个脚本，可以帮助你以一种简单的方式将补丁加入 Thunderbird。要使用它，请执行上面的步骤，然后使用该脚本作为外部编辑器。
+
+KMail
+~~~~~
+这应该有助于你使用 KMail 在线提交补丁。
+
+1. 把补丁准备成一个文本文件。
+
+2. 点击 "New Mail"。
+
+3. 在合成器窗口的 "Otions" 下，确保没有设置 "Word warp"。
+
+4. Use Message -> Insert file... 并插入补丁。
+
+5. 回到撰写窗口：在信息中添加你想要的任何其他文本，完成地址和主题字段，然后按发送。
+
+基准树信息
+-----
+
+基准树信息块用于维护者或第三方测试人员了解补丁系列所适用的确切状态。它由 ‘基本提交’ 和零个或多个 ‘前提补丁’ 组成，前者是众所周知的提交，是项目历史中稳定部分的一部分，而后者是正在运行的知名补丁，还不是 ‘基本提交’ 的一部分，在应用这些补丁之前需要在 ‘基本提交’ 之上按拓扑顺序应用。
+
+‘基本提交’ 显示为 "base-commit: "，后面是提交对象名称的 40-hex。 ‘先决补丁’ 显示为 "prerequisite-patch-id: "，后面是 40-hex 的 “补丁ID”，这个 ID 可以通过 `git patch-id --stable` 命令来获得。
+
+想象一下，在公开提交的 P 之上，你应用了别人的知名补丁 X、Y 和 Z，然后建立了你的三套补丁系列 A、B、C，历史会是这样：
+
+................................................
+---P---X---Y---Z---A---B---C
+................................................
+
+使用 `git format-patch --base=P -3 C`（或其变体，例如使用 `--cover-letter` 或使用 `Z...C` 代替 `-3 C` 来指定范围），基础树信息块会显示在命令输出的第一个信息（第一个补丁，或封面信）的末尾，像这样：
+
+------------
+base-commit: P
+prerequisite-patch-id: X
+prerequisite-patch-id: Y
+prerequisite-patch-id: Z
+------------
+
+对于非线性拓扑结构，如
+
+................................................
+---P---X---A---M---C
+    \         /
+     Y---Z---B
+................................................
+
+你也可以使用 `git format-patch --base=P -3 C` 来生成 A、B 和 C 的补丁，P、X、Y、Z 的标识符被附加在第一条信息的末尾。
+
+如果在 cmdline 中设置 `--base=auto`，它将自动计算基础提交，作为远程跟踪分支和 cmdline 中指定的修订范围的提示提交的合并基础。 对于本地分支，在使用此选项之前，需要通过 `git branch --set-upstream-to` 使其跟踪远程分支。
+
+实例
+--
+
+* 提取 R1 和 R2 修订版之间的提交，并用 "git am" 将其应用于当前分支之上，以拣选它们：
++
+------------
+$ git format-patch -k --stdout R1..R2 | git am -3 -k
+------------
+
+* 提取所有在当前分支但不在原生分支中的提交：
++
+------------
+$ git format-patch origin
+------------
++
+每次提交都会在当前目录下创建一个单独的文件。
+
+* 提取自项目开始以来所有导致 'origin' 的提交：
++
+------------
+$ git format-patch --root origin
+------------
+
+* 与前者相同：
++
+------------
+$ git format-patch -M -B origin
+------------
++
+此外，它还能智能地检测和处理重命名和完全重写，以产生重命名补丁。 重命名补丁减少了文本输出的数量，一般来说，它更容易审查。 注意，非 Git 的 “补丁” 程序不会理解重命名补丁，所以只有当你知道收件人使用 Git 来应用你的补丁时才会使用它。
+
+* 从当前分支中提取三个最重要的提交，并将其格式化为可发送电子邮件的补丁：
++
+------------
+$ git format-patch -3
+------------
+
+注意事项
+----
+
+请注意，`format-patch` 将从输出中省略合并提交，即使它们是请求范围的一部分。一个简单的 “补丁” 并不包括足够的信息让接收端重现同一个合并提交。
+
+参见
+--
+linkgit:git-am[1], linkgit:git-send-email[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

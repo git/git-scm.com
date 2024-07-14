@@ -1,0 +1,90 @@
+git-index-pack(1)
+=================
+
+NOME
+----
+git-index-pack - Construa um pacote do arquivo do índice para um arquivo compactado já existente
+
+
+RESUMO
+------
+[verse]
+'git index-pack' [-v] [-o <index-file>] [--[no-]rev-index] <pack-file>
+'git index-pack' --stdin [--fix-thin] [--keep] [-v] [-o <index-file>]
+		  [--[no-]rev-index] [<pack-file>]
+
+
+DESCRIÇÃO
+---------
+Faz a leitura de um arquivo compactado (.pack) do arquivo informado e cria um pacote do arquivo do índice (.idx) para ele e opcionalmente escreve um índice reverso(.rev) para o pacote informado. O arquivo compactado junto com o pacote do índice, pode ser colocado no diretório objects/pack/ de um repositório Git.
+
+
+OPÇÕES
+------
+-v::
+	Seja detalhado sobre o que está acontecendo, incluindo a condição geral do progresso.
+
+-o <arquivo-índice>::
+	Grava o índice do pacote gerado no arquivo especificado. Sem essa opção, o nome do índice do arquivo do pacote é construído a partir do nome do arquivo compactado, substituindo .pack por .idx (e o programa falhará se o nome do arquivo compactado não terminar com .pack).
+
+--[no-]rev-index::
+	Quando este sinalizador for informado, gere um índice reverso (um arquivo `.rev`) correspondente ao pacote informado. Caso `--verify` seja usado, certifique-se que o índice reverso existente esteja correto. Tem precedência sobre `pack.writeReverseIndex`.
+
+--stdin::
+	Quando esta opção é usada, o pacote é lido de stdin e uma cópia é gravada em <arquivo-pacote>. Se <arquivo-pacote> não for especificado, o pacote será gravado no diretório objects/pack/ do repositório Git atual com um nome padrão determinado a partir do conteúdo do pacote. Se o <arquivo-pacote> não for especificado, considere o uso da opção `--keep` para evitar uma condição de corrida entre esse processo e o 'git repack'.
+
+--fix-thin::
+	Corrija um pacote "thin" produzido por `git pack-objects --thin` (para mais detalhes, consulte linkgit:git-pack-objects[1]) adicionando os objetos excluídos nos quais os objetos "deltificados" utilizam como base no pacote. Esta opção só faz sentido caso seja utilizado em conjunto com `--stdin`.
+
+--keep::
+	Antes de mover o índice para seu destino final, crie um arquivo '.keep' vazio para o arquivo de pacote associado. Essa opção geralmente é necessária com `--stdin` para evitar que um processo simultâneo de 'git repack' exclua o pacote e o índice recém-construídos antes que as referências possam ser atualizadas para usar os objetos contidos no pacote.
+
+--keep=<msg>::
+	Como `--keep`, cria um arquivo '.keep' antes de mover o índice para seu destino final. No entanto, em vez de criar um arquivo vazio, coloque '<msg>' seguido de um LF no arquivo .keep. A mensagem "<msg>" pode ser pesquisada posteriormente em todos os arquivos '.keep' para localizar qualquer um que tenha perdido a sua utilidade.
+
+--index-version=<version>[,<offset>]::
+	Isso foi pensado para ser utilizado apenas pelo conjunto de testes. Ele permite impor a versão do índice do pacote gerado e impor as entradas no índice com 64 bits nos objetos localizados acima da compensação informada.
+
+--strict[=<msg-id>=<gravidade>...]::
+Encerra se o pacote tiver objetos ou links quebrados. Uma lista opcional separada por vírgulas de `<msg-id>=<gravidade>` pode ser passada para alterar a gravidade de alguns problemas possíveis, por exemplo, `--strict="missingEmail=ignore,badTagName=error"`. Consulte a entrada para as opções de configuração `fsck.<msg-id>` do comando linkgit:git-fsck[1] para obter mais informações sobre os possíveis valores de `<msg-id>` e `<gravidade>`.
+
+--progress-title::
+	Apenas para uso interno.
++
+Defina o título da barra de progresso. O título predefinido é "Receber objetos" e "Indexar objetos" quando a opção `--stdin` for usada.
+
+--check-self-contained-and-connected::
+	Encerre caso o pacote contenha links quebrados. Apenas para utilização interna.
+
+--fsck-objects[=<msg-id>=<gravidade>...]::
+	Encerra se o pacote contiver objetos quebrados, mas, diferentemente do `--strict`, não se engasga com links quebrados. Se o pacote tiver uma árvore que aponte para uma bolha '.gitmodules' que não exista, imprima o hash dessa bolha (para que o chamador verifique) após o hash que vai para o nome do arquivo pack/idx (consulte "Notas").
++
+Uma lista opcional separada por vírgulas de `<msg-id>=<gravidade>` pode ser passada para alterar a gravidade de alguns problemas possíveis, por exemplo, `--fsck-objects="missingEmail=ignore,badTagName=ignore"`. Consulte a entrada para as opções de configuração `fsck.<msg-id>` do comando linkgit:git-fsck[1] para obter mais informações sobre os possíveis valores de `<msg-id>` e `<gravidade>`.
+
+--threads=<n>::
+	Especifica a quantidade de threads a serem gerados ao resolver deltas. Isso exige que o 'index-pack' seja compilado com pthreads; caso contrário, essa opção será ignorada com um aviso. O objetivo é reduzir o tempo de empacotamento em máquinas com vários processadores. No entanto, a quantidade de memória necessária para a janela de pesquisa delta é multiplicada pelo número de threads. Especificar 0 fará com que o Git detecte automaticamente o número de CPUs e use no máximo 3 threads.
+
+--max-input-size=<tamanho>::
+	Encerre caso o pacote seja maior que <tamanho>.
+
+--object-format=<hash-algorithm>::
+	Especifique o formato de objeto fornecido (algoritmo de hash) para o pacote. Os valores válidos são 'sha1' e (se ativado) 'sha256'. A predefinição é o algoritmo do repositório atual (definido por `extensions.objectFormat`) ou 'sha1' se nenhum valor for definido ou se estiver fora de um repositório.
++
+Esta opção não pode ser utilizada com --stdin.
++
+Observação: No momento, não há interoperabilidade entre os repositórios SHA-256 e os repositórios SHA-1.
+
+Alertamos no passado que os repositórios SHA-256 podem exigir alterações incompatíveis com versões anteriores quando implementamos estes recursos de interoperabilidade. Hoje, esperamos apenas alterações compatíveis. Além disso, se essas alterações forem necessárias, pode-se esperar que os repositórios SHA-256 criados com o Git atual possam ser usados por versões futuras do Git sem perda de dados.
+[]
+
+--promisor[=<mensagem>]::
+	Antes fazer o commit do índice do pacote, crie um arquivo .promisor para este pacote. É particularmente útil ao escrever um pacote promissor com a opção `--fix-thin` já que o nome do pacote não é definitivo até que o pacote tenha sido totalmente escrito. Caso uma `<menssagem>` seja fornecida, esse conteúdo será gravado no arquivo .promisor para uma referência futura. Consulte o link:/docs/partial-clone/pt_BR[clone parcial] para obter mais informações.
+
+OBSERVAÇÕES
+-----------
+
+Depois que o índice é criado, o hash que vai para o nome do arquivo pack/idx é gerado no stdout. Caso a opção `--stdin` também tenha sido usado, ele será prefixado por "pack\t" ou "keep\t" se um novo arquivo .keep tiver sido criado com êxito. Isso é útil para remover um arquivo .keep usado como um bloqueio para evitar a corrida com o 'git repack' mencionada acima.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

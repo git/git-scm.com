@@ -1,0 +1,162 @@
+git-cvsimport(1)
+================
+
+NOM
+---
+git-cvsimport - Sauve vos données depuis un autre SCM qu'on aime haïr
+
+
+SYNOPSIS
+--------
+[verse]
+'git cvsimport' [-o <branche-pour-HEAD>] [-h] [-v] [-d <CVSROOT>]
+	      [-A <fichier-conv-auteur>] [-p <options-pour-cvsps>] [-P <fichier>]
+	      [-C <dépôt-git>] [-z <fuzz>] [-i] [-k] [-u] [-s <subst>]
+	      [-a] [-m] [-M <regex>] [-S <regex>] [-L <limite-commit>]
+	      [-r <distant>] [-R] [<module-CVS>]
+
+
+DESCRIPTION
+-----------
+*ATTENTION* : 'git cvsimport' utilise cvsps version 2, qui est considéré comme obsolète; il ne fonctionne pas avec cvsps version 3 et ultérieure. Si vous effectuez une importation en une fois d’un dépôt CVS envisagez d’utiliser http://cvs2svn.tigris.org/cvs2git.html[cvs2git] ou https://gitlab.com/esr/cvs-fast-export[cvs-fast-export].
+
+Importe un dépôt CVS dans Git. Il créera un nouveau dépôt, ou importera de manière incrémentielle dans un dépôt existant.
+
+La division du journal CVS en ensembles de rustines est effectuée par'cvsps'. La version 2.1 au moins est requise.
+
+*ATTENTION* : pour certaines situations, l’importation entraîne des résultats incorrects. Veuillez consulter la section <<issues,PROBLÈMES>> pour plus de référence.
+
+Vous ne devez *jamais* effectuer de travail personnel sur les branches créées par 'git cvsimport'. Par défaut, l'importation initiale créera et alimentera une branche `master` à partir de la branche principale du dépôt CVS avec laquelle vous êtes libre de travailler ; après cela, vous devez `git merge` les importations incrémentales, ou toute branche CVS, vous-même. Il est conseillé de spécifier un distant nommé via -r pour séparer et protéger les branches entrantes.
+
+Si vous avez l'intention de mettre en place un dépôt public partagé que tous les développeurs peuvent lire/écrire, ou si vous voulez utiliser linkgit:git-cvsserver[1], alors vous voudrez probablement faire un clone nu du dépôt importé, et utiliser le clone comme dépôt partagé. Voir linkgit:gitcvs-migration[7].
+
+
+OPTIONS
+-------
+-v::
+	Verbosité : laisser 'cvsimport' rapporter ce qu'il fait.
+
+-d<CVSROOT>::
+	La racine de l'archive CVS. Peut être local (un chemin simple) ou distant ; actuellement, seules les méthodes d'accès :local:, :ext: et :pserver: sont prises en charge. S'il n'est pas fourni, 'git cvsimport' essaiera de le lire à partir de 'CVS/Root'. Si aucun fichier de ce type n'existe, il recherche la variable d'environnement `CVSROOT`.
+
+<module-CVS>::
+	Module CVS que vous souhaitez importer. Par rapport à <CVSROOT>. S’il n’est pas donné, 'git cvsimport' essaie de le lire à partir de 'CVS/Repository'.
+
+-C <rép-cible>::
+Le dépôt Git dans lequel importer. Si le répertoire n'existe pas, il sera créé. La valeur par défaut est le répertoire courant.
+
+-r<distant>::
+	Le distant Git dans lequel importer ce dépôt CVS. Déplace toutes les branches CVS dans remotes/<distant>/<branche> de la même manière que 'git clone' utilise 'origin' par défaut.
+
+-o <branche-pour-HEAD>::
+	Lorsqu’aucun distant n’est spécifié (via -r), la branche 'HEAD' de CVS est importée dans la branche 'origin' du dépôt Git, car 'HEAD' a déjà une signification particulière pour Git. Lorsqu’un distant est spécifié, la branche 'HEAD' est nommée remotes/<distant>/master qui miroite le comportement de 'git clone'. Utilisez cette option si vous souhaitez importer dans une autre branche.
++
+Utilisez '-o master' pour poursuivre une importation qui a été initialement effectuée par l’ancien outil cvs2git.
+
+-i::
+	Importation uniquement : ne pas effectuer d'extraction après l’importation. Cette option garantit que le répertoire de travail et l’index restent intacts et ne les créeront pas s’ils n’existent pas.
+
+-k::
+	Tuer les mots-clés : extraira les fichiers avec '-kk' de l’archive CVS pour éviter les changements bruyants. Fortement recommandé, mais désactivé par défaut pour préserver la compatibilité avec les premiers arbres importés.
+
+-u::
+	Convertir les traits de soulignement en points dans les noms d'étiquette et de branche.
+
+-s <subst>::
+	Remplacer le caractère "/" dans les noms de branche par <subst>
+
+-p <options-pour-cvsps>::
+	Options supplémentaires pour cvsps. Les options `-u` et '-A' sont implicites et ne doivent pas être utilisées ici.
++
+Si vous devez passer plusieurs options, séparez-les par une virgule.
+
+-z <fuzz>::
+	Transmettez le facteur de fuzz d’horodatage à cvsps, en quelques secondes. S’il n’est pas défini, cvsps est défini par défaut sur 300s.
+
+-P <fichier-sortie-cvsps>::
+	Au lieu d'appeler cvsps, lire le fichier de sortie cvsps fourni. Utile pour le débogage ou lorsque cvsps est manipulé à l'extérieur du cvsimport.
+
+-m::
+	Tenter de détecter les fusions en se basant sur le message de validation. Cette option activera les regex par défaut qui tentent de capturer le nom de la branche source à partir du message de validation.
+
+-M <regex>::
+	Tenter de détecter les fusions en se basant sur le message de validation avec une regex personnalisée. Elle peut être utilisée avec `-m` pour activer les regex par défaut. Vous devez échapper les barres anti-obliques.
++
+La regex doit capturer le nom de la branche source dans $1.
++
+Cette option peut être utilisée plusieurs fois pour fournir plusieurs regexes de détection.
+
+-S <regex>::
+	Ignorer les chemins correspondant à l'expression régulière.
+
+-a::
+	Importer tous les commits, y compris les plus récents. cvsimport ignore par défaut les commits dont l'horodatage date de moins de 10 minutes.
+
+-L <limite>::
+	Limiter le nombre de commits importés. Solution de contournement pour les cas où cvsimport perd de la mémoire.
+
+-A <fichier-conv-auteur>::
+	CVS utilise par défaut le nom d'utilisateur Unix lors de l'écriture de ses journaux de commit. L'utilisation de cette option et d'un fichier fichier-conv-auteur fait correspondre le nom enregistré dans CVS au nom de l'auteur, à son e-mail et à son fuseau horaire optionnel :
++
+---------
+	exon=Andreas Ericsson <ae@op5.se>
+	spawn=Simon Pawn <spawn@frog-pond.org> America/Chicago
+
+---------
++
+'git cvsimport' le fera apparaître comme si ces auteurs avaient leurs GIT_AUTHOR_NAME et GIT_AUTHOR_EMAIL correctement définis depuis le début. Si un fuseau horaire est spécifié, GIT_AUTHOR_DATE aura le décalage correspondant appliqué.
++
+Pour plus de commodité, ces données sont enregistrées dans '$GIT_DIR/cvs-authors' chaque fois que l’option '-A' est fournie et lues à partir de ce même fichier chaque fois que 'git cvsimport' est exécuté.
++
+Il n’est pas recommandé d’utiliser cette fonctionnalité si vous avez l’intention d’exporter à nouveau les modifications vers CVS ultérieurement avec 'git cvsexportcommit'.
+
+-R::
+	Générer un fichier '$GIT_DIR/cvs-revisions' contenant un mappage des numéros de révision CVS aux ID de validation Git nouvellement créés. Le fichier généré contiendra une ligne pour chaque paire (nom de fichier, révision) importée ; chaque ligne ressemblera à
++
+---------
+src/widget.c 1.1 1d862f173cdc7325b6fa6d2ae1cfd61fd1b512b7
+---------
++
+Les données de révision sont ajoutées au fichier s’il existe déjà, pour être utilisées lors des importations incrémentielles.
++
+Cette option peut être utile si vous avez des numéros de révision CVS stockés dans des messages de validation, des systèmes de suivi des bogues, des archives d’e-mails, etc.
+
+-h::
+	Imprimer un petit message d'utilisation et de sortie.
+
+SORTIE
+------
+Si `-v` est spécifié, le script indique ce qu’il fait.
+
+Sinon, le succès est indiqué à la manière Unix, c'est-à-dire en sortant simplement avec un statut de sortie nul.
+
+[[issues]]
+PROBLÈMES
+---------
+Problèmes liés à l'horodatage :
+
+ * Si l'horodatage des commits dans le dépôt CVS n'est pas suffisamment stable pour être utilisé pour ordonner les commits, les modifications peuvent apparaître dans le mauvais ordre.
+ * Si des fichiers ont déjà été "cvs import"és plus d'une fois (par exemple, l'importation de plusieurs versions de fournisseurs), le HEAD contient le mauvais contenu.
+ * Si l'ordre d'horodatage de différents fichiers croise l'ordre de révision dans la fenêtre de temps de correspondance des commits, l'ordre des commits peut être erroné.
+
+Problèmes liés aux branches :
+
+ * Les branches sur lesquelles aucun commit n'a été effectué ne sont pas importées.
+ * Tous les fichiers du point de branchement sont ajoutés à une branche même s'ils n'ont jamais été ajoutés dans CVS.
+ * Cela s'applique aux fichiers ajoutés à la branche source *après* la création d'une branche fille : si aucun commit n'a été fait auparavant sur la branche fille, elles seront ajoutées par erreur à la branche fille dans git.
+
+Problèmes liés aux étiquettes :
+
+* Plusieurs étiquettes sur la même révision ne sont pas importées.
+
+Si vous pensez que l'un de ces problèmes peut s'appliquer au dépôt que vous voulez importer, envisagez d'utiliser cvs2git :
+
+* cvs2git (partie de cvs2svn), `https://subversion.apache.org/`
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

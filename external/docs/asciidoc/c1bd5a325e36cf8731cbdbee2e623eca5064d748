@@ -1,0 +1,90 @@
+git-check-ref-format(1)
+=======================
+
+NOM
+---
+git-check-ref-format - S'assure qu'un nom de référence est bien formé
+
+SYNOPSIS
+--------
+[verse]
+'git check-ref-format' [--normalize]
+       [--[no-]allow-onelevel] [--refspec-pattern]
+       <nom-de-réf>
+'git check-ref-format' --branch <raccourcis-de-nom-de-branche>
+
+DESCRIPTION
+-----------
+Vérifie si un 'nom-de-réf' donné est acceptable, et se termine avec un statut non nul si ce n'est pas le cas.
+
+Une référence est utilisée dans Git pour spécifier des branches et des étiquettes. Une tête de branche est stockée dans la hiérarchie `refs/heads`, tandis qu'une étiquette est stockée dans la hiérarchie `refs/tags` de l'espace de noms ref (typiquement dans les répertoires `$GIT_DIR/refs/heads` et `$GIT_DIR/refs/tags` ou, comme entrées dans le fichier `$GIT_DIR/packed-refs` si les refs sont empaquetées par `git gc`).
+
+Git impose les règles suivantes sur la façon dont les références sont nommées :
+
+. Elles peuvent inclure des barres obliques `/` pour un regroupement hiérarchique (répertoire), mais aucun composant séparé par une barre oblique ne peut commencer par un point `.` ou se terminer par la séquence `.lock`.
+
+. Elles doivent contenir au moins un `/`. Cela impose la présence d'une catégorie comme `heads/`, `tags/` etc. mais les noms réels ne sont pas limités. Si l'option `--allow-onelevel` est utilisée, cette règle est levée.
+
+. Elles ne peuvent avoir deux points consécutifs `..` nulle part.
+
+. Elles ne peuvent pas contenir de caractères de contrôle ASCII (c'est-à-dire des octets dont la valeur est inférieure à \040, ou \177 `DEL`), d'espace, de tilde `~`, de circonflexe `^`, ou de deux-points `:`.
+
+. Elles ne peuvent pas avoir de point d'interrogation `?`, d'astérisque `*`, ou de crochet ouvert `[` n'importe où. Voir l'option `--refspec-pattern` ci-dessous pour une exception à cette règle.
+
+. Elles ne peuvent pas commencer ou finir par une barre oblique `/` ou contenir plusieurs barres obliques consécutives (voir l'option `--normalize` ci-dessous pour une exception à cette règle).
+
+. Elles ne peuvent pas se terminer par un point `.`.
+
+. Elles ne peuvent pas contenir une séquence `@{`.
+
+. Elles ne peuvent pas être le caractère unique `@`.
+
+. Elles ne peuvent pas contenir de `\`.
+
+Ces règles facilitent l'analyse des noms de référence par les outils basés sur des scripts shell, l'expansion des noms de chemin par le shell lorsqu'un nom de référence est utilisé sans être protégé par des quotes (par erreur), et évitent également les ambiguïtés dans certaines expressions de noms de référence (voir linkgit:gitrevisions[7]) :
+
+. Un double point `..` est souvent utilisé comme dans `ref1..ref2`, et dans certains contextes cette notation signifie `^ref1 ref2` (c'est-à-dire pas dans `ref1` et dans `ref2`).
+
+. Un tilde `~` et un circonflexe `^` sont utilisés pour introduire le postfixe 'nième parent' et l'opération 'peler l'oignon'.
+
+. Un deux-points `:` est utilisé comme dans `srcref:dstref` pour signifier « utiliser la valeur de srcref et la stocker dans dstref » dans les opérations fetch et push. Il peut également être utilisé pour sélectionner un objet spécifique, comme avec 'git cat-file' : "git cat-file blob v1.3.3:refs.c".
+
+. L'accolade ouverte `@{` est utilisée comme notation pour accéder à une entrée reflog.
+
+Avec l'option `--branch`, la commande prend un nom et vérifie s'il peut être utilisé comme un nom de branche valide (par exemple lors de la création d'une nouvelle branche). Mais soyez prudent lorsque vous utilisez la syntaxe de vérification précédente qui peut faire référence à un état HEAD détaché. L'implantation de la règle `git check-ref-format --branch $nom` peut être plus stricte que ce que dit `git check-ref-format refs/heads/$nom` (par exemple, un tiret peut apparaître au début d'un composant ref, mais il est explicitement interdit au début d'un nom de branche). Lorsqu'il est exécuté avec l'option `--branch` dans un dépôt, l'entrée est d'abord développée pour la ``syntaxe de l'extraction précédente'' `@{-n}`. Par exemple, `@{-1}` est un moyen de faire référence à la dernière chose qui a été extraite en utilisant l'opération "git switch" ou "git checkout". Cette option devrait être utilisée par les commandes porcelaines pour accepter cette syntaxe partout où un nom de branche est attendu, afin qu'elles puissent agir comme si vous aviez tapé le nom de la branche. A titre d'exception, notez que "l'opération d'extraction précédente" peut résulter en un nom d'objet commit lorsque la N-ième dernière chose extraite n'était pas une branche.
+
+OPTIONS
+-------
+--[no-]allow-onelevel::
+	Contrôler si les noms de référence à un niveau sont acceptés (c'est-à-dire les noms de référence qui ne contiennent pas plusieurs composants séparés par des `/`). La valeur par défaut est `--no-allow-onelevel`.
+
+--refspec-pattern::
+	Interpréter <nom-de-réf> comme un modèle de nom de référence pour un spécificateur de référence (comme utilisé avec les dépôts distants). Si cette option est activée, <nom-de-réf> est autorisé à contenir un seul `*` dans le spécificateur de référence (par exemple, `foo/bar*/baz` ou `foo/bar*baz/` mais pas `foo/bar*/baz*`).
+
+--normalize::
+	Normaliser 'nom-de-réf' en supprimant les barres obliques (`/`) de tête et en regroupant les barres obliques adjacentes entre les composants du nom en une seule barre oblique. Si le nom de référence normalisé est valide, il est imprimé sur la sortie standard et sort avec un statut de 0, sinon, il sort avec un statut non nul. (`--print` est une façon dépréciée d'épeler `--normalize`).
+
+
+EXEMPLES
+--------
+
+* Afficher le nom de la dernière chose extraite :
++
+------------
+$ git check-ref-format --branch @{-1}
+------------
+
+* Déterminer le nom de référence à utiliser pour une nouvelle branche :
++
+------------
+$ ref=$(git check-ref-format --normalize "refs/heads/$nouvellebranche")||
+{ echo "nous n'aimons pas '$nouvellebranche' comme nom de branche". >&2 ; exit 1 ; }
+------------
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

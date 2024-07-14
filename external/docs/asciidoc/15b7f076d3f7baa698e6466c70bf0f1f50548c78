@@ -1,0 +1,224 @@
+git-bundle(1)
+=============
+
+NOME
+----
+git-bundle - Mova os objetos e as refs através do arquivo
+
+
+RESUMO
+------
+[verse]
+'git bundle' create [-q | --quiet | --progress
+		    [--version=<versão>] <arquivo> <git-rev-list-args>
+'git bundle' verify [-q | --quiet] <arquivo>
+'git bundle' list-heads <arquivo> [<refname>...]
+'git bundle' unbundle [--progress] <arquivo> [<refname>...]
+
+DESCRIÇÃO
+---------
+
+Crie, desempacote e manipule os arquivos "bundle" (pacote). Os pacotes são usados para a transferência "offline" dos objetos Git sem um "servidor" ativo esperando do outro lado da conexão de rede.
+
+Eles podem ser usados para criar backups incrementais e completos de um repositório e para retransmitir o estado das referências de um repositório para outro.
+
+Os comandos do Git que buscam ou "leem" através de protocolos como `ssh://` e `https://` também podem operar nos arquivos de pacote (bundle). É possível linkgit:git-clone[1] (clonar) um novo repositório a partir de um pacote, usar o comando linkgit:git-fetch[1] para buscar a partir de um e para listar as referências contidas nele usando o comando linkgit:git-ls-remote[1]. Não há suporte correspondente de "gravação", ou seja, não há suporte para fazer um 'git push' num pacote.
+
+Consulte a seção de EXEMPLOS abaixo para mais exemplos de como usar.
+
+FORMATO BUNDLE
+--------------
+
+Os pacotes são arquivos `.pack` (consulte linkgit:git-pack-objects[1]) com um cabeçalho indicando quais as referências estão contidas nele.
+
+Like the packed archive format itself bundles can either be self-contained, or be created using exclusions. See the "OBJECT PREREQUISITES" section below.
+
+Os pacotes criados usando exclusões de revisão são "pacotes finos" criados usando a opção `--thin` para linkgit:git-pack-objects[1] (empacotar os objetos), e descompactados usando a opção `--fix-thin` para linkgit:git-index-pack[1].
+
+Não há opção de criar um "pacote grosso" ao usar as exclusões de revisão, e os usuários não devem estar preocupados com essa diferença. Ao usar "pacotes finos", os pacotes "bundles" criados usando exclusões são menores em tamanho. A questão de serem "finos" sob o capô é meramente notado aqui como uma curiosidade e como uma referência a outra documentação.
+
+Consulte linkgit:gitformat-bundle[5] para obter mais detalhes e informações sobre o "thin pack" em linkgit:gitformat-pack[5].
+
+OPÇÕES
+------
+
+create [options] <arquivo> <git-rev-list-args>::
+	Used to create a bundle named 'file'. This requires the '<git-rev-list-args>' arguments to define the bundle contents. 'options' contains the options specific to the 'git bundle create' subcommand. If 'file' is `-`, the bundle is written to stdout.
+
+verify <arquivo>::
+	Used to check that a bundle file is valid and will apply cleanly to the current repository. This includes checks on the bundle format itself as well as checking that the prerequisite commits exist and are fully linked in the current repository. Then, 'git bundle' prints a list of missing commits, if any. Finally, information about additional capabilities, such as "object filter", is printed. See "Capabilities" in linkgit:gitformat-bundle[5] for more information. The exit code is zero for success, but will be nonzero if the bundle file is invalid. If 'file' is `-`, the bundle is read from stdin.
+
+list-heads <arquivo>::
+	Lists the references defined in the bundle. If followed by a list of references, only references matching those given are printed out. If 'file' is `-`, the bundle is read from stdin.
+
+unbundle <arquivo>::
+	Passes the objects in the bundle to 'git index-pack' for storage in the repository, then prints the names of all defined references. If a list of references is given, only references matching those in the list are printed. This command is really plumbing, intended to be called only by 'git fetch'. If 'file' is `-`, the bundle is read from stdin.
+
+<git-rev-list-args>::
+	A list of arguments, acceptable to 'git rev-parse' and 'git rev-list' (and containing a named ref, see SPECIFYING REFERENCES below), that specifies the specific objects and references to transport. For example, `master~10..master` causes the current master reference to be packaged along with all objects added since its 10th ancestor commit. There is no explicit limit to the number of references and objects that may be packaged.
+
+
+[<refname>...]::
+	Uma lista de referências utilizadas para limitar as referências relatadas como disponíveis. É muito útil para ser utilizado com o 'git fetch' que espera receber apenas as referências solicitadas e não necessariamente tudo no pacote (nesse caso, 'git bundle' age como 'git fetch-pack').
+
+--progress::
+	É predefinido que a condição geral do progresso seja relatada no fluxo de erros quando estiver conectado num terminal, a menos que `-q` seja utilizado. Esta opção impõem a condição geral do progresso, mesmo que o fluxo de erro predefinido não seja direcionado para um terminal.
+
+--version=<versão>::
+	Specify the bundle version. Version 2 is the older format and can only be used with SHA-1 repositories; the newer version 3 contains capabilities that permit extensions. The default is the oldest supported format, based on the hash algorithm in use.
+
+-q::
+--quiet::
+	Esta opção faz com que o comando não relate o seu progresso em meio ao fluxo de erros já predefinido.
+
+ESPECIFICANDO AS REFERÊNCIAS
+----------------------------
+
+As revisões devem ser acompanhadas pelos nomes de referência que serão empacotados num pacote (bundle).
+
+More than one reference may be packaged, and more than one set of prerequisite objects can be specified. The objects packaged are those not contained in the union of the prerequisites.
+
+O comando 'git bundle create' resolve para você, os nomes de referência, usando as mesmas regras do comando `git rev-parse --abbrev-ref=loose`. Cada pré-requisito pode ser definido de forma explicita (como `^master~10` por exemplo) ou implicitamente (`master~10..master`, `--since=10.days.ago master` por exemplo).
+
+Todos estes casos simples funcionam (assumindo que temos um ramo "master" e "next"):
+
+----------------
+$ git bundle create master.bundle master
+$ echo master | git bundle create master.bundle --stdin
+$ git bundle create master-and-next.bundle master next
+$ (echo master; echo next) | git bundle create master-and-next.bundle --stdin
+----------------
+
+E assim são estes (e os mesmos, mas omitidos, exemplos `--stdin`):
+
+----------------
+$ git bundle create recent-master.bundle master~10..master
+$ git bundle create recent-updates.bundle master~10..master next~5..next
+----------------
+
+Um nome para a revisão ou intervalo não é aceito quando o lado direito não pode ser resolvido uma referência:
+
+----------------
+$ git bundle create HEAD.bundle $(git rev-parse HEAD)
+fatal: Recusando a criação de um pacote vazio.
+$ git bundle create master-yesterday.bundle master~10..master~5
+fatal: Recusando a criação de um pacote vazio.
+----------------
+
+PRÉ-REQUISITOS DO OBJETO
+------------------------
+
+Ao criar os pacotes, é possível criar um pacote independente que pode ser descompactado num repositório sem um histórico em comum, além de fornecer revisões negativas para excluir objetos necessários nas partes anteriores do histórico.
+
+A alimentação de uma revisão como `new` (nova) para `git bundle create` criará um arquivo pacote que contém todos os objetos acessíveis a partir da `nova` revisão. Esse pacote pode ser descompactado em qualquer repositório obtendo assim uma história completa que leva até à `nova` revisão:
+
+----------------
+$ git bundle create full.bundle new
+----------------
+
+A revision range such as `old..new` will produce a bundle file that will require the revision `old` (and any objects reachable from it) to exist for the bundle to be "unbundle"-able:
+
+----------------
+$ git bundle create full.bundle old..new
+----------------
+
+Um pacote independente e sem qualquer pré-requisito, pode ser extraído em qualquer lugar, mesmo num repositório vazio ou pode ser clonado a partir de (ou por exemplo, `new` mas não `old..new`).
+
+É bom errar pelo excesso de zelo, fazendo com que o arquivo bundle (pacote) contenha os objetos já no destino, pois eles são ignorados durante a descompactação no destino.
+
+If you want to match `git clone --mirror`, which would include your refs such as `refs/remotes/*`, use `--all`. If you want to provide the same set of refs that a clone directly from the source repository would get, use `--branches --tags` for the `<git-rev-list-args>`.
+
+O comando 'git bundle verify' pode ser usado para verificar se o repositório do destinatário tem os pré-requisitos necessários para fazer o commit de um pacote.
+
+EXEMPLOS
+--------
+
+Assume you want to transfer the history from a repository R1 on machine A to another repository R2 on machine B. For whatever reason, direct connection between A and B is not allowed, but we can move data from A to B via some mechanism (CD, email, etc.). We want to update R2 with development made on the branch master in R1.
+
+Para inicializar o processo, você pode primeiro criar um pacote que não exista qualquer pré-requisitos. Você pode usar uma tag para ser lembrado até o último commit que for processado, serve para facilitar a atualização posterior do outro repositório com um pacote incremental:
+
+----------------
+machineA$ cd R1
+machineA$ git bundle create file.bundle master
+machineA$ git tag -f lastR2bundle master
+----------------
+
+Em seguida, você transfere `file.bundle` para a máquina no destino B. Como esse pacote não requer que nenhum objeto existente seja extraído, você pode criar um novo repositório na máquina B clonando a partir dele:
+
+----------------
+machineB$ git clone -b master /home/me/tmp/file.bundle R2
+----------------
+
+Isso irá definir um ponto remoto chamado "origin" (origem) no repositório que permite que você capture e extraia do pacote. O arquivo `$GIT_DIR/config` no R2 terá uma entrada como esta:
+
+------------------------
+[remote "origin"]
+    url = /home/me/tmp/file.bundle
+    fetch = refs/heads/*:refs/remotes/origin/*
+------------------------
+
+Para atualizar o repositório `mine.git`, você pode capturar ou extrair após a reposição do pacote armazenado em `/home/me/tmp/file.bundle` com as atualizações incrementais.
+
+Depois de trabalhar um pouco mais no repositório original, você pode criar um pacote incremental para atualizar um outro repositório:
+
+----------------
+machineA$ cd R1
+machineA$ git bundle create file.bundle lastR2bundle..master
+machineA$ git tag -f lastR2bundle master
+----------------
+
+Em seguida, você transfere o pacote para uma outra máquina para substituir o `/home/me/tmp/file.bundle` e captura dele.
+
+----------------
+machineB$ cd R2
+machineB$ git pull
+----------------
+
+Caso saiba até qual commit do repositório nos destinatários pretendidos devem ter os objetos necessários, você poderá utilizar este conhecimento para definir o pré-requisito, informando um ponto de corte para limitar as revisões e os objetos inclusos no pacote. O exemplo anterior utilizou a tag `lastR2bundle` para essa finalidade, porém é possível utilizar outras opções que você daria ao comando linkgit:git-log[1]. Aqui mais alguns exemplos:
+
+Você pode utilizar uma tag que esteja presente em ambos:
+
+----------------
+$ git bundle create mybundle v1.0.0..master
+----------------
+
+Você pode utilizar um pré-requisito utilizando o tempo como referência:
+
+----------------
+$ git bundle create mybundle --since=10.days master
+----------------
+
+Você pode utilizar a quantidade dos commits:
+
+----------------
+$ git bundle create mybundle -10 master
+----------------
+
+Você pode executar o comando `git-bundle verify` para ver se você consegue extrair de um pacote que foi criado com um pré-requisito:
+
+----------------
+$ git bundle verify mybundle
+----------------
+
+Isso listará quais os commits você deve ter para extrair do pacote e encerrará com um erro caso você não os tenha.
+
+Um pacote do ponto de vista de um repositório do destinatário é como um repositório regular do qual ele captura ou extrai. Você pode, por exemplo, durante a captura é possível mapear quais são as referências:
+
+----------------
+$ git fetch mybundle master:localRef
+----------------
+
+Você também pode ver quais são as referências que ela oferece:
+
+----------------
+$ git ls-remote mybundle
+----------------
+
+FORMATO DO ARQUIVO
+------------------
+
+Consulte linkgit:gitformat-bundle[5].
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

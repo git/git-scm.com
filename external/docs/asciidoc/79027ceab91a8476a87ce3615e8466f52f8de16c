@@ -1,0 +1,122 @@
+git-gc(1)
+=========
+
+NOM
+---
+git-gc - Efface les fichiers non-nécessaires et optimiser le dépôt local
+
+
+SYNOPSIS
+--------
+[verse]
+'git gc' [--aggressive] [--auto] [--quiet] [--prune=<date> | --no-prune] [--force] [--keep-largest-pack]
+
+DESCRIPTION
+-----------
+Exécute un certain nombre de tâches ménagères dans le dépôt actuel, comme la compression des révisions de fichiers (pour réduire l'espace disque et augmenter les performances), la suppression des objets inaccessibles qui peuvent avoir été créés par des invocations antérieures de 'git add', l'empaquetage des références, l'élagage des métadonnées reflog, rerere ou des arbres-de-travail périmés. Peut également mettre à jour des index auxiliaires tels que le commit-graph.
+
+Quand les opérations courantes de porcelaine qui créent des objets sont exécutées, elles vérifieront si le dépôt a grandi de façon substantielle depuis la dernière maintenance, et si c'est le cas, elles lanceront automatiquement `git gc`. Voir `gc.auto` ci-dessous pour savoir comment désactiver ce comportement.
+
+Exécuter `git gc` manuellement ne devrait être nécessaire que lors de l'ajout d'objets à un dépôt sans exécuter régulièrement de telles commandes de porcelaine, pour faire une optimisation ponctuelle du dépôt, ou par exemple pour nettoyer un import de masse sous-optimal. Voir la section "OPTIMISATION DU DÉPÔT" dans linkgit:git-fast-import[1] pour plus de détails sur le cas de l'importation.
+
+OPTIONS
+-------
+
+--aggressive::
+	Habituellement, 'git gc' fonctionne très rapidement tout en fournissant une bonne utilisation de l'espace disque et de bonnes performances. Avec cette option, 'git gc' optimisera le dépôt de manière plus agressive, au prix d'un temps d'exécution beaucoup plus long. Les effets de cette optimisation sont principalement persistants. Voir la section "AGGRESSIVE" ci-dessous pour plus de détails.
+
+--auto::
+	Avec cette option, 'git gc' vérifie si un ménage est nécessaire ; si ce n'est pas le cas, il quitte sans effectuer de travail.
++
+Voir l'option `gc.auto` dans la section "CONFIGURATION" ci-dessous pour savoir comment fonctionne cette heuristique.
++
+Une fois que le ménage est déclenché par le dépassement des limites des options de configuration telles que `gc.auto` et `gc.autoPackLimit`, toutes les autres tâches de ménage (par exemple rerere, working trees, reflog...) seront également effectuées.
+
+
+--[no-]cruft::
+	Lors de la péremption d'objets inaccessibles, les emballer séparément dans un paquet comprimé au lieu de les stocker en vrac.`--cruft` est activé par défaut.
+
+--max-cruft-size=<n>::
+	Lors de l'emballage d'objets inaccessibles dans un paquet déchet, limiter la taille de nouveaux paquets déchets à au plus`n` octets. Renvoie toute valeur spécifiée par la configuration `gc.maxCruftSize`. Voir l'option `--max-cruft-size` de linkgit:git-repack[1] pour plus de détails.
+
+--prune=<date>::
+	Éliminer les objets perdus plus anciens que la date (par défaut, il y a 2 semaines, modifiable par la variable de configuration `gc.pruneExpire`). --prune=now élague les objets perdus quel que soit leur âge et augmente le risque de corruption si un autre processus écrit dans le dépôt en même temps ; voir "NOTES" ci-dessous. --prune est activé par défaut.
+
+--no-prune::
+	Ne pas supprimer les objets esseulés.
+
+--quiet::
+	Supprimer les rapports d'avancement.
+
+--force::
+	Force `git gc` à s'exécuter même s'il y a une autre instance de `git gc` qui tourne sur ce dépôt.
+
+--keep-largest-pack::
+	Tous les paquets à l'exception du plus gros paquet non cruft, tous les paquets marqués avec un fichier `.keep`, et tous les paquets cruft sont consolidés en un seul paquet. Lorsque cette option est utilisée, `gc.bigPackThreshold` est ignoré.
+
+AGGRESSIVE
+----------
+
+Quand l'option `--aggressive` est fournie, linkgit:git-repack[1] sera invoqué avec l'option `-f`, qui à son tour passera `--no-reuse-delta` à linkgit:git-pack-objects[1]. Cela jettera tous les deltas existants et les recalculera, au prix de passer beaucoup plus de temps sur le ré-empaquetage.
+
+Les effets de ceci sont principalement persistants, par exemple lorsque des paquets et des objets libres sont fusionnés dans un autre paquet, les deltas existants dans ce paquet peuvent être réutilisés, mais il y a aussi plusieurs cas où nous pouvons choisir un delta sous-optimal d'un paquet plus récent à la place.
+
+De plus, fournir `--aggressive` modifiera les options `--depth` et `--window` passées à linkgit:git-repack[1]. Voir les paramètres `gc.aggressiveDepth` et `gc.aggressiveWindow` ci-dessous. En utilisant une taille de fenêtre plus grande, nous avons plus de chances de trouver des deltas plus optimaux.
+
+Il n'est probablement pas utile d'utiliser cette option sur un dépôt donné sans effectuer des tests de performance sur mesure. Cela prend beaucoup plus de temps, et l'optimisation de l'espace/delta qui en résulte peut ou non en valoir la peine. Ne pas l'utiliser du tout est le bon compromis pour la plupart des utilisateurs et leurs dépôts.
+
+CONFIGURATION
+-------------
+
+
+
+[WARNING]
+====
+Missing `fr/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/gc.txt`
+
+See original version for this content.
+====
+
+[]
+
+NOTES
+-----
+
+git gc' s'efforce de ne pas supprimer les objets qui sont référencés n'importe où dans votre dépôt. En particulier, il conservera non seulement les objets référencés par votre ensemble actuel de branches et de tags, mais aussi les objets référencés par l'index, les branches de suivi à distance, les reflogs (qui peuvent référencer des commits dans des branches qui ont été modifiées ou remontées ultérieurement), et tout ce qui se trouve dans l'espace de nom refs/*. Notez qu'une note (du type de celle créée par 'git notes') attachée à un objet ne contribue pas à maintenir l'objet en vie. Si vous vous attendez à ce que certains objets soient supprimés et qu'ils ne le sont pas, vérifiez tous ces emplacements et décidez si cela a un sens dans votre cas de supprimer ces références.
+
+D'autre part, lorsque 'git gc' s'exécute en même temps qu'un autre processus, il y a un risque qu'il supprime un objet que l'autre processus utilise mais auquel il n'a pas créé de référence. Cela peut simplement faire échouer l'autre processus ou corrompre le dépôt si l'autre processus ajoute plus tard une référence à l'objet supprimé. Git possède deux fonctionnalités qui atténuent considérablement ce problème :
+
+. Tout objet dont la date de modification est plus récente que la date `--prune` est conservé, ainsi que tout ce qui est accessible depuis cet objet.
+
+. La plupart des opérations qui ajoutent un objet à la base de données mettent à jour l'heure de modification de l'objet s'il est déjà présent, de sorte que le numéro 1 s'applique.
+
+Toutefois, ces fonctionnalités ne constituent pas une solution complète, de sorte que les utilisateurs qui exécutent des commandes simultanément doivent s'accommoder d'un certain risque de corruption (qui semble faible en pratique).
+
+CROCHETS
+--------
+
+La commande 'git gc --auto' peut lancer le crochet `pre-auto-gc`. Voir linkgit:githooks[5] pour de plus amples informations.
+
+
+VOIR AUSSI
+----------
+linkgit:git-prune[1] linkgit:git-reflog[1] linkgit:git-repack[1] linkgit:git-rerere[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

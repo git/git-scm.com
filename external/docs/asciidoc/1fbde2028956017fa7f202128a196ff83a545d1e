@@ -1,0 +1,582 @@
+git-push(1)
+===========
+
+NOM
+---
+git-push - Met à jour les références distantes ainsi que les objets associés
+
+
+SYNOPSIS
+--------
+[verse]
+'git push' [--all | --branches | --mirror | --tags] [--follow-tags] [--atomic] [-n | --dry-run] [--receive-pack=<git-receive-pack>]
+	   [--repo=<dépôt>] [-f | --force] [-d | --delete] [--prune] [-q | --quiet] [-v | --verbose]
+	   [-u | --set-upstream] [-o <chaîne> | --push-option=<chaîne>]
+	   [--[no-]signed|--signed=(true|false|if-asked)]
+	   [--force-with-lease[=<nom-de-réf>[:<attendu>]] [--force-if-includes]]
+	   [--no-verify] [<dépôt> [<spéc-de-réf>...]]
+
+DESCRIPTION
+-----------
+
+Met à jour les références distantes à l'aide des références locales, tout en envoyant les objets nécessaires pour compléter les références données.
+
+Vous pouvez faire arriver des choses intéressantes à un dépôt chaque fois que vous poussez vers lui, en y mettant en place des « crochets ». Voir la documentation pour linkgit:git-receive-pack[1].
+
+Lorsque la ligne de commande ne spécifie pas où pousser avec l'argument `<dépôt>`, la configuration `branch. *. remote` de la branche actuelle est consultée pour déterminer où pousser. Si la configuration est manquante, elle est par défaut 'origin'.
+
+Lorsque la ligne de commande ne spécifie pas quoi pousser avec les arguments `<spéc-de-réf>...` ou les options `--all`, `--mirror` ou `--tags`, la commande trouve la valeur par défaut` <spéc-de-réf> ` en consultant la configuration `remote. *. push`, et si elle n'est pas trouvée, honore la configuration` push.default` pour décider quoi pousser (Voir linkgit:git-config[1] pour la signification de `push.default`) .
+
+Lorsque ni la ligne de commande ni la configuration ne spécifient quoi pousser, le comportement par défaut est utilisé, ce qui correspond à la valeur `simple` pour` push.default` : la branche actuelle est poussée vers la branche amont correspondante, mais par mesure de sécurité, la poussée est abandonnée si la branche amont n'a pas le même nom que la branche locale.
+
+
+OPTIONS[[OPTIONS]]
+------------------
+<dépôt>::
+	Le dépôt "distant" qui est la destination d'une opération de poussée. Ce paramètre peut être soit une URL (voir la section <<URLS, URLS GIT >> ci-dessous) ou le nom d'un dépôt distant (voir la section <<REMOTES, DISTANTS >> ci-dessous).
+
+<réf-de-spéc>...::
+	Spécifier quelle référence de destination mettre à jour avec quel objet source. Le format d'un paramètre <réf-de-spéc> est un plus facultatif `+`, suivi de l'objet source <src>, suivi de deux points `:`, suivi de la référence ref <dst> de destination.
++
+Le <src> est souvent le nom de la branche que vous voudriez pousser, mais il peut s'agir de n'importe quelle "expression SHA-1" arbitraire, comme `master ~ 4` ou` HEAD` (voir linkgit:gitrevisions[7]) .
++
+Le <dst> indique quelle référence du côté distant est mise à jour avec cette poussée. Des expressions arbitraires ne peuvent pas être utilisées ici, une référence réelle doit être nommée. Si `git push [<dépôt>]` sans aucun argument `<spéc-de-réf>` est défini pour mettre à jour une référence à la destination avec `<src>` avec la variable de configuration `remote. <dépôt> .push`, la partie ` :<dst > ` peut être omise - une telle poussée mettra à jour une référence que` <src> `met normalement à jour sans aucun` <spéc-de-réf> `sur la ligne de commande. Sinon, un ` :<dst>` manquant signifie mettre à jour la même référence que le `<src>`.
++
+Si <dst> ne commence pas par `refs/` (par exemple `refs/heads/master`), nous essaierons de déduire où dans `refs/*` sur le <dépôt> de destination il appartient en fonction du type de <src> poussé et si <dst> est ambigu.
++
+--
+* Si <dst> fait référence sans ambiguïté à une référence sur le <dépôt> distant, alors pousser sur cette référence.
+
+* Si <src> se résout en une réf commençant par refs/heads/ ou refs/tags/, alors préfixer ceci à <dst>.
+
+* D'autres résolutions d'ambiguïté pourraient être ajoutées dans le futur, mais pour l'instant, tout autre cas se soldera par une erreur indiquant ce que nous avons essayé, et en fonction de la configuration `advice.pushUnqualifiedRefname` (voir linkgit:git-config[1]) suggérer vers quel espace de nom refs/ vous avez pu vouloir pousser.
+
+--
++
+L'objet référencé par <src> est utilisé pour mettre à jour la référence <dst> du côté distant. Le fait que cela soit autorisé dépend de l'endroit où vit la référence <dst> dans `refs/*` comme décrit en détail ci-dessous. Dans ces sections, "mise à jour" signifie tout type de modification sauf les suppressions, qui, comme indiqué après les quelques sections suivantes, sont traités différemment.
++
+L'espace de noms `refs/heads/*` n'acceptera que les objets commit, et les mises à jour uniquement si elles peuvent être en avance rapide.
++
+L'espace de noms `refs/tags/*` acceptera tout type d'objet (car les commits, les arbres et les blobs peuvent être étiquetés), et toute mise à jour de ceux-ci sera rejetée.
++
+Il est possible de pousser n'importe quel type d'objet vers n'importe quel espace de noms en dehors de `refs/{tags,heads}/*`. Dans le cas des tags et des commit, ceux-ci seront traités comme s'ils étaient des commits à l'intérieur de `refs/heads/*` afin de déterminer si la mise à jour est autorisée.
++
+C'est-à-dire qu'une avance rapide des commits et des étiquettes en dehors de `refs/{tags,heads}/*` est autorisée, même dans les cas où ce qui est avancé rapidement n'est pas un commit, mais un objet étiquette qui pointe vers un nouveau commit qui est une avance rapide de la dernière étiquette (ou commit) qu'il remplace. Le remplacement d'une étiquette par une étiquette entièrement différente est également autorisé, si elle pointe vers le même commit, ainsi que le fait de pousser une étiquette pelée, c'est-à-dire de pousser le commit vers lequel l'objet étiquette existant pointe, ou un nouvel objet étiquette vers lequel un commit existant pointe.
++
+Les objets d'arbre et de blob à l'extérieur de `refs/{tags,heads}/*` seront traités de la même manière que s'ils étaient à l'intérieur de `refs/tags/*`, toute mise à jour de ceux-ci sera rejetée.
++
+Toutes les règles décrites ci-dessus sur ce qui n'est pas autorisé en tant que mise à jour peuvent être passées outre en ajoutant le caractère facultatif `+` à une spéc-de-réf (ou en utilisant l'option de ligne de commande `--force`). La seule exception à cela est qu'aucune quantité de forçage ne fera que l'espace de noms `refs/heads/*` acceptera un objet non-commit. Les crochets et la configuration peuvent également remplacer ou modifier ces règles, voir par ex. `receive.denyNonFastForwards` dans linkgit:git-config[1] et `pre-receive` et `update` dans linkgit:githooks[5].
++
+Pousser un <src> vide vous permet de supprimer la référence <dst> du dépôt distant. Les suppressions sont toujours acceptées sans signe `+` dans la spéc-de-réf (ou `--force`), sauf lorsque la configuration ou les crochets l'interdisent. Voir `receive.denyDeletes` dans linkgit:git-config[1] et `pre-receive` et `update` dans linkgit:githooks[5].
++
+La spéc-de-réf spéciale `:` (ou `+:` pour permettre des mises à jour pas en avance rapide) ordonne à Git de pousser les branches "correspondantes" : pour chaque branche qui existe du côté local, le côté distant est mis à jour si une branche du même nom existe déjà du côté distant.
++
+`tag <étiquette>` signifie la même chose que `refs/tags/<étiquette>:refs/tags/<étiquette>`.
+
+--all::
+--branches::
+	Pousser toutes les branches (c'est-à-dire les références sous `refs/heads/`) ; ne peut pas être utilisé avec d'autres <spéc-de-réf>.
+
+--prune::
+	Supprimer les branches distantes qui n'ont pas d'équivalent local. Par exemple, une branche distante `tmp` sera supprimée si une branche locale du même nom n'existe plus. Cela respecte également les spécificateurs de référence, par exemple `git push --prune remote refs/heads/*:refs/tmp/*` s'assurera que la branche distante `refs/tmp/foo` sera supprimée si `refs/heads/foo` n'existe plus.
+
+--mirror::
+	Au lieu de nommer chaque réf à pousser, spécifier que toutes les réfs sous `refs/` (ce qui inclut mais n'est pas limité à `refs/heads/`, `refs/remotes/`, et `refs/tags/`) soient reflétées dans le dépôt distant. Les réfs locales nouvellement créées seront poussées vers l'autre extrémité, les réfs mises à jour localement seront mises à jour de force sur l'extrémité distante, et les réfs supprimées seront supprimées de l'extrémité distante. C'est la valeur par défaut si l'option de configuration `remote.<distant>.mirror` est définie.
+
+-n::
+--dry-run::
+	Fait tout sauf envoyer les mises à jour.
+
+--porcelain::
+	Produire une sortie lisible par machine. La ligne d'état de sortie pour chaque référence sera séparée par des tabulations et envoyée à stdout au lieu de stderr. Les noms symboliques complets des réfs seront donnés.
+
+-d::
+--delete::
+	Toutes les références listées sont supprimées du dépôt distant. Cela revient à préfixer toutes les références par deux points.
+
+--tags::
+	Toutes les références sous `refs/tags` sont poussées, en plus des spéc-de-réfs explicitement listés sur la ligne de commande.
+
+--follow-tags::
+	Pousser tous les réfs qui seraient poussées sans cette option, et pousser aussi les étiquettes annotées dans `refs/tags` qui sont manquantes du distant mais qui pointent vers le commit-esque qui sont accessibles depuis les réfs poussées. Cela peut également être spécifié avec la variable de configuration `push.followTags`. Pour plus d'informations, voir `push.followTags` dans linkgit:git-config[1].
+
+--[no-]signed::
+--signed=(true|false|if-asked)::
+	Signer avec GPG la demande de poussée pour mettre à jour les références du côté réception, pour lui permettre d'être vérifié par les crochets et/ou d'être enregistrée. Si `false` ou `--no-signed`, aucune signature ne sera tentée. Si `true` ou `--signed`, la poussée échouera si le serveur ne prend pas en charge les poussées signées. S'il est défini sur `if-asked`, signer si et seulement si le serveur prend en charge les poussées signées. La poussée échouera également si l'appel réel à `gpg --sign` échoue. Voir linkgit:git-receive-pack[1] pour les détails sur l'extrémité réceptrice.
+
+--[no-]atomic::
+	Utiliser une transaction atomique à distance, si possible. Soit toutes les références sont mises à jour, soit, en cas d'erreur, aucune référence n'est mise à jour. Si le serveur ne prend pas en charge les poussées atomiques, la poussée échouera.
+
+-o <option>::
+--push-option=<option>::
+	Transmettre la chaîne donnée au serveur, qui les transmet au crochet pre-receive ainsi qu'au crochet post-receive. La chaîne donnée ne doit pas contenir de caractère NUL ou LF. Lorsque plusieurs `--push-option=<option>` sont donnés, ils sont tous envoyés de l'autre côté dans l'ordre indiqué sur la ligne de commande. Lorsqu'aucun `--push-option=<option>` n'est donné en ligne de commande, les valeurs de la variable de configuration `push.pushOption` sont utilisées à la place.
+
+--receive-pack=<git-receive-pack>::
+--exec=<git-receive-pack>::
+	Chemin d'accès au programme 'git-receive-pack' sur l'extrémité distante. Parfois utile lorsque vous poussez vers un dépôt distant via ssh, et que vous n'avez pas le programme dans un répertoire sur le $PATH par défaut.
+
+--[no-]force-with-lease::
+--force-with-lease=<nom-de-réf>::
+--force-with-lease=<nom-de-réf>:<attendu>::
+	Habituellement, "git push" refuse de mettre à jour une référence distante qui n'est pas un ancêtre de la référence locale utilisée pour la remplacer.
++
+Cette option passe outre cette restriction si la valeur actuelle de la référence distante est la valeur attendue. "git push" échoue sinon.
++
+Imaginez que vous devez rebaser ce que vous avez déjà publié. Vous devrez contourner la règle "doit avancer rapidement" afin de remplacer l'historique que vous avez initialement publié par l'historique rebasé. Si quelqu'un d'autre a construit sur votre historique d'origine pendant que vous rebasez, le sommet de la branche distante peut avoir avancé avec son commit, et pousser aveuglément avec `--force` éliminera son travail.
++
+Cette option vous permet de dire que vous vous attendez à ce que l'historique que vous mettez à jour est ce que vous avez rebasé et que vous souhaitez remplacer. Si la référence distante pointe toujours sur le commit que vous avez spécifié, vous pouvez être sûr qu'aucune autre personne n'a fait quoi que ce soit à la référence. C'est comme prendre un "contrat" sur la référence sans la verrouiller explicitement, et la référence distante n'est mise à jour que si le "contrat" est toujours valide.
++
+Seul `--force-with-lease`, sans préciser les détails, protégera toutes les références distantes qui vont être mises à jour en exigeant leur valeur actuelle à être la même que la branche de suivi à distance que nous avons pour eux.
++
+`--force-with-lease=<nom-de-réf>`, sans spécifier la valeur attendue, protégera (seulement) la référence nommée, si elle va être mise à jour, en exigeant que sa valeur actuelle soit la même que la branche de suivi à distance que nous avons pour elle.
++
+`--force-with-lease=<nom-de-réf>:<attendu>` protégera (seulement) la référence nommée, si elle va être mise à jour, en exigeant que sa valeur actuelle soit la même que la valeur spécifiée `<attendu > `(qui peut être différente de la branche de suivi à distance que nous avons pour le nom de référence, ou si nous n'avons même pas besoin d'avoir une telle branche de suivi à distance lorsque cette forme est utilisée). Si `<attendu>` est la chaîne vide, alors la référence nommée ne doit pas déjà exister.
++
+Notez que toutes les formes autres que `--force-with-lease=<nom-de-réf>:<attendu>` qui spécifie explicitement la valeur actuelle attendue de la référence sont toujours expérimentales et leur sémantique peut changer à mesure que nous acquérons de l'expérience avec cette fonctionnalité.
++
+"--no-force-with-lease" annulera tous les précédents --force-with-lease sur la ligne de commande.
++
+Une note générale sur la sécurité : fournir cette option sans valeur attendue, c'est-à-dire que `--force-with-lease` ou `--force-with-lease=<nom-de-réf>` interagit très mal avec tout ce qui exécute implicitement `git fetch` sur le distant pour être poussé en arrière-plan, par exemple `git fetch origin` sur votre dépôt dans un job cron.
++
+La protection qu'il offre par rapport à `--force` est d'assurer que les modifications ultérieures sur lesquelles votre travail n'était pas basé ne sont pas supprimées, mais elle est trivialement réduite à néant si un processus de mise à jour des références est effectué en arrière-plan. Nous n'avons rien d'autre que les informations de suivi à distance à utiliser comme heuristique pour les références que vous êtes censé avoir vues et que vous êtes prêt à supprimer.
++
+Si votre éditeur ou un autre système exécute `git fetch` en arrière-plan pour vous, un moyen d'atténuer cela est simplement de configurer un autre distant :
++
+	git remote add origin-push $(git config remote.origin.url)
+	git fetch origin-push
++
+Maintenant, lorsque le processus d'arrière-plan exécute `git fetch origin`, les références sur` origin-push` ne seront pas mises à jour, et donc des commandes comme :
++
+	git push --force-with-lease origin-push
++
+Échouera à moins que vous ne lanciez manuellement `git fetch origin-push`. Cette méthode est bien sûr entièrement contrecarrée par quelque chose qui lance `git fetch --all`, auquel cas vous devrez soit la désactiver soit faire quelque chose de plus fastidieux comme :
++
+	git fetch              # mettre à jour 'master' depuis le distant
+	git tag base master    # étiqueter notre point de base
+	git rebase -i master   # réécrire quelques commits
+	git push --force-with-lease=master:base master:master
++
+C'est-à-dire créer une étiquette `base` pour les versions du code amont que vous avez vues et que vous êtes prêt à écraser, puis réécrire l'historique, et enfin forcer la poussée des modification vers `master` si la version distante est toujours à `base`, indépendamment de ce que votre `remotes/origin/master` local a été mis à jour en arrière-plan.
++
+Alternativement, spécifier `--force-if-includes` comme une option auxiliaire avec `--force-with-lease[=<nom-de-réf>]` (c'est-à-dire sans dire vers quel commit exact la réf du côté distant doit pointer, ou quelles réfs du côté distant sont protégées) au moment de "push" vérifiera si les mises à jour des réfs du côté distant qui peuvent avoir été implicitement mises à jour en arrière-plan sont intégrées localement avant d'autoriser une mise à jour forcée.
+
+-f::
+--force::
+	Habituellement, la commande refuse de mettre à jour une référence distante qui n'est pas un ancêtre de la référence locale utilisée pour la remplacer. De plus, lorsque l'option `--force-with-lease` est utilisée, la commande refuse de mettre à jour une référence distante dont la valeur actuelle ne correspond pas à ce qui est attendu.
++
+Ce drapeau désactive ces contrôles et peut entraîner la perte de commits du dépôt distant ; utilisez-le avec précaution.
++
+Notez que `--force` s'applique à toutes les refs qui sont poussées, donc l'utiliser avec `push.default` réglé sur `matching` ou avec plusieurs destinations de poussée configurées avec `remote.*.push` peut écraser les refs autres que la branche courante (y compris les refs locales qui sont strictement derrière leur homologue distante). Pour forcer un push vers une seule branche, utilisez un " + " devant le spécificateur de référence à pousser (par exemple `git push origin +master` pour forcer une poussée vers la branche `master`). Voir la section `<spéc-de -réf>...` ci-dessus pour plus de détails.
+
+--[no-]force-if-includes::
+	Ne forcer une mise à jour que si le sommet de la référence de suivi à distance a été intégré localement.
++
+Cette option permet de vérifier si le sommet de la référence de suivi à distance est accessible depuis l'une des entrées "reflog" de la branche locale qui est basée dessus pour une réécriture. Cette vérification permet de s'assurer que toutes les mises à jour du distant ont été incorporées localement en rejetant la mise à jour forcée si ce n'est pas le cas.
++
+Si l'option est passée sans spécifier `--force-with-lease`, ou spécifiée avec `--force-with-lease=<nom-de-réf>:<attendu>`, c'est un "no-op".
++
+Spécifier `--no-force-if-includes` désactive ce comportement.
+
+--repo=<dépôt>::
+	Cette option est équivalente à l'argument <dépôt>. Si les deux sont spécifiés, l'argument de la ligne de commande a la priorité.
+
+-u::
+--set-upstream::
+	Pour chaque branche qui est à jour ou poussée avec succès, ajoutet une référence de suivi amont, utilisée par les commandes sans argument linkgit:git-pull[1] et autres. Pour plus d'informations, voir `branch.<nom>.merge` dans linkgit:git-config[1].
+
+--[no-]thin::
+	Ces options sont passées à linkgit:git-send-pack[1]. Un transfert fin réduit considérablement la quantité de données envoyées lorsque l'expéditeur et le destinataire ont de nombreux objets identiques en commun. La valeur par défaut est `--thin`.
+
+-q::
+--quiet::
+	Supprimer toutes les sorties, y compris la liste des références mises à jour, à moins qu'une erreur ne se produise. Les progrès ne sont pas signalés dans le flux d'erreurs standard.
+
+-v::
+--verbose::
+	Mode bavard.
+
+--progress::
+	L'état d'avancement est affiché sur la sortie d'erreur standard quand elle est attachée à un terminal, à moins que -q soit spécifié. Ce drapeau force l'état d'avancement même si le flux d'erreur standard n'est pas dirigé vers un terminal.
+
+--no-recurse-submodules::
+--recurse-submodules=check|on-demand|only|no::
+	Peut être utilisé pour s'assurer que tous les commits de sous-module utilisés par les révisions à pousser sont disponibles sur une branche de suivi à distance. Si 'check' est utilisé, Git vérifiera que tous les commits de sous-module qui ont changé dans les révisions à pousser sont disponibles sur au moins une branche distante du sous-module. S'il manque des validations, la poussée sera interrompue et sortira avec un statut non nul. Si 'on-demand' est utilisé, tous les sous-module qui ont été modifiés dans les révisions à pousser seront poussés. Si 'on-demand' n'a pas pu pousser toutes les révisions nécessaires, il sera également interrompu et sortira avec un statut non nul. Si 'only' est utilisé, tous les sous-modules seront poussés alors que le superprojet est laissé sans poussée. La valeur 'no' ou l'utilisation de `--no-recurse-submodules` peut être utilisée pour remplacer la variable de configuration push.recurseSubmodules lorsqu'aucune récursion de sous-module n'est nécessaire.
++
+Lors de l'utilisation de 'on-demand' ou 'only', si un sous-module possède une configuration "push.recurseSubmodules={on-demand,only}" ou "submodule.recurse", une récursion supplémentaire se produira. Dans ce cas, "only" est traité comme "on-demand".
+
+--[no-]verify::
+	Basculer le crochet de pré-poussée 'pre-push' (voir linkgit:githooks[5]). La valeur par défaut est --verify, ce qui donne au crochet une chance d'empêcher la poussée. Avec --no-verify, le crochet est complètement contourné.
+
+-4::
+--ipv4::
+	Utiliser uniquement les adresses IPv4, en ignorant les adresses IPv6.
+
+-6::
+--ipv6::
+	Utiliser uniquement les adresses IPv6, en ignorant les adresses IPv4.
+
+URL GIT[[URLS]]
+---------------
+
+En général, les URL contiennent une information sur le protocole de transport, l'adresse du serveur distant et le chemin vers le dépôt. En fonction du protocole de transport, certaines de ces informations peuvent être absentes.
+
+Git supporte les protocoles ssh, git, http et https (en plus, ftp et ftps peuvent être utilisés pour la récupération, mais ceux-ci sont inefficaces et déconseillés ; ne les utilisez pas).
+
+Le transport natif (c'est-à-dire l'URL git://) n'utilise pas d'authentification et ne devrait être utilisé qu'avec précaution sur des réseaux non sécurisés.
+
+Les syntaxes suivantes peuvent être utilisées avec eux :
+
+- ++ssh://++{startsb}__<utilisateur>__++@++{endsb}__<hôte>__{startsb}++:++__<port>__{endsb}++/++__<chemin-du-dépôt-git>__
+- ++git://++__<hôte>__{startsb}:__<port>__{endsb}++/++__<chemin-du-dépôt-git>__
+- ++http++{startsb}++s++{endsb}++://++__<hôtet>__{startsb}++:++__<port>__{endsb}++/++__<chemin-du-dépôt-git>__
+- ++ftp++{startsb}++s++{endsb}++://++__<hôte>__{startsb}++:++__<port>__{endsb}++/++__<chemin-du-dépôt-git>__
+
+Une syntaxe alternative de type scp peut aussi être utilisée pour le protocole ssh :
+
+- {startsb}__<utilisateur>__++@++{endsb}__<hôte>__++:/++__<chemin-du-dépôt-git>__
+
+Cette syntaxe n'est reconnue que s'il n'y a pas de barre oblique devant les premiers deux-points. Cela permet de prendre en charge des chemins locaux qui contiendraient des deux-points. Par exemple, le chemin local `toto:titi` pourrait être spécifié comme un chemin absolu ou `./toto:titi` pour éviter d'être interprété comme une url ssh.
+
+Les protocoles ssh et git supportent en plus l'expansion ++~++__<utilisateur>__  :
+
+- ++ssh://++{startsb}__<utilisateur>__++@++{endsb}__<hôte>__{startsb}++:++__<port>__{endsb}++/~++__<utilisateur>__++/++__<chemin-du-dépôt-git>__
+- ++git://++__<hôte>__{startsb}++:++__<port>__{endsb}++/~++__<utilisateur>__++/++__<chemin-du-dépôt-git>__
+- {startsb}__<utilisateur>__++@++{endsb}__<hôte>__++:~++__<utilisateur>__++/++__<chemin-du-dépôt-git>__
+
+Pour les dépôts locaux, supportés aussi nativement par Git, les syntaxes suivantes sont aussi admises :
+
+- `/chemin/du/dépôt.git/`
+- ++file:///chemin/du/dépôt.git/++
+
+ifndef::git-clone[]
+Ces deux syntaxes sont à peu près équivalentes, à part lors d'un clonage, où la première implique l'option `--local`. Voir linkgit:git-clone[1] pour plus de détails.
+endif::git-clone[]
+
+ifdef::git-clone[]
+Ces deux syntaxes sont à peu près équivalentes, à part que la première implique l'option `--local`.
+endif::git-clone[]
+
+`git clone`, `git fetch` et `git pull`, mais pas `git push`, acceptent également un fichier paquet approprié. Voir linkgit:git-bundle[1].
+
+Quand Git ne sait pas comment gérer un certain protocole, il essaie d'utiliser l'assistant de gestion de distant `remote-`{empty}__<transport>__, s'il existe. Pour requérir l'emploi d'un assistant spécifique, la syntaxe suivante peut être utilisée :
+
+- _<transport>_::__<adresse>__
+
+où _<adresse>_ peut être un chemin, un serveur et chemin, ou une chaîne URL arbitraire reconnue par l'assistant de gestion de distant invoqué. Voir linkgit:gitremote-helpers[7] pour plus de détails.
+
+S'il y a un grand nombre de dépôts aux noms similaires et que vous souhaitez utiliser un format différent pour eux (de telle sorte que les URL que vous utiliserez seront réécrites en URL fonctionnelles), vous pouvez créer une section de configuration de la forme :
+
+[verse]
+--
+	[url "__<veritable-base-d-url>__"]
+		insteadOf = _<autre-base-d'URL>_
+--
+
+Par exemple, avec ceci :
+
+------------
+	[url "git://git.host.xz/"]
+		insteadOf = host.xz:/chemin/vers/
+		insteadOf = travail:
+------------
+
+une URL comme « travail:depot.git » ou « host.xz:/chemin/vers/depot.git » sera réécrite dans tout contexte qui requiert une URL en « git://git.host.xz/depot.git ».
+
+Si vous souhaitez réécrire les URL seulement pour pousser, vous pouvez créer une section de configuration de la forme :
+
+[verse]
+--
+	[url "__<veritable-base-d'URL>__"]
+		pushInsteadOf = _<autre-base-d-URL>_
+--
+
+Par exemple, avec ceci :
+
+------------
+	[url "ssh://exemple.org/"]
+		pushInsteadOf = git://exemple.org/
+------------
+
+une URL telle que « git://exemple.org/chemin/vers/le/depot.git » sera réécrite en « ssh://exemple.org/chemin/vers/le/depot.git » pour les poussées, mais les tirages utiliseront encore l'URL originale.
+[]
+
+DISTANTS[[REMOTES]]
+-------------------
+
+Le nom de l'un des éléments suivants peut être utilisé à la place d'une URL en tant qu'argument `<dépôt>` :
+
+* un distant dans le fichier de configuration Git : `$GIT_DIR/config`,
+* un fichier dans le répertoire `$GIT_DIR/remotes`, ou
+* un fichier dans le répertoire `$GIT_DIR/branches`.
+
+Toutes ces options vous permettent également d'omettre le spécificateur de référence de la ligne de commande car elles contiennent chacune un spécificateur de référence que git utilisera par défaut.
+
+distant nommé dans le fichier de configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vous pouvez choisir de fournir le nom d'un distant que vous aviez précédemment configuré en utilisant linkgit:git-remote[1], linkgit:git-config[1] ou même par une modification manuelle du fichier `$GIT_DIR/config`. L'URL de ce distant sera utilisée pour accéder au dépôt. Le spécificateur de référence de ce distant sera utilisé par défaut lorsque vous ne fournissez pas de spécificateur de référence sur la ligne de commande. L'entrée dans le fichier de configuration apparaîtra comme ceci :
+
+------------
+	[remote "<nom>"]
+		url = <URL>
+		pushurl = <url-poussée>
+		push = <spéc-de-réf>
+		fetch = <spéc-de-réf>
+------------
+
+Le `<url-de-poussée>` est utilisé uniquement pour les poussées. Il est optionnel et sa valeur par défaut est `<URL>`. Pousser vers un distant affecte tous les urls-de-poussés définis ou tous les urls définis si aucun url-de-poussée n'est défini. Fetch, cependant, ne récupérera que le premier url défini si plusieurs urls sont définis.
+
+Fichier nommé dans `$GIT_DIR/remotes`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vous pouvez choisir de fournir le nom d'un fichier dans `$GIT_DIR/remotes`. L'URL dans ce fichier sera utilisée pour accéder au dépôt. Le spécificateur de référence dans ce fichier sera utilisé par défaut lorsque vous ne fournissez pas de spécificateur de référence sur la ligne de commande. Ce fichier doit avoir le format suivant :
+
+------------
+	URL: un des format d'URL ci-dessus
+	Push: <spéc-de-réf>
+	Pull: <spéc-de-réf>
+
+------------
+
+Les lignes `Push:`" sont utilisées par 'git push' et les lignes `Pull:` sont utilisées par 'git pull' et 'git fetch'. Des lignes `Push:` et `Pull:` multiples peuvent être spécifiées pour des mappages supplémentaires de branches.
+
+Fichier nommé dans `$GIT_DIR/branches`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vous pouvez choisir de fournir le nom d'un fichier dans `$GIT_DIR/branches`. L'URL de ce fichier sera utilisée pour accéder au dépôt. Ce fichier doit avoir le format suivant :
+
+
+------------
+	<URL>#<tête>
+------------
+
+`<URL>` est obligatoire ; `#<tête>` est facultatif.
+
+En fonction de l'opération, git utilisera l'un des spécificateurs de référence suivants, si vous n'en fournissez pas un en ligne de commande. `<branche>` est le nom de ce fichier dans `$GIT_DIR/branches` et `<tête>` vaut par défaut `master`.
+
+git fetch utilise :
+
+------------
+	refs/heads/<tête>:refs/heads/<branche>
+------------
+
+git push utilise :
+
+------------
+	HEAD:refs/heads/<tête>
+------------
+
+
+
+
+[]
+
+SORTIE
+------
+
+La sortie de "git push" dépend de la méthode de transport utilisée ; cette section décrit la sortie lors du passage par protocole Git (soit localement soit via ssh).
+
+L'état de la poussée est affiché sous forme de tableau, chaque ligne représentant l'état d'une seule référence. Chaque ligne est de la forme :
+
+-------------------------------
+ <drapeau> <résumé> <de> -> <à> (<raison>)
+-------------------------------
+
+Si --porcelain est utilisé, alors chaque ligne de la sortie est de la forme :
+
+-------------------------------
+ <drapeau> \t <de>:<à> \t <résumé> (<raison>)
+-------------------------------
+
+L'état des références à jour n'est indiqué que si l'option --porcelaine ou --verbose est utilisée.
+
+drapeau::
+	Un seul caractère indiquant le statut de la référence :
+(espace);; pour une poussée en avance rapide réussie ;
+`+`;; pour une mise à jour forcée avec succès ;
+`-`;; pour une réf. supprimée avec succès ;
+`*`;; pour une nouvelle référence poussée avec succès ;
+`!`;; pour une référence qui a été rejetée ou qui n'a pas réussi à être poussée ; et
+`=`;; pour une référence qui était à jour et n'avait pas besoin d'être poussée.
+
+résumé::
+	Pour une réf poussée avec succès, le résumé montre les anciennes et les nouvelles valeurs de la réf sous une forme qui peut être utilisée comme argument pour `git log` (c'est `<ancien>..<nouveau>` dans la plupart des cas, et `<ancien>...<nouveau>` pour les mises à jour forcées pas en avance rapide).
++
+En cas d'échec de la mise à jour, de plus amples détails sont donnés :
++
+--
+rejeté::
+	Git n'a pas du tout essayé d'envoyer la référence, généralement parce que ce n'est pas une avance rapide et que vous n'avez pas forcé la mise à jour.
+
+le distant a rejeté::
+	Le serveur distant a refusé la mise à jour. Généralement causé par un crochet du côté distant, ou parce que le dépôt distant a l'une des options de sécurité suivantes en vigueur : `receive.denyCurrentBranch` (pour les poussées vers la branche extraite), `receive.denyNonFastForwards` (pour les mises à jour forcées mais pas en avance rapide), `receive.denyDeletes` ou `receive.denyDeleteCurrent`. Voir linkgit:git-config[1].
+
+échec distant::
+	Le serveur distant n'a pas signalé la mise à jour réussie de la référence, peut-être en raison d'une erreur temporaire du côté distant, d'une rupture de la connexion réseau ou d'une autre erreur transitoire.
+--
+
+de::
+	Le nom de la référence locale qui est poussée, moins son préfixe `refs/<type>/`. En cas de suppression, le nom de la référence locale est omis.
+
+à::
+	Le nom de la référence distante en cours de mise à jour, moins son préfixe `refs/<type>/`.
+
+raison::
+	Une explication compréhensible. Dans le cas des références qui ont été poussées avec succès, aucune explication n'est nécessaire. Dans le cas d'une référence en échec, la raison de l'échec est décrite.
+
+NOTE SUR LES AVANCES RAPIDES
+----------------------------
+
+Lorsqu'une mise à jour modifie une branche (ou plus généralement, une réf) qui pointait auparavant vers le commit A pour pointer vers un autre commit B, on parle de mise à jour en avance rapide si et seulement si B est un descendant de A.
+
+Dans une mise à jour rapide de A à B, l'ensemble des commits sur lesquels le commit original A s'appuyait est un sous-ensemble des commits sur lesquels le nouveau commit B s'appuie. Ainsi, il ne perd pas d'historique.
+
+En revanche, une mise à jour pas en avance rapide fera perdre de l'historique. Par exemple, supposons que vous et quelqu'un d'autre ayez commencé au même commit X, et que vous ayez construit un historique menant au commit B alors que l'autre personne a construit un historique menant au commit A. L'historique ressemble à ceci :
+
+----------------
+
+      B
+     /
+ ---X---A
+
+----------------
+
+Supposons en outre que l'autre personne ait déjà poussé les modifications menant à A vers le dépôt original dont vous avez tous deux obtenu le commit X original.
+
+La poussée effectuée par l'autre personne a mis à jour la branche qui pointait sur le commit X pour pointer sur le commit A. Il s'agit d'une avance rapide.
+
+Mais si vous essayez de pousser, vous essaierez de mettre à jour la branche (qui pointe maintenant vers A) avec le commit B. Cela ne fait _pas_ d'avance rapide. Si vous le faites, les modifications introduits par le commit A seront perdues, car tout le monde va maintenant commencer à construire sur B.
+
+La commande par défaut ne permet pas une mise à jour qui ne soit pas une avance rapide pour éviter une telle perte d'historique.
+
+Si vous ne voulez pas perdre votre travail (historique de X à B) ou le travail de l'autre personne (historique de X à A), vous devez d'abord récupérer l'historique du dépôt, créer un historique qui contient les modifications effectuées par les deux parties et repousser le résultat.
+
+Vous pouvez effectuer un "git pull", résoudre les conflits potentiels et "git push" le résultat. Un "git pull" créera un commit de fusion C entre les commit A et B.
+
+----------------
+
+      B---C
+     /   /
+ ---X---A
+
+----------------
+
+La mise à jour de A avec le commit de fusion résultant sera une avance rapide et votre poussée sera acceptée.
+
+Vous pouvez également rebaser votre modification entre X et B sur A, avec "git pull --rebase", et pousser le résultat. Le rebasage créera un nouveau commit D qui construit la modification entre X et B sur A.
+
+----------------
+
+      B   D
+     /   /
+ ---X---A
+
+----------------
+
+Là encore, la mise à jour de A avec ce commit sera en avance rapide et votre poussée sera acceptée.
+
+Il existe une autre situation courante dans laquelle vous pouvez rencontrer un rejet du fait d'absence d'avance rapide lorsque vous essayez de pousser, et c'est possible même lorsque vous poussez dans un dépôt dans lequel personne d'autre ne pousse. Après avoir vous-même poussé le commit A (dans la première image de cette section), remplacez-le par "git commit --amend" pour produire le commit B, et vous essayez de le pousser, parce que vous avez oublié que vous avez déjà poussé A. Dans un tel cas, et seulement si vous êtes certain que personne n'a récupéré votre commit A précédent (et a commencé à construire dessus), vous pouvez lancer "git push --force" pour l'écraser. En d'autres termes, "git push --force" est une méthode réservée aux cas où vous voulez vraiment perdre l'historique.
+
+
+EXEMPLES
+--------
+
+`git push`::
+	Fonctionne comme `git push <distant>`, où <distant> est le distant de la branche actuelle (ou `origin`, si aucun distant n'est configuré pour la branche actuelle).
+
+`git push origin`::
+	Sans configuration supplémentaire, pousse la branche en cours vers l'amont configuré (variable de configuration `branch.<nom>.merge`) si elle a le même nom que la branche actuelle et génère des erreurs sans pousser autrement.
++
+Le comportement par défaut de cette commande quand aucun <spec-de-réf> n'est donné peut être configuré en définissant l'option `push` du distant, ou la variable de configuration `push.default`.
++
+Par exemple, pour pousser par défaut uniquement la branche actelle vers `origin`, utilisez `git config remote.origin.push HEAD`. Tout <spec-de-réf> valide (comme ceux des exemples ci-dessous) peut être configuré par défaut pour `git push origin`.
+
+`git push origin :`::
+	Pousse les branches "correspondantes" sur `originè. Voir <spec-de-réf> dans la section <<OPTIONS,OPTIONS>> ci-dessus pour une description des branches "correspondantes".
+
+`git push origin master`::
+	Trouve une réf qui correspond à `master` dans le dépôt source (le plus souvent, trouvera `refs/heads/master`), et met à jour la même réf (par exemple `refs/heads/master`) dans le dépôt `origin` avec elle. Si `master` n'existait pas à distance, elle serait créée.
+
+`git push origin HEAD`::
+	Un moyen pratique de pousser la branche actuelle vers le même nom sur le distant.
+
+`git push vaisseaumère master:satellite/master dev:satellite/dev`::
+	Utiliser la référence source qui correspond à `master` (par exemple `refs/heads/master`) pour mettre à jour la référence qui correspond à `satellite/master` (très probablement `refs/remotes/satellite/master`) dans le dépôt `vaisseaumère` ; faire de même pour `dev` et `satellite/dev`.
++
+Voir la section décrivant `<spéc-de-réf>...` ci-dessus pour une discussion sur la sémantique de correspondance.
++
+Il s'agit d'émuler `git fetch` exécuté sur le `vaisseaumère` en utilisant `git push` qui est exécuté dans la direction opposée afin d'intégrer le travail effectué sur `satellite`, et est souvent nécessaire lorsque vous ne pouvez établir la connexion que dans un seul sens (c'est-à-dire que le satellite peut ssh dans vaisseaumère mais que le vaisseaumère ne peut pas établir de connexion avec satellite parce que ce dernier se trouve derrière un pare-feu ou n'exécute pas sshd).
++
+Après avoir lancé ce `git push` sur la machine `satellite`, vous ouvririez un ssh sur le `vaisseaumère` et y lanceriez `git merge` pour compléter l'émulation de `git pull` qui était lancée sur `vaisseaumère` afin de tirer les modifications faites sur `satellite`.
+
+`git push origin HEAD:master`::
+	Pousser la branche actuelle vers la référence distante correspondant à `master` dans le dépôt `origin`. Cette forme est pratique pour pousser la branche actuelle sans avoir à penser à son nom local.
+
+`git push origin master:refs/heads/experimental`::
+	Créer la branche `experimental` dans le dépôt `origin` en copiant la branche `master` actuelle. Cette forme n'est nécessaire que pour créer une nouvelle branche ou étiquette dans le dépôt distant lorsque le nom local et le nom distant sont différents ; sinon, le nom de la réf seul fonctionnera.
+
+`git push origin :experimental`::
+	Trouver une ref qui correspond à `experimental` dans le dépôt `origin` (par exemple `refs/heads/experimental`), et la supprimer.
+
+`git push origin +dev:master`::
+	Mettre à jour la branche master du dépôt origin avec la branche dev, ce qui permet des mises à jour en mode non avance rapide. *Ceci peut laisser des commits non référencés dans le dépôt origin.* Considérez la situation suivante, où une avance rapide n'est pas possible :
++
+----
+	    o---o---o---A---B  origin/master
+		     \
+		      X---Y---Z  dev
+----
++
+La commande ci-dessus changerait le dépôt origin en
++
+----
+		      A---B  (branche sans nom)
+		     /
+	    o---o---o---X---Y---Z  master
+----
++
+Les commits A et B n'appartiendraient plus à une branche portant un nom symbolique, et seraient donc injoignables. Dans cet état, ces commits seraient supprimés par une commande `git gc` sur le dépôt origin.
+
+SÉCURITÉ
+--------
+Les protocoles "fetch" et "push" ne sont pas conçus pour empêcher un tiers de voler des données de l'autre dépôt qui n'étaient pas destinées à être partagées. Si vous avez des données privées que vous devez protéger contre un tiers malveillant, la meilleure solution est de les stocker dans un autre dépôt. Cela s'applique aussi bien aux clients qu'aux serveurs. En particulier, les espaces de noms sur un serveur ne sont pas efficaces pour le contrôle de l'accès en lecture ; vous ne devez accorder l'accès en lecture à un espace de noms qu'aux clients auxquels vous feriez confiance pour l'accès en lecture à l'ensemble du dépôt.
+
+Les vecteurs d'attaque connus sont les suivants :
+
+. La victime envoie des lignes "have" annonçant les identifiants des objets qu'elle possède et qui ne sont pas explicitement destinés à être partagés, mais qui peuvent être utilisés pour optimiser le transfert si le pair les possède également. L'attaquant choisit un ID d'objet X à voler et envoie une référence à X, mais n'est pas obligé d'envoyer le contenu de X parce que la victime l'a déjà. La victime croit maintenant que l'attaquant a X, et elle lui renvoie le contenu de X plus tard. (Cette attaque est la plus simple à réaliser pour un client sur un serveur, en créant une référence à X dans l'espace de noms auquel le client a accès et en la récupérant ensuite. La façon la plus probable pour un serveur de l'exécuter sur un client est de "fusionner" X dans une branche publique et d'espérer que l'utilisateur fasse un travail supplémentaire sur cette branche et la repousse vers le serveur sans remarquer la fusion).
+
+. Comme en n°1, l'attaquant choisit un objet ID X à voler. La victime envoie un objet Y que l'attaquant possède déjà, et l'attaquant prétend faussement avoir X et non Y, de sorte que la victime envoie Y comme delta contre X. Le delta révèle à l'attaquant des régions de X qui sont similaires à Y.
+[]
+
+CONFIGURATION
+-------------
+
+
+
+[WARNING]
+====
+Missing `fr/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/push.txt`
+
+See original version for this content.
+====
+
+[]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

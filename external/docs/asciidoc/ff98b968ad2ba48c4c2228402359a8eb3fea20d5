@@ -1,0 +1,165 @@
+git-credential(1)
+=================
+
+名称
+--
+git-credential - 检索和存储用户证书
+
+概述
+--
+------------------
+'git credential' (fill|approve|reject|capability)
+------------------
+
+描述
+--
+
+Git 有一个内部接口，用于存储和检索来自系统特定帮助器的凭证，以及提示用户输入用户名和密码。git-credential 命令将这个接口暴露给脚本，这些脚本可能希望以与 Git 相同的方式检索、存储或提示凭证。这个脚本接口的设计仿照了内部的 C 语言应用程序接口；更多概念的背景见 credential.h。
+
+git-credential 使用命令行上的 "action" 选项（`fill` 、`approve` 或 `reject` 之一），并在标准输入流上读取证书描述（参见 <<IOFMT,输入/输出格式>>）。
+
+如果动作是 `fill`，git-credential 将尝试通过读取配置文件、联系任何已配置的凭证助手或提示用户来向描述中添加 “用户名” 和 “密码” 属性。然后，凭证描述中的用户名和密码属性会和已经提供的属性一起打印到标准输出流。
+
+如果动作是 `approve`，git-credential 将把描述发送给任何配置的凭证助手，它们可以存储凭证供以后使用。
+
+如果动作是 `reject`，git-credential 将把描述发送到任何配置的凭证助手，这可能会删除任何与描述相匹配的存储凭证。
+
+如果操作是 `capability`，git-credential 将宣布它支持的所有功能到标准输出。
+
+如果动作是 `approve` 或 `reject`，就不应该有输出。
+
+git 凭证的典型用途
+-----------
+
+使用 git-credential 的应用程序通常会按照以下步骤使用 `git credential`：
+
+  1. 根据上下文生成一个凭证描述。
++
+例如，如果我们想要一个 `https://example.com/foo.git` 的密码，我们可能会生成下面的凭证描述（别忘了最后的空行；它告诉 `git credential`，应用程序已经完成了所有信息的输入）：
+
+	 protocol=https
+	 host=example.com
+	 path=foo.git
+
+  2. 要求 git-credential 为这个描述提供一个用户名和密码。这可以通过运行 `git credential fill` 来实现，将步骤（1）中的描述输入到其标准输入中。完整的凭证描述（包括凭证本身，即登录名和密码）将在标准输出中产生，比如：
+
+	protocol=https
+	host=example.com
+	username=bob
+	password=secr3t
++
+在大多数情况下，这意味着输入中给出的属性将在输出中重复出现，但Git也可以修改凭证描述，例如，当协议是HTTP(s)且 `credential.useHttpPath` 为假时，删除 `path` 属性。
++
+如果`git credential` 知道密码，在返回 `password=secr3t` 之前，这一步可能不涉及用户实际输入这个密码（用户可能输入了一个密码来代替解锁钥匙串，或者如果钥匙串已经被解锁，则没有进行用户交互）。
+
+  3. 使用该证书（例如，用步骤（2）中的用户名和密码访问 URL），看看是否被接受。
+
+  4. 报告密码的成功或失败。如果凭证允许操作成功完成，那么可以用 "approve" 动作标记，告诉 `git credential` 在下一次调用中重新使用它。如果操作过程中证书被拒绝，使用 "reject" 动作，这样 `git credential` 将在下一次调用中要求一个新的密码。在这两种情况下，`git credential` 应该被输入从步骤 (2) 中获得的凭证描述（其中也包含步骤(1)中提供的描述）。
+
+[[IOFMT]]
+输入/输出格式
+-------
+
+`git credential` 在其标准输入/输出中读取和/或写入（取决于使用的操作）凭证信息。这些信息可以对应于 `git credential` 将获得登录信息的键（如主机、协议、路径），或者对应于要获得的实际凭证数据（用户名/密码）。
+
+凭证被分割成一组命名的属性，每行一个属性。每个属性由一个键值对指定，用一个 `=`（等号）分隔，后面是换行。
+
+The key may contain any bytes except `=`, newline, or NUL. The value may contain any bytes except newline or NUL. A line, including the trailing newline, may not exceed 65535 bytes in order to allow implementations to parse efficiently.
+
+键值以 C 型数组括号 `[]` 结尾的属性可以有多个值。一个多值属性的每个实例形成一个有序的值列表--重复属性的顺序决定了值的顺序。一个空的多值属性（`key[]=\n`）的作用是清除之前的任何条目并重置列表。
+
+在所有情况下，所有字节都按原样处理（即没有引号，也不能传输带有换行或NUL的值）。属性列表以空行或文件结束来结束。
+
+Git 可理解以下属性：
+
+`protocol`::
+
+	将使用证书的协议（例如，`https`）。
+
+`host`::
+
+	网络凭证的远程主机名。 如果指定了端口号，这包括端口号（例如，"example.com:8088"）。
+
+`path`::
+
+	证书将被使用的路径。例如，对于访问远程 https 版本库，这将是服务器上版本库的路径。
+
+`username`::
+
+	证书的用户名，如果我们已经有了一个（例如，从URL、配置、用户，或从先前运行的帮助器）。
+
+`password`::
+
+	凭证的密码，如果我们要求它被存储。
+
+`password_expiry_utc`::
+
+	生成的密码，如 OAuth 访问令牌，可能有一个过期日期。 当从助手那里读取凭证时，`git credential fill` 会忽略过期的密码。表示为 Unix 时间 UTC，自 1970 年以来的秒数。
+
+`oauth_refresh_token`::
+
+	一个 OAuth 刷新令牌可以伴随着一个 OAuth 访问令牌的密码。帮助者必须像密码属性一样，将此属性视为机密。Git 本身对这个属性没有特殊行为。
+
+`url`::
+
+	当这个特殊属性被 `git credential` 读取时，该值被解析为一个 URL，并被当作其组成部分来处理（例如，`url=_00` 的行为就如同提供了 `protocol=https` 和 `host=example.com`）。这可以帮助调用者避免自己解析 URL。
++
+请注意，指定协议是强制性的，如果 URL 没有指定主机名（例如，"cert:///path/to/file"），证书将包含一个主机名属性，其值是一个空字符串。
++
+URL 中缺少的组件（例如，上面的例子中没有用户名）将不被设置。
+
+`authtype`::
+	这表明应该使用所提及的认证方案。对于 HTTP 和 HTTPS，常见的值包括 `basic`、`bearer` 和 `digest`，尽管后者不安全，不应使用。如果使用了 `credential`，这可能被设置为适合所涉及协议的任意字符串（通常是 HTTP）。
++
+除非在输入时提供了适当的功能（见下文），否则不应发送此值。
+
+`credential`::
+	预编码的凭据，适用于所涉及的协议（通常是 HTTP）。如果发送了这个键，`authtype` 是强制性的，而 `username` 和 `password` 将不被使用。对于 HTTP，Git 将 `authtype` 值和这个值用一个空格连接起来，以确定 `Authorization` 头部。
++
+除非在输入时提供了适当的功能（见下文），否则不应发送此值。
+
+`ephemeral`::
+	这个布尔值表示，如果为真，则凭据助手不应保存 `credential` 字段中的值，因为其有用性是有限的。例如，HTTP Digest `credential` 值是使用一次性随机数（nonce）计算的，重复使用它不会导致认证成功。这也可能用于凭证有效期较短的情况（例如，24小时凭证）。默认值为假。
++
+凭据助手仍然会被 `store` 或 `erase` 调用，以便它可以确定操作是否成功。
++
+除非在输入时提供了适当的功能（见下文），否则不应发送此值。
+
+`state[]`::
+	这个值提供了一个不透明的状态，如果该助手再次被调用，这个状态将回传给它。每个不同的凭据助手可以指定一次这个值。该值应包括一个唯一对应凭据助手的前缀，并应忽略不匹配其前缀的值。
++
+除非在输入时提供了适当的功能（见下文），否则不应发送此值。
+
+`continue`::
+	这是一个布尔值，如果启用，表示这次认证是一个多阶段认证步骤的非最终部分。这在诸如 NTLM 和 Kerberos 等协议中很常见，这些协议需要两轮客户端认证，设置这个标志允许凭据助手实现多阶段认证步骤。这个标志只应在需要进一步阶段时发送；也就是说，如果预期会有另一轮认证。
++
+除非在输入时提供了适当的功能（见下文），否则不应发送此值。这个属性是“单向”的，用于凭据助手将信息传递给 Git（或其他调用 `git credential` 的程序）。
+
+`wwwauth[]`::
+
+	当 Git 收到包含一个或多个 "WWW-Authenticate" 认证头的 HTTP 响应时，这些头将被 Git 传递给证书助手。
++
+每个 'WWW-Authenticate' 头的值都以多值属性 'wwwauth[]' 的形式传递，其中属性的顺序与它们在 HTTP 响应中出现的一样。这个属性是 Git 的 'one-way' 属性，用于传递额外的信息给证书助手。
+
+`capability[]`::
+	这表示 Git 或助手（视情况而定）支持所提及的功能。这可以用来作为协议的一部分提供更好、更具体的数据。`capability[]` 指令必须在其依赖的任何值之前，并且这些指令 _应该_ 是协议中宣布的第一项。
++
+目前支持两种功能。第一种是 `authtype`，它表示理解 `authtype`、`credential` 和 `ephemeral` 这些值。第二种是 `state`，它表示理解 `state[]` 和 `continue` 这些值。
++
+仅仅因为支持该功能并不意味着必须使用附加特性，但在没有该功能的情况下不应提供它们。
+
+Unrecognised attributes and capabilities are silently discarded.
+
+[[CAPA-IOFMT]]
+CAPABILITY INPUT/OUTPUT FORMAT
+------------------------------
+
+对于 `git credential capability`，格式略有不同。首先，会发出一个 `version 0` 的声明，以指示当前协议的版本，然后每个功能都会通过一行如 `capability authtype` 的方式宣布。凭据助手也可以实现这种格式，同样使用 `capability` 参数。未来可能会添加额外的行；调用者应该忽略它们不理解的行。
+
+由于这是凭据助手协议的新部分，旧版本的 Git 以及一些凭据助手可能不支持它。如果收到非零退出状态，或者第一行不以单词 `version` 和一个空格开头，调用者应假设不支持任何功能。
+
+这种格式的目的是以明确的方式将其与凭据输出区分开来。可以使用非常简单的凭据助手（例如，总是产生相同输出的内联 shell 脚本）。使用独特的格式允许用户继续使用这种语法，而无需担心正确实现功能广告或意外地让查询功能的调用者感到困惑。
+
+GIT
+---
+属于 linkgit:git[1] 文档

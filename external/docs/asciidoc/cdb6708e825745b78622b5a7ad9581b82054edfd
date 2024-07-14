@@ -1,0 +1,139 @@
+git-rerere(1)
+=============
+
+NOME
+----
+git-rerere - Reutilize a resolução registrada das mesclagens conflitantes
+
+RESUMO
+------
+[verse]
+'git rerere' [clear | forget <pathspec>... | diff | status | remaining | gc]
+
+DESCRIÇÃO
+---------
+
+Em um fluxo de trabalho que utiliza ramificações do tópico com vida útil relativamente longa, o desenvolvedor às vezes precisa resolver os mesmos conflitos de forma repetida até que o tópico das ramificações sejam concluídas (entre mesclagem no ramo "release" ou enviadas e aceitas na upstream).
+
+Este comando auxilia o desenvolvedor neste processo, registrando os resultados conflitantes do "automerge" e os resultados correspondentes da resolução manual na mesclagem manual inicial e aplicando as resoluções práticas gravadas anteriormente aos resultados correspondentes do "automerge".
+
+[NOTE]
+Você precisa definir a variável de configuração `rerere.enabled` para ativar este comando.
+
+
+COMANDOS
+--------
+
+Normalmente, o comando `git rerere` é executado sem argumentos ou intervenção do usuário. No entanto, ele tem vários comandos que lhe permitem interagir com seu estado de funcionamento.
+
+'clear'::
+
+Redefine os metadados usados pelo "rerere" se uma consolidação de mesclagem tiver que ser abortada. Ao invocar o comando 'git am [--skip|--abort]' ou 'git rebase [--skip|--abort]' invocará automaticamente este comando.
+
+'forget' <pathspec>::
+
+Redefina as resoluções de conflito que a rerere registrou para o conflito atual em <pathspec>.
+
+'diff'::
+
+Exibe as diferenças (diffs) para a condição atual da resolução. É útil para rastrear o que foi alterado enquanto o usuário está resolvendo conflitos. Argumentos adicionais são passados diretamente para o comando 'diff' do sistema instalado no `PATH`.
+
+'status'::
+
+Imprima os caminhos com conflitos cuja resolução da mesclagem "rerere" será registrada novamente.
+
+'remaining'::
+
+Imprime os caminhos com conflitos que não foram resolvidos automaticamente pelo "rerere". Isso inclui caminhos cujas resoluções não podem ser rastreadas pelo "rerere", como submódulos conflitantes.
+
+'gc'::
+
+Elimine os registros das mesclagens conflitantes que ocorreram há muito tempo. É predefinido que são eliminados os conflitos não resolvidos com mais de 15 dias e os conflitos resolvidos com mais de 60 dias. Estas predefinições são controladas pelas variáveis de configuração `gc.rerereUnresolved` e `gc.rerereResolved`, respectivamente.
+
+
+DISCUSSÃO
+---------
+
+Quando o tópico do seu ramo altera uma área sobreposta onde o ramo principal (ou "upstream") tocou desde que o tópico do ramo foi extraído, é possível testá-lo com o "master" mais recente, mesmo antes do tópico do ramo estar pronto para ser impulsionado na "upstream":
+
+------------
+              o---*---o topic
+             /
+    o---o---o---*---o---o master
+------------
+
+Para este teste, você precisa mesclar o mestre e o tópico de alguma maneira. Uma maneira de fazer isso é fazer o `pull` para obter o 'master' para o tópico da ramificação:
+
+------------
+	$ git switch topic
+	$ git merge master
+
+              o---*---o---+ topic
+             /           /
+    o---o---o---*---o---o master
+------------
+
+Os commits marcados com `*` tocam a mesma área no mesmo arquivo; você precisa resolver os conflitos ao criar o commit marcado com `+`. Em seguida, você pode testar o resultado para garantir que o trabalho em andamento ainda funcione com o que está no `master` mais recente.
+
+Após esta mesclagem de teste, há duas maneiras de continuar o seu trabalho sobre o tópico. O mais fácil é construir em cima da mesclagem do commit de teste `+` e, quando o seu trabalho no ramo do tópico estiver finalmente pronto, faça um `pull` no ramo do tópico para o `master` e/ou peça ao topo (upstream) para fazer o `pull` de você. Neste momento, no entanto, o `master` ou o topo (upstream) pode ter avançado desde a mesclagem de teste `+` e, nesse caso, o gráfico do commit final seria parecido com este:
+
+------------
+	$ git switch topic
+	$ git merge master
+	$ ... trabalha ambos os ramos topic e master
+	$ git switch master
+	$ git merge topic
+
+              o---*---o---+---o---o topic
+             /           /         \
+    o---o---o---*---o---o---o---o---+ master
+------------
+
+No entanto, quando o ramo do tópico tiver vida longa, ele acabará tendo muitos commits do tipo "Merge from master", o que sobrecarregará desnecessariamente o histórico de desenvolvimento. Os leitores da lista de discussão do kernel do Linux devem se lembrar de que Linus reclamou sobre essas mesclagens de teste muito frequentes quando um mantenedor do subsistema pediu para retirar de um ramo cheio de "mesclagens inúteis".
+
+Como uma alternativa, para manter o tópico do ramo limpo das mesclagens de teste, você pode afastar a mesclagem de teste e continuar construindo sobre o cume antes da mesclagem de teste:
+
+------------
+	$ git switch topic
+	$ git merge master
+	$ git reset --hard HEAD^ ;# retrocede a mesclagem test
+	$ ... trabalha ambos os ramos topic e master
+	$ git switch master
+	$ git merge topic
+
+              o---*---o-------o---o topic
+             /                     \
+    o---o---o---*---o---o---o---o---+ master
+------------
+
+Isso deixaria apenas uma mesclagem do commit quando a ramificação do tópico estivesse finalmente pronta e mesclada na ramificação principal. Esta mesclagem exigiria que você resolvesse o conflito, introduzido pelos commits marcados com `*`. No entanto, esse conflito geralmente é o mesmo conflito que você resolveu quando criou a mesclagem de teste que foi eliminada. O comando `git rerere` ajuda você a resolver essa mesclagem final conflitante usando as informações da sua resolução manual anterior.
+
+A execução do comando `git rerere` registra imediatamente após um registro 'automerge' conflitante nos arquivos conflitantes da árvore de trabalho, com os marcadores de conflito usuais `<<<<<<<`, `=======` e `>>>>>>>` neles. Mais tarde, após terminar de resolver os conflitos, a execução do comando `git rerere` novamente registrará o estado resolvido desses arquivos. Suponha que você tenha feito isso ao criar a mesclagem de teste do `master` no tópico do ramo.
+
+Na próxima vez, após ver o mesmo conflito de 'automerge', execute o comando `git rerere` executará uma mescla de três vias entre o 'automerge' conflitante anterior, a resolução manual anterior e o 'automerge' conflitante atual. Se essa mesclagem de três vias for resolvida de forma limpa, o resultado será gravado no arquivo da árvore de trabalho, para que você não precise resolvê-lo manualmente. Observe que o comando `git rerere` deixa o arquivo de índice sozinho, portanto, você ainda precisa fazer as verificações finais de sanidade com o comando `git diff` (ou `git diff -c`) e o `git add` quando estiver satisfeito.
+
+Como medida de conveniência, o comando `git merge` invoca automaticamente o `git rerere` ao sair com um automerge com falha e o `git rerere` registra a resolução manual quando é um novo conflito ou reutiliza a resolução manual anterior quando não é. O comando `git commit` também invoca o `git rerere` ao fazer um commit resultante de uma mesclagem. Isso significa que você não precisa fazer nada de especial (além de ativar a variável de configuração `rerere.enabled`).
+
+No nosso exemplo, quando você faz a mesclagem de teste, a resolução manual é gravada e será reutilizada quando fizer a mesclagem real posteriormente com 'master' e o tópico do ramo atualizados, desde que a resolução gravada ainda seja aplicável.
+
+As informações que o `git rerere` registra também são usadas ao executar o `git rebase`. Após eliminar a mesclagem de teste e continuar o desenvolvimento na ramificação do tópico:
+
+------------
+              o---*---o-------o---o topic
+             /
+    o---o---o---*---o---o---o---o   master
+
+	$ git rebase master topic
+
+				  o---*---o-------o---o topic
+				 /
+    o---o---o---*---o---o---o---o   master
+------------
+
+Você pode executar o comando `git rebase master topic` para se atualizar antes que o tópico esteja pronto para ser enviado para o topo (upstream). Isso resultaria numa mesclagem de três vias e entraria em conflito da mesma maneira que a mesclagem de teste que você resolveu anteriormente. O comando `git rerere` será executado pelo `git rebase` para ajudá-lo a resolver este conflito.
+
+[OBSERVAÇÃO] O comando `git rerere` se baseia nos marcadores de conflito no arquivo para detectar o conflito. Se o arquivo já possuir linhas que pareçam iguais às linhas com marcadores de conflito, o comando `git rerere` poderá falhar ao registrar uma resolução de conflito. Para contornar isso, a configuração `conflict-marker-size` do comando linkgit:gitattributes[5] pode ser usada.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

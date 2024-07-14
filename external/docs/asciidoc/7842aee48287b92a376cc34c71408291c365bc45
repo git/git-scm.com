@@ -1,0 +1,249 @@
+git-notes(1)
+============
+
+NOME
+----
+git-notes - Adiciona ou inspeciona as anotações dos objeto
+
+RESUMO
+------
+[verse]
+'git notes' [list [<objeto>]]
+'git notes' add [-f] [--allow-empty] [--[no-]separator | --separator=<quebra-parágrafo>] [--[no-]stripspace] [-F <file> | -m <msg> | (-c | -C) <objeto>] [<objeto>]
+'git notes' copy [-f] ( --stdin | <do-objeto> [<para-o-objeto>] )
+'git notes' append [--allow-empty] [--[no-]separator | --separator=<quebra-parágrafo>] [--[no-]stripspace] [-F <file> | -m <msg> | (-c | -C) <objeto>] [<objeto>]
+'git notes' edit [--allow-empty] [<objeto>] [--[no-]stripspace]
+'git notes' show [<objeto>]
+'git notes' merge [-v | -q] [-s <estratégia> ] <notes-ref>
+'git notes' merge --commit [-v | -q]
+'git notes' merge --abort [-v | -q]
+'git notes' remove [--ignore-missing] [--stdin] [<objeto>...]
+'git notes' prune [-n] [-v]
+'git notes' get-ref
+
+
+DESCRIÇÃO
+---------
+Adiciona, remove ou lê as anotações anexadas aos objetos, sem tocar nos próprios objetos.
+
+É predefinido que as anotações sejam salvas e lidas do `refs/notes/commits`, mas esta predefinição pode ser substituída. Consulte as seções OPÇÕES, CONFIGURAÇÃO e AMBIENTE abaixo. Caso esta referência não exista, ela será criada de forma silenciosa quando for necessário armazenar uma nota pela primeira vez.
+
+Uma utilização típica das anotações é complementar uma mensagem de um commit sem alterar o próprio commit. As anotações podem ser exibidas com o comando 'git log' junto com a mensagem do commit original. Para distinguir entre estas anotações da mensagem armazenada no commit do objeto, as anotações são recuadas como a mensagem, após uma linha não recolocada dizendo "Notes (<refname>):" (ou "Notes:" para `refs/notes/commits`) .
+
+As anotações também podem ser adicionadas aos patches preparados com o comando `git format-patch` utilizando a opção `--notes`. Tais anotações são adicionadas como um comentário de um patch após uma linha separadora com três traços.
+
+Para alterar quais as anotações são exibidas através do comando 'git log', consulte a configuração "notes.displayRef" em <<CONFIGURATION>>.
+
+Consulte a configuração "notes.rewrite.<comando>" para conhecer uma maneira de transportar as anotações através dos comandos que reescrevem os commits.
+
+
+SUBCOMANDOS
+-----------
+
+list::
+	Liste as anotações do objeto para um determinado objeto. Caso nenhum objeto seja informado, exiba uma lista com todas as anotações dos objetos e os objetos que eles anotam (no formato "<nota do objeto> <objeto anotado>"). Este é o subcomando predefinido caso nenhum subcomando seja utilizado.
+
+add::
+	Adiciona anotações para um determinado objeto (padrão para HEAD). Abortar se o objeto já tiver anotações (use `-f` para substituir as anotações existentes). No entanto, se estiver usando o `add` de forma interativa (usando um editor para fornecer o conteúdo das notas), em vez de abortar, as anotações existentes serão abertas no editor (como o subcomando `edit`). Se você especificar vários `-m` e `-F`, uma linha em branco será inserida entre as mensagens. Use a opção `--separator` para inserir outros delimitadores.
+
+copy::
+	Copie as anotações para o primeiro objeto no segundo (a predefinição retorna para `HEAD`). Interrompa caso o segundo objeto já tenha as anotações ou caso o primeiro objeto não tiver nenhuma (utilize '-f' para substituir as anotações existentes no segundo objeto). Este subcomando se equivale a: `git notes add [-f] -C $(git notes list <do-objeto>) <para-o-objeto>`
++
+No modo `--stdin`, pegue as linhas no formato
++
+----------
+<do-objeto> SP <para-o-objeto> [ SP <rest> ] LF
+----------
++
+na entrada padrão e copie as anotações de cada <do-objeto> para o seu <para-o-objeto> correspondente. (O `<rest>` opcional é ignorado para que o comando possa ler a entrada informada ao gancho `post-rewrite`.)
+
+append::
+	Anexa nova(s) mensagem(ns) fornecida(s) pelas opções `-m` ou `-F` a uma anotação já existente ou as adiciona como uma nova anotação, caso não exista uma, para o objeto (o padrão é HEAD). Ao anexar a uma anotação existente, uma linha em branco é adicionada antes de cada nova mensagem como um separador entre os parágrafos. O separador pode ser personalizado com a opção `--separator`.
+
+edit::
+	Edite as anotações para um determinado objeto (a predefinição retorna para `HEAD`).
+
+show::
+	Mostrar as anotações para um determinado objeto (a predefinição retorna para `HEAD`).
+
+merge::
+	Mescle as anotações "ref" informadas nas anotações "ref" atuais. Será feita uma tentativa para mesclar as alterações feitas através das anotações "ref" informada (chamadas "remotas") desde a base de mesclagem (caso haja) nas anotações "ref" atuais (chamadas "locais").
++
+Caso surjam conflitos e uma estratégia para resolver automaticamente as notas conflitantes (consulte a seção "OBSERVAÇÕES SOBRE AS ESTRATÉGIAS DE MESCLAGEM") não sejam utilizadas, o resolvedor "manual" será utilizado. Este resolvedor verifica se as notas conflitantes numa árvore de trabalho especial (`.git/NOTES_MERGE_WORKTREE`) instrui o usuário a resolver manualmente os conflitos lá. Quando for concluído, o usuário pode finalizar a mesclagem com o comando 'git notes merge --commit' ou interromper a mesclagem com o comando 'git notes merge --abort'.
+
+remove::
+	Remova as anotações para determinados objetos (a predefinição retorna para `HEAD`). Ao atribuir zero ou um objeto a partir da linha de comando, isso equivale a informar uma mensagem com anotação vazia para o subcomando `edit`.
+
+prune::
+	Remova todas as anotações dos objetos inexistentes/inacessíveis.
+
+get-ref::
+	Exiba as anotações "ref" atuais. Fornece uma maneira fácil de recuperar as anotações "ref" atuais (dos scripts por exemplo).
+
+OPÇÕES
+------
+-f::
+--force::
+	Ao adicionar as anotações num objeto que já possa anotações, substitua as anotações existentes (em vez de abortar).
+
+-m <msg>::
+--message=<msg>::
+	Use a mensagem fornecida da anotação (em vez de solicitar). Se forem fornecidas várias opções `-m`, os seus valores serão concatenados como parágrafos separados. Serão removidas as linhas que começam com `#` e as linhas vazias que não sejam uma única linha entre parágrafos; se você quiser mantê-las textualmente, use a opção `--no-stripspace`.
+
+-F <arquivo>::
+--file=<arquivo>::
+	Obtém a mensagem de anotação a partir de um determinado arquivo. Use '-' para ler a mensagem da anotação na entrada padrão. As linhas que começam com `#` e as linhas vazias que não sejam uma única linha entre os parágrafos serão removidas; se você quiser mantê-las textualmente, use a opção `--no-stripspace`.
+
+-C <objeto>::
+--reuse-message=<objeto>::
+	Tome o objeto bolha fornecido (por exemplo, outra anotação) como a mensagem da anotação. (Em vez disso, use `git notes copy <objeto>` para copiar anotações entre os objetos). Por padrão, a mensagem será copiada literalmente, mas caso queira remover as linhas que começam com `#` e as linhas vazias que não sejam uma única linha entre parágrafos, use a opção `--stripspace`.
+
+-c <objeto>::
+--reedit-message=<objeto>::
+	Assim como '-C', porém com `-c` o editor é invocado para que o usuário possa editar mais a mensagem da nota.
+
+--allow-empty::
+	Permita que uma anotação vazia do objeto seja armazenado. O comportamento predefinido é remover automaticamente as anotações que estiverem vazias.
+
+--[no-]separator, --separator=<quebra-do-parágrafo>::
+	Especifique uma string usada como separador personalizado entre os parágrafos (uma nova linha é adicionada ao final, conforme seja necessário). caso a opção `--no-separator` seja usada, nenhum separador entre os parágrafos será adicionado. A predefinição é uma linha em branco.
+
+--[no-]stripspace::
+	Retire os espaços em branco iniciais e finais da mensagem de anotação. Remova também as linhas vazias que não sejam uma única linha entre os parágrafos. As linhas que começam com `#` serão removidas em casos não relacionados ao editor, como `-m`, `-F` e `-C`, mas não em casos relacionados ao editor, como `git notes edit`, `-c`, etc.
+
+--ref <ref>::
+	Manipule as anotações da árvore na <ref>. Sobrescreve o `GIT_NOTES_REF` e a configuração "core.notesRef". A "ref" determina o nome completo quando começa com `refs/notes/`; quando começa com `notes/`, `refs/` e caso contrário `refs/notes/` é prefixado para formar um nome completo da "ref".
+
+--ignore-missing::
+	Não considere um erro ao solicitar a remoção das anotações de um objeto que não possua anotações anexadas.
+
+--stdin::
+	Leia também os nomes dos objetos para remover anotações da entrada padrão (não há motivo para não combinar isso com os nomes dos objetos na linha de comando).
+
+-n::
+--dry-run::
+	Não remova nada; apenas relate os nomes dos objetos cujas anotações seriam removidas.
+
+-s <estratégia>::
+--strategy=<estratégia>::
+	Ao mesclar as anotações, resolva os conflitos das anotações utilizando uma determinada estratégia. As seguintes estratégias são reconhecidas: "manual" (predefinido), "ours" (nosso), "theirs" (deles), "union" (união) e "cat_sort_uniq". Esta opção substitui a configuração "notes.mergeStrategy". Consulte a seção "OBSERVAÇÕES SOBRE AS ESTRATÉGIAS DE MESCLAGEM" abaixo para obter mais informações sobre a estratégia de mesclagem de cada nota.
+
+--commit::
+	Finalize um 'git notes merge' em andamento. Utilize esta opção quando tiver resolvido os conflitos que o comando 'git notes merge' armazenou em `.git/NOTES_MERGE_WORKTREE`. Isso altera o commit parcial da mesclagem criado pelo comando 'git notes merge' (armazenado em `.git/NOTES_MERGE_PARTIAL`) adicionando as anotações em `.git/NOTES_MERGE_WORKTREE`. As notas "ref" armazenadas no 'symref' `.git/NOTES_MERGE_REF` são atualizadas no commit resultante.
+
+--abort::
+	Interrompa/redefina um comando 'git notes merge' em andamento, ou seja, mesmo com conflitos, uma anotação será mesclada. Simplesmente remove todos os arquivos relacionados as anotações da mesclagem.
+
+-q::
+--quiet::
+	Quando mesclar as anotações, opere em silêncio.
+
+-v::
+--verbose::
+	Quando mesclar as anotações, seja loquaz. Quando remover as anotações, relate todos os nomes dos objetos cujas notas foram removidas.
+
+
+DISCUSSÃO
+---------
+
+As anotações dos commits são bolhas que contêm informações extras sobre um objeto (geralmente informações para complementar a mensagem de um commit). Estas bolhas são retiradas das anotações refs. Uma anotação "ref" geralmente é um ramo que contém "arquivos" cujos caminhos são os nomes dos objetos que o descrevem, com alguns separadores do diretório incluídos por motivos de desempenho, nota de rodapé: [Os nomes dos caminhos permitidos têm o formato `'bf'`/`'fe'`/`'30'`/`'...'`/`'680d5a...'`: uma sequência com os nomes dos diretórios com dois dígitos hexadecimais cada um, seguido por um nome do arquivo com o resto do ID do objeto.].
+
+Cada modificação nas anotações cria um novo commit nas anotações "ref" usadas. Portanto, você pode inspecionar o histórico das notas invocando por exemplo o comando `git log -p notes/commits`. Atualmente, a mensagem do commit registra apenas qual a operação acionou a atualização, já a autoria da confirmação é determinada de acordo com as regras usuais (consulte linkgit:git-commit[1]). Estes detalhes podem mudar no futuro.
+
+Também é permitido que uma anotação da "ref" aponte diretamente para um objeto na árvore, caso onde o histórico das anotações podem ser lidos com `git log -p -g <refname>`.
+
+
+OBSERVAÇÕES SOBRE AS ESTRATÉGIAS DE MESCLAGEM
+---------------------------------------------
+
+The default notes merge strategy is "manual", which checks out conflicting notes in a special work tree for resolving notes conflicts (`.git/NOTES_MERGE_WORKTREE`), and instructs the user to resolve the conflicts in that work tree. Quando for concluído, o usuário pode finalizar a mesclagem com o comando 'git notes merge --commit' ou interromper a mesclagem com o comando 'git notes merge --abort'.
+
+Os usuários podem selecionar uma estratégia de mesclagem automatizada dentre as opções a seguir, utilizando a opção `-s/--strategy` ou configurando a opção `notes.mergeStrategy` de acordo:
+
+O "ours" (nosso) resolve automaticamente as anotações conflitantes em favor da versão local (ou seja, as anotações "ref" atuais).
+
+O "deles" resolve automaticamente os conflitos das anotações em favor da versão remota (ou seja, as anotações dadas ao "ref" são mescladas nas anotações atuais da "ref").
+
+O "union" resolve automaticamente os conflitos das anotações concatenando as versões locais e remotas.
+
+O "cat_sort_uniq" é semelhante ao "union", porém, além de concatenar as versões locais e remotas, essa estratégia também classifica as linhas resultantes e remove as linhas que estiverem no resultado. Isso é equivalente ao aplicação do pipeline shell "cat | sort | uniq" nas versões locais e remotos. Essa estratégia é útil caso as notas sigam um formato com base nas linhas, onde se deseja evitar as linhas duplicadas no resultado da mesclagem. Observe que, caso a versão local ou remota tiver linhas duplicadas antes da mesclagem, elas também serão removidas por esta anotação estratégica de mesclagem.
+
+
+EXEMPLOS
+--------
+
+Você pode utilizar notas para adicionar anotações com as informação do que não estava disponível no momento em que o commit foi feito.
+
+------------
+$ git notes add -m 'Testado-por: Johannes Sixt <j6t@kdbg.org>' 72a144e2
+$ git show -s 72a144e
+[...]
+    Assinado-por: Junio C Hamano <gitster@pobox.com>
+
+Anotações:
+    Testado-por: Johannes Sixt <j6t@kdbg.org>
+------------
+
+Em princípio, uma anotação é uma bolha Git comum e qualquer outro tipo de formato (não) é aceito. Você pode criar com segurança as anotações binárias a partir de arquivos arbitrários utilizando o comando 'git hash-object':
+
+------------
+$ cc *.c
+$ blob=$(git hash-object -w a.out)
+$ git notes --ref=built add --allow-empty -C "$blob" HEAD
+------------
+
+(Você não pode simplesmente utilizar o comando `git notes --ref=built add -F a.out HEAD` porque isso não é seguro para os arquivos binários.) É claro que não faz muito sentido exibir as anotações que não foram formatadas com 'git log', portanto, caso utilize estas anotações, provavelmente precisará escrever algumas ferramentas com um propósito especial para fazer algo útil com elas.
+
+
+[[CONFIGURATION]]
+CONFIGURAÇÃO
+------------
+
+core.notesRef::
+	Notas "ref" para ler e manipular em vez do `refs/notes/commits`. Deve ser um nome "ref" sem abreviação. Esta configuração pode ser substituída por uma variável de ambiente e através da linha de comando.
+
+
+
+[WARNING]
+====
+Missing `pt_BR/includes/cmd-config-section-rest.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `pt_BR/config/notes.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+VARIÁVEIS DO AMBIENTE
+---------------------
+
+`GIT_NOTES_REF`::
+	De qual "ref" manipular as anotações, em vez do `refs/notes/commits`. Sobrescreve a configuração `core.notesRef`.
+
+`GIT_NOTES_DISPLAY_REF`::
+	Uma lista delimitada por dois pontos das refs ou "globs" indicando quais as refs, além da predefinição do `core.notesRef` ou` GIT_NOTES_REF`, para ler as anotações ao exibir as mensagens dos commits. Sobrescreve a configuração `notes.displayRef`.
++
+Um aviso será emitido para as refs que não existam, porém um agrupamento "glob" que não corresponda a nenhuma referência é ignorada em silêncio.
+
+`GIT_NOTES_REWRITE_MODE`::
+	Ao copiar as anotações durante uma reescrita, o que fazer caso o commit de destino já tiver uma anotação. Deve ser uma das opção `overwrite`,` concatenate`, `cat_sort_uniq` ou` ignore`. Sobrescreve a configuração `core.rewriteMode`.
+
+`GIT_NOTES_REWRITE_REF`::
+	Ao reescrever os commits, as anotações que serão copiadas do original para o commit que será reescrito. Deve ser uma lista delimitada por dois pontos das refs ou globs.
++
+Caso não esteja definido no ambiente, a lista das anotações que serão copiadas irá depender das configurações `notes.rewrite.<comando>` e `notes.rewriteRef`.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

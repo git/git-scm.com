@@ -1,0 +1,165 @@
+git-fast-export(1)
+==================
+
+NOM
+---
+git-fast-export - exportateur de données Git
+
+
+SYNOPSIS
+--------
+[verse]
+'git fast-export' [<options>] | 'git fast-import'
+
+DESCRIPTION
+-----------
+Ce programme vide les révisions données dans une forme appropriée pour être introduite dans 'git fast-import'.
+
+Vous pouvez l'utiliser comme un remplacement de bundle lisible par l'homme (voir linkgit:git-bundle[1]), ou comme un format qui peut être édité avant d'être envoyé à 'git fast-import' afin de faire des réécritures d'historique (une capacité sur laquelle s'appuient des outils comme 'git filter-repo').
+
+OPTIONS
+-------
+--progress=<n>::
+	Insérer des déclarations 'de progrès' tous les <n>objets, à afficher par 'git fast-import' lors de l’importation.
+
+--signed-tags=(verbatim|warn|warn-strip|strip|abort)::
+	Spécifier comment traiter les étiquettes signées. Puisque toute transformation après l'exportation peut changer les noms des étiquettes (ce qui peut également se produire lors de l'exclusion des révisions), les signatures ne correspondront pas.
++
+Lorsque vous demandez à « abandonner » ('abort' ce qui est la valeur par défaut), ce programme mourra lorsqu'il rencontrera une étiquette signée. Avec 'strip', les étiquettes seront silencieusement rendues non signées, avec 'warn-strip' elles seront rendues non signées mais un avertissement sera affiché, avec 'verbatim', elles seront exportées silencieusement et avec 'warn', elles seront exportées, mais vous verrez un avertissement.
+
+--tag-of-filtered-object=(abort|drop|rewrite)::
+	Spécifier comment traiter les étiquettes dont l'objet étiqueté est filtré. Comme les révisions et les fichiers à exporter peuvent être limités par le chemin d'accès, les objets étiquetés peuvent être complètement filtrés.
++
+Lorsqu'il est demandé à 'abort' (ce qui est la valeur par défaut), ce programme mourra lorsqu'il rencontrera une telle étiquette. Avec 'drop', il omettra ces étiquettes de la sortie. Avec 'rewrite', si l'objet étiqueté est un commit, il réécrira l'étiquette pour étiqueter un commit ancêtre (via la réécriture du parent ; voir linkgit:git-rev-list[1]).
+
+-M::
+-C::
+	Effectuer une détection de déplacement et/ou de copie, comme décrit dans la page de manuel linkgit:git-diff[1], et l'utiliser pour générer des commandes de renommage et de copie dans le journal généré.
++
+Notez que les versions précédentes de cette commande ne se plaignaient pas et produisaient des résultats incorrects si vous donniez ces options.
+
+--export-marks=<fichier>::
+	Décharge la table interne des marques dans un <fichier>, une fois terminé. Les marques sont écrites une par ligne comme `:markid SHA-1`. Seules les marques des révisions sont écrites ; les marques des blobs sont ignorées. Des moteurs peuvent utiliser ce fichier pour valider les importations après qu'elles aient été complétées, ou pour sauvegarder la table des marques à travers des exécutions incrémentales. Comme <fichier> n'est ouvert et tronqué qu'à la fin de l'opération, le même chemin peut aussi être donné sans risque à --import-marks. Le fichier ne sera pas écrit si aucun nouvel objet n'a été marqué/exporté.
+
+--import-marks=<fichier>::
+	Avant de traiter toute entrée, charger les marques spécifiées dans <fichier> ;. Le fichier d'entrée doit exister, doit être lisible, et doit utiliser le même format que celui produit par --export-marks.
+
+--mark-tags::
+	En plus de nommer les blobs et les commits avec des identifiants de marque, vous pouvez aussi nommer les étiquettes. Ceci est utile en conjonction avec `--export-marks` et `--import-marks`, et est également utile (et nécessaire) pour l'exportation de étiquettes imbriquées. Cela ne nuit pas aux autres cas et serait la valeur par défaut, mais beaucoup de frontends d'import rapide ne sont pas préparés à accepter les étiquettes comprenant des identifiants de marque.
++
+Les commits (ou étiquettes) qui ont déjà été marqués ne seront pas exportés à nouveau. Si le backend utilise un fichier --import-marks similaire, cela permet l'exportation incrémentale bidirectionnelle du dépôt en gardant les marques identiques entre les exécutions.
+
+--fake-missing-tagger::
+	Certains anciens dépôts ont des étiquettes sans étiqueteur. Le protocole d'importation rapide était assez strict à ce sujet, et ne le permettait pas. Il faut donc simuler un étiqueteur pour pouvoir importer rapidement la sortie.
+
+--use-done-feature::
+	Démarrer le flux avec une strophe 'feature done' et le terminer avec une commande 'done'.
+
+--no-data::
+	Ignorer la sortie des objets blob et faire plutôt référence aux blobs via leur hachage SHA-1 original. Ceci est utile pour réécrire la structure du répertoire ou l'historique d'un dépôt sans toucher au contenu des fichiers individuels. Notez que le flux résultant ne peut être utilisé que par un dépôt qui contient déjà les objets nécessaires.
+
+--full-tree::
+	Cette option fera en sorte que fast-export émette une directive "deleteall" pour chaque commit suivi d'une liste complète de tous les fichiers du commit (par opposition à la liste des fichiers qui sont différents du premier parent du commit).
+
+--anonymize::
+	Anonymiser le contenu du dépôt tout en conservant la forme de l'historique et de l'arbre stocké. Voir la section `ANONYMISATION` ci-dessous.
+
+--anonymize-map=<depuis>[:<vers>]::
+	Convertir le jeton `<depuis>` en `<vers>` dans la sortie anonymisée. Si `<vers>` est omis, convertir `<depuis>` en lui-même (c'est-à-dire, ne pa l'anonymiser). Voir la section sur `ANONYMISATION` ci-dessous.
+
+--reference-excluded-parents::
+	Par défaut, l'exécution d'une commande telle que `git fast-export master~5..master` n'inclura pas le commit master{tilde}5 et fera que master{tilde}4 n'aura plus master{tilde}5 comme parent (bien que l'ancien master{tilde}4 et le nouveau master{tilde}4 auront tous les mêmes fichiers). Utilisez --reference-excluded-parents pour que le flux fasse plutôt référence aux commits dans la plage exclue de l'historique par leur sha1sum. Notez que le flux résultant ne peut être utilisé que par un dépôt qui contient déjà les commits parents nécessaires.
+
+--show-original-ids::
+	Ajouter une directive supplémentaire à la sortie pour les commits et les blobs, `original-oid <SHA1SUM>`. Bien que de telles directives seront probablement ignorées par les importateurs tels que git-fast-import, elles peuvent être utiles pour les filtres intermédiaires (par exemple pour réécrire les messages de commit qui font référence à des commits plus anciens, ou pour dépouiller les blobs par id).
+
+--reencode=(yes|no|abort)::
+	Spécifier comment gérer l'en-tête `encoding` dans les objets commit. En demandant 'abort' (« abandonner » qui est la valeur par défaut), ce programme mourra lorsqu'il rencontrera un tel objet commit. Avec 'yes', le message de livraison sera ré-encodé en UTF-8. Avec 'no', l'encodage original sera préservé.
+
+--refspec::
+	Appliquer la refspec spécifiée à chaque ref exportée. Plusieurs d'entre elles peuvent être spécifiées.
+
+[<git-rev-list-args>...]::
+	Une liste d'arguments, acceptable pour 'git rev-parse' et 'git rev-list', qui spécifie les objets et références spécifiques à exporter. Par exemple, `master~10..master` provoque l'exportation de la référence master actuelle avec tous les objets ajoutés depuis le commit de son 10ème ancêtre et (à moins que l'option --reference-excluded-parents soit spécifiée) tous les fichiers communs à master{tilde}9 et master{tilde}10.
+
+EXEMPLES
+--------
+
+-------------------------------------------------------------------
+$ git fast-export --all | (cd /dépôt/vide && git fast-import)
+-------------------------------------------------------------------
+
+Cela exportera le dépôt entier et l'importera dans le dépôt vide existant. A l'exception du réencodage des commits qui ne sont pas en UTF-8, ce sera un miroir un à un.
+
+-----------------------------------------------------
+$ git fast-export master~5..master |
+	sed "s|refs/heads/master|refs/heads/autre|" |
+	git fast-import
+-----------------------------------------------------
+
+Cela crée une nouvelle branche appelée 'autre' à partir de 'master~5..master' (c'est-à-dire que si 'master' a un historique linéaire, elle prendra les 5 derniers commits).
+
+Notez que cela suppose qu'aucun des blobs et des messages de validation référencés par cette plage de révision ne contient la chaîne 'refs/heads/master'.
+
+
+ANONYMISATION
+-------------
+
+Si l'option `--anonymize` est donnée, git tentera de supprimer toutes les informations d'identification du dépôt tout en conservant suffisamment de l'arbre original et des modèles d'historique pour reproduire certains bugs. Le but est qu'un bug git trouvé sur un dépôt privé persiste dans le dépôt anonymisé, et que ce dernier puisse être partagé avec les développeurs git pour aider à résoudre le bug.
+
+Avec cette option, git remplacera tous les noms de référence, les chemins, le contenu des blobs, les messages de commit et d'étiquette, les noms et les adresses email dans la sortie avec des données anonymes. Deux instances de la même chaîne seront remplacées de manière équivalente (par exemple, deux commits avec le même auteur auront le même auteur anonymisé dans la sortie, mais ne présenteront aucune ressemblance avec la chaîne auteur originale). La relation entre les commits, les branches et les tags est conservée, ainsi que l'horodatage des commits (mais les messages de commit et les refnames ne ressemblent pas aux originaux). La composition relative de l'arbre est conservée (par exemple, si vous avez un arbre racine avec 10 fichiers et 3 arbres, la sortie le sera aussi), mais leurs noms et le contenu des fichiers seront remplacés.
+
+Si vous pensez avoir trouvé un bogue git, vous pouvez commencer par exporter un flux anonymisé de l'ensemble du dépôt :
+
+---------------------------------------------------
+$ git fast-export --anonymize --all >flux-anon
+---------------------------------------------------
+
+Ensuite, confirmez que le bogue persiste dans un dépôt créé à partir de ce flux (de nombreux bogues ne le feront pas, car ils dépendent vraiment du contenu exact du dépôt) :
+
+---------------------------------------------------
+$ git init dépôt-anon
+$ cd dépôt-anon
+$ git fast-import <../flux-anon
+$ ... test de votre bogue ...
+---------------------------------------------------
+
+Si le dépôt anonyme montre le bogue, il peut être intéressant de partager le `flux-anon` avec un rapport de bogue normal. Notez que le flux anonymisé se compresse très bien, donc le gzippage est encouragé. Si vous voulez examiner le flux pour vérifier qu'il ne contient pas de données privées, vous pouvez l'examiner directement avant de l'envoyer. Vous pouvez également essayer :
+
+---------------------------------------------------
+$ perl -pe 's/\d+/X/g' <flux-anon | sort -u | less
+---------------------------------------------------
+
+qui montre toutes les lignes uniques (avec des nombres convertis en « X », pour réduire « Utilisateur 0 », « Utilisateur 1 », etc. en « Utilisateur X »). Cela produit une sortie beaucoup plus petite, et il est généralement facile de confirmer rapidement qu’il n’y a pas de données privées dans le flux.
+
+La reproduction de certains bogues peut nécessiter la référence à des commits ou des chemins particuliers, ce qui devient difficile après que les refnames et les chemins ont été rendus anonymes. Vous pouvez demander à ce qu'un jeton particulier soit laissé tel quel ou transformé en une nouvelle valeur. Par exemple, si vous avez un bogue qui se reproduit avec `git rev-list sensitive -- secret.c`, vous pouvez exécuter :
+
+---------------------------------------------------
+$ git fast-export --anonymize --all \
+      --anonymize-map=sensitive:foo \
+      --anonymize-map=secret.c:bar.c \
+      >flux
+---------------------------------------------------
+
+Après avoir importé le flux, vous pouvez ensuite exécuter 'git rev-list foo -- bar.c' dans le dépôt anonymisé.
+
+Notez que les chemins et les refnames sont séparés en jetons aux frontières des barres obliques. La commande ci-dessus rendrait anonyme `sousrép/secret.c` comme quelque chose comme `chemin123/bar.c` ; vous pourriez alors rechercher `bar.c` dans le dépôt anonymisé pour déterminer le nom de chemin final.
+
+Pour simplifier le référencement du chemin final, vous pouvez mettre en correspondance chaque composant du chemin ; ainsi, si vous anonymisez également `sousrép` en `réppublic`, alors le chemin final sera `réppublic/bar.c`.
+
+LIMITATIONS
+-----------
+
+Puisque 'git fast-import' ne peut pas étiqueter les arbres, vous ne pourrez pas exporter complètement le dépôt linux.git, car il contient une étiquette référençant un arbre au lieu d'un commit.
+
+VOIR AUSSI
+----------
+linkgit:git-fast-import[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

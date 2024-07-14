@@ -1,0 +1,365 @@
+git-interpret-trailers(1)
+=========================
+
+NOME
+----
+git-interpret-trailers - Adiciona ou analisa informação estruturada em mensagens de commit
+
+RESUMO
+------
+[verse]
+'git interpret-trailers' [--in-place] [--trim-empty]
+			[(--trailer (<chave>|<keyAlias>)[(=|:)<valor>])...]
+			[--parse] [<arquivo>...]
+
+DESCRIÇÃO
+---------
+Adiciona ou analisa as linhas com 'caracteres de resposta' que se assemelham aos cabeçalhos de e-mail RFC 822 no final de uma mensagem do commit. Por exemplo, na seguinte mensagem de commit
+
+------------------------------------------------
+assunto
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+Assinado-por: Alice <alice@example.com>
+Assinado-por: Bob <bob@example.com>
+------------------------------------------------
+
+as duas últimas linhas começando com "Signed-off-by" são os "trailers".
+
+This command reads commit messages from either the <file> arguments or the standard input if no <file> is specified. If `--parse` is specified, the output consists of the parsed trailers coming from the input, without influencing them with any command line options or configuration variables.
+
+Caso contrário, esse comando aplica as variáveis de configuração `trailer.*` (que podem potencialmente adicionar novos trailers, bem como reposicioná-los), assim como quaisquer argumentos de linha de comando que possam substituir as variáveis de configuração (como `--trailer=...`, que também pode adicionar novos trailers), a cada arquivo de entrada. O resultado é emitido na saída padrão.
+
+This command can also operate on the output of linkgit:git-format-patch[1], which is more elaborate than a plain commit message. Namely, such output includes a commit message (as above), a "---" divider line, and a patch part. For these inputs, the divider and patch parts are not modified by this command and are emitted as is on the output, unless `--no-divider` is specified.
+
+Algumas variáveis de configuração controlam a forma como os argumentos `--trailer` são aplicados a cada entrada e a forma como qualquer trailer existente na entrada é alterado. Eles também possibilitam a adição automática de alguns trailers.
+
+Por padrão, um argumento '<key>=<valor>' ou '<key>:<valor>' usado com `--trailer` será anexado após os trailers existentes apenas se o último trailer tiver um par (<key>, <valor>) diferente (ou se não houver nenhum trailer existente). As partes <key> e <valor> serão cortadas para remover os espaços em branco iniciais e finais, o <key> e o <valor> cortados resultantes aparecerão na saída desta maneira:
+
+------------------------------------------------
+key: valor
+------------------------------------------------
+
+Significa que o <key> e o <valor> ajustado será separado por um `': '` (dois pontos seguido por um espaço).
+
+Por conveniência, um <keyAlias> pode ser configurado para tornar o uso do `--trailer` mais curto para ser digitado na linha de comando. Isso pode ser configurado usando a variável de configuração 'trailer.<keyAlias>.key'. O <keyAlias> deve ser um prefixo completo de caracteres <key> , embora a distinção entre maiúsculas e minúsculas não seja importante. Por exemplo, se você tiver
+
+------------------------------------------------
+trailer.sign.key "Signed-off-by: "
+------------------------------------------------
+
+em sua configuração, você só precisa especificar `--trailer="sign: foo"` na linha de comando em vez de `--trailer="Signed-off-by: foo"`.
+
+É predefinido que o novo trailer apareça no final de todos os trailers já existentes. Caso não haja nenhum, o novo trailer aparecerá no final. Uma linha em branco será adicionada antes do novo trailer caso já não exista um.
+
+Existing trailers are extracted from the input by looking for a group of one or more lines that (i) is all trailers, or (ii) contains at least one Git-generated or user-configured trailer and consists of at least 25% trailers. The group must be preceded by one or more empty (or whitespace-only) lines. The group must either be at the end of the input or be the last non-whitespace lines before a line that starts with '---' (followed by a space or the end of the line).
+
+Ao ler os caracteres de resposta, não pode haver espaço em branco antes ou dentro do <key>, mas qualquer quantidade de espaço regular e de caracteres de tabulação são permitidos entre o <key> e o separador. Pode existir espaço antes, durante ou depois do <valor>. O <valor> pode ser dividido em várias linhas, com cada linha subsequente começando com pelo menos um espaço, como a "dobra" na RFC 822. Exemplo:
+
+------------------------------------------------
+key: Esse é um valor muito longo, com espaços e
+  novas linhas nele.
+------------------------------------------------
+
+Observe que os trailers não seguem (nem pretendem seguir) muitas das regras dos cabeçalhos RFC 822. Por exemplo, eles não seguem a regra de codificação.
+
+OPÇÕES
+------
+--in-place::
+	Edite os arquivos no local.
+
+--trim-empty::
+	If the <value> part of any trailer contains only whitespace, the whole trailer will be removed from the output. This applies to existing trailers as well as new trailers.
+
+--trailer <key>[(=|:)<valor>]::
+	Defina um par (<key>, <valor>) que deve ser aplicado como um caractere de resposta nas mensagens de entrada. Consulte a descrição deste comando.
+
+--where <arranjo>::
+--no-where::
+	Specify where all new trailers will be added. A setting provided with '--where' overrides the `trailer.where` and any applicable `trailer.<keyAlias>.where` configuration variables and applies to all '--trailer' options until the next occurrence of '--where' or '--no-where'. Upon encountering '--no-where', clear the effect of any previous use of '--where', such that the relevant configuration variables are no longer overridden. Possible placements are `after`, `before`, `end` or `start`.
+
+--if-exists <ação>::
+--no-if-exists::
+	Specify what action will be performed when there is already at least one trailer with the same <key> in the input. A setting provided with '--if-exists' overrides the `trailer.ifExists` and any applicable `trailer.<keyAlias>.ifExists` configuration variables and applies to all '--trailer' options until the next occurrence of '--if-exists' or '--no-if-exists'. Upon encountering '--no-if-exists, clear the effect of any previous use of '--if-exists, such that the relevant configuration variables are no longer overridden. Possible actions are `addIfDifferent`, `addIfDifferentNeighbor`, `add`, `replace` and `doNothing`.
+
+--if-missing <ação>::
+--no-if-missing::
+	Specify what action will be performed when there is no other trailer with the same <key> in the input. A setting provided with '--if-missing' overrides the `trailer.ifMissing` and any applicable `trailer.<keyAlias>.ifMissing` configuration variables and applies to all '--trailer' options until the next occurrence of '--if-missing' or '--no-if-missing'. Upon encountering '--no-if-missing, clear the effect of any previous use of '--if-missing, such that the relevant configuration variables are no longer overridden. Possible actions are `doNothing` or `add`.
+
+--only-trailers::
+	Exibe apenas os caracteres de resposta e não quaisquer outras partes da entrada.
+
+--only-input::
+	Gera apenas aos trailers existentes na entrada; não adicione nenhum a partir da linha de comando ou aplicando as variáveis de configuração `trailer.*`.
+
+--unfold::
+	Se um trailer tiver um valor que se estenda por diversas linhas (também conhecido como "dobrado"), reformate o valor em uma única linha.
+
+--parse::
+	Um alias conveniente para `--only-trailers --only-input --unfold`. Isso facilita a visualização apenas dos trailers provenientes da entrada, sem influenciá-los com nenhuma opção de linha de comando ou variável de configuração, ao mesmo tempo em que torna a saída amigável à máquina com `--unfold`.
+
+--no-divider::
+	Não trate `---` como o final da mensagem de commit. Utilize isso quando souber que a sua entrada tenha apenas a própria mensagem do commit (e não um e-mail ou a saída do `git format-patch`).
+
+VARIÁVEIS DE CONFIGURAÇÃO
+-------------------------
+
+trailer.separators::
+	Esta opção informa quais os caracteres são reconhecidos como separadores dos caracteres de resposta. É predefinido que apenas o `:` seja reconhecido como um, a menos que `=` seja sempre aceito na linha de comando por questões de compatibilidade com os outros comandos git.
++
+O primeiro caractere informado por esta opção será o caractere predefinido que será utilizado quando um outro separador não seja utilizado na configuração deste `caractere de resposta`.
++
+Como por exemplo, caso o valor desta opção seja "%=$", apenas as linhas que usam o formato '<key><sep><valor>' com <sep> contendo '%', '=' ou '$' e os espaços, serão considerados `caracteres de resposta`. É predefinido que o sinal '%' será utilizado como um separador; portanto, os caracteres de resposta aparecerão como: '<key>% <valor>' (um sinal de porcentagem e um espaço aparecerão entre key e o valor).
+
+trailer.where::
+	Esta opção informa onde um novo caractere de resposta será adicionado.
++
+Pode ser `end` (pré definido),` start`, `after` ou` before`.
++
+Caso seja `end`, então cada novo caractere de resposta aparecerá no final dos caracteres de resposta já existentes.
++
+Caso seja `start`, cada novo caractere de resposta aparecerá no início, e não no final, dos caracteres de resposta já existentes.
++
+Caso seja `after` , cada novo caractere de resposta aparecerá logo após o último caractere de resposta com o mesmo <key>.
++
+Caso seja `before`, então cada novo caractere de resposta aparecerá logo no começo do primeiro caractere de resposta com o mesmo <key>.
+
+trailer.ifexists::
+	Essa opção permite escolher a ação a ser executada quando já houver pelo menos um caractere de resposta com a mesma <key> na entrada.
++
+Os valores válidos para esta opção são: `addIfDifferentNeighbor` (predefinido), `addIfDifferent`, `add`, `replace` ou `doNothing`.
++
+Com `addIfDifferentNeighbor`, um novo caractere de resposta será adicionado apenas caso nenhum com o mesmo par (<key>,<valor>) esteja acima ou abaixo da linha onde o novo caractere de resposta será adicionado.
++
+Com `addIfDifferent`, um novo caractere de resposta será adicionado somente se nenhum caractere de resposta com o mesmo par (<key>, <valor>) já estiver na entrada.
++
+Com `add`, um novo caractere de resposta será adicionado, mesmo que alguns caracteres de resposta com o mesmo par (<token>, <valor>) já estejam na entrada.
++
+Com `replace`, um caractere de resposta existente com a mesmo <key> será excluído e um novo será adicionado. O caractere de resposta excluído será o mais próximo (com o mesmo <key>) do local onde o novo será adicionado.
++
+Com `doNothing`, nada será feito, ou seja, nenhum novo caractere de resposta será adicionado se já houver um com o mesmo <key> na entrada.
+
+trailer.ifmissing::
+	Essa opção permite escolher a ação a ser executada quando ainda não houver nenhum atrelado com o mesmo <key> na entrada.
++
+Os valores válidos para esta opção são: `add` (o valor predefinido) e `doNothing`.
++
+Com `add`, um novo caractere de resposta será adicionado.
++
+Com `doNothing`, nada será feito.
+
+trailer.<keyAlias>.key::
+	Define um <keyAlias> para a <key>. O <keyAlias> deve ser um prefixo (as maiúsculas e minúsculas não importam) da <key>. Por exemplo, em `git config trailer.ack.key "Acked-by"`, "Acked-by" é a <key> e "ack" é o <keyAlias>. Essa configuração permite a invocação mais curta do `--trailer "ack:..."` na linha de comando usando o <keyAlias> "ack" em vez do `--trailer "Acked-by:..."` mais longo.
++
+No final da <key>, pode aparecer um separador e, em seguida, alguns caracteres de espaço. Por padrão, o único separador válido é ':', mas isso pode ser alterado usando a variável de configuração `trailer.separators`.
++
+Se houver um separador na chave, ele substituirá o separador padrão ao adicionar o trailer.
+
+trailer.<keyAlias>.where::
+	Esta opção utiliza os mesmos valores da variável de configuração 'trailer.where' e substitui o que for especificado por essa opção para os caracteres de resposta com o `<keyAlias>` determinado.
+
+trailer.<keyAlias>.ifexists::
+	Essa opção utiliza os mesmos valores que a variável de configuração 'trailer.ifexists' e substitui o que for definido por esta opção para os caracteres de resposta com o <keyAlias> informado.
+
+trailer.<keyAlias>.ifmissing::
+	Esta opção utiliza os mesmos valores que a variável de configuração 'trailer.ifmissing' e substitui o que for definido por esta opção para os caracteres de resposta com o <keyAlias> informado.
+
+trailer.<keyAlias>.command::
+	Deprecated in favor of 'trailer.<keyAlias>.cmd'. This option behaves in the same way as 'trailer.<keyAlias>.cmd', except that it doesn't pass anything as argument to the specified command. Instead the first occurrence of substring $ARG is replaced by the <value> that would be passed as argument.
++
+Observe que $ARG no comando do usuário é substituído apenas uma vez e que a maneira original de substituir o $ARG não é segura.
++
+Quando ambos 'trailer.<keyAlias>.cmd' e 'trailer.<keyAlias>.command' são oferecidos para o mesmo <keyAlias>, o 'trailer.<keyAlias>.cmd' é usado e o 'trailer.<keyAlias>.command' é ignorado.
+
+trailer.<keyAlias>.cmd::
+	Essa opção pode ser usada para especificar um comando do shell que será chamado uma vez para adicionar automaticamente um caractere de resposta com o <keyAlias> especificado e, em seguida, chamado toda vez que o argumento '--trailer <keyAlias>=<valor>' for usado para alterar o <valor> do trailer que essa opção produziria.
++
+Quando o comando informado é chamado pela primeira vez para adicionar um atrelado com o <keyAlias> definido, o comportamento é como se um argumento especial '--trailer <keyAlias>=<valor>' fosse adicionado no início do comando "git interpret-trailers", onde o <valor> é considerado a saída padrão do comando com qualquer espaço em branco eliminado à esquerda e à direita.
++
+Caso algumas opção '--trailer <keyAlias>=<valor>' também sejam passados na linha de comando, o comando é invocado novamente uma vez para cada um destes argumentos que tenham o mesmo <keyAlias>. E a parte <valor> desses argumentos, caso hajam, será passada ao comando como sendo o seu primeiro argumento. Desta forma, o comando pode produzir um <valor> calculado a partir do <valor> informado na opção '--trailer <keyAlias>=<valor>'.
+
+EXEMPLOS
+--------
+
+* Configure uma "assinatura" como caractere de resposta com "Signed-off-by" e, em seguida, adicione dois desses caracteres de resposta a um arquivo de mensagem de confirmação:
++
+------------
+$ git config trailer.sign.key "Assinado-por"
+$ cat msg.txt
+subject
+
+corpo de texto
+$ git interpret-trailers --trailer 'sign: Alice <alice@example.com>' --trailer 'sign: Bob <bob@example.com>' <msg.txt
+subject
+
+corpo do texto
+
+Assinado-por: Alice <alice@example.com>
+Assinado-por: Bob <bob@example.com>
+------------
+
+* Use a opção `--in-place` para editar um arquivo de mensagem de confirmação no local:
++
+------------
+$ cat msg.txt
+subject
+
+corpo do texto
+
+Assinado-por: Bob <bob@example.com>
+$ git interpret-trailers --trailer 'Acked-by: Alice <alice@example.com>' --in-place msg.txt
+$ cat msg.txt
+subject
+
+corpo do texto
+
+Assinado-por: Bob <bob@example.com>
+Reconhecido-por: Alice <alice@example.com>
+------------
+
+* Extraia o último commit como um patch e adicione um caractere de resposta 'Cc' com um 'Revisado por' a ele:
++
+------------
+$ git format-patch -1
+0001-foo.patch
+$ git interpret-trailers --trailer 'Cc: Alice <alice@example.com>' --trailer 'Reviewed-by: Bob <bob@example.com>' 0001-foo.patch >0001-bar.patch
+------------
+
+* Configure um caractere de resposta 'sign' com um comando para adicionar automaticamente um 'Assinado-por:' com as informações do autor apenas se ainda não houver um 'Assinado-por:' e exiba como ele funciona:
++
+------------
+$ cat msg1.txt
+subject
+
+corpo do texto
+$ git config trailer.sign.key "Signed-off-by: "
+$ git config trailer.sign.ifmissing add
+$ git config trailer.sign.ifexists doNothing
+$ git config trailer.sign.cmd 'echo "$(git config user.name) <$(git config user.email)>"'
+$ git interpret-trailers --trailer sign <msg1.txt
+assunto
+
+corpo do texto
+
+Signed-off-by: Bob <bob@example.com>
+$ cat msg2.txt
+subject
+
+corpo do texto
+
+Signed-off-by: Alice <alice@example.com>
+$ git interpret-trailers --trailer sign <msg2.txt
+subject
+
+corpo do texto
+
+Assinado-por: Alice <alice@example.com>
+------------
+
+* Configure um caracteres de resposta 'fix' com uma chave que contenha um '#', sem espaço após este caractere e mostre como ele funciona:
++
+------------
+$ git config trailer.separators ":#"
+$ git config trailer.fix.key "Fix #"
+$ echo "subject" | git interpret-trailers --trailer fix=42
+subject
+
+Fix #42
+------------
+
+* Configure um atrelado de 'ajuda' com um cmd usando um script `glog-find-author` que pesquisa a identidade do autor informado no log do git no repositório e mostre como funciona:
++
+------------
+$ cat ~/bin/glog-find-author
+#!/bin/sh
+test -n "$1" && git log --author="$1" --pretty="%an <%ae>" -1 || true
+$ cat msg.txt
+subject
+
+corpo do texto
+$ git config trailer.help.key "Helped-by: "
+$ git config trailer.help.ifExists "addIfDifferentNeighbor"
+$ git config trailer.help.cmd "~/bin/glog-find-author"
+$ git interpret-trailers --trailer="help:Junio" --trailer="help:Couder" <msg.txt
+assunto
+
+corpo do texto
+
+Auxiliado por: Junio C Hamano <gitster@pobox.com>
+Auxiliado por: Christian Couder <christian.couder@gmail.com>
+------------
+
+* Configure um atrelado 'ref' com um cmd, use um script `glog-grep` para fazer um "grep" (captura) do último commit relevante do log do git no repositório e mostre como funciona:
++
+------------
+$ cat ~/bin/glog-grep
+#!/bin/sh
+test -n "$1" && git log --grep "$1" --pretty=reference -1 || true
+$ cat msg.txt
+subject
+
+corpo do texto
+$ git config trailer.ref.key "Reference-to: "
+$ git config trailer.ref.ifExists "replace"
+$ git config trailer.ref.cmd "~/bin/glog-grep"
+$ git interpret-trailers --trailer="ref:Add copyright notices." <msg.txt
+assunto
+
+corpo do texto
+
+Refere-se ao: 8bc9a0c769 (Adicionado avisos de ireitos autorais., 2005-04-07)
+------------
+
+* Configure um caractere de resposta 'see' com um comando para exibir o assunto de um commit relacionado e exibir como ele funciona:
++
+------------
+$ cat msg.txt
+subject
+
+corpo do texto
+
+see: HEAD~2
+$ cat ~/bin/glog-ref
+#!/bin/sh
+git log -1 --oneline --format="%h (%s)" --abbrev-commit --abbrev=14
+$ git config trailer.see.key "See-also: "
+$ git config trailer.see.ifExists "replace"
+$ git config trailer.see.ifMissing "doNothing"
+$ git config trailer.see.cmd "glog-ref"
+$ git interpret-trailers --trailer=see <msg.txt
+subject
+
+corpo do texto
+
+See-also: fe3187489d69c4 (assunto do commit relacionado)
+------------
+
+* Configure um modelo do commit com alguns caracteres de resposta com valores vazios (utilizando o comando sed para exibir e manter os espaços finais no final dos caracteres de resposta) e configure um gancho 'commit-msg' que utilize o comando 'git interpret-trailers' para remover os caracteres de resposta com os valores vazios e para adicionar um 'git-version':
++
+------------
+$ cat temp.txt
+***subject***
+
+***message***
+
+Fixes: Z
+Cc: Z
+Reviewed-by: Z
+Signed-off-by: Z
+$ sed -e 's/ Z$/ /' temp.txt > commit_template.txt
+$ git config commit.template commit_template.txt
+$ cat .git/hooks/commit-msg
+#!/bin/sh
+git interpret-trailers --trim-empty --trailer "git-version: \$(git describe)" "\$1" > "\$1.new"
+mv "\$1.new" "\$1"
+$ chmod +x .git/hooks/commit-msg
+------------
+
+VEJA TAMBÉM
+-----------
+linkgit:git-commit[1], linkgit:git-format-patch[1], linkgit:git-config[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

@@ -1,0 +1,161 @@
+git-archive(1)
+==============
+
+NOME
+----
+git-archive - Cria um arquivo dos arquivos vindos de uma determinada árvore
+
+
+RESUMO
+------
+[verse]
+'git archive' [--format=<fmt>] [--list] [--prefix=<prefixo>/] [<extra>]
+	      [-o <arquivo> | --output=<arquivo>] [--worktree-attributes]
+	      [--remote=<repo> [--exec=<git-upload-archive>]] <árvore>
+	      [<caminho>...]
+
+DESCRIÇÃO
+---------
+Cria um arquivo no formato especificado que contém a estrutura da árvore para a árvore mencionada e o grava na saída predefinida. Caso o <prefixo> tenha sido especificado, ele será anexado aos nomes dos arquivos no arquivo.
+
+O comando 'git archive' se comporta de forma diferente quando recebe um ID da árvore em vez de um ID do commit ou a ID da etiqueta. Quando um ID da árvore é fornecida, a hora atual é usada como a hora de alteração de cada arquivo no arquivo. Por outro lado, quando um ID do commit ou um ID da etiqueta é fornecida, o tempo do commit registrado no objeto do commit referenciado será usado. Além disso, se o formato tar for usado, a ID é armazenada num cabeçalho "pax global" estendido; ele pode ser extraído usando o comando 'git get-tar-commit-id'. Em arquivos ZIP, ele é armazenado como um comentário do arquivo.
+
+OPÇÕES
+------
+
+--format=<fmt>::
+	Formato do arquivo resultante. Os possíveis valores são `tar`, `zip`, `tar.gz`, `tgz` e qualquer formato definido usando a opção de configuração `tar.<formato>.command`. Caso a opção `--format` não seja usada e o arquivo que será gerado seja definido, será usado o formato a partir do nome do arquivo, se possível (por exemplo, gravar em `foo.zip`, isso faz com que o arquivo gerado esteja no formato `zip`). Caso contrário, o formato padrão será `tar`.
+
+-l::
+--list::
+	Exiba todos os formatos disponíveis.
+
+-v::
+--verbose::
+	Relate o progresso para o stderr.
+
+--prefix=<prefixo>/::
+	Prepend <prefix>/ to paths in the archive. Can be repeated; its rightmost value is used for all tracked files. See below which value gets used by `--add-file`.
+
+-o <arquivo>::
+--output=<arquivo>::
+	Escreva o arquivo para o `<arquivo>` em vez do stdout.
+
+--add-file=<arquivo>::
+	Adiciona um arquivo não rastreado ao arquivo. Pode ser repetido para adicionar diversos arquivos. O caminho do arquivo no arquivo é criado concatenando o valor da última opção `--prefix` (se houver) antes dessa opção `--add-file` e o nome base do <arquivo>.
+
+--add-virtual-file=<caminho>:<conteúdo>::
+	Add the specified contents to the archive. Can be repeated to add multiple files.
++
+O argumento `<caminho>` pode começar e terminar com um caractere literal de aspas duplas; o nome do arquivo contido é interpretado como um texto estilo C, ou seja, a barra invertida é interpretada como caractere de escape. O caminho deve ser citado tenha dois pontos, para evitar que os dois pontos sejam mal interpretados como o separador entre o caminho e o conteúdo, ou, caso o caminho comece ou termine com um caractere de aspas duplas.
++
+O modo do arquivo é limitado a um arquivo regular, a opção pode estar sujeita aos limites da linha de comando que dependem da plataforma. Para casos não triviais, grave um arquivo não rastreado e use `--add-file`.
++
+Note that unlike `--add-file` the path created in the archive is not affected by the `--prefix` option, as a full `<path>` can be given as the value of the option.
+
+--worktree-attributes::
+	Procure pelos atributos nos arquivos `.gitattributes` da árvore de trabalho (consulte <<ATTRIBUTES>>).
+
+--mtime=<hora>::
+	Define o tempo da alteração nas entradas do arquivo. Sem essa opção, a hora de quem fez o commit é usada se `<tree-ish>` for um commit ou uma etiqueta, ou então a hora atual se for uma árvore.
+
+<extra>::
+	Pode ser qualquer opção que o backend do arquivador compreenda. Consulte a próxima seção.
+
+--remote=<repo>::
+	Em vez de criar um arquivo tar do repositório local, recupere um arquivo tar de um repositório remoto. Observe que o repositório remoto pode colocar restrições sobre quais as expressões sha1 podem ser permitidas na `<árvore>`. Para mais detalhes consulte linkgit:git-upload-archive[1].
+
+--exec=<git-upload-archive>::
+	Utilizado com `--remote` para informar o caminho para o 'git-upload-archive' no lado remoto.
+
+<tree-ish>::
+	A árvore ou o commit que será utilizado para produzir um arquivo.
+
+<caminho>::
+	Sem um parâmetro opcional de caminho, todos os arquivos e subdiretórios do diretório de trabalho atual são incluídos no arquivo. Se um ou mais caminhos forem especificados, somente esses serão incluídos.
+
+OPÇÕES EXTRAS DA ESTRUTURA
+--------------------------
+
+zip
+~~~
+-<digito>::
+	Determine o nível de compressão. Valores maiores permitem que o comando gaste mais tempo para comprimir num tamanho menor. Os valores compatíveis vão de `-0` (apenas armazenamento) a `-9` (melhor taxa de compressão). Se nenhum for informado, a predefinição é `-6`.
+
+tar
+~~~
+-<quantidade>::
+	Especifique o nível de compressão. O valor será passado ao comando de compressão configurado em `tar.<formato>.comando`. Consulte a página do manual do comando para conhecer a lista dos níveis suportados e o nível padrão caso essa opção não seja definida.
+
+CONFIGURAÇÃO
+------------
+
+tar.umask::
+	Esta variável pode ser usada para restringir os bits de permissão das entradas do arquivo tar. A predefinição é 0002, desativa o bit de gravação mundial. O valor especial "user" indica que o "umask" do usuário de arquivamento será usado em seu lugar. Para mais detalhes consulte umask(2). Se a opção `--remote` for usada, terá efeito apenas a configuração do repositório remoto.
+
+tar.<formato>.comando::
+	Esta variável define um comando shell por onde o tar será gerado pelo `git archive` através de um "pipe". O comando é executado utilizando o shell com o arquivo tar gerado na sua entrada padrão e deve produzir a saída final na sua saída padrão. Quaisquer opções do nível de compressão serão passadas ao comando (`-9` por exemplo).
++
+Os formatos `tar.gz` e `tgz` são definidos automaticamente e por padrão usam o comando mágico `git archive gzip` que invoca uma implementação interna para gerar um arquivo gzip.
+
+tar.<formato>.remoto::
+	Caso seja 'true', ative o formato para que seja utilizado por clientes remotos através do linkgit:git-upload-archive[1]. A predefinição retorna para 'false' nos formatos definidos pelo usuário, mas 'true' para os formatos `tar.gz` e `tgz`.
+
+[[ATTRIBUTES]]
+ATRIBUTOS
+---------
+
+export-ignore::
+	Os arquivos e os diretórios com o atributo 'export-ignore' não serão adicionados aos arquivos comprimidos. Para mais detalhes consulte linkgit:gitattributes[5].
+
+export-subst::
+	Se o atributo 'export-subst' estiver definido para um arquivo, o Git expandirá vários espaços reservados ao adicionar esse arquivo num arquivo. Para mais detalhes consulte linkgit:gitattributes[5].
+
+Observe que os atributos são, por padrão, obtidos dos arquivos `.gitattributes` na árvore que está sendo arquivada. Se quiser ajustar a forma como a saída é gerada após o fato (você fez o commit sem adicionar um 'export-ignore' apropriado em seu `.gitattributes` por exemplo), ajuste o arquivo `.gitattributes` verificado conforme necessário e use a opção `--worktree-attributes`. Como alternativa, você pode manter os atributos necessários que devem ser aplicados durante o arquivamento de qualquer árvore em seu arquivo `$GIT_DIR/info/attributes`.
+
+EXEMPLOS
+--------
+`git archive --format=tar --prefix=junk/ HEAD | (cd /var/tmp/ && tar xf -)`::
+
+	Crie um arquivo tar com o conteúdo do commit mais recente no ramo atual e extraia-o no diretório `/var/tmp/junk`.
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0 | gzip >git-1.4.0.tar.gz`::
+
+	Crie um "tarball" comprimido para a versão v1.4.0.
+
+`git archive --format=tar.gz --prefix=git-1.4.0/ v1.4.0 >git-1.4.0.tar.gz`::
+
+	O mesmo que acima porém lidando com o "tar.gz" embutido.
+
+`git archive --prefix=git-1.4.0/ -o git-1.4.0.tar.gz v1.4.0`::
+
+	O mesmo que acima, porém o formato é deduzido do arquivo gerado.
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0^{tree} | gzip >git-1.4.0.tar.gz`::
+
+	Crie um tarball compactado para a versão v1.4.0, porém sem um cabeçalho pax global estendido.
+
+`git archive --format=zip --prefix=git-docs/ HEAD:Documentation/ > git-1.4.0-docs.zip`::
+
+	Coloque tudo no diretório Documentation/ do cabeçalho atual no arquivo 'git-1.4.0-docs.zip', com o prefixo 'git-docs/'.
+
+`git archive -o latest.zip HEAD`::
+
+	Crie um arquivo Zip com o conteúdo do commit mais recente na ramificação atual. Observe que o formato gerado é deduzido através da extensão do arquivo utilizado na saída.
+
+`git archive -o latest.tar --prefix=build/ --add-file=configure --prefix= HEAD`::
+
+	Cria um arquivo tar que contém o conteúdo do último commit no ramo atual sem o prefixo e o arquivo não rastreado 'configure' com o prefixo 'build/'.
+
+`git config tar.tar.xz.command "xz -c"`::
+
+	Configure um formato "tar.xz" para criar arquivos tar comprimidos com LZMA. Você pode usá-lo especificando a opção `--format=tar.xz` ou criando um arquivo final com `-o foo.tar.xz`.
+
+
+VEJA TAMBÉM
+-----------
+linkgit:gitattributes[5]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

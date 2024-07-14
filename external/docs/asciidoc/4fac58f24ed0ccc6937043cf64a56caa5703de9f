@@ -1,0 +1,307 @@
+git-worktree(1)
+===============
+
+NOME
+----
+git-worktree - Gerencie as várias árvores de trabalho
+
+
+RESUMO
+------
+[verse]
+'git worktree add' [-f] [--detach] [--checkout] [--lock [--reason <string>]]
+		   [--orphan] [(-b | -B) <novo-ramo>] <caminho> [<commit-ish>]
+'git worktree list' [-v | --porcelain [-z]]
+'git worktree lock' [--reason <string>] <árvore-de-trabalho>
+'git worktree move' <worktree> <novo-caminho>
+'git worktree prune' [-n] [-v] [--expire <expira>]
+'git worktree remove' [-f] <árvore-de-trabalho>
+'git worktree repair' [<caminho>...]
+'git worktree unlock' <árvore-de-trabalho>
+
+DESCRIÇÃO
+---------
+
+Gerencie várias árvores de trabalho conectadas ao mesmo repositório.
+
+Um repositório git pode suportar várias árvores de trabalho, permitindo que você verifique mais de um ramo de cada vez. Com o comando `git worktree add`, uma nova árvore de trabalho é associada ao repositório, juntamente com os metadados adicionais que diferenciam esta árvore de trabalho das outras no mesmo repositório. A árvore de trabalho, juntamente com estes metadados, é chamada de "worktree".
+
+Esta nova árvore de trabalho é chamada de "linked worktree" (árvore de trabalho vinculada), em oposição à "main worktree" (árvore de trabalho principal) preparada pelo comando linkgit:git-init[1] ou o comando linkgit:git-clone[1]. Um repositório tem uma árvore de trabalho principal (se não for um repositório simples) e zero ou mais árvore de trabalho vinculadas. Quando você terminar de usar uma árvore de trabalho vinculada, remova-a com o comando `git worktree remove`.
+
+Em sua forma mais simples, o comando `git worktree add <caminho>` cria automaticamente um novo ramo cujo nome é o componente final do `<caminho>`, que é conveniente caso planeje trabalhar em um novo tópico. Por exemplo, o comando `git worktree add ../hotfix` cria um novo ramo `hotfix` e elimina o caminho `../ hotfix`. Para trabalhar num ramo existente em uma nova árvore de trabalho, use o comando `git worktree add <caminho> <ramo>`. Por outro lado, caso queira apenas planejar fazer algumas alterações experimentais ou realizar testes sem atrapalhar o desenvolvimento já existente, em geral é conveniente criar uma árvore de trabalho 'descartável' e que não seja associada com nenhum ramo. Por exemplo, o comando `git worktree add -d <caminho>` cria uma nova árvore de trabalho com um `HEAD` separado no mesmo commit do ramo atual.
+
+Caso uma árvore de trabalho seja excluída sem o a utilização do comando `git worktree remove`, os seus arquivos administrativos associados, que residam no repositório (consulte "DETALHES" abaixo), serão removidos automaticamente (consulte a opção de configuração `gc.worktreePruneExpire` no linkgit:git-config[1]), ou é possível executar o comando `git worktree prune` na árvore principal ou em qualquer árvore de trabalho vinculada para fazer a limpeza de quaisquer arquivos administrativos que estejam obsoletos.
+
+Caso uma árvore de trabalho vinculada estiver armazenada num dispositivo portátil ou num compartilhamento da rede que nem sempre seja montado, é possível impedir que os seus arquivos administrativos sejam removidos emitindo o comando `git worktree lock`, utilizando opcionalmente a opção `--reason` para explicar por que a árvore de trabalho está bloqueada.
+
+COMANDOS
+--------
+add <caminho> [<commit-ish>]::
+
+Crie uma árvore de trabalho no `<caminho>` e faça a averiguação `<commit-ish>` nele. A nova árvore de trabalho está vinculada ao repositório atual, compartilhando tudo exceto arquivos específicos da árvore de trabalho, como o HEAD, o índice, etc. Por conveniência o `<commit-ish>` pode ser um simples "`-`", que é um sinônimo de `@{-1}`.
++
+Se o `<commit-ish>` for um nome de ramificação (chame-o de `<ramo>`), não for encontrado e nem a opção `-b`, `-B` ou `--detach` forem usadas, mas existir uma ramificação de rastreamento em exatamente um ramo remoto (chame-o de `<remoto>`) com um nome correspondente, trate como equivalente a:
++
+------------
+$ git worktree add --track -b <ramo> <caminho> <remoto>/<ramo>
+------------
++
+Caso o ramo exista em diversos ramos remotos e um deles seja nomeado pela variável de configuração `checkout.defaultRemote`, para propósitos de desambiguação, mesmo que `<ramo>` não seja o único em todos os outros ramos remotos. Defina por exemplo, `checkout.defaultRemote=origin` para que sempre verifique as ramificações remotas de lá caso `<ramo>` seja ambíguo e ainda assim `origin` exista. Consulte também `checkout.defaultRemote` em linkgit:git-config[1].
++
+Se o `<commit-ish>` for omitido e as opções `-b`, `-B` ou `--detach` não forem usadas, então, por conveniência, a nova árvore de trabalho será associada a uma ramificação (chamada de `<ramo>`) com o nome `$(basename <caminho>)`. Se o `<ramo>` não existir, uma nova ramificação baseada em `HEAD` será criada automaticamente como se `-b <ramo>` tivesse sido fornecido. Se o `<ramo>` existir, ele será verificado na nova árvore de trabalho, se não tiver sido verificado em nenhum outro lugar; caso contrário, o comando se recusará a criar a árvore de trabalho (a menos que a opção `--force` seja usado).
++
+Se o `<commit-ish>` for omitido e nem as opções `--detach` ou `--orphan` forem usadas e não houver ramificações locais válidas (ou ramificações remotas se `--guess-remote` for especificado), então, por conveniência, a nova árvore de trabalho será associada a uma nova ramificação não nascida denominada `<ramo>` (após `$(basename <caminho>)` se as opções `-b` ou `-B` forem usadas) como se a opção `--orphan` tivesse sido passado para o comando. Caso o repositório tenha um ramo remoto e a opção `--guess-remote` seja usada, mas não existam ramificações remotas ou locais, o comando falhará com um aviso lembrando o usuário de buscar primeiro no ramo remoto (ou substituir usando `-f/--force`).
+
+list::
+
+Liste os detalhes de cada árvore de trabalho. A árvore de trabalho principal é listada primeiro, seguida por cada uma das árvores de trabalho vinculadas. Os detalhes da saída incluem se a árvore de trabalho está vazia, a revisão que está sendo verificada no momento, o ramo que está sendo verificado no momento (ou "detached HEAD" se não houver nenhum), 'locked' se a árvore de trabalho estiver bloqueada, 'prunable' se a árvore de trabalho puder ser podada pelo comando `prune`.
+
+lock::
+
+Se uma árvore de trabalho estiver num dispositivo portátil ou num compartilhamento de rede que nem sempre é montado, bloqueie-o para evitar que seus arquivos administrativos sejam removidos automaticamente. Isso também impede que ele seja movido ou excluído. Opcionalmente, especifique um motivo para o bloqueio com a opção `--reason`.
+
+move::
+
+Mova uma árvore de trabalho para um novo local. Observe que a principal árvore de trabalho ou as árvores de trabalho vinculadas que contenham submódulos, não poderão ser movidas com este comando. (Contudo o comando `git worktree repair` pode restabelecer a conexão com as árvores de trabalho vinculadas a ela caso você mova manualmente a principal árvore de trabalho.)
+
+prune::
+
+Remova a informação da árvore de trabalho no `$GIT_DIR/worktrees`.
+
+remove::
+
+Remova uma árvore de trabalho. Somente a árvore de trabalho que estiver vazia (sem arquivos não monitorados e nenhuma alteração nos arquivos monitorados) pode ser removida. A árvore de trabalho que não estiver vazia ou com os sub-módulos podem ser removidas a força com a opção `--force`. A principal árvore de trabalho não pode ser removida.
+
+repair [<caminho>...]::
+
+Faz o reparo dos arquivos administrativos da árvore de trabalho caso tenham se corrompido ou tenham se desatualizado devido a fatores externos.
++
+Por exemplo, caso a principal árvore de trabalho (ou o repositório vazio) seja movida, as outras árvores de trabalho que estejam vinculadas à ela não serão capazes de localizá-la. Ao executar o comando `repair` na principal árvore de trabalho, fará com que a conexão das árvores de trabalho que estejam vinculadas sejam restauradas de volta para a principal árvore de trabalho.
++
+Da mesma forma, caso uma árvore de trabalho vinculada seja movida sem usar o comando `git worktree move`, a principal árvore de trabalho (ou o repositório vazio) não será capaz de localizá-la. Executando o comando `repair` dentro da árvore de trabalho recém-movida faz com que a conexão seja reestabelecida. Caso várias árvores de trabalho que estejam vinculadas sejam movidas, ao executar o `repair` a partir de qualquer árvore de trabalho usando o novo `<caminho>` de cada árvore como argumento, o vínculo será reestabelecido com todos os caminhos especificados.
++
+Caso a principal árvore de trabalho e as árvores de trabalho que estejam vinculadas tenham sido movidas manualmente, ao executar `repair` na principal árvore de trabalho e ao definir um novo `<caminho>` de cada árvore de trabalho vinculada, fará com que todas as conexões em todas as direções sejam reestabelecidas.
+
+unlock::
+
+Desbloqueie uma árvore de trabalho em funcionamento, permitindo que ela seja removida, movida ou excluída.
+
+OPÇÕES
+------
+
+-f::
+--force::
+	É predefinido que `add` se recuse a criar uma nova árvore de trabalho quando `<commit-ish>` for um nome de um ramo e já esteja em averiguação por outra árvore de trabalho, ou caso o `<caminho>` já esteja atribuído a alguma árvore de trabalho, porém esteja ausente (caso o `<caminho>` tenha sido excluído manualmente por exemplo). Esta opção substitui estas salvaguardas. Para adicionar um caminho numa árvore de trabalho ausente e que esteja bloqueada, utilize a opção `--force` duas vezes.
++
+o `move` se recusa a mover uma árvore de trabalho bloqueada a menos que a opção `--force` seja utilizada duas vezes. Caso o destino já esteja atribuído a alguma outra árvore de trabalho, porém esteja ausente (caso o `<novo-caminho>` tenha sido excluído manualmente por exemplo), então a opção `--force` permite que a ação de mover prossiga; utilize a opção `--force` duas vezes caso o destino esteja bloqueado.
++
+O `remove` se recusa a remover uma árvore de trabalho suja, a menos que a opção `--force` seja usada. Para remover uma árvore de trabalho bloqueada, especifique a opção `--force` duas vezes.
+
+-b <novo-ramo>::
+-B <novo-ramo>::
+	Com `add`, crie uma nova ramificação chamada `<novo-ramo>` começando em `<commit-ish>` e faça o 'check-out' do `<novo-ramo>` na nova árvore de trabalho. Se o `<commit-ish>` for omitido, a predefinição será `HEAD`. A predefinição `-b` se recusará a criar uma nova ramificação caso ela já exista. A opção `-B` substitui essa proteção, redefinindo `<novo-ramo>` para o `<commit-ish>`.
+
+-d::
+--detach::
+	Com `add`, desanexe o `HEAD` na nova árvore de trabalho. Consulte "HEAD DESANEXADO" em linkgit:git-checkout[1].
+
+--[no-]checkout::
+	É predefinido que `add` faça a averiguação do `<commit-ish> `, no entanto a opção `--no-checkout` pode ser utilizado para suprimir a averiguação a fim de fazer as personalizações, como configurar a averiguação esparsa. Consulte "Averiguação esparsa" em linkgit:git-read-tree[1].
+
+--[no-]guess-remote::
+	Com `worktree add <caminho>`, sem `<commit-ish>`, em vez de criar uma nova ramificação a partir do `HEAD`, caso exista uma ramificação de rastreamento em exatamente um ponto remoto que coincida com o `basename` do `<caminho>`, baseie a nova ramificação na ramificação remota rastreada e marque a ramificação rastreada remoto como um "upstream" da nova ramificação.
++
+Isso também pode ser definido como um comportamento predefinido ao usar a opção da configuração `worktree.guessRemote`.
+
+--[no-]track::
+	Ao criar uma nova ramificação, se o `<commit-ish>` for uma ramificação, marque-a como 'upstream' da nova ramificação. Esse é a predefinição se o `<commit-ish>` for um ramo rastreado remotamente. Para mais detalhes consulte `--track` do comando linkgit:git-branch[1].
+
+--lock::
+	Mantenha a árvore de trabalho bloqueada após a criação. Isso é equivalente ao comando `git worktree lock` após `git worktree add`, porém sem a condição de corrida.
+
+-n::
+--dry-run::
+	Com `prune`, não remove nada; apenas relate o que seria removido.
+
+--orphan::
+	Com `add`, esvazie o índice e a nova árvore de trabalho, associando a árvore de trabalho a uma nova ramificação chamada `<novo-ramo>`.
+
+--porcelain::
+	Com `list`, é gerado num formato compatível para scripts. Este formato permanecerá estável em todas as versões do Git e independentemente da configuração do usuário. Recomenda-se combiná-lo com a opção `-z`. Veja abaixo para mais detalhes.
+
+-z::
+	Termine cada linha com um NUL em vez de uma nova linha quando a opção `--porcelain` for usada com `list`. Isto torna possível analisar a saída quando o caminho da árvore de trabalho tiver um novo caractere de uma nova linha.
+
+-q::
+--quiet::
+	Com `add`, suprima as mensagens de feedback.
+
+-v::
+--verbose::
+	Com `prune`, relate todas as remoções.
++
+Com `list`, produza informações adicionais sobre as árvores de trabalho (veja abaixo).
+
+--expire <tempo>::
+	Com `prune`, expire apenas a árvore de trabalho que não foram utilizadas e que sejam mais velhas que `<tempo>`.
++
+Com `list`, anote a árvore de trabalho que estejam ausentes como podáveis e caso sejam mais antigas do que `<tempo>`.
+
+--reason <texto>::
+	Com `lock` ou com `add --lock`, uma explicação é dada do por que a árvore está "locked" (travada).
+
+<árvore de trabalho>::
+	A árvore de trabalho pode ser identificada através do seu caminho, seja ele relativo ou absoluto.
++
+Caso os componentes do último caminho da árvore de trabalho sejam únicos entre as árvores, ele poderá ser utilizado para identificar a árvore de trabalho. Como por exemplo, caso tenha apenas duas árvores de trabalho, em `/abc/def/ghi` e `/abc/def/ggg`, `ghi` ou `def/ghi` serão suficientes para apontar para a antiga árvore de trabalho.
+
+REFS
+----
+Quando utilizar diversas árvores de trabalho, algumas refs são compartilhadas entre todas as árvores de trabalho mas outras são específicas para cada árvore de trabalho individualmente. Um exemplo é o `HEAD`, que é único para cada a árvores de trabalho. Esta seção são sobre as regras de compartilhamento e de como acessar tais refs de uma árvore de trabalho para outra.
+
+Geralmente, cada árvore de trabalho possuí uma ref própria e todas as refs que iniciem com `refs/` podem ser compartilhados. Os pseudo-refs são aqueles como `HEAD` que estão diretamente sob `$GIT_DIR` ao invés de estarem dentro do `GIT_DIR/refs`. Contudo há exceções: as refs não serão compartilhadas quando estiverem dentro do `refs/bisect`, `refs/worktree` e `refs/rewritten`.
+
+As refs individuais de cada árvore de trabalho ainda podem ser acessadas de uma outra árvore de trabalho através de dois caminhos especiais, `main-worktree` e `worktrees`. A primeira oferece acesso `ref` individual a cada principal árvore de trabalho, enquanto a última a todas as árvores de trabalho que forem vinculadas à ela.
+
+Como por exemplo, `main-worktree/HEAD` ou `main-worktree/refs/bisect/good` resolve para o mesmo valor que `HEAD` nas principais árvores de trabalho, assim como `refs/bisect/good` respectivamente. Da mesma forma, `worktrees/foo/HEAD` e `worktrees/bar/refs/bisect/bad` são as mesmas que `$GIT_COMMON_DIR/worktrees/foo/HEAD` e `$GIT_COMMON_DIR/worktrees/bar/refs/bisect/bad`.
+
+Para acessar as `refs` é melhor não olhar diretamente para dentro do `$GIT_DIR`. Em vez disso, use comandos como o linkgit:git-rev-parse[1] ou linkgit:git-update-ref[1] que manipularão corretamente as refs.
+
+ARQUIVO DE CONFIGURAÇÃO
+-----------------------
+É predefinido que o arquivo `config` do repositório seja compartilhado em todas as árvores de trabalho. Se as variáveis de configuração `core.bare` ou `core.worktree` estiverem presentes no arquivo de configuração comum e `extensions.worktreeConfig` estiver desativado, elas serão aplicadas somente à árvore de trabalho principal.
+
+Você pode ativar a extensão `worktreeConfig` para ter uma configuração específica para as árvores de trabalho, por exemplo:
+
+------------
+$ git config extensions.worktreeConfig true
+------------
+
+Neste modo, a configuração específica permanece no caminho apontado pelo comando `git rev-parse --git-path config.worktree`. Você pode adicionar ou atualizar a configuração neste arquivo com o comando `git config --worktree`. As versões mais antigas do Git se recusarão a acessar os repositórios com esta extensão.
+
+Observe que neste arquivo, a exceção para `core.bare` e `core.worktree` desapareceu. Caso existam no `$GIT_DIR/config`, você deve movê-los para o `config.worktree` da árvore principal de trabalho. Você também pode aproveitar esta oportunidade para revisar e mover as outras configurações que não deseja compartilhar com todas as árvores de trabalho:
+
+ - `core.worktree` nunca deve ser compartilhado.
+
+ - `core.bare` não deve ser compartilhado caso o valor seja `core.bare=true`.
+
+ - Recomenda-se a opção de configuração `core.sparseCheckout` não seja compartilhada, a menos que você tenha certeza de utilizar a verificação esparsa em todas as árvores de trabalho.
+
+Para mais detalhes consulte a documentação sobre `extensions.worktreeConfig` em linkgit:git-config[1].
+
+DETALHES
+--------
+Cada árvore de trabalho vinculada tem um subdiretório privado no diretório `$GIT_DIR/worktrees` do repositório. O nome do subdiretório privado geralmente é o nome base do caminho da árvore de trabalho vinculada, possivelmente acrescido de um número para torná-lo exclusivo. Por exemplo, quando `$GIT_DIR=/path/main/.git`, o comando `git worktree add /path/other/test-next next` cria a árvore de trabalho vinculada em `/path/other/test-next` e também cria um diretório `$GIT_DIR/worktrees/test-next` (ou `$GIT_DIR/worktrees/test-next1` se o `test-next` já estiver ocupado).
+
+Dentro de uma árvore de trabalho vinculada, `$GIT_DIR` é configurado para apontar para este diretório privado (`/path/main/.git/worktrees/test-next` no exemplo) e `$GIT_COMMON_DIR` é configurado para apontar de volta para a principal árvore de trabalho `$GIT_DIR` (`/path/main/.git` por exemplo). Estas configurações são feitas em um arquivo `.git` localizado no diretório mais alto do vínculo da árvore de trabalho.
+
+A resolução do caminho através do comando `git rev-parse --git-path` utiliza `$GIT_DIR` ou `$GIT_COMMON_DIR`, dependendo do caminho. Na árvore de trabalho vinculada, o comando `git rev-parse --git-path HEAD` retorna `/path/main/.git/worktrees/test-next/HEAD` (não `/path/other/test-next/.git/HEAD` ou `/path/main/.git/HEAD`) enquanto o comando `git rev-parse --git-path refs/heads/master` usa `$GIT_COMMON_DIR` e retorna `/path/main/.git/refs/heads/master`, já que as refs são compartilhados em todas as árvores de trabalho, exceto `refs/bisect`, `refs/worktree` e `refs/rewritten`.
+
+Para mais informações consulte linkgit:gitrepository-layout[5]. A regra geral é não fazer qualquer suposição sobre se um caminho pertence ao `$GIT_DIR` ou ao `$GIT_COMMON_DIR` quando você precisar acessar diretamente algo dentro do `$GIT_DIR`. Para obter o caminho final utilize o comando `git rev-parse --git-path`.
+
+Caso queira mover o vínculo de uma árvore de trabalho manualmente, será preciso atualizar o arquivo 'gitdir' no diretório da entrada. Como por exemplo, caso o vínculo de uma árvore de trabalho seja movida para `/newpath/test-next` e o seu arquivo `.git` aponte para `/path/main/.git/worktrees/test-next`, então atualize `/path/main/.git/worktrees/test-next/gitdir` para a referência `/newpath/test-next`. Melhor ainda, execute o comando `git worktree repair` para restabelecer a conexão automaticamente.
+
+Para evitar que uma entrada `$GIT_DIR/worktrees` seja removida (o que pode ser útil em algumas situações, como quando a árvore de trabalho da entrada é armazenada num dispositivo portátil), use o comando `git worktree lock`, que adiciona um arquivo chamado `locked` ao diretório da entrada. O arquivo contém o motivo em texto simples. Por exemplo, se o arquivo `.git` de uma árvore de trabalho vinculada apontar para `/path/main/.git/worktrees/test-next` então o arquivo chamado `/path/main/.git/worktrees/test-next/locked` impedirá que a entrada `test-next` seja eliminada. Para mais detalhes consulte linkgit:gitrepository-layout[5].
+
+Quando a opção de configuração `extensions.worktreeConfig` está ativo, o arquivo de configuração `.git/worktrees/<id>/config.worktree` é lido após o `.git/config`.
+
+FORMATO DA LISTA DE SAÍDA
+-------------------------
+O comando `worktree list` tem dois formatos de saída. O formato predefinido mostra os detalhes numa única linha com colunas. Por exemplo:
+
+------------
+$ git worktree list
+/path/to/bare-source            (bare)
+/path/to/linked-worktree        abcd1234 [master]
+/path/to/other-linked-worktree  1234abc  (HEAD desanexado)
+------------
+
+O comando também mostra as anotações para cada árvore de trabalho, de acordo com a sua condição. Estas anotações são:
+
+ * `locked`, caso a árvore de trabalho esteja bloqueada.
+ * `prunable`, caso a árvore de trabalho possa ser podada através do comando `git worktree prune`.
+
+------------
+$ git worktree list
+/path/to/linked-worktree    abcd1234 [master]
+/path/to/locked-worktree    acbd5678 (brancha) bloqueado
+/path/to/prunable-worktree  5678abc  (HEAD desanexada) podável
+------------
+
+Para essas anotações, um motivo também pode estar disponível e isso pode ser visto usando o modo detalhado. A anotação é então movida para a próxima linha recuada seguida pelas informações adicionais.
+
+------------
+$ git worktree list --verbose
+/path/to/linked-worktree              abcd1234 [master]
+/path/to/locked-worktree-no-reason    abcd5678 (HEAD desanexado) bloqueado
+/path/to/locked-worktree-with-reason  1234abcd (brancha)
+	bloqueado: a árvore de trabalho está montando em um dispositivo portátil
+/path/to/prunable-worktree            5678abc1 (HEAD desanexado)
+	podável: o arquivo gitdir aponta para um local que não existe
+------------
+
+Observe que a anotação é movida para a próxima linha caso a informação adicional esteja disponível, caso contrário, ela permanece na mesma linha que a própria árvore de trabalho.
+
+Formato Porcelana
+~~~~~~~~~~~~~~~~~
+O formato porcelana tem uma linha por atributo. Se a opção `-z` for usada, as linhas serão encerradas com 'NUL' em vez de uma nova linha. Os atributos são listados com um rótulo e um valor separados por um espaço simples. Os atributos booleanos (como `bare` e `detached`) são listados apenas como um rótulo e estão presentes somente se o valor for verdadeiro. Alguns atributos (como `locked`) podem ser listados apenas como um rótulo ou com um valor, dependendo da disponibilidade de um motivo. O primeiro atributo de uma árvore de trabalho é sempre `worktree`, uma linha vazia indica o fim do registro. Por exemplo:
+
+------------
+$ git worktree list --porcelain
+worktree /path/to/bare-source
+bare
+
+worktree /path/to/linked-worktree
+HEAD abcd1234abcd1234abcd1234abcd1234abcd1234
+branch refs/heads/master
+
+worktree /path/to/other-linked-worktree
+HEAD 1234abc1234abc1234abc1234abc1234abc1234a
+detached
+
+worktree /path/to/linked-worktree-locked-no-reason
+HEAD 5678abc5678abc5678abc5678abc5678abc5678c
+branch refs/heads/locked-no-reason
+locked
+
+worktree /path/to/linked-worktree-locked-with-reason
+HEAD 3456def3456def3456def3456def3456def3456b
+branch refs/heads/locked-with-reason
+locked reason why is locked
+
+worktree /path/to/linked-worktree-prunable
+HEAD 1233def1234def1234def1234def1234def1234b
+detached
+prunable gitdir file points to non-existent location
+
+------------
+
+A menos que `-z` seja utilizado, quaisquer caracteres "incomuns" no motivo do bloqueio, tais como novas linhas, são escapados e o motivo inteiro é citado conforme explicado na variável de configuração `core.quotePath` (consulte o comando linkgit:git-config[1]). Por exemplo:
+
+------------
+$ git worktree list --porcelain
+...
+locked "reason\nwhy is locked"
+...
+------------
+
+EXEMPLOS
+--------
+Você está no meio de uma sessão de refatoração e o seu chefe entra e exige que você conserte algo imediatamente. Você normalmente pode usar o linkgit:git-stash[1] para armazenar temporariamente as suas alterações, no entanto, a sua árvore de trabalho está em uma condição de desordem (com arquivos novos, movidos e removidos e outros pedaços espalhados) que você não quer arriscar mexer em nenhum deles. Em vez disso, você cria uma árvore de trabalho vinculada temporária para fazer a correção de emergência, removê-la quando terminar e em seguida, retomar a sua sessão de refatoração anterior.
+
+------------
+$ git worktree add -b emergency-fix ../temp master
+$ pushd ../temp
+# ... hack hack hack ...
+$ git commit -a -m 'correção de emergência para o chefe'
+$ popd
+$ git worktree remove ../temp
+------------
+
+BUGS
+----
+A averiguação múltipla em geral ainda é experimental e a compatibilidade para os submódulos ainda está incompleto. NÃO é recomendado fazer várias averiguações de um superprojeto.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

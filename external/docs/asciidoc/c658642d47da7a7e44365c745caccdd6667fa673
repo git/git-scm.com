@@ -1,0 +1,356 @@
+git-update-index(1)
+===================
+
+名称
+--
+git-update-index - 将工作区中的文件内容注册到索引中
+
+
+概述
+--
+[verse]
+'git update-index'
+	     [--add] [--remove | --force-remove] [--replace]
+	     [--refresh] [-q] [--unmerged] [--ignore-missing]
+	     [(--cacheinfo <mode>,<object>,<file>)...]
+	     [--chmod=(+|-)x]
+	     [--[no-]assume-unchanged]
+	     [--[no-]skip-worktree]
+	     [--[no-]ignore-skip-worktree-entries]
+	     [--[no-]fsmonitor-valid]
+	     [--ignore-submodules]
+	     [--[no-]split-index]
+	     [--[no-|test-|force-]untracked-cache]
+	     [--[no-]fsmonitor]
+	     [--really-refresh] [--unresolve] [--again | -g]
+	     [--info-only] [--index-info]
+	     [-z] [--stdin] [--index-version <n>]
+	     [--show-index-version]
+	     [--verbose]
+	     [--] [<file>...]
+
+描述
+--
+修改索引。提到的每个文件都会更新到索引中，任何 “未合并” 或 “需要更新” 的状态都会被清除。
+
+参见 linkgit:git-add[1]，以获取更友好的索引操作方法。
+
+'git update-index' 处理文件的方式可以通过各种选项来修改：
+
+选项
+--
+--add::
+	如果索引中还没有指定文件，则会添加该文件。 默认行为是忽略新文件。
+
+--remove::
+	如果指定的文件在索引中但丢失了，则会被移除。 默认行为是忽略已删除的文件。
+
+--refresh::
+	查看当前索引，并通过检查 stat() 信息查看是否需要合并或更新。
+
+-q::
+安静 如果 --refresh 发现索引需要更新，默认行为是出错。 该选项会让 'git update-index' 继续执行。
+
+--ignore-submodules::
+	不尝试更新子模块。 该选项只有在 --refresh 之前使用时才会被遵守。
+
+--unmerged::
+如果 --refresh 在索引中发现未合并的更改，默认行为是出错。 这个选项会让 'git update-index' 继续执行。
+
+--ignore-missing::
+	在 --refresh 过程中忽略丢失的文件
+
+--cacheinfo <模式>,<对象>,<路径>::
+--cacheinfo <模式> <对象> <路径>::
+	将指定信息直接插入索引。 为了向后兼容，也可以将这三个参数分别作为三个参数，但建议新用户使用单参数形式。
+
+--index-info::
+        从标准输入流读取索引信息。
+
+--chmod=(+|-)x::
+        设置更新文件的执行权限。
+
+--[no-]assume-unchanged::
+	指定此标志后，路径记录的对象名称不会更新。 相反，该选项会设置/取消路径的 “假设不变” 位。 当 “假设不变” 位开启时，用户承诺不更改文件，并允许 Git 假设工作区文件与索引中记录的一致。 如果你想修改工作区文件，就需要取消设置来告诉 Git。 有时，在使用 lstat(2) 系统调用（如 cifs）非常慢的文件系统上处理大型项目时，这一点会很有用。
++
+如果 Git 需要在索引中修改该文件，例如在合并提交时，Git 会（优雅地）失败；因此，如果假定未跟踪的文件在上游被修改，你需要手动处理这种情况。
+
+--really-refresh::
+	类似于 `--refresh`，但无条件检查统计信息，不考虑 “假设不变” 设置。
+
+--[no-]skip-worktree::
+	如果指定了这些标志之一，路径记录的对象名称将不会更新。相反，这些选项会设置或取消路径的 “跳过工作树” 位。更多信息，请参阅下文 “跳过工作树位” 部分。
+
+
+--[no-]ignore-skip-worktree-entries::
+	即使指定了 `--remove` 选项，也不会删除跳过工作区（又称 “仅索引” ）条目。
+
+--[no-]fsmonitor-valid::
+	如果指定了这些标志之一，则不会更新路径记录的对象名称。相反，这些选项会设置或取消路径的 "fsmonitor valid" 位。更多信息，请参阅下文 “文件系统监视器” 部分。
+
+-g::
+--again::
+	在索引项与 `HEAD` 提交不同的路径上运行 'git update-index'。
+
+--unresolve::
+	在合并过程中，如果意外清除了文件的 “未合并” 或 “需要更新” 状态，则恢复该状态。
+
+--info-only::
+	不在对象数据库中为所有使用此标记的 <文件> 参数创建对象；只将其对象 ID 插入索引。
+
+--force-remove::
+	从索引中删除文件，即使工作目录中仍有该文件。(意味着 --remove 。）
+
+--replace::
+	默认情况下，当索引中存在文件 `path` 时，'git update-index' 会拒绝添加文件 `path/file` 的尝试。 同样，如果文件 `path/file` 已经存在，则无法添加文件 `path`。 使用 --replace 标志，与正在添加的条目冲突的现有条目会被自动删除，并伴有警告信息。
+
+--stdin::
+	从标准输入中读取路径列表，而不是从命令行中读取路径列表。 默认情况下，路径之间用 LF 分隔（即每行一个路径）。
+
+--verbose::
+	报告索引中添加和删除的内容。
+
+--index-version <n>::
+	以指定的磁盘格式版本写出生成的索引。 支持的版本有 2、3 和 4。当前默认版本为 2 或 3，取决于是否使用了额外功能，如 `git add -N`。 使用 `--verbose`，还可以报告索引文件在此命令前后使用的版本。
++
+版本 4 执行了简单的路径名压缩，可将大型软件仓库的索引大小减少 30%-50%，从而加快加载速度。 Git 从 2012 年 10 月发布的 1.8.0 版开始支持该功能，2016 年 libgit2 和 2020 年 JGit 也分别添加了对该功能的支持。 本手册页面的旧版本称其为 “相对年轻”，但如今应被视为成熟技术。
+
+--show-index-version::
+	报告磁盘索引文件使用的索引格式版本。 参见上文的 `--index-version`。
+
+-z::
+	只有在使用 `--stdin` 或 `--index-info` 时才有意义；路径用 NUL 字符分隔，而不用 LF。
+
+--split-index::
+--no-split-index::
+	启用或禁用分割索引模式。如果已启用拆分索引模式，且再次给出 `--split-index`，则 $GIT_DIR/index 中的所有更改都会推送回共享索引文件。
++
+无论 `core.splitIndex` 配置变量（参见 linkgit:git-config[1]）的值如何，这些选项都会生效。但当更改与配置值相悖时，系统会发出警告，因为配置值会在下次读取索引时生效，这将消除选项的预期效果。
+
+--untracked-cache::
+--no-untracked-cache::
+	启用或禁用非跟踪缓存功能。启用前请使用 `--test-untracked-cache`。
++
+无论 `core.untrackedCache` 配置变量的值是多少，这些选项都会生效（参见 linkgit:git-config[1]）。但当更改与配置值相悖时，系统会发出警告，因为配置值会在下次读取索引时生效，从而消除选项的预期效果。
+
+--test-untracked-cache::
+	只在工作目录下进行测试，以确保可以使用非跟踪缓存。如果真的要使用非跟踪缓存，必须使用 `--untracked-cache` 、`--force-untracked-cache` 或 `core.untrackedCache` 配置变量手动启用它。如果测试失败，则退出代码为 1，并根据需要给出一条信息，说明测试失败的原因，否则退出代码为 0，并打印 OK。
+
+--force-untracked-cache::
+	与 `--untracked-cache` 相同。提供该选项是为了向后兼容旧版本的 Git，在旧版本中，`--untracked-cache` 意味着 `--test-untracked-cache` ，但该选项将无条件启用扩展。
+
+--fsmonitor::
+--no-fsmonitor::
+	启用或禁用文件系统监视器功能。无论 `core.fsmonitor` 配置变量的值是多少，这些选项都会生效（参见 linkgit:git-config[1]）。但如果更改与配置值相反，则会发出警告，因为配置值会在下次读取索引时生效，从而消除选项的预期效果。
+
+\--::
+	不将之后的参数解释为选项。
+
+<文件>::
+	要处理的文件。 请注意，以 '. ' 开头的文件将被丢弃。这包括 `./file` 和 `dir/./file` 。如果不想这样，可以使用更干净的名称。 这同样适用于以 '/' 结尾的目录和以 '//' 结尾的路径
+
+使用 --REFRESH
+------------
+`--refresh` 选项不会计算新的 sha1 文件，也不会为模式/内容更改更新索引。但是，它要做的是将文件的统计信息与索引 “重新匹配”，以便您可以刷新未更改但统计条目已过期的文件的索引。
+
+例如，您需要在执行 'git read-tree' 后执行此操作，以便将统计索引详情与适当的文件联系起来。
+
+使用 --CACHEINFO 或 --INFO-ONLY
+----------------------------
+`--cacheinfo` 用于注册不在当前工作目录中的文件。 这对最小检查合并很有用。
+
+假设路径下有一个文件，带有模式和 sha1，例如：
+
+----------------
+$ git update-index --add --cacheinfo <模式>,<sha1>,<路径>
+----------------
+
+`--info-only` 用于注册文件而不将其放入对象数据库。 这对仅有状态的仓库非常有用。
+
+`--cacheinfo` 和 `--info-only` 的行为类似：索引会更新，但对象数据库不会更新。 当对象在数据库中但文件在本地不可用时，`--cacheinfo` 很有用。 当文件可用但不希望更新对象数据库时，`--info-only` 很有用。
+
+
+使用 --INDEX-INFO
+---------------
+
+`--index-info` 是一种更强大的机制，可让你从标准输入中输入多个条目定义，专为脚本设计。 它可以接受三种格式的输入：
+
+    . 模式 SP 类型 SP sha1 TAB 路径
++
+这种格式是将 `git ls-tree` 输出塞入索引。
+
+    . 模式 SP sha1 SP 阶段 TAB 路径
++
+这种格式是为了将更高阶的阶段放入索引文件，与 'git ls-files --stage' 的输出相匹配。
+
+    . 模式 SP 类型 SP sha1 TAB 路径
++
+任何 Git 命令都不再生成这种格式，但 `update-index --index-info` 将继续支持这种格式。
+
+若要在索引中输入更高一级的条目，应首先删除路径，为路径输入模式 =0 的条目，然后按第三种格式输入必要的输入行。
+
+例如，从这个索引开始：
+
+------------
+$ git ls-files -s
+100644 8a1218a1024a212bb3db30becd860315f9f3ac52 0       frotz
+------------
+
+你可以向 `--index-info` 输入以下内容：
+
+------------
+$ git update-index --index-info
+0 0000000000000000000000000000000000000000	frotz
+100644 8a1218a1024a212bb3db30becd860315f9f3ac52 1	frotz
+100755 8a1218a1024a212bb3db30becd860315f9f3ac52 2	frotz
+------------
+
+输入的第一行输入 0 作为删除路径的模式；只要格式正确，SHA-1 并不重要。 然后，第二行和第三行分别输入该路径的阶段 1 和阶段 2 条目。 经过上述操作后，我们将得到以下结果：
+
+------------
+$ git ls-files -s
+100644 8a1218a1024a212bb3db30becd860315f9f3ac52 1	frotz
+100755 8a1218a1024a212bb3db30becd860315f9f3ac52 2	frotz
+------------
+
+
+使用 ''假设不变'' 位
+-------------
+
+Git 中的许多操作都依赖于文件系统高效的 `lstat(2)` 实现，这样就能以低成本检查工作树文件的 `st_mtime` 信息，查看文件内容是否与索引文件中记录的版本有所变化。 遗憾的是，有些文件系统的 `lstat(2)` 效率很低。 如果你的文件系统属于这种情况，你可以在没有更改过的路径上设置 “假设未更改” 位，这样 Git 就不会进行这种检查了。 需要注意的是，在路径上设置这个位并不意味着 Git 会检查文件的内容是否有变化，而是让 Git 忽略任何检查，假设文件 *没有* 变化。 当你对工作区文件进行修改时，你必须在修改之前或之后，通过丢弃 “假定不变” 位来明确告知 Git。
+
+要设置 “假设不变” 位，请使用 `--assume-unchanged` 选项。 要取消设置，使用 `--no-assume-unchanged` 选项。使用 `git ls-files -v` 查看哪些文件设置了 “假设不变” 位（参见 linkgit:git-ls-files[1]）。
+
+该命令会查看 `core.ignorestat` 配置变量。 为真时，用 `git update-index paths...` 更新的路径，以及用其他同时更新索引和工作区的 Git 命令（例如 'git apply --index', 'git checkout-index -u', 和 'git read-tree -u'）更新的路径，都会被自动标记为 “假设不变”。 请注意，如果 `git update-index --refresh` 发现工作区文件与索引匹配，“假设不变” 位将不会被设置（如果想标记为 “假设不变”，请使用 `git update-index --really-refresh`）。
+
+有时用户会将假定不变位与跳过工作区位混淆。 关于两者的区别，请参阅下文 “跳过工作区位” 部分的最后一段。
+
+
+实例
+--
+只更新和刷新已签出的文件：
+
+----------------
+$ git checkout-index -n -f -a && git update-index --ignore-missing --refresh
+----------------
+
+在设置了 `core.ignorestat` 的低效文件系统上::
++
+------------
+$ git update-index --really-refresh              <1>
+$ git update-index --no-assume-unchanged foo.c   <2>
+$ git diff --name-only                           <3>
+$ edit foo.c
+$ git diff --name-only                           <4>
+M foo.c
+$ git update-index foo.c                         <5>
+$ git diff --name-only                           <6>
+$ edit foo.c
+$ git diff --name-only                           <7>
+$ git update-index --no-assume-unchanged foo.c   <8>
+$ git diff --name-only                           <9>
+M foo.c
+------------
++
+<1> 强制 lstat(2) 设置与索引匹配的路径的 “假设不变” 位。
+<2> 标记要编辑的路径。
+<3> 执行 lstat(2)，找到与路径匹配的索引。
+<4> 这将执行 lstat(2)，发现索引与路径 *不* 匹配。
+<5> 将新版本注册到索引中会设置 “假设不变” 位。
+<6> 并假定其保持不变。
+<7> 即使在编辑之后也是如此。
+<8> 你可以在事后了解变化。
+<9> 现在它使用 lstat(2) 进行检查，发现它已被更改。
+
+
+跳过工作区位
+------
+
+跳过工作区位可以用一句（长）话来定义：告诉 Git 在合理的情况下避免将文件写入工作目录，当文件不在工作目录中时，将其视为不变文件。
+
+请注意，并非所有的 Git 命令都会关注这一点，有些命令仅部分支持这一点。
+
+linkgit:git-sparse-checkout[1] 命令为配置和处理跳过工作树位提供了更简便的方法。 如果你想缩减工作区，只处理仓库中的部分文件，我们强烈建议你使用 linkgit:git-sparse-checkout[1] 而不是底层的 update-index 和 read-tree 原语。
+
+跳过工作树位的主要目的是实现稀疏签出，即工作目录中只存在路径的子集。 设置了跳过工作树位后，Git 命令（如 `switch` 、`pull` 、`merge` ）将避免写入这些文件。 不过，在一些重要的情况下，比如合并或重置过程中的冲突，这些命令有时还是会写入这些文件。 Git 命令也会避免将缺少这些文件视为有意删除；例如 `git add -u` 不会阶段性删除这些文件，而 `git commit -a` 也不会提交删除这些文件。
+
+虽然这个位看起来与假定未修改位相似，但目标不同。 假定未修改位用于将文件保留在工作树中，但让 Git 忽略检查文件是否被修改，并假定文件未被修改（当然，如果 Git 可以在不统计文件的情况下确定文件已被修改，它也可以自由地记录这些修改）。 skip-worktree 则告诉 Git 忽略文件的缺失，尽可能避免使用通常会更新大部分工作目录的命令（如 `checkout` 、`switch` 、`pull` 等）更新文件，并且不在提交中记录文件的缺失。 需要注意的是，在稀疏签出中（通过 `git sparse-checkout` 或将 core.sparseCheckout 配置为 true 设置），如果某个文件在索引中被标记为跳过工作区，但在工作区中找到了，Git 会清除该文件的跳过工作区位。
+
+SPLIT INDEX
+-----------
+
+该模式专为拥有超大索引的仓库而设计，旨在减少重复写入这些索引所需的时间。
+
+在这种模式下，索引被分割成两个文件：$GIT_DIR/index 和 $GIT_DIR/sharedindex.<SHA-1>。更改会累积到分割索引的 $GIT_DIR/index，而共享索引文件则包含所有索引条目并保持不变。
+
+当拆分索引中的条目数达到 splitIndex.maxPercentChange 配置变量（参见 linkgit:git-config[1]）指定的水平时，拆分索引中的所有更改都会被推送回共享索引文件。
+
+每次创建新的共享索引文件时，如果旧的共享索引文件的修改时间早于 splitIndex.sharedIndexExpire 配置变量（参见 linkgit:git-config[1]）的指定时间，则会被删除。
+
+为避免删除仍在使用的共享索引文件，每次创建或读取基于共享索引文件的新拆分索引时，都会将其修改时间更新为当前时间。
+
+UNTRACKED CACHE
+---------------
+
+该缓存的目的是加快涉及确定未跟踪文件（如 `git status` ）的命令的执行速度。
+
+该功能的工作原理是记录工作树目录的 mtime，然后省略读取目录和对 mtime 未发生变化的目录中文件的 stat 调用。要实现这一功能，如果目录中的文件被添加、修改或删除，底层操作系统和文件系统必须更改目录的 `st_mtime` 字段。
+
+你可以使用`--test-untracked-cache` 选项来测试文件系统是否支持该功能。在旧版本的 Git 中，`--untracked-cache` 选项曾隐含地执行该测试，但现在已不再如此。
+
+如果你想启用（或禁用）这项功能，使用 `core.untrackedCache` 配置变量（参见 linkgit:git-config[1]）比在每个版本库中使用 `--untracked-cache` 选项来 `git update-index` 要容易得多，尤其是如果你想在你使用的所有仓库中都这样做的话，因为你只需在 `$HOME/.gitconfig` 中将配置变量设置为 `true` （或 `false` ）一次，它就会影响你接触的所有仓库。
+
+当更改 `core.untrackedCache` 配置变量时，未跟踪缓存会在下一次命令读取索引时添加到索引中或从索引中移除；而当使用 `--[no-|force-]untracked-cache` 时，未跟踪缓存会立即添加到索引中或从索引中移除。
+
+在 2.17 之前，untracked 缓存有一个 bug，即用指向另一个目录的符号链接替换一个目录会导致它错误地将 Git 追踪的文件显示为未追踪。参见 git.git 上的 "status: add a failing test showing a core.untrackedCache bug" 。解决这个问题的方法是（将来也可能适用于其他未被发现的 bug）：
+
+----------------
+$ git -c core.untrackedCache=false status
+----------------
+
+当涉及到非跟踪缓存的内部结构时，这个 bug 也会影响到用文件替换目录的非符号链接情况，但还没有报告说这会导致错误的 "git status" 输出。
+
+在某些情况下，由 2.17 之前版本的 Git 编写的现有索引会引用已不存在的目录，这可能会在 "git status" 上打印出许多 "could not open directory" （无法打开目录）的警告。这些警告是针对以前被默默丢弃的现有问题的新警告。
+
+与上述错误一样，解决办法是一次性运行 `core.untrackedCache=false` 的 "git status" ，以清除剩余的坏数据。
+
+文件系统监视器
+-------
+
+该功能旨在加快工作目录较大的仓库的 Git 操作速度。
+
+它能让 Git 与文件系统监视器（参见 linkgit:git-fsmonitor{litdd}daemon[1] 和 linkgit:githooks[5] 中的 "fsmonitor-watchman" 部分）协同工作，监视器会告诉 Git 哪些文件被修改了。这样，Git 就不必通过 lstat() 来查找修改过的文件了。
+
+与非跟踪缓存结合使用时，可以避免扫描整个工作目录寻找新文件的成本，从而进一步提高性能。
+
+如果您想启用（或禁用）此功能，使用 `core.fsmonitor` 配置变量（参见 linkgit:git-config[1]）比在每个仓库中使用 `-git update-index` 的 `--fsmonitor` 选项更方便，尤其是如果您想在您使用的所有仓库中启用（或禁用）此功能，因为您只需在 `$HOME/.gitconfig` 中设置一次配置变量，就能影响您接触的所有仓库。
+
+更改 `core.fsmonitor` 配置变量后，文件系统监视器将在下一次命令读取索引时添加到索引或从索引中移除。当使用 `--[no-]fsmonitor` 时，文件系统监视器会立即添加到索引或从索引中移除。
+
+配置
+--
+
+命令尊重 `core.filemode` 配置变量。 如果您的仓库位于可执行位不可靠的文件系统上则应将其设置为 'false'（参见 linkgit:git-config[1]）。 如果索引中记录的文件模式与文件系统上的文件模式仅在可执行位上不同，则命令会忽略两者之间的差异。 在这种不幸的文件系统上，你可能需要使用 "git update-index --chmod= "。
+
+与此类似，如果将 `core.symlinks` 配置变量设为 'false'（参见 linkgit:git-config[1]），符号链接将作为普通文件签出，此命令不会将记录的文件模式从符号链接修改为普通文件。
+
+该命令会查看 `core.ignorestat` 配置变量。 请参阅上文 “使用 ‘假设不变’ 位 ”部分。
+
+该命令还会查看 `core.trustctime` 配置变量。 当 Git 以外的东西（文件系统爬虫和备份系统使用 ctime 来标记处理过的文件）定期修改 inode 变更时间时，这个变量会很有用（参见 linkgit:git-config[1]）。
+
+非跟踪缓存扩展可以通过 `core.untrackedCache` 配置变量启用（参见 linkgit:git-config[1]）。
+
+注释
+--
+
+用户经常尝试使用假设不变和跳过工作区位来告诉 Git 忽略对已跟踪文件的修改。 但这并不尽如人意，因为在执行某些操作时，Git 仍会根据索引检查工作区文件。 一般来说，Git 并不提供忽略被跟踪文件的方法，因此建议使用其他解决方案。
+
+例如，如果要修改的文件是某种配置文件，仓库可以包含一个样本配置文件，然后将其复制到被忽略的文件名中并进行修改。 仓库甚至可以包含一个脚本，将样本文件作为模板，自动修改和复制。
+
+参见
+--
+linkgit:git-config[1], linkgit:git-add[1], linkgit:git-ls-files[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

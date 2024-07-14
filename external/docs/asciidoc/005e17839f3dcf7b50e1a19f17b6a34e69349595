@@ -1,0 +1,224 @@
+git-bundle(1)
+=============
+
+名称
+--
+git-bundle - 通过存档移动对象和引用
+
+
+概述
+--
+[verse]
+'git bundle' create [-q | --quiet | --progress]
+		    [--version=<版本>] <文件> <git-rev-list-args>
+'git bundle' verify [-q | --quiet] <文件>
+'git bundle' list-heads <文件> [<引用名>...]
+'git bundle' unbundle [--progress] <文件> [<引用名>...]
+
+描述
+--
+
+创建、解包和操作 “打包” 文件。捆绑文件用于 Git 对象的 “离线” 传输，而不需要在网络连接的另一端有一个活跃的 “服务器”。
+
+它们可以用来创建仓库的增量和完全备份，并将一个仓库中的引用状态传递给另一个版本库。
+
+通过 `ssh://` 和 `https://` 等协议获取或以其他方式 “读取” 的 Git 命令也可以对打包文件进行操作。它可以通过 linkgit:git-clone[1] 从打包中建立新的仓库，用 linkgit:git-fetch[1] 从其中获取，并通过 linkgit:git-ls-remote[1] 列出其中的引用。没有相应的 "写" 支持，也就是说，不支持 'git push' 捆绑包。
+
+关于如何使用捆绑包的例子，见下面的 “实例” 部分。
+
+捆绑包格式
+-----
+
+捆绑包是 `.pack` 文件（见 linkgit:git-pack-objects[1]），有一个标头说明捆绑包中包含哪些引用。
+
+就像打包的归档格式本身一样，捆绑包既可以是独立的，也可以使用排除法创建。 参见下面的 "目标前提" 部分。
+
+使用修订版排除法创建的捆绑包是使用 linkgit:git-pack-objects[1] 的 `--thin` 选项创建的 “轻量包”，并使用 linkgit:git-index-pack[1] 的 `--fix-thin` 选项解除捆绑。
+
+在使用修订排除法时，没有创建 “复杂包” 的选项，用户不应该担心这种差异。通过使用 “轻量包”，使用排除法创建的捆绑文件尺寸较小。它们在引擎盖下是 “薄” 的，在此只是作为一种好奇，并作为其他文档的参考。
+
+更多细节见 linkgit:gitformat-bundle[5] ，以及 linkgit:gitformat-pack[5] 中关于 “轻量包” 的讨论。
+
+选项
+--
+
+create [options] <文件> <git-rev-list-args>::
+	用来创建一个名为 '<文件>' 的捆绑包。 这需要 '<git-rev-list-args>' 参数来定义包的内容。 '选项' 包含 'git bundle create' 子命令的特定选项。如果 'file' 是 '-'，捆绑内容将被写入标准输出流。
+
+verify <文件>::
+	用于检查捆绑包文件是否有效，是否能干净地应用到当前仓库。 这包括对捆绑包格式本身的检查，以及检查前提提交是否存在，并在当前版本库中被完全链接。 然后，'git bundle' 会打印出一个缺失提交的列表，如果有的话。 最后，打印出关于额外能力的信息，比如 “对象过滤器”。更多信息见 linkgit:gitformat-bundle[5] 中的 “能力”。成功时退出代码为零，但如果捆绑包文件无效，退出代码将为非零。如果 'file' 是 `-`，则从标准输入流读取捆绑包文件。
+
+list-heads <文件>::
+	列出捆绑中定义的引用。 如果后面是引用列表，则只打印出与之匹配的引用。如果 'file' 是 `-`，则从标准输入流中读取捆绑包文件。
+
+unbundle <文件>::
+	将捆绑包中的对象传递给 'git index-pack' 以存储在仓库中，然后打印出所有定义的引用的名称。如果给了一个引用列表，则只打印列表中匹配的引用。这个命令是真正的管道，只打算由 'git fetch' 调用。 如果 'file' 是 `-`，则从标准输入流读取捆绑包文件。
+
+<git-rev-list-args>::
+	一个参数列表，可以被 'git rev-parse' 和 'git rev-list' 接受（并包含一个命名的引用，见下面的 指定引用），它指定了要传送的特定对象和引用。 例如，`master~10...master` 会导致当前的主引用与自其第 10 次祖先提交后添加的所有对象一起被打包。 对于可以打包的引用和对象的数量没有明确的限制。
+
+
+[<引用名>...]::
+	用于限制报告的可用引用的列表。这主要是对 'git fetch' 有用，它希望只收到那些要求的引用，而不一定是包中的所有内容（在这种情况下， 'git bundle' 就像 'git fetch-pack'）。
+
+--progress::
+	当标准错误流连接到终端时，除非指定了 -q，否则默认情况下会在标准错误流上报告进展状态。即使标准错误流没有指向终端，这个标志也会强制显示进度状态。
+
+--version=<版本>::
+	指定捆绑包的版本。 版本 2 是较老的格式，只能用于 SHA-1 仓库；较新的版本 3 包含允许扩展的功能。默认是最古老的支持格式，基于使用中的哈希算法。
+
+-q::
+--quiet::
+	这个标志使命令不在标准错误流中报告其进度。
+
+指定引用
+----
+
+修订必须附有引用名称，才能打包成捆绑包。
+
+可以打包一个以上的引用，也可以指定一组以上的先决条件对象。 被打包的对象是那些不包含在先决条件组合中的对象。
+
+'git bundle create' 命令使用与 `git rev-parse --abbrev-ref=loose` 相同的规则为您解析引用名称。每个先决条件都可以明确指定（例如 `^master~10` ），或者隐含地指定（例如 `master~10...master`，`--since=10.days.ago master`）。
+
+所有这些简单的情况都没有问题（假设我们有一个 "master" 和 "next" 分支）：
+
+----------------
+$ git bundle create master.bundle master
+$ echo master | git bundle create master.bundle --stdin
+$ git bundle create master-and-next.bundle master next
+$ (echo master; echo next) | git bundle create master-and-next.bundle --stdin
+----------------
+
+这些也是如此（还有相同的但省略了 `--stdin` 的例子）：
+
+----------------
+$ git bundle create recent-master.bundle master~10..master
+$ git bundle create recent-updates.bundle master~10..master next~5..next
+----------------
+
+不接受修订名称或其右侧不能被解析为引用的范围：
+
+----------------
+$ git bundle create HEAD.bundle $(git rev-parse HEAD)
+fatal: 拒绝产生空捆绑包。
+$ git bundle create master-yesterday.bundle master~10..master~5
+fatal: 拒绝产生空捆绑包。
+----------------
+
+对象的先决条件
+-------
+
+在创建捆绑包时，可以创建一个独立的捆绑包，可以在没有共同历史的版本库中解绑，也可以提供负修订，以排除历史早期部分所需的对象。
+
+向 `git bundle create` 输入诸如`new'这样的修订版将创建一个捆绑包文件，其中包含所有从 `new` 修订版可以到达的对象。捆绑文件可以在任何版本库中解绑，以获得通往 `new` 版本的完整历史：
+
+----------------
+$ git bundle create mybundle -10 master
+----------------
+
+向`git bundle create` 输入诸如 `new` 这样的修订版将创建一个捆绑包文件，其中包含所有从 `new` 修订版可以到达的对象。捆绑包文件可以在任何仓库中解绑，以获得通往 `new` 版本的完整历史：
+
+----------------
+$ git bundle create mybundle v1.0.0..master
+----------------
+
+一个没有任何先决条件的独立软件包可以被提取到任何地方，甚至可以提取到一个空的仓库中，或者被克隆出来（即 `new`，但不是 `old..new`）。
+
+谨慎行事是可以的，使捆绑文件包含已经在目的地的对象，因为在目的地解包时这些对象会被忽略。
+
+如果你想匹配 `git clone --mirror`，这将包括你的 refs 如 `refs/remotes/*`，使用 `--all`。 如果你想提供与直接从源码库克隆得到的相同的引用，使用 `--branches --tags` 作为 `<git-rev-list-args>`。
+
+'git bundle verify' 命令可以用来检查你的接收库是否有一个捆绑包所需的先决条件提交。
+
+实例
+--
+
+假设你想把 A 机器上的版本库 R1 的历史记录转移到 B 机器上的另一个版本库 R2。由于某种原因，A 和 B 之间不允许直接连接，但我们可以通过某种机制（CD、电子邮件等）把数据从 A 转移到 B。 我们想用 R1 中的分支 master 上的开发来更新 R2。
+
+为了启动这个过程，你可以先创建一个没有任何先决条件的捆绑包。你可以使用一个标签来记住你最后处理的提交，以方便以后用增量的捆绑包来更新其他仓库：
+
+----------------
+machineA$ cd R1
+machineA$ git bundle create file.bundle master
+machineA$ git tag -f lastR2bundle master
+----------------
+
+然后你把 file.bundle 传输到目标机器 B。因为这个捆绑包不需要提取任何现有的对象，你可以通过克隆它在机器 B 上创建一个新的仓库：
+
+----------------
+机器 B $ git clone -b master /home/me/tmp/file.bundle R2
+----------------
+
+这将在生成的版本库中定义一个名为 "origin" 的远程，让你从捆绑包中获取和拉取。R2 中的 $GIT_DIR/config 文件将有一个这样的条目：
+
+------------------------
+[remote "origin"]
+    url = /home/me/tmp/file.bundle
+    fetch = refs/heads/*:refs/remotes/origin/*
+------------------------
+
+要更新产生的 mine.git 仓库，你可以在用增量更新替换存储在 /home/me/tmp/file.bundle 的捆绑包后取用或拉取。
+
+在原始仓库中再工作一段时间后，你可以创建一个增量包来更新另一个版本库：
+
+----------------
+机器 A $ cd R1
+机器 A $ git bundle create file.bundle lastR2bundle..master
+机器 A $ git tag -f lastR2bundle master
+----------------
+
+然后你把捆绑包转移到另一台机器上，以取代 /home/me/tmp/file.bundle，并从其中提取。
+
+----------------
+机器 B $ cd R2
+机器 B $ git pull
+----------------
+
+如果你知道预期的接收库应该在哪次提交中拥有必要的对象，你可以用这些知识来指定先决条件，给出一个截止点来限制产生的捆绑包中的修订和对象。前面的例子为此使用了 lastR2bundle 标签，但你也可以使用任何其他选项，就像你给 linkgit:git-log[1] 命令的那样。这里有更多的例子：
+
+你可以使用一个在两者中都存在的标签：
+
+----------------
+$ git bundle create mybundle v1.0.0..master
+----------------
+
+你可以使用基于时间的先决条件：
+
+----------------
+$ git bundle create mybundle --since=10.days master
+----------------
+
+你可以使用提交的数量：
+
+----------------
+$ git bundle create mybundle -10 master
+----------------
+
+你可以运行 `git-bundle verify` 来看看你是否可以从一个用先决条件创建的包中提取：
+
+----------------
+$ git bundle verify mybundle
+----------------
+
+这将列出你必须有哪些提交才能从捆绑包中提取，如果你没有这些提交就会出错。
+
+从接收者仓库的角度来看，一个捆绑包就像一个普通的仓库，它从那里获取或拉取。例如，你可以在获取的时候映射引用：
+
+----------------
+$ git fetch mybundle master:localRef
+----------------
+
+你也可以看看它提供哪些引用：
+
+----------------
+$ git ls-remote mybundle
+----------------
+
+文件格式
+----
+
+参见 linkgit:gitformat-bundle[5]。
+
+GIT
+---
+属于 linkgit:git[1] 文档

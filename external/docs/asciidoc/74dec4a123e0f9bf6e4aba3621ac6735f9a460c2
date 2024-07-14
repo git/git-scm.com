@@ -1,0 +1,394 @@
+git-bisect(1)
+=============
+
+NOME
+----
+git-bisect - Utilize a pesquisa binária para localizar o commit que introduziu um bug
+
+
+RESUMO
+------
+[verse]
+'git bisect' <subcomando> <opções>
+
+DESCRIÇÃO
+---------
+O comando assume vários subcomandos das diferentes opções dependendo do subcomando:
+
+ git bisect start [--term-(new|bad)=<term-new> --term-(old|good)=<term-old>]
+		  [--no-checkout] [--first-parent] [<bad> [<good>...]] [--] [<pathspec>...]
+ git bisect (bad|new|<term-new>) [<rev>]
+ git bisect (good|old|<term-old>) [<rev>...]
+ git bisect terms [--term-good | --term-bad]
+ git bisect skip [(<rev>|<range>)...]
+ git bisect reset [<commit>]
+ git bisect (visualize|view)
+ git bisect replay <logfile>
+ git bisect log
+ git bisect run <cmd> [<arg>...]
+ git bisect help
+
+Este comando utiliza um algoritmo de pesquisa binária para descobrir qual o commit no histórico do seu projeto introduziu um "bug" (problema). Você o utiliza informando primeiro a um commit "bad" (ruim) que é informado por conter o bug e um commit "good" (bom) informado antes da introdução do bug. Então o comando `git bisect` seleciona um commit entre estes dois pontos extremos e pergunta se o commit selecionado é "bom" ou "ruim". Continua estreitando o intervalo até encontrar o commit exato responsável pela introdução da alteração.
+
+De fato, o comando `git bisect` pode ser utilizado para encontrar o commit que alterou *qualquer* propriedade do seu projeto; um commit que corrigiu um problema ou um commit que fez com que o desempenho de um benchmark melhorasse por exemplo. Para dar apoio a nesta utilização mais genérica, os termos "old" (antigo) e "new" (novo) podem ser utilizados no lugar de "good" (bom) e "bad" (ruim), ou escolha os seus próprios termos. Consulte a seção "Termos alternativos" abaixo para obter mais informações.
+
+Comandos "bisect" básicos : `start` (começar), `bad` (ruim), `good` (bom)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Como exemplo, suponha que você esteja tentando encontrar um commit que estragou um recurso que funcionava na versão `v2.6.13-rc2` do seu projeto. Você começa uma seção "besect" como demonstrado abaixo:
+
+------------------------------------------------
+$ git bisect start
+$ git bisect bad                 # A versão atual está ruim
+$ git bisect good v2.6.13-rc2    # v2.6.13-rc2 é conhecido por estar bom
+------------------------------------------------
+
+Uma vez que você tenha utilizado pelo menos um commit ruim e um commit bom, o comando `git bisect` seleciona um commit no meio deste intervalo do histórico, faz a averiguação e produz algo por exemplo:
+
+------------------------------------------------
+Bisecting: 675 revisões deixadas para testar depois disso (aproximadamente 10 passos)
+------------------------------------------------
+
+Agora você deve compilar a versão com check-out e testá-la. Caso esta versão funcione corretamente, digite
+
+------------------------------------------------
+$ git bisect good
+------------------------------------------------
+
+Se essa versão estiver quebrada, digite
+
+------------------------------------------------
+$ git bisect bad
+------------------------------------------------
+
+Então o comando `git bisect` irá responder algo como
+
+------------------------------------------------
+Bisecting: 337 revisões deixadas para testar depois disso (aproximadamente 9 passos)
+------------------------------------------------
+
+Continue repetindo o processo: compile a árvore, teste-a e dependendo se ela for boa ou ruim, execute o comando `git bisect good` ou `git bisect bad` para solicitar o próximo commit que precisa ser testado.
+
+Eventualmente, não haverá mais revisões a serem inspecionadas e o comando exibirá uma descrição do primeiro commit ruim. A referência `refs/bisect/bad` será deixada apontando para o commit.
+
+
+Bisect reset
+~~~~~~~~~~~~
+
+Para limpar a condição geral bisseção e retornar ao `HEAD` original, execute o seguinte comando:
+
+------------------------------------------------
+$ git bisect reset
+------------------------------------------------
+
+By default, this will return your tree to the commit that was checked out before `git bisect start`. (A new `git bisect start` will also do that, as it cleans up the old bisection state.)
+
+Com um argumento opcional, você pode retornar para um commit diferente:
+
+------------------------------------------------
+$ git bisect reset <commit>
+------------------------------------------------
+
+Por exemplo, `git bisect reset bisect/bad` irá verificar a primeira revisão ruim enquanto o `git bisect reset HEAD` deixará você no commit atual da bisseção evitando a alternância para outros commits.
+
+
+Termos alternativos
+~~~~~~~~~~~~~~~~~~~
+
+Às vezes, você não está procurando por um commit que introduziu um problema, mas sim um commit que causou uma alteração "antiga" entre alguma condição "nova". Você pode estar procurando por um commit que introduziu uma correção em específico por exemplo. Ou você pode estar procurando o primeiro commit onde os nomes dos arquivos do código-fonte foram finalmente convertidos para o padrão de nomes da sua empresa. Ou algo assim.
+
+Nesses casos, pode ser muito confuso utilizar as opções "good" e "bad" para se referir a "condição antes da mudança" e "a condição após a mudança". Portanto, você pode utilizar os termos "old" e "new" respectivamente, no lugar de "good" e "bad". (Observe que não é possível misturar "good" e "bad" com "old" e "new" numa única sessão.)
+
+Neste uso mais geral, você utiliza o comando `git bisect` com um commit "new" que tem alguma propriedade e um commit "old" que não tem nenhuma. Cada vez que o comando `git bisect` faz a verificação de um commit, você testa se o commit tem a propriedade. Em caso afirmativo, marque o commit como "new"; Caso contrário, marque-o como "old". Quando a bisseção tiver sido concluída, o comando `git bisect` informará qual o commit que introduziu a propriedade.
+
+Para utilizar "old" e "new" em vez de "good" e "bad", você deve executar `git bisect start` sem nenhum commit e depois executar os seguintes comandos para adicionar os commits:
+
+------------------------------------------------
+git bisect old [<rev>]
+------------------------------------------------
+
+para indicar que um commit foi feito antes da alteração solicitada, ou
+
+------------------------------------------------
+git bisect new [<rev>...]
+------------------------------------------------
+
+para indicar que foi depois.
+
+Para receber um lembrete dos termos utilizados no momento, utilize
+
+------------------------------------------------
+git bisect terms
+------------------------------------------------
+
+Você pode obter apenas o termo antigo (respectivamente novo) com `git bisect terms --term-old` ou `git bisect terms --term-good`.
+
+Caso queira utilizar os seus próprios termos em vez de "bad"/"good" ou "new"/"old", escolha qualquer nome que quiser (exceto os subcomandos bisect já existentes como `reset`, `start`, ...) iniciando uma bisseção utilizando
+
+------------------------------------------------
+git bisect start --term-old <termo-antigo> --term-new <novo-termo>
+------------------------------------------------
+
+Caso esteja procurando por um commit que introduziu uma regressão ao desempenho, poderá utilizar por exemplo
+
+------------------------------------------------
+git bisect start --term-old fast --term-new slow
+------------------------------------------------
+
+Ou caso esteja procurando o commit que corrigiu um problema, você pode usar
+
+------------------------------------------------
+git bisect start --term-new fixed --term-old broken
+------------------------------------------------
+
+Então, utilize `git bisect <termo-antigo>` e `git bisect <novo-termo>` em vez de `git bisect good` e `git bisect bad` para marcar os commits.
+
+Bisect visualize/observe
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Para ver os suspeitos restantes no 'gitk', utilize o seguinte comando durante o processo de bisseção (o `view` do subcomando pode ser utilizado como uma alternativa ao `visualize`):
+
+------------
+$ git bisect visualize
+------------
+
+Git detects a graphical environment through various environment variables: `DISPLAY`, which is set in X Window System environments on Unix systems. `SESSIONNAME`, which is set under Cygwin in interactive desktop sessions. `MSYSTEM`, which is set under Msys2 and Git for Windows. `SECURITYSESSIONID`, which may be set on macOS in interactive desktop sessions.
+
+If none of these environment variables is set, 'git log' is used instead. You can also give command-line options such as `-p` and `--stat`.
+
+------------
+$ git bisect visualize --stat
+------------
+
+Bisect log e bisect replay
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Depois de ter marcado as revisões como boas ou ruins, emita o seguinte comando para exibir o que foi feito até agora:
+
+------------
+$ git bisect log
+------------
+
+Caso descubra que cometeu um erro ao especificar a condição de uma revisão, é possível salvar o arquivo gerado num arquivo, editá-lo para remover as entradas que estiverem incorretas e em seguida, utilizar os seguintes comandos para corrigir a condição de corrigido:
+
+------------
+$ git bisect reset
+$ git bisect replay that-file
+------------
+
+Evitando o teste de um commit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Se no meio de uma sessão bisect, você sabe que a revisão sugerida não é boa para testar (ela falha em construir e você sabe que a falha não tem nada a ver com o bug que você está procurando por exemplo), é possível selecionar manualmente um commit próximo e testá-lo em vez disso.
+
+Por exemplo:
+
+------------
+$ git bisect good/bad			# a rodada anterior estava boa ou ruim.
+Bisecting: 337 revisions left to test after this (roughly 9 steps)
+$ git bisect visualize			# oops, isso não foi interessante.
+$ git reset --hard HEAD~3		# tente 3 revisões anteriores
+					# ao que foi sugerido
+------------
+
+Em seguida, compile, teste a revisão escolhida e depois marque a revisão da maneira usual como boa ou ruim.
+
+Bisect skip
+~~~~~~~~~~~
+
+Em vez de escolher um commit próximo, é possível pedir ao Git para fazer isso por você, utilizando o comando:
+
+------------
+$ git bisect skip                 # A versão atual não pode ser testada
+------------
+
+No entanto, caso você pule um commit adjacente ao que você está procurando, o Git não saberá exatamente qual destes commits foi o primeiro que estava ruim.
+
+É possível Você também pular um intervalo de commits em vez de apenas um, utilizando a notação do intervalo. Por exemplo:
+
+------------
+$ git bisect skip v2.5..v2.6
+------------
+
+Isso diz ao processo "bisect" que nenhum commit após a versão `v2.5` e até a versão `v2.6`, deve ser testada.
+
+Observe que, caso você também queira pular o primeiro commit do intervalo, utilize o seguinte comando:
+
+------------
+$ git bisect skip v2.5 v2.5..v2.6
+------------
+
+Informa ao processo "bisect" que os commits entre as versões `v2.5` e `v2.6` (inclusive) devem ser ignorados.
+
+
+Reduza a bisseção informando mais parâmetros para o início do bisect
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can further cut down the number of trials, if you know what part of the tree is involved in the problem you are tracking down, by specifying pathspec parameters when issuing the `bisect start` command:
+
+------------
+$ git bisect start -- arch/i386 include/asm-i386
+------------
+
+Caso saiba de antemão se há mais de um commit bom, é possível restringir o espaço do "bisect" ao informar todos os commits bons imediatamente após o commit com problema quando utilizar o comando `bisect start`:
+
+------------
+$ git bisect start v2.6.20-rc6 v2.6.20-rc4 v2.6.20-rc1 --
+                   # v2.6.20-rc6 é ruim
+                   # v2.6.20-rc4 é v2.6.20-rc1 está bom
+------------
+
+Bisect run
+~~~~~~~~~~
+
+Caso tenha um script que possa dizer se o código-fonte atual é bom ou ruim, é possível fazer o "bisect" utilize o seguinte comando:
+
+------------
+$ git bisect run meu_script opções
+------------
+
+Observe que o script (`meu_script` no exemplo acima) deve encerrar com o código 0 caso o código-fonte atual seja bom/antigo e encerrar com um código entre 1 e 127 (inclusive), exceto 125, caso o código-fonte atual seja ruim/novo.
+
+Qualquer outro código gerado interromperá o processo bisect. Deve ser observado que um programa que encerra com `exit (-1)` deixa um $? = 255, (consulte a página do manual exit(3)), pois o valor é cortado com `& 0377`.
+
+O código especial 125 da saída deve ser utilizado quando o código-fonte atual não puder ser testado. Caso o script encerre com este código, a revisão atual será ignorada (consulte o comando `git bisect skip` acima). O 125 foi selecionado como o maior valor a ser utilizado para esta finalidade, pois 126 e 127 são utilizandos pelos shells POSIX para sinalizar uma condição de erro específica (127 é utilizado para o comando não encontrado, 126 é para o comando que foi encontrado, mas não é executável - estes detalhes não são importantes, pois são erros normais do script, no que diz respeito ao comando `bisect run`).
+
+Muitas vezes você pode achar que durante uma sessão bisect você queira ter alterações temporárias (`s/#define DEBUG 0/#define DEBUG 1/` ao cabeçalho de um arquivo, ou "a revisão que não tem este commit e precisa que esta correção seja aplicada como um quebra galho que seja irrelevante para esta bisseção por exemplo") aplicada à revisão que está sendo testada.
+
+To cope with such a situation, after the inner 'git bisect' finds the next revision to test, the script can apply the patch before compiling, run the real test, and afterwards decide if the revision (possibly with the needed patch) passed the test and then rewind the tree to the pristine state. Finally the script should exit with the status of the real test to let the `git bisect run` command loop determine the eventual outcome of the bisect session.
+
+OPÇÕES
+------
+--no-checkout::
++
+Do not checkout the new working tree at each iteration of the bisection process. Instead just update the reference named `BISECT_HEAD` to make it point to the commit that should be tested.
++
+Essa opção pode ser útil quando o teste que você executaria em cada etapa não exigir uma árvore com check-out.
++
+Caso o repositório seja simples, assume-se a opção `--no-checkout`.
+
+--first-parent::
++
+Siga apenas o primeiro commit ao ver a mesclagem de um commit.
++
+Durante a detecção das regressões introduzidas através da mesclagem de um ramo o commit mesclado será identificado como uma introdução do bug e os seus ancestrais serão ignorados.
++
+Esta opção é útil para evitar falsos positivos quando um ramo que foi mesclado tenham commits quebrados ou que não possam ser construídos, porém a mesclagem em si foi OK.
+
+EXEMPLOS
+--------
+
+* Faça o bisect automaticamente uma construção quebrada entre v1.2 e HEAD:
++
+------------
+$ git bisect start HEAD v1.2 --      # HEAD está ruim, v1.2 está bom
+$ git bisect run make                # "make" compila o app
+$ git bisect reset                   # encerra a seção bisect
+------------
+
+* Faça o bisect automaticamente num teste que falhou entre a `origin` (origem) e o `HEAD`:
++
+------------
+$ git bisect start HEAD origin --    # HEAD está ruim, origin está bom
+$ git bisect run make test           # "make test" compila e testa
+$ git bisect reset                   # encerra a seção bisect
+------------
+
+* Faça o bisect automaticamente num teste quebrado:
++
+------------
+$ cat ~/test.sh
+#!/bin/sh
+make || exit 125                     # ignora as construções quebradas
+~/check_test_case.sh                 # será que o exemplo passa?
+$ git bisect start HEAD HEAD~10 --   # o culpado está entre os últimos 10
+$ git bisect run ~/test.sh
+$ git bisect reset                   # encerra a seção bisect
+------------
++
+Here we use a `test.sh` custom script. In this script, if `make` fails, we skip the current commit. `check_test_case.sh` should `exit 0` if the test case passes, and `exit 1` otherwise.
++
+É mais seguro se os arquivos `test.sh` e `check_test_case.sh` estiverem fora do repositório para evitar interações entre os processos `bisect`, `make`, `test` e os scripts.
+
+* Faça o bisect automaticamente com alterações temporárias (hot-fix):
++
+------------
+$ cat ~/test.sh
+#!/bin/sh
+
+# faz ajustes na árvore de trabalho ao mesclar
+# a solução do problema no ramo e tenta compilá-lo
+if	git merge --no-commit --no-ff hot-fix &&
+	make
+then
+	# executa testes específicos no projeto e informa a sua condição atual
+	~/check_test_case.sh
+	status=$?
+else
+	# diga a quem requisitou que isso não pode ser testado
+	status=125
+fi
+
+# desfaça o ajuste para permitir uma alteração limpa para o próximo commit
+git reset --hard
+
+# controle de retorno
+existir $status
+------------
++
+São aplicadas alterações de um hotfix para ramificação antes de cada teste, caso o seu ambiente de construção ou teste tenha sido alterado para que as revisões mais antigas precisem de uma correção que as mais recentes já tenham por exemplo. (Certifique-se que o hot-fix do ramo tenha base num commit que está contida em todos as revisões que você esteja fazendo o bisect, para que a mesclagem não realize muitos resgates ou utilize o comando `git cherry-pick` em vez do `git merge`. )
+
+* Faça o bisect automaticamente num teste quebrado:
++
+------------
+$ git bisect start HEAD HEAD~10 --   # o culpado está entre os últimos 10
+$ git bisect run sh -c "make || exit 125; ~/check_test_case.sh"
+$ git bisect reset                   # encerra a seção bisect
+------------
++
+Isso exibe o que você pode fazer sem executar um script caso escreva o teste numa única linha.
+
+* Localize uma boa região do grafo dos objetos num repositório que foi danificado
++
+------------
+$ git bisect start HEAD <known-good-commit> [ <boundary-commit> ... ] --no-checkout
+$ git bisect run sh -c '
+	GOOD=$(git for-each-ref "--format=%(objectname)" refs/bisect/good-*) &&
+	git rev-list --objects BISECT_HEAD --not $GOOD >tmp.$$ &&
+	git pack-objects --stdout >/dev/null <tmp.$$
+	rc=$?
+	rm -f tmp.$$
+	test $rc = 0'
+
+$ git bisect reset                   # encerra a seção bisect
+------------
++
+Neste caso, quando 'git bisect run' encerra, o bisect/bad (ruim) irá apontar para um commit que tenha pelo menos uma origem cujo grafo seja completamente cruzado no sentido requerido pelo comando 'git pack objects'.
+
+* Procure por uma correção em vez de uma regressão no código
++
+------------
+$ git bisect start
+$ git bisect new HEAD    # o commit atual é marcado como novo
+$ git bisect old HEAD~10 # o décimo commit a partir de agora é marcado como antigo
+------------
++
+ou:
+------------
+$ git bisect start --term-old broken --term-new fixed
+$ git bisect fixed
+$ git bisect broken HEAD~10
+------------
+
+Conseguindo ajuda
+~~~~~~~~~~~~~~~~~
+
+Utilize o comando `git bisect` para obter uma descrição resumida da sua utilização e `git bisect help` ou `git bisect -h` para obter uma descrição completa.
+
+VEJA TAMBÉM
+-----------
+link:/docs/git-bisect-lk2009/pt_BR[Lutando contra regressões com git bisect], linkgit:git-blame[1].
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

@@ -1,0 +1,311 @@
+git-worktree(1)
+===============
+
+NOM
+---
+git-worktree - Gérer plusieurs arbres de travail
+
+
+SYNOPSIS
+--------
+[verse]
+'git worktree add' [-f] [--detach] [--checkout] [--lock [--reason <chaîne>]]
+		   [--orphan] [(-b | -B) <nouvelle-branche>] <chemin> [<commit-esque>]
+'git worktree list' [-v | --porcelain [-z]]
+'git worktree lock' [--reason <chaîne>] <arbre-de-travail>
+'git worktree move' <arbre-de-travail> <nouveau-chemin>
+'git worktree prune' [-n] [-v] [--expire <expire>]
+'git worktree remove' [-f] <arbre-de-travail>
+'git worktree repair' [<path>...]
+'git worktree unlock' <arbre-de-travail>
+
+DESCRIPTION
+-----------
+
+Gère plusieurs arbres de travail rattachés au même dépôt.
+
+Un dépôt git peut prendre en charge plusieurs arbres de travail, ce qui vous permet de consulter plus d'une branche à la fois. Avec `git worktree add`, un nouvel arbre de travail est associé au dépôt, avec des métadonnées supplémentaires qui différencient cet arbre de travail des autres dans le même dépôt. L'arbre de travail, ainsi que ces métadonnées, est appelé un "worktree".
+
+Ce nouvel arbre-de-travail est appelé "arbre-de-travail lié" par opposition à l'"arbre-de-travail principal" préparé par linkgit:git-init[1] ou linkgit:git-clone[1]. Un dépôt a un arbre-de-travail principal (s'il ne s'agit pas d'un dépôt nu) et zéro ou plusieurs arbres-de-travail liés. Lorsque vous avez terminé avec un arbre-de-travail lié, supprimez-le avec `git worktree remove`.
+
+Dans sa forme la plus simple, `git worktree add <chemin>` crée automatiquement une nouvelle branche dont le nom est le composant final de `<chemin>`, ce qui est pratique si vous prévoyez de travailler sur un nouveau sujet. Par exemple, `git worktree add ../hotfix` crée une nouvelle branche `hotfix` et l'extrait dans le chemin `../hotfix`. Pour travailler sur une branche existante dans un nouvel arbre-de-travail, utilisez `git worktree add <chemin> <branche>`. D'autre part, si vous prévoyez juste de faire quelques modifications expérimentales ou de faire des tests sans perturber le développement existant, il est souvent pratique de créer un arbre-de-travail « jetable » qui n'est associé à aucune branche. Par exemple, `git worktree add -d <chemin>` crée un nouvel arbre-de-travail avec une `HEAD` détachée au même commit que la branche courante.
+
+Si un arbre de travail est supprimé sans utiliser `git worktree remove`, alors les fichiers administratifs associés, qui résident dans le dépôt (voir "DÉTAILS" ci-dessous), seront éventuellement supprimés automatiquement (voir `gc.worktreePruneExpire` dans linkgit:git-config[1]), ou vous pouvez exécuter `git worktree prune` dans l'arbre-de-travail principal ou dans tout autre arbre de travail lié pour nettoyer les fichiers administratifs périmés.
+
+Si l'arbre de travail pour un arbre-de-travail est stocké sur un support mobile ou un partage réseau qui n'est pas toujours monté, vous pouvez empêcher l'élagage de ses fichiers administratifs en lançant la commande `git worktree lock`, en spécifiant éventuellement `--reason` pour expliquer pourquoi l'arbre-de-travail est verrouillé.
+
+COMMANDES
+---------
+ajouter <chemin> [<commit-esque>]::
+
+Créer un arbre-de-travail dans `<chemin>` et extraire `<commit-esque>` dans celui-ci. Le nouvel arbre-de-travail est lié au dépôt actuel, partageant tout sauf les fichiers spécifiques au répertoire-de-travail tels que `HEAD`, `index`, etc. Pour plus de commodité, `<commit-esque>` peut être un simple "`-`", qui est synonyme de `@{-1}`.
++
+Si le `<commit-esque>` est un nom de branche (appelons-le '<branche>') et n'est pas trouvé, et ni `-b` ni `-B` ni `--detach` ne sont utilisés, mais qu'il existe une branche de suivi dans exactement un dépôt distant (appelons-le '<distant>') avec un nom correspondant, le traiter comme équivalent à :
++
+------------
+$ git worktree add --track -b <branche> <chemin> <distant>/<branche>
+------------
++
+Si la branche existe dans plus d'un distant et que l'un d'entre eux est la valeur de la variable de configuration `checkout.defaultRemote`, celui-ci sera utilisé pour désambiguïser, même si la <branche> n'est pas unique parmi tous les distants. Réglez la variable `checkout.defaultRemote=origin` par exemple pour extraire toujours les branches distantes depuis celle-ci si <branche> est ambigüe mais existe sur le distant `origin`. Voir aussi `checkout.defaultRemote` dans linkgit:git-config[1].
++
+Si `<commit-esque>` est omis et que ni `-b` ni `-B` ni `--detach` ne sont utilisés, alors, par commodité, le nouvel arbre-de-travail est associé à une branche (appelons-la `<branche>`) nommée d'après `$(basename <chemin>)`. Si `<branche>` n'existe pas, une nouvelle branche basée sur `HEAD` est automatiquement créée comme si `-b <branche>` était donné. Si `<branche>` existe, elle sera extraite dans le nouvel arbre-de-travail, si elle n'est pas extraite ailleurs, sinon la commande refusera de créer l'arbre-de-travail (à moins que `--force` soit utilisé).
++
+Si l'on omet `<commit-esque>`, que ni `--detach`, ni `--orphan` ne sont utilisés et qu'il n'y a pas de branche locale valide (ou de branches distantes si`--guess-remote` est spécifié), alors, par commodité, le nouvel arbre-de-travail est associé à une nouvelle branche non née dénommée `<branche >` (après `$(basename <chemin>)` si ni `-b`ni `-B` n'est utilisé) comme si `--orphan` était passé à la commande. Dans le cas où le dépôt a un distant et où `--guess-remote` est utilisé, mais où il n'y a pas de branches distantes ou locales, alors la commande échoue avec un avertissement rappelant à l'utilisateur de récupérer depuis leur dépôt distant avant (ou passer outre en utilisant `-f/--force`).
+
+list::
+
+Lister les détails de chaque arbre-de-travail. L'arbre-de-travail principal est listé en premier, suivi de chacun des arbres-de-travail liés. Les détails de sortie comprennent si l'arbre-de-travail est nu, la révision actuellement extraite, la branche en cours (ou « HEAD détachée » s'il n'y en a pas), et "verrouillé" si l'arbre-de-travail est verrouillé, "prunable" si l'arbre de travail peut être élagué par la commande `prune`.
+
+lock::
+
+Si un arbre-de-travail se trouve sur un support amovible ou un partage réseau qui n'est pas toujours monté, le verrouiller pour éviter que ses fichiers administratifs ne soient élagués automatiquement. Cela permet également d'éviter qu'il soit déplacé ou supprimé. Si vous le souhaitez, vous pouvez spécifier une raison pour le verrouillage avec `--reason`.
+
+move::
+
+Déplacer un arbre-de-travail vers une nouvelle place. Notez que l'arbre-de-travail principal ou les arbres-de-travail liés contenant des sous-modules ne peuvent pas être déplacés avec cette commande. (La commande `get worktree repair`, cependant peut rétablir la connexion avec les arbres-de-travail liés si vous déplacez l'arbre-de-travail principal.)
+
+prune::
+
+Élaguer les informations de l'arbre-de-travail dans `$GIT_DIR/worktrees`.
+
+remove::
+
+Supprimer un arbre-de-travail. Seules les arbres-de-travail propres (pas de fichiers non suivis et pas de modification dans les fichiers suivis) peuvent être supprimés. Les arbres-de-travail non propres ou ceux qui comportent des sous-modules peuvent être supprimés avec `--force`. L'arbre-de-travail principal ne peut pas être supprimé.
+
+reparir [<chemin>...]::
+
+Réparer les fichiers administratifs de l'arbre-de-travail, si possible, s'ils sont devenus corrompus ou obsolètes en raison de facteurs externes.
++
+Par exemple, si l'arbre-de-travail principal (ou le dépôt nu) est déplacé, les arbres-de-travail liés seront incapables de le localiser. L'exécution de `repair` dans l'arbre-de-travail principal rétablira la connexion entre les arbres-de-travail liés et l'arbre-de-travail principal.
++
+De même, si un arbre de travail pour un arbre-de-travail lié est déplacé sans utiliser `git worktree move`, l'arbre-de-travail principal (ou le dépôt nu) ne pourra pas le localiser. L'exécution de `repair` dans l'arbre-de-travail récemment déplacé rétablira la connexion. Si plusieurs arbres-de-travail liés sont déplacés, l'exécution de `repair` à partir de n'importe quel arbre-de-travail avec le nouveau `<chemin>` de chaque arbre comme argument, rétablira la connexion à tous les chemins spécifiés.
++
+Si l'arbre-de-travail principal et les arbres-de-travail liés ont été déplacés manuellement, alors l'exécution de `repair` dans l'arbre-de-travail principal et la spécification du nouveau `<chemin>` de chaque arbre-de-travail lié rétablira toutes les connexions dans les deux directions.
+
+unlock::
+
+Déverrouiller un arbre-de-travail, ce qui permet de l'élaguer, de le déplacer ou de le supprimer.
+
+OPTIONS
+-------
+
+-f::
+--force::
+	Par défaut, `add` refuse de créer un nouvel arbre-de-travail lorsque `<commit-esque>` est un nom de branche et est déjà extrait par un autre arbre-de-travail, ou si `<chemin>` est déjà assigné à un arbre-de-travail mais est manquant (par exemple, si `<chemin>` a été supprimé manuellement). Cette option annule ces protections. Pour ajouter un chemin d'arbre-de-travail manquant mais verrouillé, spécifiez `--force` deux fois.
++
+`move` refuse de déplacer un arbre-de-travail verrouillé à moins que `--force` ne soit spécifiée deux fois. Si la destination est déjà assignée à un autre arbre-de-travail mais est manquante (par exemple, si `<nouveau-chemin>` a été supprimé manuellement), alors `--force` permet au déplacement de continuer ; utilisez `--force` deux fois si la destination est verrouillée.
++
+`remove` refuse de supprimer un arbre-de-travail sale à moins que `--force` ne soit utilisé. Pour supprimer un arbre-de-travail verrouillé, il faut spécifier deux fois `-- force`.
+
+-b <nouvelle-branche>::
+-B <nouvelle-branche>::
+	Avec `add`, créer une nouvelle branche nommée `<nouvelle-branche>` commençant à `<commit-esque>`, et extraire `<nouvelle-branche>` dans le nouvel arbre-de-travail. Si `<commit-esque>` est omis, la valeur par défaut est `HEAD`. Par défaut, `-b` refuse de créer une nouvelle branche si elle existe déjà. `-B` annule cette protection, en remettant `<nouvelle-branche>` à `<commit-esque>`.
+
+-d::
+--detach::
+	Avec `add`, détacher `HEAD` dans le nouvel arbre-de-travail. Voir "HEAD DÉTACHÉE" dans linkgit:git-checkout[1].
+
+--[no-]checkout::
+	Par défaut, `add`extrait `<commit-esque>`, cependant, `--no-checkout` peut être utilisé pour annuler l'extraction afin de permettre des personnalisations, telles que la configuration de l'extraction partielle. Voir "Extraction partielle" dans linkgit:git-read-tree[1].
+
+--[no-]guess-remote::
+	Avec `worktree add <chemin>`, sans `<commit-esque>`, au lieu de créer une nouvelle branche à partir de `HEAD`, s'il existe une branche de suivi d'exactement un distant correspondant au basename de `<chemin>`, baser la nouvelle branche sur la branche de suivi à distance, et marquer la branche de suivi à distance comme étant "amont" de la nouvelle branche.
++
+Cela peut également être configuré comme le comportement par défaut en utilisant l'option de configuration `worktree.guessRemote`.
+
+--[no-]track::
+	À la création d'une nouvelle branche, si `<commit-esque>`est une branche, la marquer comme « upstream » amont de la nouvelle branche. C'est la valeur par défaut si `<commit-esque>` est une branche de suivi à distance. Voir `--track` dans linkgit:git-branch[1] pour plus de détails.
+
+--lock::
+	Garder l'arbre-de-travail verrouillé après la création. C'est l'équivalent de `git worktree lock` après `git worktree add`, mais sans condition de compétition.
+
+-n::
+--dry-run::
+	Avec `prune`, ne rien supprimer ; montrer seulement ce qui serait supprimé.
+
+--orphan::
+	Avec `add`, rendre le nouveau arbre-de-travail et index vides, associant l'arbre-de-travail avec une nouvelle branche non-née nommée `<nouvelle-branche>`.
+
+--porcelain::
+	Avec `list`, donner la sortie dans un format facile à analyser par script. Ce format restera stable à travers les versions de Git et sans tenir compte de la configuration utilisateur. Il est recommandé de combiner ceci avec `-z`. Voir ci-dessous pour de plus amples détails.
+
+-z::
+	Terminer chaque ligne avec un caractère NUL plutôt qu'une nouvelle ligne lorsque `--porcelain` est spécifié avec `list`. Cela permet d'analyser la sortie lorsqu'un chemin de l'arbre de travail contient un caractère de nouvelle ligne.
+
+-q::
+--quiet::
+	Avec `add`, supprimer les messages d'état.
+
+-v::
+--verbose::
+	Avec `prune`, signaler toutes les suppressions.
++
+Avec `list`, afficher des informations supplémentaires sur les arbres de travail (voir ci-dessous).
+
+--expire <date>::
+	Avec `prune`, n'expirer que les arbres-de-travail inutilisés plus vieux que `<temps>`.
++
+Avec `list`, annoter les arbres-de-travail manquant comme élagable s'ils sont plus vieux que `<temps>`.
+
+--reason <chaîne>::
+	Avec `lock` ou `add--lock`, une explication de la raison pour laquelle l'arbre-de-travail est verrouillé.
+
+<arbre-de-travail>::
+	Les arbres-de-travail peuvent être identifiés par leur chemin, qu'il soit relatif ou absolu.
++
+Si le dernier élément du chemin de l'arbre-de-travail est unique parmi les arbres-de-travail, il peut être utilisé pour identifier les arbres-de-travail. Par exemple, si vous n'avez que deux arbres-de-travail, à `/abc/def/ghi` et `/abc/def/ggg`, alors `ghi` ou `def/ghi` suffit à indiquer le premier arbre-de-travail.
+
+RÉFS
+----
+Dans le cas de plusieurs arbres-de-travail utilisés, certaines réfs peuvent être partagées entre tous les arbres-de-travail, mais d'autres sont spécifiques aux arbres-de-travail individuels. Par exemple, `HEAD` est différente pour tous les arbres-de-travail. Cette section concerne les règles de partage et la manière d'accéder aux références d'un arbre-de-travail à partir d'un autre.
+
+En général, toutes les pseudo réfs sont par arbre-de-travail et toutes les réfs commençant par `refs/` sont partagées. Les pseudo réfs sont celles comme `HEAD` qui sont directement sous `$GIT_DIR` au lieu d'être à l'intérieur de `$GIT_DIR/refs`. Il y a cependant des exceptions à cela : les réfs à l'intérieur de `refs/bisect`, `refs/worktree` et `refs/rewritten` ne sont pas partagées.
+
+Les références par arbre-de-travail sont toujours accessibles à partir d'un autre arbre-de-travail via deux chemins spéciaux, `main-worktree` et `worktrees`. Le premier donne accès aux références par arbre-de-travail de l'arbre de travail principal, tandis que le second donne accès à tous les arbres-de-travail liés.
+
+Par exemple, `main-worktree/HEAD` ou `main-worktree/refs/bisect/good` ont la même valeur que la `HEAD` de l'arbre-de-travail principal et `refs/bisect/good` respectivement. De même, `worktrees/foo/HEAD` ou `worktrees/bar/refs/bisect/bad` sont les mêmes que `$GIT_COMMON_DIR/worktrees/foo/HEAD` et `$GIT_COMMON_DIR/worktrees/bar/refs/bisect/bad`.
+
+Pour accéder aux réfs, il est préférable de ne pas regarder directement dans `$GIT_DIR`. Utilisez plutôt des commandes telles que linkgit:git-rev-parse[1] ou linkgit:git-update-ref[1] qui gèreront les réfs correctement.
+
+FICHIER DE CONFIGURATION
+------------------------
+Par défaut, le fichier `config` du dépôt est partagé entre tous les arbres-de-travail. Si les variables de configuration `core.bare` ou `core.worktree` sont déjà dans le fichier de configuration commun et que `extensions.worktreeConfig` est désactivé, alors elles ne seront appliquées qu'aux arbres-de-travail principaux.
+
+Afin d'avoir une configuration spécifique aux arbres-de-travail, vous pouvez activer l'extension `worktreeConfig`, par exemple :
+
+------------
+$ git config extensions.worktreeConfig true
+------------
+
+Dans ce mode, la configuration spécifique reste dans le chemin indiqué par `git rev-parse --git-path config.worktree`. Vous pouvez ajouter ou mettre à jour la configuration dans ce fichier avec `git config --worktree`. Les anciennes versions de Git refuseront l'accès aux dépôts avec cette extension.
+
+Notez que dans ce fichier, l'exception pour `core.bare` et `core.worktree` a disparu. S'ils existent dans `$GIT_DIR/config`, vous devez les déplacer vers `config.worktree` de l'arbre-de-travail principal. Vous pouvez également profiter de cette occasion pour revoir et déplacer d'autres configurations que vous ne voulez pas partager dans tous les arbres-de-travail :
+
+ - `core.worktree` ne devrait jamais être partagé.
+
+ - `core.bare` ne doit pas être partagé si la valeur est `core.bare=true`.
+
+ - `core.sparseCheckout` ne devrait pas être partagé, à moins que vous ne soyez sûr de toujours utiliser des extractions partielles pour tous les arbres-de-travail.
+
+Voir la documentation de `extensions.worktreeConfig` dans linkgit:git-config[1] pour plus de détails.
+
+DÉTAILS
+-------
+Chaque arbre-de-travail lié possède un sous-répertoire privé dans le répertoire `$ GIT_DIR/worktrees` du dépôt. Le nom du sous-répertoire privé est généralement le nom de base du chemin de l'arbre-de-travail lié, éventuellement accompagné d'un numéro pour le rendre unique. Par exemple, lorsque `$GIT_DIR=/chemin/principal/ .git`, la commande`git worktree add /chemin/autre/test-prochain prochain` crée l'arbre-de-travail lié dans `/chemin/autre/test-prochain` et crée aussi un répertoire `$GIT_DIR/worktrees/test-prochain` (ou`$GIT_DIR/worktrees/test-prochain1` si `test-prochain` est déjà pris).
+
+Dans un arbre-de-travail lié, `$GIT_DIR` est défini pour pointer vers ce répertoire privé (par exemple, `/chemin/principal/.git/worktrees/test-prochain` dans l'exemple) et `$GIT_COMMON_DIR` est défini pour pointer vers l'arbre-de-travail principal. `$GIT_DIR` (par exemple `/chemin/principal/.git`). Ces paramètres sont définis dans un fichier `.git` situé dans le répertoire supérieur de l'arbre-de-travail lié.
+
+La résolution du chemin via `git rev-parse --git-path` utilise soit `$GIT_DIR` soit `$GIT_COMMON_DIR` selon le chemin. Par exemple, dans l'arbre-de-travail lié `git rev-parse --git-path HEAD` renvoie `/chemin/principal/.git/worktrees/test-prochain/HEAD` (pas `/chemin/autre/test-prochain/.git/HEAD` ou `/chemin/principal/.git/HEAD`) tandis que `git rev-parse --git-path refs/heads/master` utilise `$GIT_COMMON_DIR` et retourne `/chemin/principal/.git/refs/heads/master`, puisque les réfs sont partagées sur tous les arbres-de-travail, sauf `refs/bisect`,`refs/worktree` et `refs/rewritten`.
+
+Voir linkgit:gitrepository-layout[5] pour plus d'informations. La règle de base est de ne pas faire d'hypothèse sur l'appartenance d'un chemin à `$GIT_DIR` ou `$GIT_COMMON_DIR` lorsque vous devez accéder directement à quelque chose à l'intérieur de ``$GIT_DIR`. Utilisez `git rev-parse --git-path` pour obtenir le chemin final.
+
+Si vous déplacez manuellement un arbre-de-travail lié, vous devez mettre à jour le fichier `gitdir` dans le répertoire de l'entrée. Par exemple, si un arbre-de-travail lié est déplacé vers `/nouveau-chemin/test-prochain` et que son fichier` .git` pointe vers `/chemin/principal/.git /worktrees/test-prochain`, puis mettez à jour`/chemin/principal/.git/worktrees/test-prochain/gitdir` pour référencer `/nouveau-chemin/test-prochain` à la place. Mieux encore, exécutez `git worktree repair` pour rétablir automatiquement la connexion.
+
+Pour éviter qu'une entrée `$GIT_DIR/worktrees` ne soit élaguée (ce qui peut être utile dans certaines situations, comme lorsque l'arbre-de-travail de l'entrée est stocké sur un support amovible), utilisez la commande `git worktree lock`, qui ajoute un fichier nommé `locked` au répertoire de l'entrée. Le fichier contient le motif en texte clair. Par exemple, si le fichier `.git` d'un arbre-de-travail lié pointe vers `/chemin/principal/.git/worktrees/test-prochain`, alors un fichier nommé `/chemin/principal/.git/worktrees/test-prochain/locked` empêchera l'élagage de l'entrée `test-prochain`. Voir linkgit:gitrepository-layout[5] pour plus de détails.
+
+Lorsque `extensions.worktreeConfig` est activé, le fichier de configuration `.git/worktrees/<id>/config.worktree` est lu après `.git/config`.
+
+FORMAT DE SORTIE DE LA LISTE
+----------------------------
+La commande `worktree list` a deux formats de sortie. Le format par défaut affiche les détails sur une seule ligne avec des colonnes. Par exemple :
+
+------------
+$ git worktree list
+/chemin/vers/source-nu            (bare)
+/chemin/vers/arbre-de-travail-lié        abcd1234 [master]
+/chemin/vers/autre-arbre-de-travail-lié  1234abc  (detached HEAD)
+------------
+
+La commande affiche également des annotations pour chaque arbre-de-travail, en fonction de son état. Ces annotations sont :
+
+ * `locked`, si l'arbre-de-travail est verrouillé.
+ * `prunable`, si l'arbre-de-travail peut être élagué via` git worktree prune`.
+
+------------
+$ git worktree list
+/chemin/vers/arbre-de-travail-lié        abcd1234 [master]
+/chemin/vers/arbre-de-travail-verrouillé        abcd568 (branche-a) locked
+/chemin/vers/arbre-de-travail-élagable  5678abcd  (detached HEAD) prunable
+------------
+
+Pour ces annotations, une raison peut également être disponible et cela peut être vu en utilisant le mode verbeux. L'annotation est alors déplacée à la ligne suivante en retrait, suivie des informations complémentaires.
+
+------------
+$ git worktree list --verbose
+/chemin/vers/arbre-de-travail-lié              abcd1234 [master]
+/chemin/vers/arbre-de-travail-verrouillé-pas-de-raison    abcd5678 (HEAD détachée) locked
+chemin/vers/arbre-de-travail-verrouillé-avec-raison  1234abcd (branche-a)
+	locked: working tree path is mounted on a portable device
+chemin/vers/arbre-de-travail-elagable            5678abc1 (HEAD détachée)
+	prunable: gitdir file points to non-existent location
+------------
+
+Notez que l'annotation est déplacée à la ligne suivante si les informations supplémentaires sont disponibles, sinon elle reste sur la même ligne que l'arbre-de-travail lui-même.
+
+Format de la porcelaine
+~~~~~~~~~~~~~~~~~~~~~~~
+Le format de porcelaine comporte une ligne par attribut. Si `-z` est fourni alors les lignes sont terminées par un caractère NUL au lieu d'un caractère nouvelle ligne Les attributs sont énumérés avec une étiquette et une valeur séparées par un seul espace. Les attributs booléens (comme `bare` et `detached`) sont énumérés sous forme d'étiquette uniquement, et ne sont présents que si la valeur est vraie. Certains attributs (comme `locked`) peuvent être listés comme étiquette seule ou avec une valeur si la raison de cet attribut est disponible Le premier attribut d'un arbre-de-travail est toujours `worktree`, une ligne vide indique la fin de l'enregistrement. Par exemple :
+
+------------
+$ git worktree list --porcelain
+worktree /chemin/vers/source-nu
+bare
+
+worktree /chemin/vers/arbre-de-travail-lié
+HEAD abcd1234abcd1234abcd1234abcd1234abcd1234
+branch refs/heads/master
+
+worktree /chemin/vers/autre-arbre-de-travail-lié
+HEAD 1234abc1234abc1234abc1234abc1234abc1234a
+detached
+
+worktree /path/to/linked-worktree-locked-no-reason
+HEAD 5678abc5678abc5678abc5678abc5678abc5678c
+branch refs/heads/locked-no-reason
+locked
+
+worktree /chemin/vers/arbre-de-travail-lié-verrouillé-avec-raison
+HEAD 3456def3456def3456def3456def3456def3456b
+branch refs/heads/verrrouille-avec-raison
+raison pourquoi l'arbre est verrouillé
+
+worktree /path/to/linked-worktree-prunable
+HEAD 1233def1234def1234def1234def1234def1234b
+detached
+prunable gitdir file points to non-existent location
+
+------------
+
+À moins que `-z` ne soit utilisé, les caractères « inhabituels » dans la raison de verrouillage tels que des retours chariot sont échappés et la raison est entièrement citée comme expliqué pour la variable de configuration `core.quotePath` (voir linkgit:git-config[1]). Par exemple :
+
+------------
+$ git worktree list --porcelain
+...
+locked "reason\nwhy is locked"
+...
+------------
+
+EXEMPLES
+--------
+Vous êtes au milieu d'une séance de refactorisation et votre patron arrive et exige que vous répariez quelque chose immédiatement. Vous pouvez généralement utiliser linkgit:git-stash[1] pour stocker temporairement vos modifications, cependant, votre arbre de travail est dans un tel état de désordre (avec des fichiers nouveaux, déplacés et supprimés, et d'autres éléments éparpillés) que vous ne voulez pas risquer d'en déranger quoi que ce soit. Au lieu de cela, vous créez un arbre-de-travail liée temporaire pour effectuer le correctif d'urgence, le supprimez lorsque vous avez terminé, puis reprenez votre session de refactoring précédente.
+
+------------
+$ git worktree add -b correctif-d-urgence ../temp master
+$ pushd ../temp
+# ... travail travail travail ...
+$ git commit -a -m 'correction en urgence pour le patron'
+$ popd
+$ git worktree remove ../temp
+------------
+
+BOGUES
+------
+L'extraction multiple en général est encore expérimentale, et le support des sous-modules est incomplet. Il n'est PAS recommandé d'effectuer des extractions multiples d'un superprojet.
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

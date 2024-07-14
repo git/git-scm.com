@@ -1,0 +1,205 @@
+git-merge-tree(1)
+=================
+
+NOME
+----
+git-merge-tree - Realiza a mesclagem sem tocar no índice ou na árvore de trabalho
+
+
+RESUMO
+------
+[verse]
+'git merge-tree' [--write-tree] [<opções>] <ramo1> <ramo2>
+'git merge-tree' [--trivial-merge] <árvore-principal> <ramo1> <ramo2> (descontinuado)
+
+[[NEWMERGE]]
+DESCRIÇÃO
+---------
+
+Este comando tem um modo moderno `--write-tree` e um modo obsoleto `--trivial-merge`. Com exceção da seção <<DEPMERGE,DESCRIÇÃO DESCONTINUADA>> no final, o restante desta documentação descreve o modo moderno `--write-tree`.
+
+Executa uma mesclagem, mas não faz novos commits e não lê ou grava na árvore de trabalho ou no índice.
+
+A mesclagem que foi realizada, usará os mesmos recursos que o linkgit:git-merge[1] "real", incluindo:
+
+  * mesclagem do conteúdo com três vias dos arquivos individuais
+  * renomeia a detecção
+  * tratamento adequado para diretórios/arquivos com conflitos
+  * consolidação recursiva do ancestral (ou seja, quando há mais de uma mesclagem da base, criando uma mesclagem virtual da base ao mesclar as bases)
+  * etc.
+
+Após a conclusão da mesclagem, um novo objeto no cume da árvore é criado. Para mais detalhes consulte SAÍDA logo abaixo.
+
+OPÇÕES
+------
+
+-z::
+	Não coloque os nomes de arquivos entre aspas na seção `<Informações de arquivos em conflito>` e termine cada nome de arquivo com um caractere NUL em vez de nova linha. Também inicie a seção de mensagens com um caractere NUL em vez de uma nova linha. Consulte <<OUTPUT>> abaixo para obter mais informações.
+
+--name-only::
+	Na seção de informação do arquivo em conflito, em vez de escrever uma lista de tuplas (mode, oid, stage, path) para a saída dos arquivos em conflito, apenas forneça uma lista com os nomes dos arquivos conflitantes (e não liste os nomes dos arquivos várias vezes caso eles tenham vários estágios conflitantes).
+
+--[no-]messages::
+	Escreva todas as mensagens informativas, como "Auto-merging <caminho>" ou os avisos de CONFLITO, no final do stdout. Se não for especificado, a predefinição é incluir estas mensagens quando houver conflitos de mesclagem e, caso contrário, omiti-las.
+
+--allow-unrelated-histories::
+	É predefinido que o 'merge-tree' mostre um erro se as duas ramificações especificadas não compartilharem um histórico em comum. Esta opção pode ser usada para substituir essa verificação e fazer com que a mesclagem prossiga assim mesmo.
+
+--merge-base=<tree-ish>::
+	Em vez de encontrar as bases de mesclagem para <ramo1> e <ramo2>, especifique uma base de mesclagem para uma mesclagem, no momento, a especificação de várias bases não é suportada. Esta opção é incompatível com `--stdin`.
++
+As the merge-base is provided directly, <branch1> and <branch2> do not need to specify commits; trees are enough.
+
+-X<opção>::
+--strategy-option=<opção>::
+	Encaminhe a opção específica da estratégia de mesclagem para a estratégia de mesclagem. Para mais detalhes consulte linkgit:git-merge[1].
+
+[[OUTPUT]]
+SAÍDA
+-----
+
+Para uma mesclagem bem-sucedida, a saída do git-merge-tree é basicamente uma linha:
+
+	<OID do cume da árvore>
+
+Considerando que para uma mesclagem conflitante, a saída é, por padrão, do formulário:
+
+	<OID do cume da árvore>
+	<info do arquivo em conflito>
+	<mensagens de informação>
+
+Estes são discutidos individualmente abaixo.
+
+Entretanto, há uma exceção. Se a opção `--stdin` for usada, haverá uma seção extra no início, um caractere NUL no final e, em seguida, todas as seções serão repetidas para cada linha de entrada. Portanto, se a primeira mesclagem estiver em conflito e a segunda estiver limpa, a saída será do tipo:
+
+	<Condição da mesclagem>
+	<OID do cume da árvore>
+	<Informação do arquivo com conflito>
+	<Mensagens informacionais>
+	NUL
+	<Merge status>
+	<OID do cume da árvore>
+	NUL
+
+[[MS]]
+Condição da mesclagem
+~~~~~~~~~~~~~~~~~~~~~
+
+Esse é uma condição geral inteira, seguido por um caractere NUL. A condição geral inteira é:
+
+     0: merge had conflicts
+     1: merge was clean
+     <0: something prevented the merge from running (e.g. access to repository
+	 objects denied by filesystem)
+
+[[OIDTLT]]
+OID do cume da árvore
+~~~~~~~~~~~~~~~~~~~~~
+
+Esse é um objeto de árvore que representa o que seria verificado na árvore de trabalho no final do comando `git merge`. Se houver conflitos, os arquivos dessa árvore poderão ter marcadores de conflito incorporados. Esta seção é sempre seguida por uma nova linha (ou NUL se `-z` for usado).
+
+[[CFI]]
+Informação do arquivo em conflito
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Esta é uma sequência de linhas com o formato
+
+	<modo> <objeto> <estágio> <nome_do_arquivo>
+
+O nome do arquivo será citado conforme explicado na variável de configuração `core.quotePath` (consulte linkgit:git-config[1]). No entanto, se a opção `--name-only` for usada, o modo, o objeto e o estágio serão omitidos. Se `-z` for usado, as "linhas" serão terminadas com um caractere NUL em vez de um caractere de nova linha.
+
+[[IM]]
+Mensagens de Informação
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Esta seção fornece mensagens informativas, geralmente sobre os conflitos. O formato da seção varia significativamente, dependendo se `-z` for usado.
+
+Caso `-z` seja utilizado:
+
+O formato da saída é zero ou registros informativos adicionais do conflito, cada um no formato:
+
+	<lista-dos-caminhos><tipo-do-conflito>NUL<mensagem-do-conflito>NUL
+
+onde <lista-dos-caminhos> é da forma
+
+	<quantidade-dos-caminhos>NUL<caminho1>NUL<caminho2>NUL...<caminhoN>NUL
+
+E inclui caminhos (ou nomes de ramificações) afetados pelo conflito ou pela mensagem informativa em <mensagem-de-conflito>. Além disso, o <tipo-do-conflito> é uma string estável que explica o tipo do conflito, como
+
+  * "Auto-merging"
+  * "CONFLITO (renomear/excluir)"
+  * "CONFLICT (o submódulo não possui uma base para mesclagem)"
+  * "CONFLITO (binário)"
+
+E a <mensagem-de-conflito> é uma mensagem mais detalhada sobre o conflito que frequentemente (mas nem sempre) incorpora a <descrição-curta-do-tipo-estável-da-redução>. Estas strings poderão ser alteradas em futuras versões do Git. Alguns exemplos:
+
+  * "Auto-merging <arquivo>"
+  * "CONFLITO (renomear/excluir): <oldfile> renomeado...mas excluído em..."
+  * "Houve uma falha ao mesclar o submódulo <submódulo> (sem base para mesclar)"
+  * "Aviso: não é possível mesclar arquivos binários: <nome-do-arquivo>"
+
+Caso `-z` NÃO seja utilizado:
+
+Esta seção começa com uma linha em branco para separá-la das seções anteriores e, em seguida, contém apenas as informações <mensagem-de-conflito> da seção anterior (que são separadas por novas linhas). Essas são cadeias de caracteres não estáveis que não devem ser analisadas por scripts e são destinadas apenas para avaliação humana. Além disso, observe que, embora as cadeias de caracteres <mensagem-de-conflito> normalmente não contenham novas linhas incorporadas, às vezes elas contêm. (No entanto, as mensagens de formato livre nunca terão um caractere NUL incorporado). Portanto, todo o bloco de informações é destinado a avaliação humana como uma aglomeração de todas as mensagens de conflito.
+
+CONDIÇÃO DE ENCERRAMENTO
+------------------------
+
+Para uma mesclagem bem-sucedida e sem conflitos, a condição de encerramento é 0. Quando a mesclagem tem conflitos, a condição de encerramento é 1. Se a mesclagem não puder ser concluída (ou iniciada) devido a algum tipo de erro, a condição de encerramento será algo diferente de 0 ou 1 (e a saída não será especificada). Quando a opção `--stdin` é usada, a condição de retorno é 0 para mesclagens bem-sucedidas e conflitantes, algo diferente de 0 ou 1 se não for possível concluir todas as mesclagens solicitadas.
+
+OBSERVAÇÕES SOBRE A UTILIZAÇÃO
+------------------------------
+
+Este comando destina-se a uma canalização de baixo nível, semelhante a linkgit:git-hash-object[1], linkgit:git-mktree[1], linkgit:git-commit-tree[1], linkgit:git-write-tree[1], linkgit:git-update-ref[1] e linkgit:git-mktag[1]. Assim, ele pode ser usado como parte de uma série de etapas, como:
+
+       NEWTREE=$(git merge-tree --write-tree $BRANCH1 $BRANCH2)
+       test $? -eq 0 || die "Houveram conflitos..."
+       NEWCOMMIT=$(git commit-tree $NEWTREE -p $BRANCH1 -p $BRANCH2)
+       git update-ref $BRANCH1 $NEWCOMMIT
+
+Observe que quando o status de saída for diferente de zero, `NEWTREE` nesta sequência conterá muito mais saída do que apenas uma árvore.
+
+Para conflitos, a saída inclui as mesmas informações que você obteria com linkgit:git-merge[1]:
+
+  * o que seria escrito na árvore de trabalho (o <<OIDTLT,OID do cume da árvore>>)
+  * os estágios de ordem superior que seriam gravados no índice (o <<CFI,informação do arquivo em conflito>>)
+  * quaisquer mensagens que seriam geradas no stdout (as <<IM,mensagens informativas>>)
+
+FORMATO DE ENTRADA
+------------------
+O formato de entrada 'git merge-tree --stdin' é totalmente com base em texto. Cada linha tem este formato:
+
+	[<base-commit> -- ]<ramo1> <ramo2>
+
+Caso uma linha seja separada por `--`, o texto antes do separador é usado para definir uma base de mesclagem para uma mesclagem e o texto após o separador, descreve as ramificações que serão mescladas.
+
+ERROS A SEREM EVITADOS
+----------------------
+
+NÃO examine o cume da árvore resultante para tentar descobrir quais os arquivos estão em conflito; em vez disso, analise a seção <<CFI,Informações dos arquivos conflitantes>>. Além da análise de uma árvore inteira ser extremamente lenta em grandes repositórios, há vários tipos de conflitos que não podem ser representados por marcadores de conflito (modificar/excluir, modo de conflito, arquivo binário alterado em ambos os lados, conflitos de arquivo/diretório, várias permutações de conflito de renomeação etc.)
+
+NÃO interprete uma lista <<CFI,Informações de arquivo conflitantes>> vazia como uma mesclagem limpa; verifique a condição de encerramento. Uma mesclagem pode ter conflitos sem que os arquivos individuais entrem em conflito (há alguns tipos de conflitos de renomeação de diretório que se enquadram nessa categoria, e outros também poderão ser adicionados no futuro).
+
+NÃO tente adivinhar ou fazer com que o usuário adivinhe os tipos de conflito da lista <<CFI,Informações dos arquivos conflitantes>>. As informações existentes são insuficientes para isso. Por exemplo: Conflitos de renomeação/renomeação(1 para 2) (ambos os lados renomearam o mesmo arquivo de forma diferente) resultarão em três arquivos diferentes com estágios de ordem superior (mas cada um tem apenas um estágio de ordem superior), sem nenhuma maneira (exceto a seção <<IM,Mensagens informativas>>) de determinar quais três arquivos estão relacionados. Os conflitos de arquivo/diretório também resultam num arquivo com exatamente um estágio de ordem mais elevada. Conflitos de renomeação dos diretórios possivelmente envolvidos (quando "merge.directoryRenames" não está definido ou está definido como "conflicts") também resultam num arquivo com exatamente um estágio de ordem mais elevada. Em todos os casos, a seção <<IM,Mensagens informativas>> tem as informações necessárias, embora não tenha sido projetada para ser analisável por máquina.
+
+NÃO presuma que cada caminho de <<CFI,Informações de arquivo conflitantes>> e os conflitos lógicos nas <<IM,Mensagens informativas>> tenham um mapeamento de um para um, nem que haja um mapeamento de um para muitos, nem um mapeamento de muitos para um. Existem mapeamentos de muitos para muitos, o que significa que cada caminho pode ter muitos tipos de conflitos lógicos numa única mesclagem, e cada tipo de conflito lógico pode afetar muitos caminhos.
+
+NÃO presuma que todos os nomes de arquivos listados na seção <<IM,Mensagens informativas>> tenham conflitos. Podem ser incluídas mensagens para arquivos que não tenham conflitos, como "Auto-merging <arquivo>".
+
+EVITE pegar os OIDS do <<CFI,Informações de arquivo conflitantes>> e mesclá-los novamente para apresentar os conflitos ao usuário. Isso fará com que você perca informações. Em vez disso, procure a versão do arquivo encontrado em <<OIDTLT,OID do cume da árvore>> e mostre-a. Em particular, o último terá marcadores de conflito anotados com o ramo/commit original que está sendo mesclado e, se houver renomeações envolvidas, o nome do arquivo original. Embora você possa incluir o ramo/commit original nas anotações do marcador de conflito ao refazer a mesclagem, o nome do arquivo original não está disponível no <<CFI,Informações de arquivo conflitantes>> e, portanto, você estaria perdendo informações que poderiam ajudar o usuário a resolver o conflito.
+
+[[DEPMERGE]]
+DESCRIÇÃO DESCONTINUADA
+-----------------------
+
+De acordo com <<NEWMERGE,DESCRIÇÃO>> e diferente do restante desta documentação, esta seção descreve um modo da opção `--trivial-merge` já descontinuado.
+
+Além da opção opcional `--trivial-merge`, este modo não aceita opções.
+
+Esse modo lê três árvores e gera resultados de mesclagem triviais e estágios conflitantes na saída padrão num formato de semi-difusão. Como isso foi projetado para que scripts do cume consumam e mesclem os resultados de volta ao índice, ele omite entradas que correspondem a <branch1>. O resultado dessa segunda forma é semelhante ao que o comando de três vias que o comando 'git read-tree -m' faz, mas, em vez de armazenar os resultados no índice, o comando envia as entradas para a saída padrão.
+
+Este formulário não só tem aplicabilidade limitada (uma mesclagem trivial não pode lidar com as mesclagens do conteúdo de arquivos individuais, a detecção de renomeações, manipulação adequada de conflito de diretório/arquivo etc.), o formato de saída também é difícil de trabalhar e geralmente terá menos desempenho do que o primeiro formulário, mesmo nas mesclagens bem-sucedidas (especialmente se estiver trabalhando em grandes repositórios).
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

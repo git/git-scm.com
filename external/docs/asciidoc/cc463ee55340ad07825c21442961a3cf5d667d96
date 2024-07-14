@@ -1,0 +1,225 @@
+git-http-backend(1)
+===================
+
+NOME
+----
+git-http-backend - Implementação do servidor do Git sobre HTTP
+
+RESUMO
+------
+[verse]
+'git http-backend'
+
+DESCRIÇÃO
+---------
+A simple CGI program to serve the contents of a Git repository to Git clients accessing the repository over http:// and https:// protocols. The program supports clients fetching using both the smart HTTP protocol and the backwards-compatible dumb HTTP protocol, as well as clients pushing using the smart HTTP protocol. It also supports Git's more-efficient "v2" protocol if properly configured; see the discussion of `GIT_PROTOCOL` in the ENVIRONMENT section below.
+
+Verifica se o diretório possui o arquivo mágico "git-daemon-export-ok" e se recusará a exportar qualquer diretório Git que não tenha sido explicitamente marcado para exportação (a menos que a variável de ambiente `GIT_HTTP_EXPORT_ALL` esteja definida) .
+
+By default, only the `upload-pack` service is enabled, which serves 'git fetch-pack' and 'git ls-remote' clients, which are invoked from 'git fetch', 'git pull', and 'git clone'. If the client is authenticated, the `receive-pack` service is enabled, which serves 'git send-pack' clients, which is invoked from 'git push'.
+
+SERVIÇOS
+--------
+Estes serviços podem ser ativados/desativados usando o arquivo de configuração por repositório:
+
+http.getanyfile::
+	This serves Git clients older than version 1.6.6 that are unable to use the upload pack service. When enabled, clients are able to read any file within the repository, including objects that are no longer reachable from a branch but are still present. It is enabled by default, but a repository can disable it by setting this configuration value to `false`.
+
+http.uploadpack::
+	This serves 'git fetch-pack' and 'git ls-remote' clients. It is enabled by default, but a repository can disable it by setting this configuration value to `false`.
+
+http.receivepack::
+	This serves 'git send-pack' clients, allowing push. It is disabled by default for anonymous users, and enabled by default for users authenticated by the web server. It can be disabled by setting this item to `false`, or enabled for all users, including anonymous users, by setting it to `true`.
+
+TRADUÇÃO DA URL
+---------------
+To determine the location of the repository on disk, 'git http-backend' concatenates the environment variables PATH_INFO, which is set automatically by the web server, and GIT_PROJECT_ROOT, which must be set manually in the web server configuration. If GIT_PROJECT_ROOT is not set, 'git http-backend' reads PATH_TRANSLATED, which is also set automatically by the web server.
+
+EXEMPLOS
+--------
+Todos os exemplos a seguir mapeiam o `http://$hostname/git/foo/bar.git` para `/var/www/git/foo/bar.git`.
+
+Apache 2.x::
+	Certifique-se que o 'mod_cgi', 'mod_alias' e 'mod_env' estejam ativos, defina o `GIT_PROJECT_ROOT` (ou 'DocumentRoot') adequadamente e crie um "ScriptAlias" para o CGI:
++
+----------------------------------------------------------------
+SetEnv GIT_PROJECT_ROOT /var/www/git
+SetEnv GIT_HTTP_EXPORT_ALL
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+
+# Isso não é estritamente necessário ao usar o apache e uma versão moderna do
+# git-http-backend, como o servidor web vai passar através do cabeçalho no
+# ambiente como HTTP_GIT_PROTOCOL e o http-backend vai copiar isso no
+# GIT_PROTOCOL. Mas você pode precisar desta linha (ou algo semelhante caso
+# esteja usando um servidor web diferente) ou caso queira que seja compatível com um
+# git mais antigo que não fizeram essa cópia.
+#
+# Ter o servidor web configurado GIT_PROTOCOL é suficiente mesmo com
+# versões mais modernas (que terá precedência sobre o HTTP_GIT_PROTOCOL,
+# o que significa que pode ser usado para substituir o pedido do cliente).
+SetEnvIf Git-Protocol ".*" GIT_PROTOCOL=$0
+----------------------------------------------------------------
++
+Para habilitar o acesso de leitura anônima, porém com acesso de gravação autenticado, exija a autorização para o anúncio da "ref" inicial (que detectamos como um "push" por meio do parâmetro "service" na cadeia de consulta) e a própria chamada do pacote de recebimento:
++
+----------------------------------------------------------------
+RewriteCond %{QUERY_STRING} service=git-receive-pack [OR]
+RewriteCond %{REQUEST_URI} /git-receive-pack$
+RewriteRule ^/git/ - [E=AUTHREQUIRED:yes]
+
+<LocationMatch "^/git/">
+	Order Deny,Allow
+	Deny from env=AUTHREQUIRED
+
+	AuthType Basic
+	AuthName "Git Access"
+	Require group committers
+	Satisfy Any
+	...
+</LocationMatch>
+----------------------------------------------------------------
++
+Caso não tenha o `mod_rewrite` disponível para coincidir com o texto sob consulta é suficiente apenas para proteger o próprio `git-receive-pack`, como:
++
+----------------------------------------------------------------
+<LocationMatch "^/git/.*/git-receive-pack$">
+	AuthType Basic
+	AuthName "Acesso Git"
+	Require group committers
+	...
+</LocationMatch>
+----------------------------------------------------------------
++
+In this mode, the server will not request authentication until the client actually starts the object negotiation phase of the push, rather than during the initial contact. For this reason, you must also enable the `http.receivepack` config option in any repositories that should accept a push. The default behavior, if `http.receivepack` is not set, is to reject any pushes by unauthenticated users; the initial request will therefore report `403 Forbidden` to the client, without even giving an opportunity for authentication.
++
+Para exigir a autenticação para ambas as leituras e gravações, utilize uma diretiva local ao redor do repositório ou um dos seus diretórios upstream:
++
+----------------------------------------------------------------
+<Location /git/private>
+	AuthType Basic
+	AuthName "Acesso Git Privado"
+	Require group committers
+	...
+</Location>
+----------------------------------------------------------------
++
+Para veicular o gitweb na mesma URL, utilize um 'ScriptAliasMatch' apenas para ss URLs que o 'git http-backend' pode manipular e encaminhe o restante para o gitweb:
++
+----------------------------------------------------------------
+ScriptAliasMatch \
+	"(?x)^/git/(.*/(HEAD | \
+			info/refs | \
+			objects/(info/[^/]+ | \
+				 [0-9a-f]{2}/[0-9a-f]{38} | \
+				 pack/pack-[0-9a-f]{40}\.(pack|idx)) | \
+			git-(upload|receive)-pack))$" \
+	/usr/libexec/git-core/git-http-backend/$1
+
+ScriptAlias /git/ /var/www/cgi-bin/gitweb.cgi/
+----------------------------------------------------------------
++
+Para servir os vários repositórios vindos de diferentes linkgit:gitnamespaces[7] num único repositório:
++
+----------------------------------------------------------------
+SetEnvIf Request_URI "^/git/([^/]*)" GIT_NAMESPACE=$1
+ScriptAliasMatch ^/git/[^/]*(.*) /usr/libexec/git-core/git-http-backend/storage.git$1
+----------------------------------------------------------------
+
+Apache estático acelerado 2.x::
+	Similar to the above, but Apache can be used to return static files that are stored on disk. On many systems this may be more efficient as Apache can ask the kernel to copy the file contents from the file system directly to the network:
++
+----------------------------------------------------------------
+SetEnv GIT_PROJECT_ROOT /var/www/git
+
+AliasMatch ^/git/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$          /var/www/git/$1
+AliasMatch ^/git/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$ /var/www/git/$1
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+----------------------------------------------------------------
++
+Pode ser combinado com a configuração do gitweb:
++
+----------------------------------------------------------------
+SetEnv GIT_PROJECT_ROOT /var/www/git
+
+AliasMatch ^/git/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$          /var/www/git/$1
+AliasMatch ^/git/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$ /var/www/git/$1
+ScriptAliasMatch \
+	"(?x)^/git/(.*/(HEAD | \
+			info/refs | \
+			objects/info/[^/]+ | \
+			git-(upload|receive)-pack))$" \
+	/usr/libexec/git-core/git-http-backend/$1
+ScriptAlias /git/ /var/www/cgi-bin/gitweb.cgi/
+----------------------------------------------------------------
+
+Lighttpd::
+	Certifique-se de que `mod_cgi`, `mod_alias`, `mod_auth`, `mod_setenv` estejam carregados, então defina a variável `GIT_PROJECT_ROOT` adequadamente e redirecione todas as solicitações para o CGI:
++
+----------------------------------------------------------------
+alias.url += ( "/git" => "/usr/lib/git-core/git-http-backend" )
+$HTTP["url"] =~ "^/git" {
+	cgi.assign = ("" => "")
+	setenv.add-environment = (
+		"GIT_PROJECT_ROOT" => "/var/www/git",
+		"GIT_HTTP_EXPORT_ALL" => ""
+	)
+}
+----------------------------------------------------------------
++
+Para ativar o acesso de leitura anônima porém o acesso de gravação autenticado:
++
+----------------------------------------------------------------
+$HTTP["querystring"] =~ "service=git-receive-pack" {
+	include "git-auth.conf"
+}
+$HTTP["url"] =~ "^/git/.*/git-receive-pack$" {
+	include "git-auth.conf"
+}
+----------------------------------------------------------------
++
+onde o `git-auth.conf` se parece com:
++
+----------------------------------------------------------------
+auth.require = (
+	"/" => (
+		"method" => "basic",
+		"realm" => "Acesso Git",
+		"require" => "valid-user"
+	       )
+)
+# ...and set up auth.backend here
+----------------------------------------------------------------
++
+Para exigir a autenticação tanto para leituras quanto para gravações:
++
+----------------------------------------------------------------
+$HTTP["url"] =~ "^/git/private" {
+	include "git-auth.conf"
+}
+----------------------------------------------------------------
+
+
+VARIÁVEIS DO AMBIENTE
+---------------------
+O 'git http-backend' conta com as variáveis do ambiente `CGI` definidas pelo servidor da Web que está sendo invocado, incluindo:
+
+* `PATH_INFO` (caso `GIT_PROJECT_ROOT` seja definido, caso contrário utilize `PATH_TRANSLATED`)
+* REMOTE_USER
+* REMOTE_ADDR
+* CONTENT_TYPE
+* QUERY_STRING
+* REQUEST_METHOD
+
+A variável de ambiente `GIT_HTTP_EXPORT_ALL` pode ser passada para o comando 'git-http-backend' para ignorar a verificação do arquivo "git-daemon-export-ok" em cada repositório antes de permitir a exportação desse repositório.
+
+The `GIT_HTTP_MAX_REQUEST_BUFFER` environment variable (or the `http.maxRequestBuffer` config option) may be set to change the largest ref negotiation request that git will handle during a fetch; any fetch requiring a larger buffer will not succeed. This value should not normally need to be changed, but may be helpful if you are fetching from a repository with an extremely large number of refs. The value can be specified with a unit (e.g., `100M` for 100 megabytes). The default is 10 megabytes.
+
+Os clientes podem sondar por capacidades opcionais do protocolo (como o protocolo v2) utilizando o cabeçalho HTTP `Git-Protocol`. Para ser compatível com eles, o conteúdo desse cabeçalho deve aparecer na variável de ambiente `GIT_PROTOCOL`. A maioria dos servidores web passará esse cabeçalho para o CGI através da variável `HTTP_GIT_PROTOCOL` e o `git-http-backend` copiará automaticamente para a variável `GIT_PROTOCOL`. Entretanto, alguns servidores web podem ser mais seletivos sobre quais os cabeçalhos eles passarão, nesse caso, eles precisam ser configurados de forma explícita (veja a menção do `Git-Protocol` na configuração do Apache, a partir da seção EXEMPLOS mais recentes).
+
+A estrutura define o `GIT_COMMITTER_NAME` como '$REMOTE_USER' e `GIT_COMMITTER_EMAIL` como '$\{REMOTE_USER}@http.$\{REMOTE_ADDR\}', garantindo que quaisquer reflogs que forem criados através do comando 'git-receive-pack' contenham algumas informações de identificação do ramo remoto do usuário que executou o push.
+
+Todas as variáveis do ambiente `CGI` estão disponíveis para cada um dos ganchos invocados pelo comando 'git-receive-pack'.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

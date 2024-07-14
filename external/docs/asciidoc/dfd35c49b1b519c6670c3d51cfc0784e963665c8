@@ -1,0 +1,426 @@
+git-checkout(1)
+===============
+
+NOME
+----
+git-checkout - Alterne entre os ramos ou restaure os arquivos da árvore de trabalho
+
+RESUMO
+------
+[verse]
+'git checkout' [-q] [-f] [-m] [<ramo>]
+'git checkout' [-q] [-f] [-m] --detach [<ramo>]
+'git checkout' [-q] [-f] [-m] [--detach] <commit>
+'git checkout' [-q] [-f] [-m] [[-b|-B|--orphan] <novo-ramo>] [<ponto-de-partida>]
+'git checkout' [-f] <tree-ish> [--] <pathspec>...
+'git checkout' [-f] <tree-ish> --pathspec-from-file=<file> [--pathspec-file-nul]
+'git checkout' [-f|--ours|--theirs|-m|--conflict=<estilo>] [--] <pathspec>...
+'git checkout' [-f|--ours|--theirs|-m|--conflict=<estilo>] --pathspec-from-file=<arquivo> [--pathspec-file-nul]
+'git checkout' (-p|--patch) [<árvore>] [--] [<pathspec>...]
+
+DESCRIÇÃO
+---------
+Updates files in the working tree to match the version in the index or the specified tree. If no pathspec was given, 'git checkout' will also update `HEAD` to set the specified branch as the current branch.
+
+'git checkout' [<ramo>]::
+	Para se preparar para trabalhar em um `<ramo>`, alterne para ele atualizando o índice, os arquivos na árvore de trabalho e apontando para o `HEAD` do ramo. As modificações locais são mantidas nos arquivos da árvore de trabalho, para que o commit possa ser no `<ramo>`.
++
+Caso o `<ramificação>` não seja encontrada mas exista uma monitorada remotamente (chame-o de `<remoto>`) com um nome que coincida e quando `--no-guess` não seja utilizado, trate-o como um equivalente a
++
+------------
+$ git checkout -b <ramo> --track <remoto>/<ramo>
+------------
++
+Você pode omitir o `<ramo>` no caso em que o comando se degenera para "verificar o branch atual", que é um glorificado não-op com efeitos colaterais bastante dispendiosos para exibir apenas as informações de rastreamento, caso existam, para o ramo atual.
+
+'git checkout' -b|-B <new-branch> [<ponto-de-partida>]::
+
+	Specifying `-b` causes a new branch to be created as if linkgit:git-branch[1] were called and then checked out. In this case you can use the `--track` or `--no-track` options, which will be passed to 'git branch'. As a convenience, `--track` without `-b` implies branch creation; see the description of `--track` below.
++
+Caso a opção `-B` seja utilizada, então um `<novo-ramo>` é criado caso ainda não exista, senão, será redefinido. Este é o equivalente transacional do
++
+------------
+$ git branch -f <ramo> [<ponto-de-partida>]
+$ git checkout <ramo>
+------------
++
+that is to say, the branch is not reset/created unless "git checkout" is successful (e.g., when the branch is in use in another worktree, not just the current branch stays the same, but the branch is not reset to the start-point, either).
+
+'git checkout' --detach [<ramo>]::
+'git checkout' [--detach] <commit>::
+
+	Prepare to work on top of `<commit>`, by detaching `HEAD` at it (see "DETACHED HEAD" section), and updating the index and the files in the working tree. Local modifications to the files in the working tree are kept, so that the resulting working tree will be the state recorded in the commit plus the local modifications.
++
+Quando o argumento `<commit>` é um nome de ramificação a opção `--detach` pode ser utilizada para desanexar o `HEAD` na ponta do ramo (`git checkout <ramo>` verificaria aquela ramificação sem desanexar o `HEAD`).
++
+Ao omitir o `<ramo>` isso desanexa o `HEAD` na ponta do ramo atual.
+
+'git checkout' [-f|--ours|--theirs|-m|--conflict=<estilo>] [<árvore>] [--] <pathspec>...::
+'git checkout' [-f|--ours|--theirs|-m|--conflict=<estilo>] [<árvore>] --pathspec-from-file=<arquivo> [--pathspec-file-nul]::
+
+	Overwrite the contents of the files that match the pathspec. When the `<tree-ish>` (most often a commit) is not given, overwrite working tree with the contents in the index. When the `<tree-ish>` is given, overwrite both the index and the working tree with the contents at the `<tree-ish>`.
++
+The index may contain unmerged entries because of a previous failed merge. By default, if you try to check out such an entry from the index, the checkout operation will fail and nothing will be checked out. Using `-f` will ignore these unmerged entries. The contents from a specific side of the merge can be checked out of the index by using `--ours` or `--theirs`. With `-m`, changes made to the working tree file can be discarded to re-create the original conflicted merge result.
+
+'git checkout' (-p|--patch) [<árvore>] [--] [<pathspec>...]::
+	This is similar to the previous mode, but lets you use the interactive interface to show the "diff" output and choose which hunks to use in the result. See below for the description of `--patch` option.
+
+OPÇÕES
+------
+-q::
+--quiet::
+	Silencioso, suprima as mensagens de feedback.
+
+--progress::
+--no-progress::
+	A condição do progresso é relatado no fluxo de erro predefinido ao estar conectado num terminal, a menos que as opções `--quiet` seja utilizados. Esta opção ativa os relatórios de progresso, mesmo que não estejam anexados a um terminal, independentemente da opção `--quiet`.
+
+-f::
+--force::
+	When switching branches, proceed even if the index or the working tree differs from `HEAD`, and even if there are untracked files in the way. This is used to throw away local changes and any untracked files or directories that are in the way.
++
+Ao verificar os caminhos do índice, não falhe em entradas não mescladas; Em vez disso, as entradas não mescladas são ignoradas.
+
+--ours::
+--theirs::
+	Ao verificar os caminhos do índice, confira o estágio #2 ('nosso') ou #3 ('deles') para paths não mesclados.
++
+Observe que durante o `git rebase` e o `git pull --rebase`, o 'ours' (nosso) e o 'theirs' (deles) podem aparecer trocados; `--ours` informa a versão do ramo onde as alterações são feitas, enquanto `--theirs` informa a versão do ramo que contém o seu trabalho que está sendo feito o "rebase".
++
+This is because `rebase` is used in a workflow that treats the history at the remote as the shared canonical one, and treats the work done on the branch you are rebasing as the third-party work to be integrated, and you are temporarily assuming the role of the keeper of the canonical history during the rebase. As the keeper of the canonical history, you need to view the history from the remote as `ours` (i.e. "our shared canonical history"), while what you did on your side branch as `theirs` (i.e. "one contributor's work on top of it").
+
+-b <novo-ramo>::
+	Crie uma nova ramificação chamada `<-novo-ramo>`, inicie-a em `<ponto-de-partida>`; e verifique o ramo criado; para obter mais detalhes consulte linkgit:git-branch[1].
+
+-B <novo-ramo>::
+	Creates the branch `<new-branch>`, start it at `<start-point>`; if it already exists, then reset it to `<start-point>`. And then check the resulting branch out. This is equivalent to running "git branch" with "-f" followed by "git checkout" of that branch; see linkgit:git-branch[1] for details.
+
+-t::
+--track[=(direct|inherit)]::
+	Durante a criação de um novo ramo, defina a configuração do "upstream". Para mais detalhes, consulte "--track" em linkgit:git-branch[1].
++
+If no `-b` option is given, the name of the new branch will be derived from the remote-tracking branch, by looking at the local part of the refspec configured for the corresponding remote, and then stripping the initial part up to the "*". This would tell us to use `hack` as the local branch when branching off of `origin/hack` (or `remotes/origin/hack`, or even `refs/remotes/origin/hack`). If the given name has no slash, or the above guessing results in an empty name, the guessing is aborted. You can explicitly give a name with `-b` in such a case.
+
+--no-track::
+	Não configure "upstream" mesmo que a variável de configuração `branch.autoSetupMerge` seja verdadeira.
+
+--guess::
+--no-guess::
+	Caso o `<ramo>` não seja encontrado mas exista uma ramificação de rastreamento exatamente em uma localidade remota (chame-o <remoto>) que coincida com um nome, trate como equivalente a
++
+------------
+$ git checkout -b <ramo> --track <remoto>/<ramo>
+------------
++
+Caso o ramo exista em diversos ramos remotos e um deles seja nomeado pela variável de configuração `checkout.defaultRemote`, para propósitos de desambiguação, mesmo que `<ramo>` não seja o único em todos os outros ramos remotos. Defina por exemplo, `checkout.defaultRemote=origin` para que sempre verifique as ramificações remotas de lá caso `<ramo>` seja ambíguo e ainda assim `origin` exista. Consulte também `checkout.defaultRemote` em linkgit:git-config[1].
++
+`--guess` é o comportamento predefinido. Utilize a opção `--no-guess` para desativá-lo.
++
+O comportamento predefinido pode ser definido através da variável de configuração `checkout.guess`.
+
+-l::
+	Crie o reflog da nova ramificação; veja linkgit:git-branch[1] para detalhes.
+
+-d::
+--detach::
+	Rather than checking out a branch to work on it, check out a commit for inspection and discardable experiments. This is the default behavior of `git checkout <commit>` when `<commit>` is not a branch name. See the "DETACHED HEAD" section below for details.
+
+--orphan <novo-ramo>::
+	Create a new unborn branch, named `<new-branch>`, started from `<start-point>` and switch to it. The first commit made on this new branch will have no parents and it will be the root of a new history totally disconnected from all the other branches and commits.
++
+The index and the working tree are adjusted as if you had previously run `git checkout <start-point>`. This allows you to start a new history that records a set of paths similar to `<start-point>` by easily running `git commit -a` to make the root commit.
++
+Isso pode ser útil quando você quer publicar a árvore a partir de um commit sem expor o seu histórico completo. Você pode fazer isso para publicar um ramo de código aberto de um projeto cuja árvore atual esteja "limpa", mas cujo histórico completo contenha pequenos pedaços de código proprietário amontoados.
++
+If you want to start a disconnected history that records a set of paths that is totally different from the one of `<start-point>`, then you should clear the index and the working tree right after creating the orphan branch by running `git rm -rf .` from the top level of the working tree. Afterwards you will be ready to prepare your new files, repopulating the working tree, by copying them from elsewhere, extracting a tarball, etc.
+
+--ignore-skip-worktree-bits::
+	É predefinido que no modo de averiguação esparsa, apenas as entradas que sejam coincidentes com `<pathspec>` e com os padrões esparsos em `$GIT_DIR/info/sparse-checkout`. Esta opção ignora os padrões esparsos e os adiciona de volta nos arquivos em `<pathspec>`.
+
+-m::
+--merge::
+	When switching branches, if you have local modifications to one or more files that are different between the current branch and the branch to which you are switching, the command refuses to switch branches in order to preserve your modifications in context. However, with this option, a three-way merge between the current branch, your working tree contents, and the new branch is done, and you will be on the new branch.
++
+Quando ocorre um conflito durante a mesclagem, as entradas do índice para os caminhos conflitantes não são mesclados, sendo necessário que você resolva os conflitos e marque os caminhos resolvidos com `git add` (ou `git rm` caso a mesclagem resulte na exclusão do caminho) .
++
+When checking out paths from the index, this option lets you recreate the conflicted merge in the specified paths. This option cannot be used when checking out paths from a tree-ish.
++
+Ao alternar as ramificações com `--merge` as alterações que já foram organizadas podem ser perdidas.
+
+--conflict=<estilo>::
+	O mesmo que a opção `--merge` acima, porém altera a maneira como os blocos conflitantes são apresentados, ao substituir a variável de configuração `merge.conflictStyle`. Os valores possíveis são `merge` (predefinido), "diff3" e "zdiff3".
+
+-p::
+--patch::
+	Interactively select hunks in the difference between the `<tree-ish>` (or the index, if unspecified) and the working tree. The chosen hunks are then applied in reverse to the working tree (and if a `<tree-ish>` was specified, the index).
++
+Isso significa que você pode usar o `git checkout -p` para descartar seletivamente as edições da sua árvore de trabalho atual. Veja a seção ``Interactive Mode'' do linkgit:git-add[1] para aprender como operar o modo `--patch`.
++
+Observe que por predefinição esta opção usa o modo sem sobreposição (consulte também `--overlay`), assim como, atualmente também não é compatível com o modo de sobreposição.
+
+--ignore-other-worktrees::
+	O comando `git checkout` irá se recusar quando a "ref" desejada já tenha sido averiguada através de uma outra árvore de trabalho. Esta opção faz com que ele averigue a "ref" mesmo assim. Em outras palavras, a "ref" pode ser mantida por mais de uma árvore de trabalho.
+
+--overwrite-ignore::
+--no-overwrite-ignore::
+	Substitua silenciosamente os arquivos ignorados ao alternar ramificações. Este é o comportamento predefinido. Utilize `--no-overwrite-ignore` para interromper a operação quando o novo ramo contiver os arquivos que foram ignorados.
+
+--recurse-submodules::
+--no-recurse-submodules::
+	Using `--recurse-submodules` will update the content of all active submodules according to the commit recorded in the superproject. If local modifications in a submodule would be overwritten the checkout will fail unless `-f` is used. If nothing (or `--no-recurse-submodules`) is used, submodules working trees will not be updated. Just like linkgit:git-submodule[1], this will detach `HEAD` of the submodule.
+
+--overlay::
+--no-overlay::
+	In the default overlay mode, `git checkout` never removes files from the index or the working tree. When specifying `--no-overlay`, files that appear in the index and working tree, but not in `<tree-ish>` are removed, to make them match `<tree-ish>` exactly.
+
+--pathspec-from-file=<arquivo>::
+	O "pathspec" é passado com `<arquivo>` em vez dos argumentos da linha de comando. Caso o `<arquivo>` seja exatamente `-`, a entrada padrão será utilizada. Os elementos do "pathspec" são separados por caracteres de término de linha `LF` ou `CR/LF`. Os elementos do "pathspec" podem ser citados conforme explicado na variável de configuração `core.quotePath` (consulte linkgit:git-config[1]). Consulte também opção `--pathspec-file-nul` e o global `--literal-pathspecs`.
+
+--pathspec-file-nul::
+	Só faz algum sentido caso seja utilizado junto com a opção `--pathspec-from-file`. Os elementos "pathspec" são separados com caracteres `NUL` e todos os outros caracteres são considerados de forma literal (incluindo as novas linhas e as citações).
+
+<ramo>::
+	O ramo que será averiguado; caso se referira a um ramo (ou seja, um nome que, quando anexado com "refs/heads/", seja uma "ref" válida), então este ramo será retirado. Caso contrário, caso tenha referência para um commit inválido, o seu `HEAD` se torna "desanexado" e você não estará mais em qualquer outro ramo (veja mais detalhes abaixo).
++
+You can use the `@{-N}` syntax to refer to the N-th last branch/commit checked out using "git checkout" operation. You may also specify `-` which is synonymous to `@{-1}`.
++
+Como um caso especial, você pode usar `A...B` como um atalho para a mesclagem na base de `A` e` B` se houver exatamente uma base a ser mesclada. Você pode deixar de fora, no máximo, um de `A` e` B`, no caso, a predefinição retorna para `HEAD`.
+
+<novo-ramo>::
+	Nome para o novo branch.
+
+<início-ponto>::
+	O nome do commit onde o ramo deve iniciar; para mais detalhes consulte linkgit:git-branch[1]. A predefinição retorna para `HEAD`.
++
+Como um caso especial, é possível utilizar `"A...B"` como um atalho como uma base para a mesclagem de `A` e `B` caso exista exatamente uma base de merge. Você pode deixar de fora, no máximo, um de `A` e` B`, caso onde a predefinição retorna para `HEAD`.
+
+<tree-ish>::
+	Árvore que será averiguada (quando os caminhos são informados). Caso não seja informado, o índice será usado.
++
+Como um caso especial, é possível utilizar `"A...B"` como um atalho como uma base para a mesclagem de `A` e `B` caso exista exatamente uma base de merge. Você pode deixar de fora, no máximo, um de `A` e` B`, caso onde a predefinição retorna para `HEAD`.
+
+\--::
+	Não interprete mais argumentos como opções.
+
+<pathspec>...::
+	Limita os caminhos afetados pela operação.
++
+Para mais detalhes sobre a sintaxe, consulte a entrada 'pathspec' em linkgit:gitglossary[7].
+
+HEAD DESANEXADO
+---------------
+O `HEAD` normalmente se refere a um determinado ramo (por exemplo, `master`). Enquanto isso, cada ramo se refere a um commit em específico. Vejamos um repositório com três commits, um deles marcado e com o ramo `master` averiguado:
+
+------------
+           HEAD (refere-se ao ramo 'master')
+            |
+            v
+a---b---c  ramo 'master' (refere-se ao commit 'c')
+    ^
+    |
+  tag 'v2.0' (refere-se ao commit 'b')
+------------
+
+Quando um commit é criado nest condição, o ramo é atualizado para se referir ao novo commit. Em específico o comando 'git commit' que cria um novo commit `d`, cujo pai é o commit `c`, que atualiza o ramo `master` para ter referência com o novo commit `d`. O `HEAD` ainda se refere ao ramo `master` e agora indiretamente, refere ao commit `d`:
+
+------------
+$ editar; git adicionar; git commit
+
+               HEAD (refere-se ao ramo 'master')
+                |
+                v
+a---b---c---d  ramo 'master' (refere-se ao commit 'd')
+    ^
+    |
+  tag 'v2.0' (refere-se ao commit 'b')
+------------
+
+Às vezes, é útil poder fazer a averiguação de um commit que não está no topo de qualquer ramo conhecido ou mesmo para criar um novo commit que não seja referenciado por nenhum outro ramo conhecido. Vejamos o que acontece quando fazemos a averiguação do commit `b` (aqui exibimos duas maneiras de faze-lo):
+
+------------
+$ git checkout v2.0  # ou
+$ git checkout master^^
+
+   HEAD (refere-se ao commit 'b')
+    |
+    v
+a---b---c---d  ramo 'master' (refere-se ao commit 'd')
+    ^
+    |
+  tag 'v2.0' (refere-se ao commit 'b')
+------------
+
+Notice that regardless of which checkout command we use, `HEAD` now refers directly to commit `b`. This is known as being in detached `HEAD` state. It means simply that `HEAD` refers to a specific commit, as opposed to referring to a named branch. Let's see what happens when we create a commit:
+
+------------
+$ editar; git adicionar; git commit
+
+     HEAD (refere-se ao commit 'e')
+      |
+      v
+      e
+     /
+a---b---c---d  ramo 'master' (refere-se ao commit 'd')
+    ^
+    |
+  tag 'v2.0' (refere-se ao commit 'b')
+------------
+
+Agora existe um novo commit `e`, porém a sua referência existe apenas no `HEAD`. Nessa condição fica claro que podemos adicionar mais um commit:
+
+------------
+$ editar; git adicionar; git commit
+
+	 HEAD (refere-se ao commit 'f')
+	  |
+	  v
+      e---f
+     /
+a---b---c---d  ramo 'master' (refere-se ao commit 'd')
+    ^
+    |
+  tag 'v2.0' (refere-se ao commit 'b')
+------------
+
+De fato, podemos executar todas as operações normais do Git. Porém vejamos o que acontece quando fazemos um checkout do `master`:
+
+------------
+$ git checkout master
+
+               HEAD (refere-se ao ramo 'master')
+      e---f     |
+     /          v
+a---b---c---d  ramo 'master' (refere-se ao commit 'd')
+    ^
+    |
+  tag 'v2.0' (refere-se ao commit 'b')
+------------
+
+É importante perceber que neste momento nada se refere ao commit `f`. Eventualmente o commit `f` (e de tabela o commit `e`) será excluído pelo processo rotineiro da coleta de lixo do Git, antes que isso aconteça é preciso criar uma referência. Se ainda não nos afastamos do commit `f`, qualquer um deles criará uma referência a ele:
+
+------------
+$ git checkout -b foo  # or "git switch -c foo"  <1>
+$ git branch foo                                 <2>
+$ git tag foo                                    <3>
+------------
+<1> cria uma nova ramificação `foo` com referência ao commit `f`, atualiza HEAD com referência ao ramo `foo`. Isso significa que agora não estamos mais desanexados do `HEAD` após este comando.
+<2> similarmente cria um novo ramo `foo` com referência ao commit `f` deixando `HEAD` desanexado.
+<3> cria uma nova tag `foo`com referência ao commit `f` deixando HEAD desanexado.
+
+Se nos afastamos do commit `f`, primeiro precisamos recuperar o nome do objeto (normalmente utilizando `git reflog`) e em seguida, podemos criar uma referência para ele. Para ver os dois últimos commits aos quais o `HEAD` se refere, podemos usar um destes comandos, por exemplo:
+
+------------
+$ git reflog -2 HEAD # ou
+$ git log -g -2 HEAD
+------------
+
+DESAMBIGUAÇÃO DOS ARGUMENTOS
+----------------------------
+
+When there is only one argument given and it is not `--` (e.g. `git checkout abc`), and when the argument is both a valid `<tree-ish>` (e.g. a branch `abc` exists) and a valid `<pathspec>` (e.g. a file or a directory whose name is "abc" exists), Git would usually ask you to disambiguate. Because checking out a branch is so common an operation, however, `git checkout abc` takes "abc" as a `<tree-ish>` in such a situation. Use `git checkout -- <pathspec>` if you want to checkout these paths out of the index.
+
+EXEMPLOS
+--------
+
+=== 1. Caminhos
+
+A sequência a seguir exclui o ramo `master`, reverte o` Makefile` para duas revisões anteriores, exclui o arquivo hello.c por engano e faz a recuperação do índice.
+
+------------
+$ git checkout master             <1>
+$ git checkout master~2 Makefile  <2>
+$ rm -f hello.c
+$ git checkout hello.c            <3>
+------------
+<1> alternância do ramo
+<2> tirar um arquivo de um outro commit
+<3> restaura o arquivo `hello.c` a partir do índice
+
+Caso queira verificar _todos_ os arquivos "*.c" do código-fonte diretamente do índice, você pode utilizar
+
+------------
+$ git checkout -- '*.c'
+------------
+
+Note the quotes around `*.c`. The file `hello.c` will also be checked out, even though it is no longer in the working tree, because the file globbing is used to match entries in the index (not in the working tree by the shell).
+
+If you have an unfortunate branch that is named `hello.c`, this step would be confused as an instruction to switch to that branch. You should instead write:
+
+------------
+$ git checkout -- hello.c
+------------
+
+=== 2. Mesclar
+
+Depois de trabalhar no ramo errado, mudar para o ramo correto seria feito utilizando:
+
+------------
+$ git checkout mytopic
+------------
+
+No entanto, o seu ramo "errado" e o correto "mytopic" podem diferir nos arquivos modificados localmente por você. Que dessa maneira, a verificação acima falhará assim:
+
+------------
+$ git checkout mytopic
+error: You have local changes to 'frotz'; not switching branches.
+------------
+
+Você pode repassar a opção`-m` ao comando, que tentaria uma mesclagem de três vias:
+
+------------
+$ git checkout -m mytopic
+Auto-merging frotz
+------------
+
+Após esta mesclagem de três vias, as alterações locais não serão registradas no seu arquivo do índice, portanto, o `git diff` exibirá quais foram as alterações feitas desde o cume do novo ramo.
+
+=== 3. Mesclar os conflitos
+
+Quando um conflito de mesclagem acontece durante a troca de branches com a opção `-m`, você veria algo assim:
+
+------------
+$ git checkout -m mytopic
+Auto-merging frotz
+ERROR: Merge conflict in frotz
+fatal: merge program failed
+------------
+
+At this point, `git diff` shows the changes cleanly merged as in the previous example, as well as the changes in the conflicted files. Edit and resolve the conflict and mark it resolved with `git add` as usual:
+
+------------
+$ edit frotz
+$ git add frotz
+------------
+
+CONFIGURAÇÃO
+------------
+
+
+
+[WARNING]
+====
+Missing `pt_BR/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `pt_BR/config/checkout.txt`
+
+See original version for this content.
+====
+
+[]
+
+VEJA TAMBÉM
+-----------
+linkgit:git-switch[1], linkgit:git-restore[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

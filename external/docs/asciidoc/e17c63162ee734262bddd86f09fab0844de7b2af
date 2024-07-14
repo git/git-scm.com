@@ -1,0 +1,228 @@
+git-bundle(1)
+=============
+
+NOM
+---
+git-bundle - Déplace les objets et les références par archive
+
+
+SYNOPSIS
+--------
+[verse]
+'git bundle' create [-q | --quiet | --progress]
+		    [--version=<version>] <fichier> <arguments-git-rev-list>
+'git bundle' verify [-q | --quiet] <fichier>
+'git bundle' list-heads <fichier> [<nom-de-ref>...]
+'git bundle' unbundle [--progress] <fichier> [<nom-de-ref>...]
+
+DESCRIPTION
+-----------
+
+Créer, décompresser et manipuler des fichiers "bundle". Les colis sont utilisés pour le transfert "hors ligne" d'objets Git sans qu'un "serveur" actif se trouve de l'autre côté de la connexion réseau.
+
+Ils peuvent être utilisés pour créer des sauvegardes incrémentielles et complètes d'un dépôt, et pour relayer l'état des références d'un dépôt à un autre.
+
+Les commandes Git qui récupèrent ou autrement "lisent" via des protocoles tels que `ssh://` et `https://` peuvent aussi opérer sur des fichiers cois. Il est possible de linkgit:git-clone[1] un nouveau dépôt à partir d'un colis, d'utiliser linkgit:git-fetch[1] pour en récupérer, et de lister les références qu'il contient avec linkgit:git-ls-remote[1]. Il n'y a pas de support d'"écriture" correspondant, c'est-à-dire qu'un 'git push' dans un colis n'est pas supporté.
+
+Voir la section "EXEMPLES" ci-dessous pour plus des exemples d'utilisation des colis.
+
+FORMATS DES COLIS
+-----------------
+
+Les colis sont des fichiers `.pack` (voir linkgit:git-pack-objects[1]) avec un en-tête indiquant quelles références sont contenues dans le colis.
+
+Comme le format d'archive packed lui-même, les colis peuvent être soit autonomes, soit créés à l'aide d'exclusions. Voir la section "PRÉREQUIS D'OBJET" ci-dessous.
+
+Les colis créés en utilisant les exclusions de révision sont des "paquets minces" créés en utilisant l'option `--thin` de linkgit:git-pack-objects[1], et dépaquetés en utilisant l'option `--fix-thin` de linkgit:git-index-pack[1].
+
+Il n'y a pas d'option pour créer un "paquet épais" lors de l'utilisation des exclusions de révision, et les utilisateurs ne doivent pas s'inquiéter de la différence. En utilisant des "paquets minces", les paquets créés à l'aide d'exclusions sont plus petits en taille. Le fait qu'ils soient "minces" sous le capot est simplement noté ici comme une curiosité, et comme une référence à d'autres documents.
+
+Voir linkgit:gitformat-bundle[5] pour plus de détails et la discussion sur le "paquets fins" dans linkgit:gitformat-pack[5] pour plus de détails.
+
+OPTIONS
+-------
+
+create [options] <fichier> <git-rev-list-args>::
+	Utilisé pour créer un regroupement nommé 'fichier'. Cela nécessite les arguments '<arguments-git-rev-list>' pour définir le contenu du regroupement. options' contient les options spécifiques à la sous-commande 'git bundle create'. si 'fichier' est `-`, le paquet envoyé sur la sortie standard.
+
+verify <fichier>::
+	Utilisé pour vérifier qu'un fichier regroupement est valide et s'appliquera proprement au dépôt actuel. Cela inclut des vérifications sur le format du regroupement lui-même ainsi que la vérification que les commits pré-requis existent et sont complètement liés dans le dépôt actuel. 'git bundle' affiche une liste des commits manquants, s'il y en a. Enfin, des informations sur des capacités supplémentaires, telles que "object filter" sont imprimées. Voir "Capacités" dans linkgit:gitformat-bundle[5] pour plus d'informations. Le code de sortie est zéro en cas de succès, mais sera non nul si le fichier colis est invalide. Si 'fichier' est `-`, le paquet est lu sur l'entrée standard.
+
+list-heads <fichier>::
+	Liste les références définies dans le regroupement. Si elle est suivie d'une liste de références, seules les références correspondant à celles données sont imprimées. Si 'fichier' est `-`, le paquet est lu sur l'entrée standard.
+
+unbundle <fichier>::
+	Passe les objets du groupement à 'git index-pack' pour qu'ils soient stockés dans le dépôt, puis affiche les noms de toutes les références définies. Si une liste de références est donnée, seules les références correspondant à celles de la liste sont imprimées. Cette commande est vraiment de plomberie et n'est définie que pour être appelée par 'git fetch'. si 'fichier' est `-`, le paquet est lu depuis l'entrée standard.
+
+<git-rev-list-args>::
+	Une liste d'arguments, acceptable pour 'git rev-parse' et 'git rev-list' (et contenant une référence nommée, voir SPECIFICATION DES REFERENCES ci-dessous), qui spécifie les objets et références spécifiques à transporter. Par exemple, `master~10..master` fait en sorte que la référence master actuelle soit regroupée avec tous les objets ajoutés depuis le dixième commit de son ancêtre. Il n'y a pas de limite explicite au nombre de références et d'objets qui peuvent être regroupés.
+
+
+[<nom-de-réf>...]::
+	Une liste de références utilisée pour limiter les références signalées comme disponibles. Ceci est principalement utile à 'git fetch', qui s'attend à ne recevoir que les références demandées et pas nécessairement tout le contenu du pack (dans ce cas, 'git bundle' agit comme 'git fetch-pack').
+
+--progress::
+	L'état d'avancement est affiché sur la sortie d'erreur standard quand elle est attachée à un terminal, à moins que -q soit spécifié. Ce drapeau force l'état d'avancement même si le flux d'erreur standard n'est pas dirigé vers un terminal.
+
+--version=<version>::
+	Spécifier la version du regroupement. La version 2 est l'ancien format et ne peut être utilisée qu'avec les dépôts SHA-1 ; la version 3, plus récente, contient des capacités qui permettent des extensions. La valeur par défaut est le plus ancien format pris en charge, en fonction de l'algorithme de hachage utilisé.
+
+-q::
+--quiet::
+	Ce drapeau permet à la commande de ne pas signaler sa progression sur le flux d'erreur standard.
+
+SPÉCIFICATION DES RÉFÉRENCES
+----------------------------
+
+Les révisions doivent être accompagnées de noms de référence pour être regroupées dans un colis.
+
+Plus d'une référence peut être empaquetée, et plus d'un ensemble d'objets prérequis peut être spécifié. Les objets empaquetés sont ceux qui ne sont pas contenus dans l'union des prérequis.
+
+La commande 'git bundle create' résout les noms de référence pour vous en utilisant les mêmes règles que `git rev-parse --abbrev-ref=loose`. Chaque pré-requis peut être spécifié explicitement (par exemple `^master~10`), ou implicitement (par exemple `master~10..master`, `--since=10.days.ago master`).
+
+Tous ces cas simples sont OK (en supposant que nous avons des branches "master" et "next") :
+
+----------------
+$ git bundle create master.bundle master
+$ echo master | git bundle create master.bundle --stdin
+$ git bundle create master-and-next.bundle master next
+$ (echo master; echo next) | git bundle create master-and-next.bundle --stdin
+----------------
+
+Et il en est de même pour ces exemples (et le même mais avec `--stdin` omis) :
+
+----------------
+$ git bundle create recent-master.bundle master~10..master
+$ git bundle create recent-updates.bundle master~10..master next~5..next
+----------------
+
+Un nom de révision ou un intervalle dont le côté droit ne peut être résolu en une référence n'est pas accepté :
+
+----------------
+$ git bundle create HEAD.bundle $(git rev-parse HEAD)
+fatal: Refus de créer un colis vide.
+$ git bundle create master-yesterday.bundle master~10..master~5
+fatal: Refus de créer un colis vide.
+----------------
+
+PRÉ-REQUIS D'OBJET
+------------------
+
+Lors de la création de colis, il est possible de créer un colis autonome qui peut être dégroupé dans un dépôt sans historique commun, ainsi que de fournir des révisions négatives pour exclure les objets nécessaires dans les parties antérieures de l'historique.
+
+Fournir une révision telle que `nouveau` à `git bundle create` créera un fichier colis qui contient tous les objets accessibles depuis la révision `nouveau`. Ce colis peut être dégroupé dans n'importe quel dépôt pour obtenir un historique complet qui mène à la révision `nouveau` :
+
+----------------
+$ git bundle create complet.bundle nouveau
+----------------
+
+Une plage de révision telle que `ancien..nouveau` produira un fichier colis qui nécessitera l'existence de la révision `ancien` (et de tout objet pouvant être atteint à partir de celle-ci) pour que le colis puisse être "dégroupé" :
+
+----------------
+$ git bundle create complet.bundle ancien..nouveau
+----------------
+
+Un colis autonome sans pré-requis peut être extrait n'importe où, même dans un dépôt vide, ou peut être cloné (c-à-d, `nouveau`, mais pas `ancien..nouveau`).
+
+Il n'y a pas de problème à être prudent et faire en sorte que le fichier regroupement contienne des objets déjà présents dans la destination, car ceux-ci sont ignorés lors du déballage à la destination.
+
+Si vous voulez imiter `git clone --mirror`, qui inclurait vos refs comme `refs/remotes/*`, utilisez `--all`. Si vous voulez fournir le même ensemble de références qu'un clone directement depuis le dépôt source, utilisez `--branches --tags` pour les `<arguments-git-rev-list>`.
+
+La commande 'git bundle verify' peut être utilisée pour vérifier si votre dépôt destinataire possède les commits pré-requis nécessaires pour un colis.
+
+EXEMPLES
+--------
+
+Supposons que vous vouliez transférer l'historique d'un dépôt R1 sur la machine A vers un autre dépôt R2 sur la machine B. Pour une raison quelconque, la connexion directe entre A et B n'est pas autorisée, mais nous pouvons déplacer les données de A à B via un mécanisme quelconque (CD, email, etc.). Nous voulons mettre à jour R2 avec le développement fait sur la branche master dans R1.
+
+Pour amorcer le processus, vous pouvez d'abord créer un paquet qui n'a pas de prérequis. Vous pouvez utiliser une étiquette pour vous rappeler jusqu'à quel commit le dernier traitement a été fait, afin de faciliter la mise à jour ultérieure de l'autre dépôt avec un paquet incrémental :
+
+----------------
+machineA$ cd R1
+machineA$ git bundle create fichier.paquet master
+machineA$ git tag -f dernierpaquetR2 master
+----------------
+
+Ensuite, vous transférez fichier.paquet sur la machine cible B. Comme ce paquet ne nécessite pas l'extraction d'un objet existant, vous pouvez créer un nouveau déôt sur la machine B en le clonant :
+
+----------------
+machineB$ git clone -b master /home/moi/tmp/fichier.paquet R2
+----------------
+
+Cela définira un répertoire distant appelé "origin" dans le dépôt résultant qui vous permettra de récupérer et de tirer du paquet. Le fichier $GIT_DIR/config dans R2 aura une entrée comme celle-ci :
+
+------------------------
+[remote "origin"]
+    url = /home/moi/tmp/fichier.paquet
+    fetch = refs/heads/*:refs/remotes/origin/*
+------------------------
+
+Pour mettre à jour le dépôt mine.git résultant, vous pouvez récupérer ou tirer après avoir remplacé le paquet stocké dans /home/moi/tmp/fichier.paquet par des mises à jour incrémentales.
+
+Après avoir travaillé un peu plus dans le dépôt d'origine, vous pouvez créer un paquet incrémental pour mettre à jour l'autre dépôt :
+
+----------------
+machineA$ cd R1
+machineA$ git bundle create fichier.paquet dernierpaquetR2..master
+machineA$ git tag -f dernierpaquetR2 master
+----------------
+
+Vous transférez ensuite le paquet sur l'autre machine pour remplacer /home/moi/tmp/fichier.paquet, et vous tirez à partir de celui-ci.
+
+----------------
+machineB$ cd R2
+machineB$ git pull
+----------------
+
+Si vous savez jusqu'à quel commit le dépôt destinataire devrait avoir les objets nécessaires, vous pouvez utiliser cette connaissance pour spécifier le prérequis, en donnant un point de coupure pour limiter les révisions et les objets qui vont dans le paquet résultant. L'exemple précédent a utilisé l'étiquette dernierpaquetR2 dans ce but, mais vous pouvez utiliser toute autre option que vous donneriez à la commande linkgit:git-log[1]. Voici d'autres exemples :
+
+Vous pouvez utiliser une étiquette qui est présente dans les deux dépôts :
+
+----------------
+$ git bundle create monpaquet v1.0.0..master
+----------------
+
+Vous pouvez utiliser un prérequis défini par le temps :
+
+----------------
+$ git bundle create monpaquet --since=10.days master
+----------------
+
+Vous pouvez utiliser le nombre de commits :
+
+----------------
+$ git bundle create monpaquet -10 master
+----------------
+
+Vous pouvez lancer `git-bundle verify` pour voir si vous pouvez extraire d'un paquet qui a été créé avec un prérequis :
+
+----------------
+$ git bundle verify monpaquet
+----------------
+
+Cela permettra d’énumérer ce que vous devez avoir pour extraire du paquet et fera une erreur si vous ne les avez pas.
+
+Du point de vue du dépôt destinataire, un paquet est exactement comme un dépôt ordinaire dont il extrait ou tire des données. Vous pouvez, par exemple, aligner les références lors de l'extraction :
+
+----------------
+$ git fetch monpaquet master:localRef
+----------------
+
+Vous pouvez également voir quelles références il offre :
+
+----------------
+$ git ls-remote monpaquet
+----------------
+
+FORMATS DE FICHIER
+------------------
+
+Voir linkgit:gitformat-bundle[5].
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

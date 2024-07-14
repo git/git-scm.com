@@ -1,0 +1,915 @@
+Combatendo as regressões com comando `git bisect`
+=================================================
+:Author: Christian Couder
+:Email: chriscool@tuxfamily.org
+:Date: 2009/11/08
+
+Resumo
+------
+
+O comando "git bisect" permite que os usuários e os desenvolvedores de software encontrem facilmente o commit que introduziu uma regressão. Mostramos por que é importante ter boas ferramentas para combater as regressões. Nós descrevemos como o comando "git bisect" funciona de fora e os algoritmos que ele utiliza por dentro. Em seguida, explicamos como tirar proveito do comando "git bisect" para melhorar as práticas atuais. E discutimos como o "git bisect" pode melhorar no futuro.
+
+
+Introdução ao "git bisect'
+--------------------------
+
+O Git é um sistema de controle de versão distribuído (DVCS) criado por Linus Torvalds e mantido por Junio Hamano.
+
+No Git como em muitos outros sistemas de controle de versão (VCS), as diferentes condições dos dados gerenciados pelo sistema são chamados de commits. E como o VCS é utilizado principalmente para gerenciar o código-fonte do software, algumas alterações "interessantes" do comportamento no software são introduzidas em alguns commits.
+
+De fato, as pessoas estão especialmente interessadas em confirmações que introduzem um comportamento "ruim", chamado de bug ou regressão. Eles estão interessados nestes commits porque um commit (espero) contém um conjunto muito pequeno de alterações no código-fonte. E é muito mais fácil entender e corrigir adequadamente um problema quando você só precisa verificar um conjunto muito pequeno de alterações do que quando não sabe onde procurar.
+
+Portanto, para ajudar as pessoas a encontrar os commits que introduzam um comportamento "ruim", o conjunto dos comandos "git bisect" foi inventado. E segue-se, é claro, que na linguagem do comando "git bisect", os commits onde o "comportamento interessante" estão presente são chamados de "commits ruins", enquanto os outros commits são chamados de commits "bons". E um commit que introduz o comportamento que estamos interessados é chamado de "primeiro commit ruim". Observe que pode haver mais de um "primeiro commit ruim" no espaço do commit que estamos pesquisando.
+
+Portanto, o comando "git bisect" foi projetado para ajudar a encontrar um "primeiro commit ruim". E para ser o mais eficiente possível, ele tenta executar uma pesquisa binária.
+
+
+Uma visão geral da luta contra as regressões
+--------------------------------------------
+
+Regressões: um grande problema
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As regressões são um grande problema na indústria do software. Mas é difícil colocar alguns números reais por trás desta afirmação.
+
+Existem alguns números sobre os erros em geral, como um estudo do NIST em 2002 <<1>> que dizia:
+
+_____________
+Software bugs, or errors, are so prevalent and so detrimental that they cost the U.S. economy an estimated $59.5 billion annually, or about 0.6 percent of the gross domestic product, according to a newly released study commissioned by the Department of Commerce's National Institute of Standards and Technology (NIST). At the national level, over half of the costs are borne by software users and the remainder by software developers/vendors. The study also found that, although all errors cannot be removed, more than a third of these costs, or an estimated $22.2 billion, could be eliminated by an improved testing infrastructure that enables earlier and more effective identification and removal of software defects. These are the savings associated with finding an increased percentage (but not 100 percent) of errors closer to the development stages in which they are introduced. Currently, over half of all errors are not found until "downstream" in the development process or during post-sale software use.
+_____________
+
+E depois:
+
+_____________
+Os desenvolvedores de software já gastam aproximadamente 80 por cento dos custos de desenvolvimento na identificação e na correção dos defeitos, e ainda assim poucos produtos de qualquer tipo que não sejam software são enviados com níveis muito altos de erros.
+_____________
+
+Eventualmente, a conclusão começou com:
+
+_____________
+O caminho para uma maior qualidade de software é um teste significativamente aprimorado do software.
+_____________
+
+Existem outras estimativas dizendo que 80% do custo relacionado ao software é relacionado com a manutenção<<2>>.
+
+Porém, de acordo com a Wikipedia <<3>>:
+
+_____________
+Uma percepção comum da manutenção é que ela está apenas consertando bugs. No entanto, estudos e pesquisas ao longo dos anos indicaram que a maioria, mais de 80%, do esforço de manutenção é usada para ações não corretivas (Pigosky, 1997). Essa percepção é perpetuada através dos usuários que enviam relatórios de problemas que, na realidade, são aprimoramentos da funcionalidade no sistema.
+_____________
+
+Porém podemos adivinhar que o aprimoramento do software existente é muito caro porque é preciso estar atento às regressões. Pelo menos isso tornaria os estudos acima consistentes entre si.
+
+É claro que algum tipo de software é desenvolvido, usado durante algum tempo sem ser muito aprimorado e finalmente, jogado fora. Nesse caso, é claro, as regressões podem não ser um grande problema. Por outro lado, há muitos softwares grandes que são continuamente desenvolvidos e mantidos durante anos ou mesmo dezenas de anos por muitas pessoas. E como muitas vezes existem muitas pessoas que dependem (às vezes de maneira crítica) deste software, as regressões são realmente um grande problema.
+
+Um destes softwares é o kernel do Linux. E se olharmos para o kernel Linux, podemos ver que muito tempo e esforço são gastos para combater as regressões. O ciclo de lançamento começa com uma janela de mesclagem de duas semanas. Em seguida, o candidato do primeiro lançamento (rc) é marcado. E depois disso, cerca de 7 ou 8 versões de candidatos aparecerão com cerca de uma semana de espaço entre cada uma delas, antes do lançamento final.
+
+O tempo entre a primeira versão rc (release candidate = versão de lançamento) e a versão final deve ser utilizado para testar as versões rc, resolver os bugs e especialmente as regressões. Mais de 80% deste tempo gira em torno do ciclo de lançamento. Mas este ainda não é o fim da batalha, pois é óbvio que ele continua após o seu lançamento.
+
+E é isso que o Ingo Molnar (um informado desenvolvedor de kernel do Linux) diz sobre o uso do 'git bisect':
+
+_____________
+Eu o utilizo de forma mais ativa durante a janela da mesclagem (quando muitas árvores são mescladas na upstream e quando o influxo de bugs é mais alto) - e sim, houve casos onde eu o usei várias vezes no dia. Minha média é de aproximadamente uma vez por dia.
+_____________
+
+Portanto, as regressões são combatidas o tempo todo pelos desenvolvedores e de fato, é sabido que os bugs devem ser corrigidos o mais rápido possível, tão logo sejam encontrados. É por isso que é importante ter boas ferramentas para este fim.
+
+Outras ferramentas para combater as regressões
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Então, quais são as ferramentas utilizadas para combater as regressões? Eles são quase os mesmos daqueles utilizados para combater os bugs tradicionais. As únicas ferramentas específicas são pacotes de testes e as ferramentas similares ao "git bisect".
+
+Os conjuntos de teste são muito legais. Mas quando eles são utilizados sozinhos, eles devem ser usados para que todos os testes sejam verificados após cada commit. Isto significa que eles não são muito eficientes, porque muitos testes são realizados sem resultados interessantes e sofrem com explosões combinatórias.
+
+De fato, o problema é que um software grande geralmente possui muitas opções de configuração diferentes e que cada caso de teste deve passar para cada configuração após cada commit. Portanto, caso tenha para cada release: 'N' configurações, 'M' commits e 'T' casos de teste, execute:
+
+-------------
+N * M * T tests
+-------------
+
+onde 'N', 'M' e 'T' estão crescendo com o tamanho do seu software.
+
+Logo, não será possível testar completamente tudo.
+
+E caso alguns erros passarem pelo seu conjunto de testes, você poderá adicionar um teste ao seu conjunto de testes. Porém caso queira utilizar o seu novo conjunto aprimorado de testes para descobrir onde o erro ocorreu, será necessário emular um processo de bisseção ou talvez você teste cada commit sem rodeios de forma inversa a partir do commit "ruim" que você possa ter, sendo um total desperdício.
+
+Visão geral do "git bisect"
+---------------------------
+
+Iniciando uma bisseção
+~~~~~~~~~~~~~~~~~~~~~~
+
+O primeiro subcomando "git bisect" que será usado é "git bisect start" para iniciar a pesquisa. Em seguida, os limites devem ser definidos para limitar o espaço dos commits. Isso geralmente é feito com um commit "ruim" e pelo menos um commit "bom". Eles podem ser passados na chamada inicial para o comando "git bisect start" assim:
+
+-------------
+$ git bisect start [BAD [GOOD...]]
+-------------
+
+ou eles podem ser definidos usando:
+
+-------------
+$ git bisect bad [COMMIT]
+-------------
+
+e:
+
+-------------
+$ git bisect good [COMMIT...]
+-------------
+
+onde `BAD`, `GOOD` e `COMMIT` são todos os nomes que podem ser resolvidos para um commit.
+
+Então, o comando "git bisect" fará a averiguação de um commit de sua escolha e solicitará que o usuário o teste, assim:
+
+-------------
+$ git bisect start v2.6.27 v2.6.25
+Bisecting: 10928 revisions left to test after this (roughly 14 steps)
+[2ec65f8b89ea003c27ff7723525a2ee335a2b393] x86: clean up using max_low_pfn on 32-bit
+-------------
+
+Observe que o exemplo que usaremos é realmente um exemplo de brinquedo; procuraremos o primeiro commit que possui uma versão como "2.6.26-alguma-coisa", ou seja, o commit que possua uma linha "SUBLEVEL = 26" no nível mais alto do Makefile. Este é um exemplo de um brinquedo, porque existem maneiras melhores para encontrar este commit com o Git em vez de utilizar o "git bisect" (por exemplo, "git blame" ou "git log -S<texto>").
+
+Conduzindo uma bisseção manualmente
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Neste ponto, existem basicamente duas maneiras de conduzir a pesquisa. Pode ser acionado manualmente através do usuário ou automaticamente através de um script ou comando.
+
+Caso o usuário esteja conduzindo, em cada etapa da pesquisa, o usuário terá que testar a confirmação atual e dizer se é "bom" ou "ruim" utilizando os comandos 'git bisect good' or 'git bisect bad' respectivamente, como foram descritos acima. Por exemplo:
+
+-------------
+$ git bisect bad
+Bisecting: 5480 revisions left to test after this (roughly 13 steps)
+[66c0b394f08fd89236515c1c84485ea712a157be] KVM: kill file->f_count abuse in kvm
+-------------
+
+E após mais algumas etapas como essa, o comando "git bisect" acabará por encontrar um primeiro commit incorreto:
+
+-------------
+$ git bisect bad
+2ddcca36c8bcfa251724fe342c8327451988be0d is the first bad commit
+commit 2ddcca36c8bcfa251724fe342c8327451988be0d
+Autor: Linus Torvalds <torvalds@linux-foundation.org>
+Data:   Sáb Mai 3 11:59:44 2008 -0700
+
+    Linux 2.6.26-rc1
+
+:100644 100644 5cf82581... 4492984e... M      Makefile
+-------------
+
+Neste ponto, podemos ver o que o commit faz, dar uma olhada (se ainda não tiver feito a averiguação) ou mexer com ele, por exemplo:
+
+-------------
+$ git show HEAD
+commit 2ddcca36c8bcfa251724fe342c8327451988be0d
+Autor: Linus Torvalds <torvalds@linux-foundation.org>
+Data:   Sáb Mai 3 11:59:44 2008 -0700
+
+    Linux 2.6.26-rc1
+
+diff --git a/Makefile b/Makefile
+index 5cf8258..4492984 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 2
+ PATCHLEVEL = 6
+-SUBLEVEL = 25
+-EXTRAVERSION =
++SUBLEVEL = 26
++EXTRAVERSION = -rc1
+ NAME = Funky Weasel is Jiggy wit it
+
+ # *DOCUMENTAÇÃO*
+-------------
+
+E quando terminarmos, podemos usar o comando "git bisect reset" para voltar ao ramo em que estávamos antes de começarmos a dividir:
+
+-------------
+$ git bisect reset
+Checking out files: 100% (21549/21549), done.
+Previous HEAD position was 2ddcca3... Linux 2.6.26-rc1
+Switched to branch 'master'
+-------------
+
+Conduzindo uma bisseção automaticamente
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A outra maneira de conduzir o processo de bisseção é dizer ao `git bisect` para lançar um script ou comando a cada etapa da bisseção para saber se o compromisso atual é "bom" ou "ruim". Para fazer isso, nós usamos o comando "git bisect run". Por exemplo:
+
+-------------
+$ git bisect start v2.6.27 v2.6.25
+Bisecting: 10928 revisions left to test after this (roughly 14 steps)
+[2ec65f8b89ea003c27ff7723525a2ee335a2b393] x86: clean up using max_low_pfn on 32-bit
+$
+$ git bisect run grep '^SUBLEVEL = 25' Makefile
+running grep ^SUBLEVEL = 25 Makefile
+Bisecting: 5480 revisions left to test after this (roughly 13 steps)
+[66c0b394f08fd89236515c1c84485ea712a157be] KVM: kill file->f_count abuse in kvm
+running grep ^SUBLEVEL = 25 Makefile
+SUBLEVEL = 25
+Bisecting: 2740 revisions left to test after this (roughly 12 steps)
+[671294719628f1671faefd4882764886f8ad08cb] V4L/DVB(7879): Adding cx18 Support for mxl5005s
+...
+...
+running grep ^SUBLEVEL = 25 Makefile
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[2ddcca36c8bcfa251724fe342c8327451988be0d] Linux 2.6.26-rc1
+running grep ^SUBLEVEL = 25 Makefile
+2ddcca36c8bcfa251724fe342c8327451988be0d is the first bad commit
+commit 2ddcca36c8bcfa251724fe342c8327451988be0d
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sat May 3 11:59:44 2008 -0700
+
+    Linux 2.6.26-rc1
+
+:100644 100644 5cf82581... 4492984e... M      Makefile
+bisect run success
+-------------
+
+Neste exemplo, passamos "grep '^SUBLEVEL = 25' Makefile" como parâmetro para o comando `git bisect run`. Isso significa que, a cada passo, o comando 'grep' que encaminhamos será iniciado. E caso encerre com o código 0 (que significa sucesso), o comando `git bisect` marcará a condição atual como "bom". Caso encerre com o código 1 (ou qualquer código entre 1 e incluindo o 127, exceto o código especial 125), a condição atual será marcado como "ruim".
+
+O código de saída entre 128 e 255 é especial para o comando "git bisect run". Eles fazem parar imediatamente o processo de bisseção. É útil por exemplo, caso o comando encaminhado demorar muito para ser concluído, por é possível encerrá-lo com um sinal que interromperá o processo de bisseção.
+
+Também pode ser útil nos scripts encaminhados para o comando "git bisect run" para "exit 255" Caso alguma situação muito anormal seja detectada.
+
+Evitando os commits que não foram testados
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Às vezes, acontece que a condição atual não possa ser testada, por exemplo, caso ele não seja compilado porque houve um erro que o impedia naquele momento. É para isso que serve o código de encerramento especial 125. Diz ao comando "git bisect run" que o commit atual deve ser marcado como não testável e que outro deve ser selecionado e averiguado.
+
+Caso o processo de bisseção tenha sido conduzido manualmente, será possível utilizar o comando "git bisect skip" para realizar a mesma coisa. (De fato, o código de saída especial 125 faz o comando "git bisect run" utilizar "git bisect skip" em segundo plano.)
+
+Ou, caso queira mais controle, poderá inspecionar a condição atual usando, por exemplo, o comando "git bisect visualize". Ele iniciará o gitk (ou o comando "git log" caso a variável de ambiente `DISPLAY` não estiver configurada) para ajudá-lo a encontrar um melhor ponto de bisseção.
+
+De qualquer forma, caso você tenha uma sequência de commits não testáveis, pode acontecer que a regressão que você está procurando tenha sido introduzido por um destes commits não testáveis. Nesse caso, não é possível saber com certeza qual o commit introduziu a regressão.
+
+Portanto, tenha utilizado o comando "git bisect skip" (ou o script de execução encerrou com o código especial 125), poderá obter um resultado como este:
+
+-------------
+Restam apenas os commits que foram 'ignorados' e faltam testar.
+O primeiro commit incorreto pode ser qualquer um destes:
+15722f2fa328eaba97022898a305ffc8172db6b1
+78e86cf3e850bd755bb71831f42e200626fbd1e0
+e15b73ad3db9b48d7d1ade32f8cd23a751fe0ace
+070eab2303024706f2924822bfec8b9847e4ac1b
+Não podemos mais seguir adiante com o bisect!
+-------------
+
+Salvando um registro log e reproduzindo-o
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Caso queira exibir para outras pessoas o seu processo de bisseção, é possível obter um registro log utilizando, por exemplo:
+
+-------------
+$ git bisect log > bisect_log.txt
+-------------
+
+E é possível reproduzi-lo utilizando:
+
+-------------
+$ git bisect replay bisect_log.txt
+-------------
+
+
+Detalhes do "git bisect"
+------------------------
+
+Algoritmo da bisseção
+~~~~~~~~~~~~~~~~~~~~~
+
+Como o commit do Git forma um grafo acíclico direcionado (DAG), encontrar o melhor commit de bisseção para testar em cada etapa não é tão simples. De qualquer forma, Linus encontrou e implementou um algoritmo "de forama verdadeiramente estúpida", posteriormente aprimorado por Junio Hamano, que funciona muito bem.
+
+Portanto, o algoritmo usado pelo comando "git bisect" para encontrar a melhor bisseção do commit quando não há commits que foram ignorados é o seguinte:
+
+1) mantenha apenas os commits que:
+
+a) são ancestrais do commit "ruim" (incluindo o próprio commit "ruim"),
+b) não são ancestrais de um commit "bom" (excluindo os commits "bons").
+
+Significa que nos livramos dos commits que não interessam do DAG.
+
+Como por exemplo, caso comecemos com um grafo como este:
+
+-------------
+G-Y-G-W-W-W-X-X-X-X
+	   \ /
+	    W-W-B
+	   /
+Y---G-W---W
+ \ /   \
+Y-Y     X-X-X-X
+
+-> o tempo passa neste sentido ->
+-------------
+
+onde 'B' é o commit "ruim", o "G" são os commits "bons" e 'W', 'X' e 'Y' são outros commits, obteremos o seguinte grafo após esta primeira etapa:
+
+-------------
+W-W-W
+     \
+      W-W-B
+     /
+W---W
+-------------
+
+Portanto, apenas os commits 'W' e 'B' serão mantidos. Como os commits 'X' e 'Y' serão removidos pelas regras a) e b) respectivamente, e porque os commits 'G' são removidos pela regra b) também.
+
+Nota para os usuários do Git, é equivalente a manter apenas o commit informado por:
+
+-------------
+git rev-list BAD --not GOOD1 GOOD2...
+-------------
+
+Observe também que não exigimos que os commits mantidos sejam descendentes de um "bom" commit. Portanto, no exemplo a seguir, os commits 'W' e 'Z' serão mantidas:
+
+-------------
+G-W-W-W-B
+   /
+Z-Z
+-------------
+
+2) a partir das extremidades "boas" do grafo, associe para cada commit a quantidade de ancestrais que possui mais um
+
+Como por exemplo, com o grafo a seguir, onde 'H' é o commit "ruim" e 'A' e o 'D' são alguns parentes de alguns commits "bons":
+
+-------------
+A-B-C
+     \
+      F-G-H
+     /
+D---E
+-------------
+
+isto nos dá:
+
+-------------
+1 2 3
+A-B-C
+     \6 7 8
+      F-G-H
+1   2/
+D---E
+-------------
+
+3) associado para cada commit: min(X, N - X)
+
+onde 'X' é o valor associado ao commit na etapa 2) e 'N' é a quantidade total dos commits no grafo.
+
+No exemplo acima, temos 'N=8', portanto, isso dará:
+
+-------------
+1 2 3
+A-B-C
+     \2 1 0
+      F-G-H
+1   2/
+D---E
+-------------
+
+4) o melhor ponto de bisseção é o commit com o maior número associado a ele
+
+Portanto, no exemplo acima, o melhor ponto de bisseção é o commit 'C'.
+
+5) observe que alguns atalhos são implementados para acelerar o algoritmo
+
+Como conhecemos o "N" desde o início, sabemos que mínimo (X, N - X) não pode ser maior que N/2. Portanto, durante as etapas 2) e 3), se associarmos N/2 a um commit, sabemos que este é o melhor ponto de bisseção. Portanto neste caso, podemos simplesmente parar de processar qualquer outro commit e retorne para o commit atual.
+
+Depuração do algoritmo da bisseção
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Para qualquer grafo do commit, você pode ver o número associado a cada commit utilizando o comando "git rev-list --bisect-all".
+
+Por exemplo, para o grafo acima, o comando seria:
+
+-------------
+$ git rev-list --bisect-all BAD --not GOOD1 GOOD2
+-------------
+
+geraria algo como:
+
+-------------
+e15b73ad3db9b48d7d1ade32f8cd23a751fe0ace (dist=3)
+15722f2fa328eaba97022898a305ffc8172db6b1 (dist=2)
+78e86cf3e850bd755bb71831f42e200626fbd1e0 (dist=2)
+a1939d9a142de972094af4dde9a544e577ddef0e (dist=2)
+070eab2303024706f2924822bfec8b9847e4ac1b (dist=1)
+a3864d4f32a3bf5ed177ddef598490a08760b70d (dist=1)
+a41baa717dd74f1180abf55e9341bc7a0bb9d556 (dist=1)
+9e622a6dad403b71c40979743bb9d5be17b16bd6 (dist=0)
+-------------
+
+Discussão sobre o algoritmo da bissecção
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Primeiro vamos definir "melhor ponto de bisseção". Digamos que um commt 'X' é o melhor ponto de bisseção ou um melhor commit de bisseção caso conheça a sua condição ("bom" ou "ruim") fornece o máximo de informações possíveis caso a condição do commit seja "bom" ou "ruim".
+
+Isto significa que as melhores bisseção dos commits são os commits onde a seguinte função seja máxima:
+
+-------------
+f(X) = min(information_if_good(X), information_if_bad(X))
+-------------
+
+onde 'information_if_good(X)' é a informação que obtemos caso 'X' seja bom e 'information_if_bad(X)' é a informação que obtemos caso 'X' seja ruim.
+
+Agora vamos supor que exista apenas um "primeiro commit ruim". Isto significa que todos os seus descendentes são "ruins" e todos os outros commits são "bons". E iremos supor que todos os commits têm uma probabilidade igual de serem bons ou ruins, ou de serem o primeiro commit incorreto, portanto, conhecer a condição do commit 'c' dá sempre a mesma quantidade de informações onde quer que estes commits 'c' estejam no grafo e independente do que o 'c' seja. (Portanto, supomos que estes commits, seja por exemplo, em um ramo ou próximo a um commit bom ou ruim, não forneçam mais ou menos informações).
+
+Vamos supor também que tenhamos um grafo limpo como um após o outro
+1) no algoritmo de bisseção acima. Isso significa que podemos medir as informações que obtemos em termos quantidade dos commits que podemos remover do grafo.
+
+E vamos receber um commit 'X' no grafo.
+
+Caso 'X' seja considerado "bom", sabemos que os seus ancestrais são todos "bons", então queremos dizer que:
+
+-------------
+information_if_good(X) = number_of_ancestors(X)  (TRUE)
+-------------
+
+E isso é verdade porque na etapa 1) b) removemos os ancestrais dos "bons" commits.
+
+Caso 'X' seja considerado "ruim", sabemos que todos os seus descendentes são "ruins", então queremos dizer que:
+
+-------------
+information_if_bad(X) = number_of_descendants(X)  (WRONG)
+-------------
+
+Mas é errado, porque na etapa 1) a) mantemos apenas os ancestrais dos commits ruins. Então obtemos mais informações quando um commit é marcado como "ruim", porque também sabemos que os ancestrais do commit "ruim" anterior, não são ancestrais do novo commit "ruim" que não são o primeiro commit incorreto. Não sabemos se eles são bons ou ruins, porém sabemos que eles não são o primeiro commit incorreto porque não são ancestrais do novo commit "ruim".
+
+Portanto, quando um commit é marcado como "ruim", sabemos que podemos remover todos os commit no grafo, exceto aqueles que são os ancestrais do novo commit "ruim". Isto significa que:
+
+-------------
+information_if_bad(X) = N - number_of_ancestors(X)  (TRUE)
+-------------
+
+onde 'N' é a quantidade de commits no grafo (limpos).
+
+Portanto, no final, isso significa que, para encontrar as melhores bisseções dos commits, devemos maximizar a função:
+
+-------------
+f(X) = min(number_of_ancestors(X), N - number_of_ancestors(X))
+-------------
+
+And this is nice because at step 2) we compute number_of_ancestors(X) and so at step 3) we compute f(X).
+
+Vamos tomar o seguinte grafo como exemplo:
+
+-------------
+            G-H-I-J
+           /       \
+A-B-C-D-E-F         O
+           \       /
+            K-L-M-N
+-------------
+
+Caso calculemos a seguinte função não ideal nela:
+
+-------------
+g(X) = min(number_of_ancestors(X), number_of_descendants(X))
+-------------
+
+nós temos:
+
+-------------
+            4 3 2 1
+            G-H-I-J
+1 2 3 4 5 6/       \0
+A-B-C-D-E-F         O
+           \       /
+            K-L-M-N
+            4 3 2 1
+-------------
+
+porém com o algorítimo utilizado pelo 'git bisect' nós temos:
+
+-------------
+            7 7 6 5
+            G-H-I-J
+1 2 3 4 5 6/       \0
+A-B-C-D-E-F         O
+           \       /
+            K-L-M-N
+            7 7 6 5
+-------------
+
+Então escolhemos 'G', 'H', 'K' ou 'L' como o melhor ponto de bisseção, que é melhor que 'F'. Porque, por exemplo, o 'L' é ruim, saberemos não apenas que 'L', 'M' e 'N' são ruins, mas também que o 'G', 'H', 'I' e 'J' não são os primeiros commits ruins (pois supomos que haja apenas um primeiro commit ruim e ele deve ser um ancestral do 'L').
+
+Portanto, o algoritmo atual parece ser o melhor possível, dado o que supomos inicialmente.
+
+Algoritmo de salto
+~~~~~~~~~~~~~~~~~~
+
+Quando alguns commits forem ignoradas (utilizando o comando "git bisect skip"), o algoritmo de bisseção é o mesmo da etapa 1) a 3). Então utilizamos aproximadamente as seguintes etapas:
+
+6) classifique o commit diminuindo o valor associado
+
+7) se o primeiro commit não foi ignorado, podemos retorná-lo e parar aqui
+
+8) caso contrário, filtre todos os commits ignorados da lista
+
+9) use um gerador de número pseudo-aleatório (PRNG) para gerar um número aleatório entre '0' e '1'
+
+10) multiplique este número aleatório com a a sua raiz quadrada para enviesá-lo para 0
+
+11) multiplicada o resultado pela quantidade dos commits na lista dos filtrados e obtenha um índice nesta lista
+
+12) retorne o commit ao índice que foi processado
+
+Discussão sobre o algoritmo de salto
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Após a etapa 7) (no algoritmo 'skip'), poderíamos verificar se o segundo commit foi ignorado e retorná-lo, se não for o caso. E de fato, este foi o algoritmo que utilizamos quando o comando "git bisect skip" foi desenvolvido no Git versão 1.5.4 (lançado em 1º de fevereiro de 2008) até o Git versão 1.6.4 (lançado em 29 de julho de 2009).
+
+Porém o Ingo Molnar e o H. Peter Anvin (outro informado desenvolvedor de kernel do linux) reclamaram que às vezes os melhores pontos de bisseção aconteciam em uma área onde todos os commits eram testáveis. E neste caso, o usuário foi solicitado a testar muitos commits onde não são possíveis de serem testados, o que poderia ser muito ineficiente.
+
+Na verdade, os commits não testáveis geralmente não são testáveis porque uma quebra foi introduzida em algum momento, e essa quebra foi corrigida somente depois que muitos outras commits foram introduzidos.
+
+Naturalmente, essa quebra não está relacionada à quebra que estamos tentando localizar no grafo do commit. Porém isso nos impede de saber se o "mau comportamento" que interessa está presente ou não.
+
+Portanto, é fato que os commits próximos de um commit onde o teste não possa ser feito têm uma alta probabilidade de serem elas mesmas as não testáveis. Os melhores commits para bisseção também são frequentemente encontrados juntos (devido ao algoritmo de bisseção).
+
+É por isso que é uma péssima ideia escolher a próxima melhor bisseção do commit que não foi ignorado quando o primeiro tenha sido ignorado.
+
+Descobrimos que a maioria dos commits no grafo pode fornecer muitas informações quando são testadas. E os commits que, em média, não fornecerão muita informação são os próximos commits bons e ruins.
+
+Portanto, ao usar um PRNG com um viés para favorecer os commits longe dos commits bons e ruins parecia ser uma boa escolha.
+
+Uma melhoria óbvia neste algoritmo seria procurar por um commit que tenha um valor associado próximo ao do melhor commit de bisseção e que esteja em outra ramificação, antes de utilizar o PRNG. Pois caso este commit exista, é muito provável que também não seja testável, logo, provavelmente fornecerá mais informações do que o que foi selecionado aleatoriamente.
+
+Verificando as bases mescladas
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Há outro ajuste no algoritmo de bisseção que não foi descrito no "algoritmo de bisseção" acima.
+
+Nos exemplos anteriores, supomos que os commits "bons" eram ancestrais do commit "ruim". Porém isto não é um requisito do "git bisect".
+
+Of course the "bad" commit cannot be an ancestor of a "good" commit, because the ancestors of the good commits are supposed to be "good". And all the "good" commits must be related to the bad commit. They cannot be on a branch that has no link with the branch of the "bad" commit. But it is possible for a good commit to be related to a bad commit and yet not be neither one of its ancestor nor one of its descendants.
+
+Como por exemplo, pode haver um ramo "main" (principal) e um ramo "dev" que foi bifurcada no ramo principal em um commit chamado "D" desta maneira:
+
+-------------
+A-B-C-D-E-F-G  <--main
+       \
+        H-I-J  <--dev
+-------------
+
+O commit "D" é chamado de uma "base de mesclagem" para o ramo "main" e "dev" pois é o melhor ancestral comum destas ramificações para uma mesclagem.
+
+Agora, suponha que o commit J seja ruim, que o commit G seja bom e que apliquemos o algoritmo de bisseção como foi descrito anteriormente.
+
+Conforme descrito na etapa 1) b) do algoritmo de bisseção, removemos todos os ancestrais dos commits bons porque eles também devem ser bons.
+
+Então, ficaríamos com apenas:
+
+-------------
+H-I-J
+-------------
+
+Mas o que acontece caso o primeiro commit incorreto seja o "B" e se foi corrigido no ramo "principal" (main) pelo commit "F"?
+
+O resultado dessa bisseção seria que descobriríamos que "H" é o primeiro commit ruim, quando na verdade é o "B". Portanto, isso seria errado!
+
+E sim, na prática pode acontecer das pessoas que trabalham em um ramo não estejam cientes que as pessoas que trabalham no outro ramo corrigiram um bug! Também pode acontecer que F tenha corrigido mais de um bug ou que seja uma reversão de algum grande esforço de desenvolvimento que não estava pronto para ser liberado.
+
+De fato, as equipes de desenvolvimento geralmente mantêm um ramo de desenvolvimento e um ramo de manutenção, seria muito fácil para eles caso o comando "git bisect" funcionasse quando quisessem dividir uma regressão no ramo de desenvolvimento que não está no ramo de manutenção. Eles devem ser capaz de começar a dividir utilizando:
+
+-------------
+$ git bisect start dev main
+-------------
+
+Para ativar esse recurso adicional, quando uma bisseção é iniciada e quando alguns commits bons não são ancestrais do commit ruim, primeiro calculamos a mesclagem das bases entre os commits ruins e os bons, escolhemos estas bases da mesclagem como os primeiros commits que serão averiguados e testados.
+
+Caso ocorra de uma base que foi mesclada esteja ruim, o processo de bisseção será interrompido com uma mensagem como:
+
+-------------
+A base da mesclagem BBBBBB é ruim.
+Isto significa que o bug foi corrigido entre BBBBBB e [GGGGGG, ...].
+-------------
+
+onde BBBBBB é o hash sha1 da base de mesclagem ruim e [GGGGGG, ...] é uma lista separada por vírgulas do sha1 do bom commit.
+
+Caso algumas das mesclagens das bases sejam ignoradas, o processo de bisseção continuará, porém a seguinte mensagem será impressa para cada mesclagem da base que foi ignorada:
+
+-------------
+Aviso: a base da mesclagem entre BBBBBB e [GGGGGG,...] deve ser ignorado.
+Portanto, não podemos ter certeza de que o primeiro commit ruim esteja entre MMMMMM e BBBBBB.
+Continuamos mesmo assim.
+-------------
+
+onde BBBBBB é o hash sha1 do commit ruim, o MMMMMM é o sha1 da base da mesclagem que é ignorado e [GGGGGG, ...] é uma lista separada por vírgulas do sha1 dos commits bons.
+
+Portanto, caso não haja uma base da mesclagem ruim, o processo de bisseção continuará normalmente após esta etapa.
+
+Melhores práticas para as bisseções
+-----------------------------------
+
+Usando conjuntos de teste e o comando 'git bisect' juntos
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Caso você possua um conjunto de testes e utiliza o `git bisect`, torna-se menos importante verificar se todos os testes passam após cada confirmação. Embora, claro, seja provavelmente uma boa ideia fazer algumas verificações para evitar a quebra de muitas coisas pois isso pode dificultar a bisseção dos outros bugs.
+
+Você pode concentrar os teus esforços para verificar alguns pontos (as versões rc e beta por exemplo) que todos os casos de teste 'T' passam por todas as 'N' configurações. E quando alguns testes não passam, você pode usar "git bisect" (ou melhor, "git bisect run"). Então você deve executar a grosso modo:
+
+-------------
+c * N * T + b * M * log2(M) tests
+-------------
+
+onde 'c' é a quantidade de rodadas de teste (portanto, uma constante pequena) e 'b' é a proporção dos erros por commit(espero que também seja uma constante pequena).
+
+Então é claro que é muito melhor que O(N * T) vs O(N * T * M) caso testasse tudo após cada commit.
+
+Isto significa que os conjuntos de testes são bons para evitar que o commit de alguns bugs sejam feitos e também são bons para dizer que você tem alguns bugs. Mas eles não são tão bons para dizer onde alguns erros foram introduzidos. Para te dizer isso eficientemente, o comando 'git bisect' é necessário.
+
+A outra coisa interessante dos conjuntos de testes é que, quando você tem um, já sabe como testar o mau comportamento. Portanto, você pode usar este conhecimento para criar um novo caso de teste para o comando "git bisect" quando parecer que uma regressão existe. Portanto, será mais fácil dividir o bug e corrigi-lo. E então você pode adicionar o caso de teste que você acabou de criar ao seu conjunto de testes.
+
+Portanto, caso saiba criar casos de teste e dividir em partes, estará sujeito a um círculo virtuoso:
+
+mais testes => mais fácil de criar testes => mais fácil de fazer 'bisect' => mais testes
+
+Portanto, os conjuntos de testes e o comando "git bisect", quando utilizadas em conjunto, são ferramentas complementares que são muito poderosas e eficientes.
+
+Falhas na construção da bisseção
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Você pode facilmente fazer o 'bisect' automaticamente em construções quebradas usando algo como:
+
+-------------
+$ git bisect start BAD GOOD
+$ git bisect run make
+-------------
+
+Encaminhando sh -c "alguns comandos" para "git bisect run"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Por exemplo:
+
+-------------
+$ git bisect run sh -c "make || exit 125; ./my_app | grep 'good output'"
+-------------
+
+Por outro lado, caso faça isso com frequência, pode valer a pena ter scripts para evitar muita digitação.
+
+Localizando regressões de desempenho
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Aqui está um exemplo do script que é ligeiramente modificado a partir de um script do mundo real utilizado por Junio Hamano <<4>>.
+
+Este script pode ser passado através de um "git bisect run" para localizar um commit que introduziu uma regressão de desempenho:
+
+-------------
+#!/bin/sh
+
+# Os erros de compilação não me interessam.
+make my_app || exit 255
+
+# Estamos verificando se ele para em um período de tempo razoável, então
+# deixe correr em segundo plano...
+
+./my_app >log 2>&1 &
+
+# ... e pega a ID do seu processo.
+pid=$!
+
+# ... e aguarde o tempo suficiente.
+sleep $NORMAL_TIME
+
+# ... e veja se o processo ainda está lá.
+if kill -0 $pid
+then
+	# e se ainda estiver rodando -- isso é ruim.
+	kill $pid; sleep 1; kill $pid;
+	exit 1
+else
+	# Ele já terminou (o $pid do processo não existe mais),
+	# e nós estamos felizes.
+	exit 0
+fi
+-------------
+
+Seguindo as melhores práticas gerais
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Obviamente, é uma boa ideia não ter commits com alterações que conscientemente quebram as coisas, mesmo que os outros commits consigam consertar quebras posteriores.
+
+Também é uma boa ideia ao usar qualquer VCS ter apenas uma pequena alteração lógica em cada commit.
+
+Quanto menores as alterações no seu commit, mais eficaz será o "git bisect". E provavelmente você precisará do comando "git bisect", não de primeira pois as pequenas alterações são mais fáceis de revisar, mesmo que sejam revisadas apenas pelo responsável do envio.
+
+Outra boa ideia é ter boas mensagens para os commits. Eles podem ser muito úteis para entender por que algumas alterações foram feitas.
+
+Estas boas práticas são muito úteis caso você faça 'bisect' com muita frequência.
+
+Evitando mesclagens propensas a erros
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As primeiras mesclagens por si só podem introduzir algumas regressões, mesmo quando a mesclagem não precise de uma resolução de conflitos do código-fonte. Isso ocorre porque uma mudança semântica pode ocorrer em um ramo, enquanto o outro ramo não está ciente do que aconteceu.
+
+Como por exemplo, um ramo pode alterar a semântica de uma função, enquanto o outro ramo adiciona mais chamadas à mesma função.
+
+Piora muito caso muitos arquivos precisem ser corrigidos por causa de conflitos. É por isso que estas mesclagens são chamadas de "mesclagens más" (evil merges). Eles podem tornar as regressões muito difíceis de rastrear. Pode até ser enganador saber que o primeiro commit ruim, caso seja uma mesclagem deste tipo, porque as pessoas podem pensar que o bug vem de uma má resolução de conflito quando se trata de uma alteração semântica em um ramo.
+
+De qualquer forma, "git rebase" pode ser utilizado para linearizar o histórico. Pode ser utilizado em primeiro lugar, para evitar a mesclagem. Ou pode ser utilizado para dividir um histórico linear em vez do que não seja linear, pois isso deve fornecer mais informações no caso de uma alteração semântica em um ramo.
+
+As mesclagens também podem ser simplificadas utilizando os ramos menores ou ao utilizar muitos tópicos das ramificações, em vez de apenas as ramificações das versões mais longas.
+
+E os testes podem ser feitos com mais frequência nos ramos nas integrações especiais como 'linux-next' para o kernel do linux.
+
+Adaptando o seu fluxo de trabalho
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Um fluxo de trabalho especial para processar as regressões pode dar ótimos resultados.
+
+Aqui está um exemplo de um fluxo de trabalho utilizado por Andreas Ericsson:
+
+* escreva, no conjunto de testes, um script de teste que exponha a regressão
+* Utilize um "git bisect run" para localizar o commit que introduziu um bug
+* corrija o bug que muitas vezes se torna óbvio na etapa anterior
+* faz o commit de ambas as correções e o script de teste (e se necessário, mais testes)
+
+E aqui está o que o Andreas disse sobre este fluxo de trabalho <<5>>:
+
+_____________
+Para dar alguns números concretos, costumávamos ter um relatório médio para corrigir o ciclo de 142.6 horas (de acordo com nosso rastreador de bugs um tanto estranho que apenas mede o tempo). Desde que nos mudamos para o Git, diminuímos para 16.2 horas. Principalmente porque podemos ficar em cima da correção dos bugs agora e porque todo mundo está tentando resolver os bugs (estamos muito orgulhosos de como somos preguiçosos em deixar o Git encontrar os bugs para nós). Cada nova versão resulta em ~40% menos bugs (quase certamente devido à forma como nos sentimos ao escrever testes).
+_____________
+
+Claramente, este fluxo de trabalho utiliza o círculo virtuoso entre os conjuntos de testes e o "git bisect". De fato, torna o procedimento padrão para lidar com a regressão.
+
+Em outras mensagens, Andreas diz que eles também utilizam as "melhores práticas" descritas acima: pequenos commits lógicos, tópicos das ramificações, sem mesclagem "do mal",... Todas estas práticas aprimoram a bisectabilidade do grafo do commit, tornando mais fácil e mais útil o processo de bisseção.
+
+Portanto, um bom fluxo de trabalho deve ser projetado em torno dos pontos acima. Isso está tornando a divisão mais fácil, mais útil e padronizado.
+
+Envolvendo pessoas do controle de qualidade e se possível, usuários finais
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Um aspecto interessante do comando "git bisect" é que ele não é apenas uma ferramenta de desenvolvedor. Ele pode ser usado efetivamente por pessoas do controle de qualidade ou mesmo pelos usuários finais (caso eles tenham acesso ao código-fonte ou se puderem ter acesso a todas as compilações).
+
+Houve uma discussão em um ponto na lista de discussão do kernel do linux sobre se era permitido sempre pedir ao usuário final que fizesse um 'bisect', foram levantados muitos pontos interessantes apoiando este ponto de vista que sim, é permitido.
+
+Como por exemplo, David Miller escreveu <<6>>:
+
+_____________
+What people don't get is that this is a situation where the "end node principle" applies. When you have limited resources (here: developers) you don't push the bulk of the burden upon them. Instead you push things out to the resource you have a lot of, the end nodes (here: users), so that the situation actually scales.
+_____________
+
+Isto significa que geralmente é "mais barato" se as pessoas do controle de qualidade ou dos usuários finais puderem fazer isso.
+
+O interessante também é que os usuários finais que estão relatando os bugs (ou das pessoas do controle de qualidade que reproduziram um bug) têm acesso ao ambiente onde o bug ocorre. Portanto, eles geralmente podem reproduzir mais facilmente uma regressão. E se eles puderem fazer um 'bisect', mais informações serão extraídas do ambiente onde o erro ocorre, o que significa que será mais fácil compreender e então corrigir o bug.
+
+Para os projetos de código aberto, pode ser uma boa maneira de obter contribuições mais úteis dos usuários finais e apresentá-las às atividades do controle de qualidade e desenvolvimento.
+
+Usando scripts complexos
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Em alguns casos, como no desenvolvimento do kernel, pode valer a pena desenvolver scripts complexos para poder automatizar completamente a bissetriz.
+
+Aqui está o que Ingo Molnar diz sobre isso <<7>>:
+
+_____________
+Eu tenho um script para bisseção totalmente automatizado que trava o processo de boot. Tem origem no "git-bisect run". Eu o executo, ele cria e inicializa os kernels automaticamente e quando a inicialização falha (o script percebe que, por meio do registro log serial, que ele assiste continuamente ou por um tempo limite, caso o sistema não apareça em 10 minutos, é um kernel "ruim"), o script chama minha atenção através de um sinal sonoro e eu desligo a caixa de teste. (sim, eu devo usar uma tomada gerenciada para automatizá-la 100%)
+_____________
+
+Combinando os conjuntos dos testes, git bisect e outros sistemas juntos
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vimos que os conjuntos dos testes e o comando 'git bisect' são muito poderosos quando usados juntos. Pode ser ainda mais poderoso caso possa combiná-los com outros sistemas.
+
+Como por exemplo, alguns conjuntos de testes podem ser executados automaticamente à noite com algumas configurações incomuns (ou mesmo aleatórias). E caso uma regressão eja encontrada por um conjunto de testes, o comando "git bisect" poderá ser iniciado automaticamente e o seu resultado poderá ser enviado através de um e-mail ao autor do primeiro commit ruim encontrado pelo "git bisect", e talvez das outras pessoas também. E uma nova entrada no sistema de monitoramento dos bugs também pode ser criada de forma automática.
+
+
+O futuro da bisseção
+--------------------
+
+"git replace"
+~~~~~~~~~~~~~
+
+Vimos anteriormente que o comando "git bisect skip" agora está usando um PRNG para tentar evitar as áreas no grafo do commit onde o commit não sejam testáveis. O problema é que, às vezes, o primeiro commit ruim fica em uma área não testável.
+
+Para simplificar a discussão, supomos que a área não testável seja uma cadeia simples de commits e que ela foi criada por uma quebra introduzida por um commit (vamos chamá-lo de 'BBC' para o 'bisect' quebrado do commit) e posteriormente corrigida por outro (vamos chamá-lo de 'BFC' para o 'bisect' que vai corrigir o commit).
+
+Por exemplo:
+
+-------------
+...-Y-BBC-X1-X2-X3-X4-X5-X6-BFC-Z-...
+-------------
+
+onde sabemos que 'Y' é bom e 'BFC' é ruim e onde 'BBC' e de 'X1' até 'X6' onde os testes não sejam possíveis.
+
+Neste caso, se estiver fazendo o bisecting manualmente, o que você pode fazer é criar uma ramificação especial que comece logo antes da "BBC". O primeiro commit neste ramo deve ser o "BBC" com o "BFC" compactado nele. E os outros commits no ramo devem ser os commits entre "BBC" e "BFC" reconstruídos no primeiro commit do ramo e depois o commit após o BFC também ter sido reconstruído.
+
+Por exemplo:
+
+-------------
+      (BBC+BFC)-X1'-X2'-X3'-X4'-X5'-X6'-Z'
+     /
+...-Y-BBC-X1-X2-X3-X4-X5-X6-BFC-Z-...
+-------------
+
+onde os commits citados com ' foram reconstruídos na sua base (rebased).
+
+Você pode criar facilmente um ramo com o Git usando reconstrução interativa.
+
+Utilizando por exemplo:
+
+-------------
+$ git rebase -i Y Z
+-------------
+
+e depois mover o 'BFC' após o 'BBC' e esmagá-lo.
+
+Depois disso, é possível começar a dividir normalmente no novo ramo e eventualmente, encontrar o primeiro commit com problemas.
+
+Por exemplo:
+
+-------------
+$ git bisect start Z' Y
+-------------
+
+Caso esteja utilizando o comando `git bisect run`, é possível utilizar a mesma correção manual acima e em seguida, iniciar outro comando `git bisect run` no ramo especial. Ou como diz na página do manual `git bisect`, o script passado ao `git bisect run` pode aplicar um patch antes de compilar e testar o software <<8>>. O patch deve transformar um commit atual não testável em um testável. Portanto, o teste resultará em "bom" ou "ruim" e o comando `git bisect` será capaz de encontrar o primeiro commit que estiver ruim. O script não deve se esquecer de remover o patch assim que o teste for concluído antes de encerrar o script.
+
+(Observe que, em vez de um patch, é possível utilizar o comando "git cherry-pick BFC" para aplicar a correção e neste caso, utilizar o comando "git reset --hard HEAD^" para reverter a escolha seletiva após o teste e antes de retornar do script.)
+
+Porém as maneiras demonstradas acima para solucionar as áreas não testáveis são um pouco atrapalhadas. Utilizar os ramos especiais é bom porque estas ramificações podem ser compartilhadas pelos desenvolvedores como ramos comuns, porém o risco é que as pessoas obtenham muitos ramos. E isso interrompe o fluxo de trabalho normal "git bisect". Portanto, caso queira utilizar o "git bisect run" automaticamente, precisará adicionar um código especial ao seu script para reiniciar a bisseção nos ramos especiais.
+
+De qualquer forma, pode-se notar no exemplo do ramo especial acima que os commit Z' e Z devem apontar para a mesma condição do código-fonte (a mesma "árvore" da linguagem git). Isso ocorre porque Z' resulta da aplicação das mesmas alterações que Z em uma ordem ligeiramente diferente.
+
+Portanto, se pudéssemos "substituir" 'Z' por 'Z' quando fazemos o 'bisect', não precisaríamos adicionar nada em um script. Funcionaria apenas para qualquer pessoa no projeto que compartilhasse as ramificações especiais e as substituições.
+
+Com o exemplo acima, isso daria:
+
+-------------
+      (BBC+BFC)-X1'-X2'-X3'-X4'-X5'-X6'-Z'-...
+     /
+...-Y-BBC-X1-X2-X3-X4-X5-X6-BFC-Z
+-------------
+
+É por isso que o comando "git replace" foi criado. Tecnicamente, ele armazena as substituições das refs na hierarquia "refs/replace/". Estas refs são como ramificações (que são armazenadas em "refs/heads/") ou nas tags (que são armazenadas em "refs/tags"), isso significa que eles podem ser automaticamente compartilhados como ramificações ou tags entre os desenvolvedores.
+
+O comando "git replace" é um mecanismo muito poderoso. Pode ser utilizado para corrigir os commits no histórico já lançado, por exemplo, alterar a mensagem do commit ou o autor do mesmo. E também pode ser utilizado em vez dos "enxertos" do git para vincular um repositório a um outro repositório antigo.
+
+De fato, é este o último recurso que o "vendeu" para a comunidade Git, agora está no ramo "master" do repositório Git do Git e deve ser lançado no Git 1.6.5 em outubro ou novembro de 2009.
+
+Um problema com o comando "git replace" é que ele atualmente armazena todas as substituições refs no "refs/replace/", mas talvez seja melhor caso as substituições das refs de que são úteis apenas para a bisseção estivessem no "refs/replace/bisect/". Dessa maneira, a reposição das refs poderiam ser usados apenas para fazer a bisseção, enquanto as outras refs diretamente em "refs/replace/" seriam utilizadas quase que o tempo todo.
+
+Erros esporádicos da bisseção
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Outra possível melhoria do "git bisect" seria adicionar opcionalmente alguma redundância aos testes que forem realizados, para que fosse mais confiável durante o rastreio de erros esporádicos.
+
+Isso foi solicitado por alguns desenvolvedores do kernel porque alguns erros chamados esporádicos não aparecem em todas as compilações porque são muito dependentes do que é gerado pelo compilador.
+
+A ideia é que a cada três testes por exemplo, o comando "git bisect" possa solicitar ao usuário que teste um commit que já foi considerado "bom" ou "ruim" (porque um de seus descendentes ou um dos seus ancestrais tenha sido encontrado como sendo "bom" ou "ruim", respectivamente). Caso um commit tenha sido previamente classificado incorretamente, a bisseção poderá ser interrompida mais cedo, antes que muitos erros possam ser cometidos. Em seguida, o usuário terá que verificar o que aconteceu e reiniciar a bisseção usando um registro log fixo do 'bisect'.
+
+Já existe um projeto chamado 'BBChop' criado por Ealdwulf Wuffinga no Github que faz algo assim usando a Teoria Bayesiana de Pesquisa <<9>>:
+
+_____________
+O BBChop é como o comando 'git bisect' (ou equivalente), mas funciona quando o seu bug for intermitente. Ou seja, funciona na presença dos falsos negativos (quando uma versão funcione embora contenha o erro). Assume que não há falsos positivos (em princípio, a mesma abordagem funcionaria, porém adicioná-la pode não ser trivial).
+_____________
+
+Porém o 'BBChop' é independente de qualquer VCS e seria mais fácil para os usuários do Git ter algo integrado no Git.
+
+Conclusão
+---------
+
+Vimos que as regressões são um problema importante e que o comando "git bisect" possui recursos interessantes que complementam as boas práticas e outras ferramentas, especialmente os conjuntos de testes, que geralmente são usados para combater as regressões. Mas pode ser necessário alterar alguns fluxos de trabalho e hábitos (ruins) para tirar o máximo proveito disso.
+
+Algumas melhorias nos algoritmos dentro do comando "git bisect" são possíveis e alguns novos recursos podem ajudar em alguns casos, porém o comando "git bisect" em geral já funciona muito bem, é muito usado e já é muito útil. Para apoiar essa última afirmação, vamos dar a palavra final ao Ingo Molnar, quando o autor lhe perguntou quanto tempo ele acha que o comando "git bisect" o salva quando ele o utiliza:
+
+_____________
+_muito_.
+
+Cerca de dez anos atrás, eu fiz minha primeira "bisseção" de uma fila de patches do Linux. Isso foi antes dos dias do Git (e mesmo antes do "BitKeeper"). Eu literalmente passei os dias resolvendo os patches, criando o que em essência eram compromissos independentes que eu acho que estavam relacionados com este bug.
+
+Foi uma ferramenta de último recurso absoluta. Prefiro passar dias olhando a saída do 'printk' do que fazer uma 'bisseção dos patches' manualmente.
+
+Com o Git bisect, é fácil: no melhor dos casos, é possível obter uma bisseção do kernel com ~15 passos entre 20 a 30 minutos de maneira automatizada. Mesmo com ajuda manual ou ao dividir vários bugs acumulados, raramente leva mais de uma hora.
+
+Na verdade, é inestimável porque existem bugs que eu nem tentaria depurar caso não fosse pelo comando `git bisect`. No passado, havia padrões de bug que eram imediatamente inúteis para se depurar - na melhor das hipóteses eu poderia enviar a assinatura da falha/bug para o 'lkml' e esperar que alguém pudesse pensar em algo.
+
+E ainda que uma bisseção falhe, hoje ela nos diz algo valioso sobre o bug: que é não determinístico - depende do tempo ou do layout da imagem do kernel.
+
+Portanto, o comando 'git bisect' é uma bondade incondicional e fique à vontade para citar isso ;-)
+_____________
+
+Agradecimentos
+--------------
+
+Meus agradecimentos ao Junio Hamano por sua ajuda na revisão deste documento, por revisar os patches que enviei para a lista de discussão do Git, por discutir algumas ideias e por me ajudar a melhorá-las, por melhorar muito o "git bisect" e por seu incrível trabalho em manter e desenvolvendo o Git.
+
+Meus agradecimentos ao Ingo Molnar por me fornecer informações muito úteis que aparecem neste artigo, por comentar este artigo, pelas suas sugestões para melhorar o "git bisect" e por evangelizar o "git bisect" nas listas de discussão do kernel do linux.
+
+Meus agradecimentos ao Linus Torvalds por inventar, desenvolver e evangelizar "git bisect", Git e o Linux.
+
+Meus agradecimentos a muitas outras ótimas pessoas que ajudaram de um jeito ou de outro quando eu trabalhei no Git, especialmente ao Andreas Ericsson, Johannes Schindelin, H. Peter Anvin, Daniel Barkalow, Bill Lear, John Hawley, Shawn O. Pierce, Jeff King, Sam Vilain, Jon Seymour.
+
+Meus agradecimentos ao comitê do programa Linux-Kongress por escolher o autor para dar uma palestra e por publicar este artigo.
+
+Referências
+-----------
+
+- [[[1]]] https://web.archive.org/web/20091206032101/http://www.nist.gov/public_affairs/releases/n02-10.htm['Software Errors Cost U.S. Economy $59.5 Billion Annually'. Nist News Release.] See also https://www.nist.gov/system/files/documents/director/planning/report02-3.pdf['The Economic Impacts of Inadequate Infratructure for Software Testing'. Nist Planning Report 02-3], Executive Summary and Chapter 8.
+- [[[2]]] https://www.oracle.com/java/technologies/javase/codeconventions-introduction.html['Code Conventions for the Java Programming Language: 1. Introduction'. Sun Microsystems.]
+- [[[3]]] https://en.wikipedia.org/wiki/Software_maintenance['Manutenção do Software'. Wikipedia.]
+- [[[4]]] https://lore.kernel.org/git/7vps5xsbwp.fsf_-_@assigned-by-dhcp.cox.net/[Junio C Hamano. 'A História de sucesso de um bisect automatizado'.]
+- [[[5]]] https://lwn.net/Articles/317154/[Christian Couder. 'Um bisect totalmente automatizado com "git bisect run"'. LWN.net.]
+- [[[6]]] https://lwn.net/Articles/277872/[Jonathan Corbet. 'A bisseção divide usuários e os desenvolvedores'. LWN.net.]
+- [[[7]]] https://lore.kernel.org/lkml/20071207113734.GA14598@elte.hu/[Ingo Molnar. 'Re: BUG 2.6.23-rc3 can't see sd partitions on Alpha'. Linux-kernel mailing list.]
+- [[[8]]] https://www.kernel.org/pub/software/scm/git/docs/git-bisect.html[Junio C Hamano and the git-list. 'git-bisect(1) Página do Manual'. Arquivos do Linux Kernel.]
+- [[[9]]] https://github.com/Ealdwulf/bbchop[Ealdwulf. 'bbchop'. GitHub.]
