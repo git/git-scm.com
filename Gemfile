@@ -18,7 +18,7 @@ gem "puma"
 
 gem "diffy"
 gem "nokogiri"
-gem "rss"
+gem "rss", ">= 0.3.0"
 
 # Assets
 gem "sass-rails"
@@ -35,11 +35,11 @@ group :development, :test do
   gem "dotenv-rails"
   gem "listen"
   gem "pry-byebug"
-  gem "rubocop"
-  gem "rubocop-discourse"
-  gem "rubocop-performance"
-  gem "rubocop-rails"
-  gem "rubocop-rspec"
+  gem "rubocop", ">= 1.37.0"
+  gem "rubocop-discourse", ">= 3.0.1"
+  gem "rubocop-performance", ">= 1.11.1"
+  gem "rubocop-rails", ">= 2.17.0"
+  gem "rubocop-rspec", ">= 2.14.0"
   gem "ruby-prof"
   gem "sqlite3"
 end
@@ -52,7 +52,7 @@ group :test do
   gem "rspec-rails"
   gem "shoulda"
   gem "vcr"
-  gem "webmock"
+  gem "webmock", ">= 3.15.1"
 end
 
 group :production do
