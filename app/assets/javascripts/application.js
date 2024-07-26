@@ -102,6 +102,7 @@ var Search = {
     Search.observeFocus();
     Search.observeTextEntry();
     Search.observeResultsClicks();
+    Search.installKeyboardShortcuts();
   },
 
   observeFocus: function() {
@@ -146,6 +147,15 @@ var Search = {
   observeResultsClicks: function() {
     $('#search-results').mousedown(function(e) {
       e.preventDefault();
+    });
+  },
+
+  installKeyboardShortcuts: function() {
+    $(document).keydown(function(e) {
+      if (e.target.tagName.toUpperCase() !== 'INPUT' && ['s', 'S', '/'].includes(e.key)) {
+        e.preventDefault();
+        $('form#search input').focus();
+      }
     });
   },
 
