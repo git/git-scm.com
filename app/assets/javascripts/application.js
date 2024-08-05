@@ -102,6 +102,7 @@ var Search = {
     Search.observeFocus();
     Search.observeTextEntry();
     Search.observeResultsClicks();
+    Search.listenForKeys();
   },
 
   observeFocus: function() {
@@ -147,6 +148,14 @@ var Search = {
     $('#search-results').mousedown(function(e) {
       e.preventDefault();
     });
+  },
+
+  listenForKeys: function() {
+    window.addEventListener("keyup", function(e) {
+      if ((e.key === 's' || e.key === 'S' || e.key === '/') && e.target === document.body) {
+        $('form#search input').focus();
+      }
+    }, false);
   },
 
   runSearch: function() {
