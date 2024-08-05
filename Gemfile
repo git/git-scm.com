@@ -18,7 +18,7 @@ gem "puma"
 
 gem "diffy"
 gem "nokogiri"
-gem "rss", ">= 0.3.0"
+gem "rss", ">= 0.3.1"
 
 # Assets
 gem "sass-rails"
