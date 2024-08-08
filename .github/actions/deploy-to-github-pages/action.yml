@@ -1,0 +1,129 @@
+name: 'Run Hugo/Pagefind and deploy to GitHub Pages'
+description: 'Runs Hugo and Pagefind and then deploys the result to GitHub Pages.'
+# This composite Action requires the following things in the calling workflow:
+#
+# permissions:
+#   contents: write # to push changes (if any)
+#   pages: write # to deploy to GitHub Pages
+#   id-token: write # to verify that the deployment source is legit
+# environment:
+#   name: github-pages
+#   url: ${{ steps.<id-of-deployment-step>.outputs.url }}
+inputs:
+  github-token:
+    description: The GitHub token used to create an authenticated client
+    default: ${{ github.token }}
+    required: true
+outputs:
+  url:
+    description: The URL to which the site was deployed
+    value: ${{ steps.deploy.outputs.page_url }}
+runs:
+  using: "composite"
+  steps:
+    - name: push changes (if needed)
+      shell: bash
+      run: |
+        test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/${{ github.ref_name }})" ||
+        git push origin HEAD:${{ github.ref }}
+
+    - name: un-sparse worktree to prepare for deployment
+      shell: bash
+      run: git sparse-checkout disable
+
+    - name: setup GitHub Pages
+      id: pages
+      uses: actions/configure-pages@v5
+
+    - name: configure Hugo and Pagefind version
+      shell: bash
+      run: |
+        set -x &&
+        echo "HUGO_VERSION=$(sed -n 's/^ *hugo_version: *//p' <hugo.yml)" >>$GITHUB_ENV
+        echo "PAGEFIND_VERSION=$(sed -n 's/^ *pagefind_version: *//p' <hugo.yml)" >>$GITHUB_ENV
+
+    - name: install Hugo ${{ env.HUGO_VERSION }}
+      shell: bash
+      run: |
+        set -x &&
+        curl -Lo /tmp/hugo.deb https://github.com/gohugoio/hugo/releases/download/v$HUGO_VERSION/hugo_extended_${HUGO_VERSION}_linux-amd64.deb &&
+        sudo dpkg -i /tmp/hugo.deb
+
+    - name: run Hugo to build the pages
+      env:
+        HUGO_RELATIVEURLS: false
+      shell: bash
+      run: hugo config && hugo --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
+
+    - name: run Pagefind ${{ env.PAGEFIND_VERSION }} to build the search index
+      shell: bash
+      run: npx -y pagefind@${{ env.PAGEFIND_VERSION }} --site public
+
+    - name: upload GitHub Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./public
+
+    - name: deploy
+      id: deploy
+      uses: actions/deploy-pages@v4
+
+    - name: construct `--remap` option for lychee
+      id: remap
+      shell: bash
+      run: |
+        base_url='${{ steps.pages.outputs.base_url }}'
+        echo "result=$(echo "$base_url" |
+          sed 's|^\(.*\)\(/git-scm\.com\)$|(\1)?\2(.*)|') file://$PWD/public\$2" \
+          >>$GITHUB_OUTPUT
+
+    - name: check for broken links
+      id: lychee
+      uses: lycheeverse/lychee-action@25a231001d1723960a301b7d4c82884dc7ef857d # until an official version is out that includes https://github.com/lycheeverse/lychee/pull/1422
+      with:
+        lycheeVersion: nightly # until an official version includes https://github.com/lycheeverse/lychee/pull/1422
+        args: >-
+          --offline
+          --fallback-extensions html
+          --base '${{ steps.pages.outputs.base_url }}'
+          --remap '${{ steps.remap.outputs.result }}'
+          --exclude file:///path/to/repo.git/
+          --exclude file:///caminho/para/o/reposit%C3%B3rio.git/
+          --exclude file:///ruta/a/repositorio.git/
+          --exclude file:///sl%C3%B3%C3%B0/til/hirsla.git/
+          --exclude file:///Pfad/zum/Repo.git/
+          --exclude file:///chemin/du/d%C3%A9p%C3%B4t.git/
+          --exclude file:///srv/git/project.git
+          public/
+        output: lychee.md
+        jobSummary: true
+        fail: false
+        failIfEmpty: false # needed because its default overrides `fail = false`
+
+    - name: ${{ env.lychee_exit_code != '0' && 'maybe close' || 'open or update' }} link checker issue
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = await import('fs')
+          // GitHub issues can only have 64k characters in their body
+          const body = (s => {
+            if (s.length < 65535) return s
+            return s.replace(/^([^]{0,65000}\n)[^]*\n(.+)\n?$/, '$1\n[...]\n\n$2')
+          })(await fs.promises.readFile('lychee.md', 'utf8'))
+
+          const req = { owner: context.repo.owner, repo: context.repo.repo }
+          const q = `"Link+Checker+Report"+in:title+is:issue+label:linkchecker+is:open+repo:${req.owner}/${req.repo}`
+          const issues = await github.rest.search.issuesAndPullRequests({ ...req, q, sort: 'created', per_page: 1 })
+
+          if (issues.data.items.length === 0) {
+            if (process.env.lychee_exit_code !== '0') {
+              await github.rest.issues.create({ ...req, title: 'Link Checker Report', body, labels: ['linkchecker'] })
+            }
+          } else {
+            req.issue_number = issues.data.items[0].number
+            await github.rest.issues.createComment({ ...req, body })
+            if (process.env.lychee_exit_code === '0') {
+              await github.rest.issues.update({ ...req, state: 'closed' })
+            }
+          }

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+{{ if isset .Params "redirect_to" }}
+{{ $redirect_to := .Params.redirect_to }}
+{{ if not (hasPrefix $redirect_to "https://") }}
+{{ $redirect_to = relURL $redirect_to }}
+{{ end }}
+<html lang="en">
+ <head>
+  <meta charset="utf-8">
+  <title>Redirecting&hellip;</title>
+  <link rel="canonical" href="{{ $redirect_to }}">
+  <meta http-equiv="refresh" content="0; url={{ $redirect_to }}">
+  <meta name="robots" content="noindex">
+ </head>
+ <body>
+  <script>window.location.replace(document.querySelector("link[rel='canonical']").href + window.location.hash)</script>
+  <h1>Redirecting&hellip;</h1>
+  <a href="{{ $redirect_to }}">Click here if you are not redirected.</a>
+ </body>
+</html>
+{{ else }}
+{{ $lang := "en" }}
+{{ if isset .Params "lang" }}
+{{ $lang = .Params.lang }}
+{{ else if and (isset .Params "book") (isset .Params.book "language_code") }}
+{{ $lang = .Params.book.language_code }}
+{{ end }}
+<html lang="{{ $lang }}">
+
+{{ $section := "" }}
+{{ if isset .Params "section" }}
+{{ $section = .Params.section }}
+{{ else if (eq .Page.Path "/docs") }}
+{{ $section = "documentation" }}
+{{ else if (isset .Page "Section") }}
+{{ $section = .Page.Section }}
+{{ else if (or (eq .Page.Type "doc") (eq .Page.Type "docs") (eq .Page.Type "video")) }}
+{{ $section = "documentation" }}
+{{ else if (isset .Page "Type") }}
+{{ $section = .Page.Type }}
+{{ else }}
+{{ warnf "No section found in %s" (.Page.Path | jsonify) }}
+{{ end }}
+{{ .Scratch.Set "section" $section }}
+
+<head>
+  <meta charset='utf-8'>
+  <meta content='IE=edge,chrome=1' http-equiv='X-UA-Compatible'>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>{{ .Page.Title | default "Git" }}</title>
+
+  <link href="{{ relURL "favicon.ico" }}" rel='shortcut icon' type='image/x-icon'>
+
+  {{ if eq $section "search" }}<link href="{{ relURL "pagefind/pagefind-ui.css" }}" rel="stylesheet">{{ end }}
+  {{ $style := resources.Get "sass/application.scss" | resources.ExecuteAsTemplate "application.scss" . | resources.ToCSS | resources.Minify }}
+  <link rel="stylesheet" href="{{ $style.RelPermalink }}">
+  <script src="{{ relURL "js/modernizr.js" }}"></script>
+  <script src="{{ relURL "js/modernize.js" }}"></script>
+  <!--[if (gte IE 6)&(lte IE 8)]>
+  <script src="{{ relURL "js/selectivizr-min.js" }}"></script>
+  <![endif]-->
+
+</head>
+
+<body id="{{ $section }}">
+
+  <div class="inner">
+    {{ partial "header.html" . }}
+  </div> <!-- .inner -->
+
+  {{ if (isset .Params "is_site_root") }}
+    {{ partial "masthead.html" . }}
+    <div id="content-wrapper">
+      <div class="inner">
+        {{ partial "site-root.html" . }}
+      </div> <!-- .inner -->
+      {{ partial "footer.html" . }}
+    </div> <!-- #content-wrapper -->
+  {{ else if (isset .Params "book") }}
+    {{ .Scratch.Set "book" (index .Site.Data.book .Params.book.language_code) }}
+    <div class="inner">
+      <div id="content-wrapper">
+        {{ partial "sidebar.html" . }}
+        <div id="content">
+          {{ if isset .Params.book "front_page" }}
+            {{ partial "book-front-page.html" . }}
+          {{ else }}
+          <div id="book-chapters">
+            {{ partial "chapters.html" . }}
+
+            <span class="light" id="edition">
+              2nd Edition
+            </span>
+          </div>
+          <div id="main" data-pagefind-filter="category:{{ $section }}" data-pagefind-meta="category:Book" data-pagefind-weight="0.05" data-pagefind-body class="book edition2">
+            <h1>{{ .Params.book.section.cs_number }} {{ .Params.book.chapter.title }} - {{ .Params.book.section.title }}</h1>
+            <div>
+              {{ .Content }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ partial "footer.html" . }}
+    </div>
+  {{ else if (isset .Params "docname") }}
+    <div class="inner">
+      <div id="content-wrapper">
+        {{ partial "sidebar.html" . }}
+        <div id="content">
+          <div id='reference-version'>
+            {{ partial "ref/languages.html" . }}
+            {{ partial "ref/topics.html" . }}
+            {{ partial "ref/versions.html" . }}
+          </div>
+
+          <!-- older manual page versions are less interesting and need to be excluded from the search -->
+          {{ $include_in_search := (or (not (isset .Params "docname")) (isset .Params "latest-changes")) }}
+          <div id="main"{{ if $include_in_search }} data-pagefind-filter="category:{{ $section }}" data-pagefind-meta="category:Reference" data-pagefind-weight="0.05" data-pagefind-body{{ end }}>
+            {{ .Content }}
+            {{ $match := findRESubmatch "(?s)>NAME</h2>.*?<p[^>]*>(git-)?([^ ]+)" .Content 1 }}
+            {{ if (eq ($match | len) 1) }}
+              {{ $command_name := (index (index $match 0) 2) }}
+              {{ $weight := cond (strings.Contains $command_name "-") 7 10 }}
+              <!-- boost the command name in the search -->
+              <h3 hidden="true" data-pagefind-weight="{{ $weight }}">{{ $command_name }}</h3>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+      {{ partial "footer.html" . }}
+    </div>
+  {{ else }}
+    <div class="inner">
+      <div id="content-wrapper">
+        {{ partial "sidebar.html" . }}
+        <div id="content" data-pagefind-filter="category:{{ $section }}" data-pagefind-weight="0.05" data-pagefind-body>
+          {{ if (eq .Page.Path "/docs") }}
+            {{ partial "ref/index.html" . }}
+          {{ else if isset .Params "video_title" }}
+            <div id="main">
+              <h1>{{ .Params.category }} Episode {{ .Params.episode }}</h1>
+              <h2>{{ .Params.video_title }}</h2>
+
+              <div id="video-container">
+                <iframe src="https://player.vimeo.com/video/{{ .Params.ext_id }}?title=0&amp;byline=0&amp;portrait=0&amp;color=f14e32" width="635" height="360" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
+              </div>
+            </div>
+          {{ else if eq $section "about" }}
+            <div id="main">
+              <h1>About</h1>
+
+              <ol id="about-nav">
+                {{ $abouts := sort (where .Site.RegularPages "Params.section" "about") "Params.order"  }}
+                {{ range $about := $abouts }}
+                <li>
+                  <a href="{{ relURL (strings.TrimSuffix ".html" $about.RelPermalink) }}" class="{{ $about.Params.display_class }}{{ if eq $.Params.subsection $about.Params.subsection }} current{{ end }}">{{ $about.Params.subtitle }}</a>
+                </li>
+                {{ end }}
+              </ol>
+              {{ .Content }}
+            </div>
+          {{ else }}
+            {{ .Content }}
+          {{ end }}
+        </div>
+      </div>
+      {{ partial "footer.html" . }}
+    </div>
+  {{ end }}
+
+</body>
+</html>
+{{ end }}

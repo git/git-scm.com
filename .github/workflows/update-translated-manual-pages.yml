@@ -1,0 +1,90 @@
+name: Update translated manual pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      force-rebuild:
+        description: Force re-building all manual pages (e.g. after a script change)
+        type: boolean
+        default: false
+  schedule:
+    # check daily for updates
+    - cron: '41 19 * * *'
+
+jobs:
+  check-for-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            external/docs/sync
+            script
+      - uses: actions/github-script@v7
+        id: get-pending
+        with:
+          script: |
+            const { areTranslatedManualPagesUpToDate } = require('./script/ci-helper.js')
+
+            return await areTranslatedManualPagesUpToDate(github)
+    outputs:
+      up-to-date: ${{ steps.get-pending.outputs.result }}
+  update-translated-manual-pages:
+    needs: [check-for-updates]
+    if: inputs.force-rebuild == true || needs.check-for-updates.outputs.up-to-date == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push changes (if any)
+      pages: write # to deploy to GitHub Pages
+      id-token: write # to verify that the deployment source is legit
+      issues: write # to open tickets upon broken links
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: ruby setup
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: clone jnavila/git-html-l10n
+        run: git clone --bare https://github.com/jnavila/git-html-l10n '${{ runner.temp }}/git-html-l10n'
+      - name: update translated manual pages
+        run: |
+          if test true = '${{ inputs.force-rebuild }}'
+          then
+            export RERUN=true
+          fi
+          bundle exec ruby script/update-docs.rb '${{ runner.temp }}/git-html-l10n' l10n
+      - name: commit translated manual pages
+        id: manual-pages
+        run: |
+          mkdir -p external/docs/sync &&
+          git -C '${{ runner.temp }}/git-html-l10n' rev-parse HEAD >external/docs/sync/git-html-l10n.sha &&
+          git add external/docs/sync/git-html-l10n.sha &&
+
+          git add -A external/docs &&
+          if test true = '${{ inputs.force-rebuild }}' && git diff-index --cached --quiet HEAD --
+          then
+            echo '::notice::Rebuild of the translated manual pages was requested but resulted in no changes' >&2
+            exit 0
+          fi &&
+          git \
+            -c user.name=${{ github.actor }} \
+            -c user.email=${{ github.actor }}@noreply.github.com \
+            commit -m "Update translated manual pages" \
+              -m 'Updated via the `update-translated-manual-pages.yml` GitHub workflow.' &&
+          echo "result=modified" >>$GITHUB_OUTPUT
+      - name: verify that there are no uncommitted changes
+        run: |
+          git update-index --refresh &&
+          if test -n "$(git diff HEAD)$(git ls-files --exclude-standard --other)"
+          then
+            echo '::error::there are uncommitted changes!' >&2
+            git status >&2
+            exit 1
+          fi
+      - name: deploy to GitHub Pages
+        if: steps.manual-pages.outputs.result != ''
+        id: deploy
+        uses: ./.github/actions/deploy-to-github-pages

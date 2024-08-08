@@ -1,0 +1,345 @@
+git-send-email(1)
+=================
+
+名称
+--
+git-send-email - 以电子邮件形式发送补丁集
+
+
+概述
+--
+[verse]
+'git send-email' [<options>] (<file>|<directory>)...
+'git send-email' [<options>] <format-patch-options>
+'git send-email' --dump-aliases
+
+
+描述
+--
+获取命令行中给出的补丁并将其发送出去。 补丁可以指定为文件、目录（将发送目录中的所有文件），或直接指定为修订列表。 在最后一种情况下，linkgit:git-format-patch[1] 接受的任何格式，以及 linkgit:git-format-patch[1] 可以理解的选项，都可以传递给 git send-email。
+
+电子邮件的标题可通过命令行选项进行配置。 如果未在命令行中指定，系统将在启用读取行的界面上提示用户提供必要的信息。
+
+补丁文件有两种格式：
+
+1. mbox 格式文件
++
+这就是 linkgit:git-format-patch[1] 生成的内容。 大部分头文件和 MIME 格式都会被忽略。
+
+2. Greg Kroah-Hartman 的 'send_lots_of_email.pl' 脚本使用的原始格式
++
+这种格式希望文件的第一行包含 "Cc:"（抄送）值，第二行包含邮件的 "主题："。
+
+
+选项
+--
+
+撰写
+~~
+
+--annotate::
+	审核并编辑您即将发送的每个补丁。默认为 `sendemail.annotate` 的值。有关 `sendemail.multiEdit` 请参阅配置部分。
+
+--bcc=<地址>,...::
+	为每封电子邮件指定一个 "Bcc："（密送）值。默认为 `sendemail.bcc` 的值。
++
+该选项可指定多次。
+
+--cc=<地址>,...::
+	为每封电子邮件指定一个起始 "Cc："（抄送）值。 默认值为 `sendemail.cc`。
++
+该选项可指定多次。
+
+--compose::
+	调用文本编辑器（参见 linkgit:git-var[1] 中的 GIT_EDITOR）编辑补丁系列的介绍信息。
++
+当使用 `--compose` 时，git send-email 将使用邮件中指定的发件人、收件人、抄送人、密送人、主题、回复人和收件人标题。如果邮件正文（在标题和空行之后输入的内容）只包含空行（或 Git: 前缀），摘要将不会被发送，但上述标题将被使用，除非它们被移除。
++
+将提示是否有缺失的发件人或收件人标题。
++
+请参阅 `sendemail.multiEdit` 的配置部分。
+
+--from=<地址>::
+	指定电子邮件的发件人。 如果未在命令行中指定，则使用配置选项 `sendemail.from` 的值。 如果命令行选项和 `sendemail.from` 均未设置，则会提示用户输入值。 提示的默认值是 GIT_AUTHOR_IDENT 的值，如果没有设置 GIT_COMMITTER_IDENT，则使用 "git var -l" 返回的值。
+
+--reply-to=<地址>::
+	指定收件人回复的地址。 如果邮件的回复地址与 --from 参数指定的地址不同，请使用此参数。
+
+--in-reply-to=<标识符>::
+	使第一封邮件（或所有带有 `--no-thread`（无线程）的邮件）作为给定 Message-ID 的回复出现，从而避免为提供新的补丁系列而中断线程。 第二封及其后的邮件将根据 "--[no-]chain-reply-to "设置作为回复发送。
++
+例如，如果指定了 `--thread` 和 `--no-chain-reply-to`，则第二个和后续补丁将是对第一个补丁的回复，如下图所示，`[PATCH v2 0/3]` 是对 `[PATCH 0/2]` 的回复：
++
+  [PATCH 0/2] 我是这样做的...
+    [PATCH 1/2] 清理和测试
+    [PATCH 2/2] 实施情况
+    [PATCH v2 0/3] 这里是重选
+      [PATCH v2 1/3] 清理
+      [PATCH v2 2/3] 新测试
+      [PATCH v2 3/3] 实施情况
++
+只有同时设置了 --compose 时才有必要。 如果未设置 --compose，则会提示。
+
+--subject=<字符串>::
+	指定电子邮件线程的初始主题。 只有同时设置了 --compose 时才需要。 如果未设置 --compose，系统将提示输入。
+
+--to=<地址>,...::
+	指定所生成电子邮件的主要收件人。一般来说，这将是相关项目的上游维护者。默认值是 `sendemail.to` 配置值的值，如果未指定该值，且未指定 --to-cmd 参数，则会提示该值。
++
+该选项可指定多次。
+
+--8bit-encoding=<编码>::
+	当遇到未声明其编码的非 ASCII 邮件或主题时，添加标头/引号以表明它是以 <编码> 编码的。 默认值是 'sendemail.assume8bitEncoding ' 的值；如果未指定该值，则在遇到任何非 ASCII 文件时会提示使用该值。
++
+请注意，我们不会尝试验证编码。
+
+--compose-encoding=<编码>::
+	Specify encoding of compose message. Default is the value of the 'sendemail.composeEncoding'; if that is unspecified, UTF-8 is assumed.
+
+--transfer-encoding=(7bit|8bit|quoted-printable|base64|auto)::
+	指定通过 SMTP 发送邮件时使用的传输编码。 如仓本库中包含含有回车的文件，quoted-printable 会很有用，但会使原始补丁邮件文件（从 MUA 中保存）更难手动检查。
++
+默认为 `sendemail.transferEncoding` 配置值的值，如果未指定，则默认为 `auto`。
+
+--xmailer::
+--no-xmailer::
+	添加（或阻止添加）"X-Mailer: " 标头。 默认情况下会添加，但可以通过将配置变量 `sendemail.xmailer` 设为 `false`来关闭。
+
+发送中
+~~~
+
+--envelope-sender=<地址>::
+	指定用于发送电子邮件的信封发件人。 如果您的默认地址不是订阅列表的地址，这将非常有用。为了使用 'From'（发件人）地址，请将值设置为 "auto"。如果使用 sendmail 二进制文件，必须为 -f 参数设置适当的权限。 默认值是 `sendemail.envelopeSender` 配置变量的值；如果未指定，则由 MTA 选择信封发件人。
+
+--sendmail-cmd=<命令>::
+	Specify a command to run to send the email. The command should be sendmail-like; specifically, it must support the `-i` option. The command will be executed in the shell if necessary. Default is the value of `sendemail.sendmailCmd`. If unspecified, and if --smtp-server is also unspecified, git-send-email will search for `sendmail` in `/usr/sbin`, `/usr/lib` and $PATH.
+
+--smtp-encryption=<加密>::
+	指定 SMTP 连接的加密方式。 有效值为 'ssl' 和 'tls'。任何其他值都将恢复为普通（未加密）SMTP，默认端口为 25。 尽管名称不同，但这两个值都将使用相同的 TLS 更新版本，只是由于历史原因才使用了这些名称。'ssl' 指 “隐式” 加密（有时称为 SMTPS），默认使用 465 端口。 'tls' 指 “显式” 加密（通常称为 STARTTLS），默认使用 25 端口。SMTP 服务器还可能使用其他端口，但这些端口并非默认端口。常见的 'tls' 和未加密的替代端口是 587。您需要查看供应商的文档或服务器配置，以确定自己的情况。默认值为 `sendemail.smtpEncryption`。
+
+--smtp-domain=<FQDN>::
+	指定发送到 SMTP 服务器的 HELO/EHLO 命令中使用的完全限定域名 (FQDN)。 有些服务器要求 FQDN 与您的 IP 地址匹配。 如果未设置，git send-email 会尝试自动确定您的 FQDN。 默认值为 `sendemail.smtpDomain`。
+
+--smtp-auth=<验证机制>::
+	以空白分隔的允许 SMTP-AUTH 机制列表。此设置只强制使用列出的机制。例如：
++
+------
+$ git send-email --smtp-auth="PLAIN LOGIN GSSAPI" ...
+------
++
+如果指定的机制中至少有一种与 SMTP 服务器公布的机制相匹配，且受所使用的 SASL 库支持，则该机制将用于身份验证。如果既未指定 'sendemail.smtpAuth'，也未指定 `--smtp-auth`参数，则可使用 SASL 库支持的所有机制。如果指定了特殊值 'none'，则可以完全禁用与 `--smtp-user` 参数无关的身份验证
+
+--smtp-pass[=<密码>]::
+	SMTP-AUTH 的密码。参数为可选参数：如果未指定参数，则使用空字符串作为密码。默认值是 `sendemail.smtpPass` 的值，但 `--smtp-pass` 始终会覆盖该值。
++
+此外，无需在配置文件或命令行中指定密码。如果已指定用户名（使用 `--smtp-user` 或 `sendemail.smtpUser`），但未指定密码（使用 `--smtp-pass` 或 `sendemail.smtpPass`），则使用 'git-credential' 获取密码。
+
+--no-smtp-auth::
+	禁用 SMTP 验证。`--smtp-auth=none` 的简称
+
+--smtp-server=<主机>::
+	如果设置，则指定要使用的外发 SMTP 服务器（例如 `smtp.example.com` 或原始 IP 地址）。 如果未指定，而且`--sendmail-cmd` 也未指定，默认情况下会在`/usr/sbin`、`/usr/lib` 和 $PATH 中搜索 `sendmail`（如果有），否则会返回到 `localhost`。
++
+为了向后兼容，该选项也可以指定一个类似于 sendmail 的程序的完整路径名；该程序必须支持 `-i` 选项。 这种方法不支持传递参数或使用纯命令名。 在这些情况下，请考虑使用 `--sendmail-cmd`。
+
+--smtp-server-port=<端口>::
+	指定一个不同于默认端口的端口（SMTP 服务器通常监听 smtp 端口 25，但也可能监听 submission 端口 587 或常用的 SSL smtp 端口 465）；也接受符号端口名称（如用 "submission" 代替 587）。端口也可以通过 `sendemail.smtpServerPort` 配置变量来设置。
+
+--smtp-server-option=<选项>::
+	如果设置，则指定要使用的外发 SMTP 服务器选项。 默认值可由 `sendemail.smtpServerOption` 配置选项指定。
++
+对于要传递给服务器的每个选项，都必须重复使用 --smtp-server-option 选项。同样，每个选项必须在配置文件中使用不同的行。
+
+--smtp-ssl::
+	'--smtp-encryption ssl' 的遗留别名。
+
+--smtp-ssl-cert-path::
+	Path to a store of trusted CA certificates for SMTP SSL/TLS certificate validation (either a directory that has been processed by 'c_rehash', or a single file containing one or more PEM format certificates concatenated together: see verify(1) -CAfile and -CApath for more information on these). Set it to an empty string to disable certificate verification. Defaults to the value of the `sendemail.smtpSSLCertPath` configuration variable, if set, or the backing SSL library's compiled-in default otherwise (which should be the best choice on most platforms).
+
+--smtp-user=<用户>::
+	SMTP-AUTH 的用户名。默认值是 `sendemail.smtpUser` 的值；如果未指定用户名（使用 `--smtp-user` 或 `sendemail.smtpUser`），则不会尝试验证。
+
+--smtp-debug=(0|1)::
+	启用 (1) 或禁用 (0) 调试输出。如果启用，将打印 SMTP 命令和回复。用于调试 TLS 连接和身份验证问题。
+
+--batch-size=<数值>::
+	某些邮件服务器（如 smtp.163.com）限制每次会话（连接）发送的邮件数量，这将导致发送大量邮件时出现故障。 有了这个选项，send-email 会在发送 $<数值> 邮件后断开连接，等待几秒钟（参见 --relogin-delay ），然后重新连接，以规避这种限制。 你可能需要使用某种形式的凭证助手，以避免每次都要重新输入密码。 默认为 `sendemail.smtpBatchSize` 配置变量。
+
+--relogin-delay=<整数>::
+	重新连接 SMTP 服务器前等待 $<整数> 秒。与 --batch-size 选项一起使用。 默认为 `sendemail.smtpReloginDelay` 配置变量。
+
+自动化
+~~~
+
+--no-to::
+--no-cc::
+--no-bcc::
+	清除之前通过配置设置的 "To:"（收件人）、"Cc:"（抄送人）、"Bcc:"（密送人）地址列表。
+
+--no-identity::
+	清除先前读取的通过配置设置的 `sendemail.identity` 值（如果有）。
+
+--to-cmd=<命令>::
+	Specify a command to execute once per patch file which should generate patch file specific "To:" entries. Output of this command must be single email address per line. Default is the value of 'sendemail.toCmd' configuration value.
+
+--cc-cmd=<命令>::
+	指定每个补丁文件执行一次的命令，该命令应生成补丁文件特定的 "Cc:"（抄送人）条目。 该命令的输出必须是每行一个电子邮件地址。 默认值为 `sendemail.ccCmd` 配置值。
+
+--header-cmd=<命令>::
+	指定一条命令，每封发送邮件执行一次，并输出 RFC 2822 样式的标题行插入其中。如果设置了 `sendemail.headerCmd` 配置变量，则始终使用其值。在命令行中提供 --header-cmd 参数时，其值优先于 `sendemail.headerCmd` 配置变量。
+
+--no-header-cmd::
+	禁用任何正在使用的标题命令。
+
+--[no-]chain-reply-to::
+	如果设置了此项，每封邮件都将作为对前一封邮件的回复发送。 如果使用 "--no-chain-reply-to" 禁用该选项，则第一封邮件之后的所有邮件都将作为对第一封邮件的回复发送。 使用此功能时，建议给出的第一个文件是整个补丁系列的概述。默认情况下已禁用，但可以使用 `sendemail.chainReplyTo` 配置变量启用它。
+
+--identity=<身份>::
+	配置标识。给定后，'sendemail.<认证>' 分节中的值将优先于 'sendemail' 部分中的值。默认身份是 `sendemail.identity` 的值。
+
+--[no-]signed-off-by-cc::
+	If this is set, add emails found in the `Signed-off-by` trailer or Cc: lines to the cc list. Default is the value of `sendemail.signedOffByCc` configuration value; if that is unspecified, default to --signed-off-by-cc.
+
+--[no-]cc-cover::
+	If this is set, emails found in Cc: headers in the first patch of the series (typically the cover letter) are added to the cc list for each email set. Default is the value of 'sendemail.ccCover' configuration value; if that is unspecified, default to --no-cc-cover.
+
+--[no-]to-cover::
+	If this is set, emails found in To: headers in the first patch of the series (typically the cover letter) are added to the to list for each email set. Default is the value of 'sendemail.toCover' configuration value; if that is unspecified, default to --no-to-cover.
+
+--suppress-cc=<类别>::
+	指定一个额外的收件人类别，以禁止自动收件：
++
+--
+- 'author' 将避免包含补丁作者。
+- 'self' 将避免包括发件人。
+- 'cc' 将避免包括补丁头中抄送行提到的任何人，但自己除外（使用 'self' 即可）。
+- 'bodycc' 将避免在补丁正文（提交信息）中包含抄送行中提到的任何人，但自己除外（为此使用 'self'）。
+- 'sob' 将避免包括签名行中提到的任何人， 除了自我 （为此使用 "自我" ）。
+- 'misc-by' 将避免包含补丁正文中的 Acked-by、Reviewed-by、Tested-by 和其他 "-by " 行提到的任何人，但 Signed-off-by 除外（使用 'sob' ）。
+- 'cccmd' 将避免运行 --cc-cmd 命令。
+- 'body' 等同于 'sob' + 'bodycc' + 'misc-by'。
+- 'all' 会抑制所有自动抄送值。
+--
++
+Default is the value of `sendemail.suppressCc` configuration value; if that is unspecified, default to 'self' if --suppress-from is specified, as well as 'body' if --no-signed-off-cc is specified.
+
+--[no-]suppress-from::
+	如果设置了此项，则不会将发件人地址添加到抄送地址列表中。 默认值是 `sendemail.suppressFrom` 配置值的值，如果未指定，则默认为 --no-suppress-from 参数。
+
+--[no-]thread::
+	如果设置了此项，每封邮件都会添加 In-Reply-To 和 References 标头。 每封邮件是引用前一封邮件（'git format-patch' 中的 `deep` 线程），还是引用第一封邮件（`shallow` 线程），由 "--[no-]chain-reply-to" 决定。
++
+如果使用"--no-thread" 禁用，则不会添加这些标题（除非使用 --in-reply-to 指定）。 默认值是 "sendemail.thread" 配置值；如果未指定，则默认为 --thread 选项。
++
+当 'git send-email' 被要求添加 In-Reply-To 头信息时，用户应确保该头条信息不存在（特别要注意的是，'git format-patch' 可被配置为自行进行线程处理）。 否则可能无法在收件人的 MUA 中产生预期结果。
+
+
+管理
+~~
+
+--confirm=<模式>::
+	发送前确认：
++
+--
+- 'always' 总会在发送前确认
+- 'never' 在发送前不会确认
+- 如果发送邮件已自动将补丁中的地址添加到抄送列表中，'cc' 将在发送前进行确认
+- 当使用 --compose 选项时，'compose' 会在发送第一条信息前进行确认。
+- 'auto' 等同于 'cc' + 'compose'
+--
++
+默认值是 `sendemail.confirm` 配置值的值，如果未指定，则默认为 'auto'，除非指定了任何抑制选项，在这种情况下默认为 'compose'。
+
+--dry-run::
+	除了实际发送邮件外，什么都做。
+
+--[no-]format-patch::
+	当参数可以理解为引用或文件名时，选择将其理解为格式补丁参数（`--format-patch`）或文件名（`--no-format-patch`）。默认情况下，当出现这种冲突时，git send-email 操作将失败。
+
+--quiet::
+	让 git-send-email 少输出一些。 每封邮件只输出一行即可。
+
+--[no-]validate::
+	对补丁进行正确性检查。 目前，验证的含义如下：
++
+--
+		*	调用 sendemail-validate （发送邮件验证）钩子（如果存在）（参见 linkgit:githooks[5])。
+		*	警告含有长于
+			998 个字符，除非使用了合适的传输编码
+			('auto'、'base64' 或 'quoted-printable'）都会使用；
+			这是因为 SMTP 的限制，如
+			https://www.ietf.org/rfc/rfc5322.txt。
+--
++
+默认为 `sendemail.validate` 的值；如果未设置，则默认为 `--validate` 参数。
+
+--force::
+	即使安全检查不允许，也要发送电子邮件。
+
+
+信息
+~~
+
+--dump-aliases::
+	Instead of the normal operation, dump the shorthand alias names from the configured alias file(s), one per line in alphabetical order. Note that this only includes the alias name and not its expanded email addresses. See 'sendemail.aliasesFile' for more information about aliases.
+
+
+配置
+--
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/sendemail.txt`
+
+See original version for this content.
+====
+
+[]
+
+实例
+--
+使用 gmail 作为 smtp 服务器
+~~~~~~~~~~~~~~~~~~~~
+要使用 'git send-email' 通过 GMail SMTP 服务器发送补丁，请编辑 ~/.gitconfig 指定账户设置：
+
+----
+[sendemail]
+	smtpEncryption = tls
+	smtpServer = smtp.gmail.com
+	smtpUser = yourname@gmail.com
+	smtpServerPort = 587
+----
+
+如果您的 Gmail 账户设置了多因素身份验证，您可以生成一个应用程序专用密码，供 'git send-email' 使用。请访问 https://security.google.com/settings/security/apppasswords 创建密码。
+
+一旦您的提交已准备好发送至邮件列表，请运行以下命令：
+
+	$ git format-patch --cover-letter -M origin/master -o outgoing/
+	$ edit outgoing/0000-*
+	$ git send-email outgoing/*
+
+首次运行时，系统会提示您输入凭据。 请根据情况输入特定于应用程序的密码或常规密码。 如果配置了凭据助手（参见 linkgit:git-credential[1]），密码会保存在凭据存储区，下次就不用再输入了。
+
+注意：需要安装以下 Perl 核心模块，这些模块可能已随 Perl 发行版一起安装： MIME::Base64、MIME::QuotedPrint、Net::Domain 和 Net::SMTP。 还需要安装这些额外的 Perl 模块： Authen::SASL 和 Mail::Address。
+
+
+参见
+--
+linkgit:git-format-patch[1], linkgit:git-imap-send[1], mbox(5)
+
+GIT
+---
+属于 linkgit:git[1] 文档

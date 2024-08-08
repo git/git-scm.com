@@ -1,0 +1,202 @@
+git-range-diff(1)
+=================
+
+NOME
+----
+git-range-diff - Compara os dois intervalos de um commit (as duas versões de um ramo por exemplo)
+
+RESUMO
+------
+[verse]
+'git range-diff' [--color=[<quando>]] [--no-color] [<diff-options>]
+	[--no-dual-color] [--creation-factor=<fator>]
+	[--left-only | --right-only]
+	( <intervalo1> <intervalo2> | <rev1>...<rev2> | <base> <rev1> <rev2> )
+	[[--] <caminho>...]
+
+DESCRIÇÃO
+---------
+
+Este comando mostra as diferenças entre as duas versões de uma série de correções (patchs) ou de forma geral, dois intervalos entre os commits (ignorando as confirmações de mesclagem).
+
+Na presença de argumentos `<caminho>`, estas faixas de commits são devidamente limitados.
+
+Para esse fim, ele primeiro encontra os pares dos commits a partir de ambos os intervalos entre os commits onde um corresponda ao outro. Sabe-se que dois commits se correspondem quando a diferença entre os patchs das suas correções (ou seja, a informação do autor, a mensagem do commit e a diferença deste commit) seja razoavelmente pequena comparada ao tamanho dos patches de correções. Consulte ``Algoritmo`` abaixo para obter mais detalhes.
+
+Finalmente, a lista de correspondência dos commits é mostrada na ordem do intervalo do segundo commit, com commits sem correspondência sendo inseridos logo depois que todos os seus ancestrais tenham sido mostrados.
+
+Existem três maneiras de definir os intervalos do commit:
+
+- `<intervalo1> <intervalo2>`: Qualquer intervalo do commit pode ter o formato `<base>..<rev>`, `<rev>^!` ou `<rev>^-<n>`. Para mais detalhes consulte `ESPECIFICANDO OS INTERVALOS` em linkgit:gitrevisions[7].
+
+- `<rev1>...<rev2>`. É equivalente a `<rev2>..<rev1> <rev1>..<rev2>`.
+
+- `<base> <rev1> <rev2>`: É equivalente a `<base>..<rev1> <base>..<rev2>`.
+
+OPÇÕES
+------
+--no-dual-color::
+	Quando os diffs do commit diferirem, o comando `git range-diff` recria a
+coloração dos diffs originais e adiciona marcadores dos diffs externos -/+
+com o *fundo* em vermelho/verde para facilitar a visualização, quando houve
+uma alteração nas linhas exatas que foram adicionadas por exemplo.
++
+Além disso, as linhas de diferenças de confirmação que estão presentes apenas no primeiro intervalo de confirmação são mostradas "esmaecidas" (isso pode ser alterado usando a configuração `color.diff.<slot>` onde `<slot>` será `contextDimmed` , `oldDimmed` e `newDimmed`), as linhas das diferenças do commit que estão presentes apenas no segundo intervalo do commit são mostradas em negrito (podendo ser substituídas usando as configurações `color.diff.<slot>` com `<slot > `sendo `contextBold`, `oldBold` ou `newBold`).
++
+Isso é conhecido por `range-diff` como "coloração dupla". Use a opção `--no-dual-color` para reverter a cor de todas as linhas de acordo com os marcações diff externos (e ignorar completamente o diff interno quando se tratar de cor).
+
+--creation-factor=<percentual>::
+	Defina o fator de correção do custo de criação/exclusão como `<por-cento>`. A predefinição é 60. Tente um valor maior se o comando `git range-diff` considerar erroneamente uma grande alteração como uma reescrita total (exclusão de um commit e adição de outro) e um valor menor no caso inverso. Consulte a seção ``Algoritmo`` abaixo para obter uma explicação do por que isso é necessário.
+
+--left-only::
+	Suprime os commits que estão faltando no primeiro intervalo informado (ou o "intervalo esquerdo" ao usar o formato `<rev1>...<rev2>`).
+
+--right-only::
+	Suprime os commits que estão faltando no segundo intervalo informado (ou o "intervalo direito" ao usar o formato `<rev1>...<rev2>`).
+
+--[no-]notes[=<ref>]::
+	Esta opção é repassada para o comando `git apply` que aplica as correções (patch) (consulte linkgit:git-log[1]).
+
+<intervalo da revisão1> <intervalo da revisão2>::
+	Compare os commits através dos dois intervalos, onde `<intervalo1>` é considerado uma versão mais antiga de `<intervalo1>`.
+
+<rev1>...<rev2>::
+	É o mesmo que passar `<rev2>..<rev1>` e `<rev1>..<rev2>`.
+
+<base> <rev1> <rev2>::
+	É o mesmo que passar `<base>..<rev1>` e `<base>..<rev2>`. Observe que `<base>` não precisa ser o ponto exato da ramificação das ramificações. Exemplo: após o rebase de uma ramificação `my-topic`, o comando `git range-diff my-topic@{u} my-topic@{1} my-topic` mostraria as diferenças introduzidas pelo rebase.
+
+O comando `git range-diff` também aceita as opções normais do diff (consulte linkgit:git-diff[1]), mais notavelmente as opções `--color=[<quando>]` e `--no-color`. Estas opções são usadas ao criar a "diferença entre as correções", ou seja, para comparar o autor, a mensagem do commit e o diff correspondente dos commits antigos/novos. Atualmente não há meios de ajustar a maioria das opções do diff passadas para o `git log` ao gerar esses patches.
+
+ESTABILIDADE DA SAÍDA
+---------------------
+
+A saída do comando `range-diff` está sujeita a alterações. Pretende-se que seja uma saída porcelana legível para as pessoas, não algo que possa ser usado nas versões do Git para obter um `range-diff` textualmente estável (em oposição a opção `--stable` com linkgit:git-patch-id[1]). Também não há um equivalente ao linkgit:git-apply[1] para o `range-diff`, a saída não se destina a ser legível para máquina.
+
+Isso é particularmente verdadeiro ao passar opções diff. Atualmente, algumas opções como `--stat` podem, como um efeito emergente, produzir uma saída bastante inútil no contexto do comando `range-diff`. Versões futuras do comando `range-diff` podem aprender a interpretar tais opções de uma maneira específica (para `--stat` produzindo uma saída legível que resume como o diffstat mudou por exemplo).
+
+CONFIGURAÇÃO
+------------
+Esse comando usa as configurações `diff.color.*` e `pager.range-diff` (a predefinição desta última é estar ativada). Consulte linkgit:git-config[1].
+
+
+EXEMPLOS
+--------
+
+Quando um rebase requer que os conflitos da mesclagem sejam resolvidos, compare as alterações introduzidas através do rebase diretamente depois usando:
+
+------------
+$ git range-diff @{u} @{1} @
+------------
+
+
+Uma típica saída do comando `git range-diff` ficaria assim:
+
+------------
+-:  ------- > 1:  0ddba11 Se prepare para o inevitável!
+1:  c0debee = 2:  cab005e Adicione uma mensagem de ajuda no início
+2:  f00dbal ! 3:  decafe1 Descreva o problema
+    @@ -1,3 +1,3 @@
+     Autor: A U Thor <author@example.com>
+
+    -TODO: Descreva um problema
+    +Descreva um problema
+    @@ -324,5 +324,6
+      Já era esperado.
+
+    -+O que é inesperado é que também irá travar.
+    ++Inesperadamente, ele também trava. Este é um bug, e o júri é
+    ++ainda está no ar a maneira de como melhor consertar. Consulte o tíquete #314 para obter mais detalhes.
+
+      Contato
+3: bedhead <-: ------- PARA DESFAZER
+------------
+
+Neste exemplo, existem 3 commits antigos e 3 novos onde o desenvolvedor removeu o terceiro, adicionou um novo antes dos dois primeiros, e alterou a mensagem do commit do segundo commit, bem como o seu diff.
+
+Quando a saída vai para um terminal, ela é codificada em cores , assim como a saída normal do comando `git diff`. Além disso, a primeira linha (adicionando um commit) é verde, a última linha (excluindo um commit) é vermelha, a segunda linha (com uma correspondência perfeita) é amarela como o cabeçalho do commit gerado pelo `git show`, a terceira linha colore o commit antigo de vermelho, o novo como verde e o resto como o cabeçalho do commit do comando `git show`.
+
+Uma diferença ingênua dos diffs codificada por cores é na verdade um pouco difícil de ler, pois pinta todas as linhas de vermelho ou de verde. A linha que adicionou "O que é inesperado" ao commit antigo, por exemplo, é toda vermelha, mesmo se a intenção do commit antigo fosse adicionar algo.
+
+Para auxiliar na questão, é predefinido que o `range` use o modo `--dual-color`. Neste modo, o diff das diffs irá reter as cores diff originais e prefixar as linhas com marcações -/+ que têm o seu *fundo* vermelho ou verde, para tornar mais óbvio que eles descrevem como o próprio diff mudou.
+
+
+Algoritmo
+---------
+
+A ideia geral é esta: geramos uma matriz de custo entre os commits no intervalor de ambos os commits e em seguida, resolvemos a atribuição com o menor custo.
+
+A matriz de custo é populada assim: para cada par de commits, ambos os diffs são gerados, o "diff dos diffs" é gerado com 3 linhas de contexto, então a quantidade das linhas naquele diff é usado como custo.
+
+Para evitar falsos positivos (quando um patch foi removido e um patch não relacionado foi adicionado entre as duas iterações da mesma série de patches por exemplo), a matriz de custo é estendida para que isso seja permitido, adicionando as entradas de custo fixo para o que foi excluído/adicionado.
+
+Exemplo: Deixe que os commits `1--2` sejam a primeira iteração de uma série de patches e `A--C` a segunda iteração. Vamos supor que `A` é uma escolha seletiva de `2,` e `C` é uma escolha seletiva de `1` porém com uma pequena modificação (digamos, um erro de digitação que foi corrigido). Visualize os commits como um gráfico bipartido:
+
+------------
+    1            A
+
+    2            B
+
+		 C
+------------
+
+Estamos procurando uma "melhor" explicação para a nova série em comparação com a antiga. Podemos representar uma "explicação" como uma borda no gráfico:
+
+
+------------
+    1            A
+	       /
+    2 --------'  B
+
+		 C
+------------
+
+Essa explicação vem "de graça" porque não houve alteração. Da mesma forma, `C` pode ser explicado usando `1`, mas isso tem algum custo c>0 por causa da modificação:
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+	  |
+	  `----- C
+	  c>0
+------------
+
+Em termos matemáticos, o que estamos procurando é algum tipo de correspondência bipartida com um custo mínimo; `1` coincidiu com `C` custando alguma coisa, etc. O gráfico subjacente é, na verdade, um gráfico bipartido completo; o custo que associamos com cada borda é o tamanho do diff entre os patches dos dois commits. Para também explicar os novos commits, introduzimos nós fictícios dos dois lados:
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+	  |
+    o     `----- C
+	  c>0
+    o            o
+
+    o            o
+------------
+
+O custo de uma borda `o--C` é o tamanho do diff em `C`, modificado por um fator de correção que deve ser menor que 100%. O custo de uma borda `o--o` é de graça. O fator de correção é necessário porque mesmo que `1` e `C` não tenham nada em comum, eles ainda podem compartilhar algumas linhas vazias, possivelmente tornando a atribuição `1--C`, `o--o` ligeiramente mais barata do que `1--o`, `o--C` ainda que `1` e `C` não tenham nada em comum. Com o fator de correção, exigimos uma parte comum muito maior para considerar os patches como correspondentes.
+
+O tempo total necessário para calcular este algoritmo é o mesmo tempo necessário para calcular o diff de n+m commit e então os diffs de n*m patches, mais o tempo necessário para calcular a atribuição com o menor custo entre os diffs n e m. Git usa uma implementação do algoritmo de Jonker-Volgenant para resolver o problema da atribuição que tem complexidade de tempo de execução cúbica. A correspondência encontrada neste caso será semelhante a esta:
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+       .--+-----'
+    o -'  `----- C
+	  c>0
+    o ---------- o
+
+    o ---------- o
+------------
+
+
+VEJA TAMBÉM
+-----------
+linkgit:git-log[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

@@ -1,0 +1,172 @@
+git-cherry-pick(1)
+==================
+
+名称
+--
+git-cherry-pick - 应用某些现有提交引入的更改
+
+概述
+--
+[verse]
+'git cherry-pick' [--edit] [-n] [-m parent-number] [-s] [-x] [--ff]
+		  [-S[<键 ID>]] <提交>...
+'git cherry-pick' (--continue | --skip | --abort | --quit)
+
+描述
+--
+
+给出一个或多个现有的提交，应用每个提交所带来的变化，为每个提交记录一个新的提交。 这需要您的工作区是干净的（没有对 HEAD 提交的修改）。
+
+当如何应用一个变化不明显时，会发生以下情况：
+
+1. 当前的分支和 `HEAD` 指针保持在最后一次成功提交的位置。
+2. `CHERRY_PICK_HEAD` 引用被设置为指向引入难以应用的修改的提交。
+3. 在索引文件和你的工作区中，更改应用得很干净的路径都被更新。
+4. 对于冲突的路径，索引文件最多记录三个版本，如 linkgit:git-merge[1] 的 “正确的合并” 部分所述。 工作区文件将包括对冲突的描述，括号里是通常的冲突标记 `<<<<<<<` 和 `>>>>>>>`。
+5. 不做其他修改。
+
+参见 linkgit:git-merge[1] 以了解一些解决此类冲突的提示。
+
+选项
+--
+<提交>...::
+	拣选（cherry-pick）的提交。 更完整的拼写提交的方法列表，见 linkgit:gitrevisions[7]。 可以传递提交集，但默认不做遍历，就像指定了 `--no-walk` 选项一样，见 linkgit:git-rev-list[1]。注意，指定一个范围会把所有 <提交>... 参数送入一个单一的修订版（见后面的例子，使用 'maint master...next'）。
+
+-e::
+--edit::
+	有了这个选项，'git cherry-pick' 会让你在提交前编辑提交信息。
+
+--cleanup=<模式>::
+	这个选项决定了提交信息在传递给提交机制之前将如何进行清理。更多细节见 linkgit:git-commit[1]。特别是，如果 '<模式>' 的值为 `scissors`，那么在发生冲突时，`scissors` 将被附加到 `MERGE_MSG` 上。
+
+-x::
+	在记录提交时，在原始提交信息中添加一行 "(cherry picked from commit ...)"，以表明这个改动是从哪个提交中拣选的。 这只适用于没有冲突的拣选。 如果你是从自己的私有分支中偷梁换柱，请不要使用这个选项，因为这个信息对接收者来说是无用的。 另一方面，如果您是在两个公开可见的分支之间进行拣选（例如，从开发分支向维护分支回传一个旧版本的修正），添加这一信息会很有用。
+
+-r::
+	过去，该命令默认为做上述的 `-x`，`-r` 是禁用它。 现在默认是不做 `-x` ，所以这个选项是一个无用的选项。
+
+-m <父提交数量>::
+--mainline <父提交数量>::
+	通常你不能对一个合并进行拣选，因为你不知道合并的哪一边应该被视为主线。 这个选项指定了主线的父号（从 1 开始），允许拣选相对于指定的父号重放修改。
+
+-n::
+--no-commit::
+	通常该命令会自动创建一连串的提交。 这个标志会对您的工作树和索引进行必要的修改，以摘取每个命名的提交，而不做任何提交。 此外，使用这个选项时，您的索引不需要与 HEAD 提交相匹配。 挑拣是针对你的索引的起始状态进行的。
++
+这在连续摘取多个提交的效果给你的索引时很有用。
+
+-s::
+--signoff::
+	在提交信息的末尾添加一个 `Signed-off-by` 的尾注。 更多信息见 linkgit:git-commit[1] 中的 signoff 选项。
+
+-S[<keyid>]::
+--gpg-sign[=<键 ID>]::
+--no-gpg-sign::
+	GPG 签名提交。`keyid` 参数是可选的，默认为提交者身份；如果指定了，则必须与选项相连，不加空格。`--no-gpg-sign` 用于还原 `commit.gpgSign` 配置变量和先前的 `--gpg-sign`。
+
+--ff::
+	如果当前的 HEAD 与拣选的提交的父本相同，那么将执行快速合并到这个提交。
+
+--allow-empty::
+	By default, cherry-picking an empty commit will fail, indicating that an explicit invocation of `git commit --allow-empty` is required. This option overrides that behavior, allowing empty commits to be preserved automatically in a cherry-pick. Note that when "--ff" is in effect, empty commits that meet the "fast-forward" requirement will be kept even without this option. Note also, that use of this option only keeps commits that were initially empty (i.e. the commit recorded the same tree as its parent). Commits which are made empty due to a previous commit will cause the cherry-pick to fail. To force the inclusion of those commits, use `--empty=keep`.
+
+--allow-empty-message::
+	默认情况下，对空信息的提交进行拣选会失败。 这个选项覆盖了这一行为，允许对空信息的提交进行拣选。
+
+--empty=(drop|keep|stop)::
+	如何处理被挑拣的提交与当前历史中已有的更改重复的情况。
++
+--
+`drop`;;
+	这个提交会被丢弃。
+`keep`;;
+	这个提交会被保留。暗含 `--allow-empty` 选项。
+`stop`;;
+	当提交被应用时，挑拣操作将停止，允许您检查该提交。这是默认行为。
+--
++
+请注意，`--empty=drop` 和 `--empty=stop` 仅指定如何处理最初不是空的提交，而是由于之前的提交而变为空的情况。除非指定了 `--empty=keep` 或 `--allow-empty` 选项，否则最初就是空的提交仍然会导致挑拣操作失败。
++
+
+--keep-redundant-commits::
+	Deprecated synonym for `--empty=keep`.
+
+--strategy=<策略>::
+	使用给定的合并策略。 应该只使用一次。 详见 linkgit:git-merge[1] 中的合并策略部分。
+
+-X<选项>::
+--strategy-option=<选项>::
+	将合并策略特有的选项传递给合并策略。 详见 linkgit:git-merge[1]。
+
+--rerere-autoupdate::
+--no-rerere-autoupdate::
+	在 rerere 机制重用当前冲突的记录解析来更新工作树中的文件后，允许它也用解析的结果来更新索引。 `--no-rerere-autoupdate`是一个很好的方法，在用单独的 `git add` 提交结果到索引之前，可以反复检查 `rerere` 所做的事情，并抓住潜在的错误合并。
+[]
+
+序列器子命令
+------
+--continue::
+	使用`.git/sequencer`中的信息继续进行中的操作。 可以用来在解决拣选或还原失败的冲突后继续执行。
+
+--skip::
+	跳过当前的提交，继续进行队列中其余的命令。
+
+--quit::
+	忽略当前正在进行的操作。 可以用来在拣选或还原失败之后清除序列器的状态。
+
+--abort::
+	取消操作并返回到预排序状态。
+[]
+
+实例
+--
+`git cherry-pick master`::
+
+	应用主分支顶端的提交所引入的修改，并以这个修改创建一个新的提交。
+
+`git cherry-pick ..master`::
+`git cherry-pick ^HEAD master`::
+
+	应用所有属于 master 但不属于 HEAD 的祖先的提交所带来的变化，产生新的提交。
+
+`git cherry-pick maint next ^master`::
+`git cherry-pick maint master..next`::
+
+	应用所有属于 maint 或 next 的祖先的提交所带来的变化，但不包括 master 或其任何祖先。 注意，后者不是指 `maint` 和 `master` 与 `next` 之间的一切；具体来说，如果 `maint` 包含在 `master` 中，则不会被使用。
+
+`git cherry-pick master~4 master~2`::
+
+	应用 master 指向的第五次和最后第三次提交所带来的变化，并根据这些变化创建两个新的提交。
+
+`git cherry-pick -n master~1 next`::
+
+	在工作区和索引中应用 master 指向的倒数第二个提交和 next 指向的最后一个提交所带来的变化，但不要用这些变化创建任何提交。
+
+`git cherry-pick --ff ..next`::
+
+	如果历史是线性的，并且 HEAD 是 next 的祖先，则更新工作区并将 HEAD 指针向前推进以匹配 next。 否则，将那些在 next 但不在 HEAD 中的提交所带来的变化应用到当前分支，为每个新变化创建一个新的提交。
+
+`git rev-list --reverse master -- README | git cherry-pick -n --stdin`::
+
+	将主干分支上所有触及 README 的提交所带来的变化应用到工作区和索引中，这样就可以检查结果，并在合适的时候做成一个新的提交。
+
+下面的序列试图回传一个补丁，因为补丁所适用的代码变化太大，所以放弃了，然后再试一次，这次对上下文行的匹配更加谨慎。
+
+------------
+$ git cherry-pick topic^             <1>
+$ git diff                           <2>
+$ git cherry-pick --abort            <3>
+$ git cherry-pick -Xpatience topic^  <4>
+------------
+<1> 应用将由 `git show topic^` 显示的变化。 在这个例子中，补丁没有干净地应用，所以冲突的信息被写入索引和工作树，没有新的提交结果。
+<2> 总结需要调节的变化
+<3> 取消 cherry-pick。 换句话说，返回到 cherry-pick 前的状态，保留你在工作区上的任何本地修改。
+<4> 尝试再次应用由 `topic^` 引入的修改，花费额外的时间来避免基于不正确匹配的上下文行的错误。
+
+参见
+--
+linkgit:git-revert[1]
+
+GIT
+---
+属于 linkgit:git[1] 文档

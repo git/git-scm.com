@@ -1,0 +1,161 @@
+git-archive(1)
+==============
+
+名称
+--
+git-archive - 从命名的目录树中创建一个归档文件
+
+
+概述
+--
+[verse]
+'git archive' [--format=<fmt>] [--list] [--prefix=<前缀>/] [<extra>]
+	      [-o <文件> | --output=<文件>] [--worktree-attributes]
+	      [--remote=<仓库> [--exec=<Git 上传归档>]] <树状对象>
+	      [<路径>...]
+
+描述
+--
+创建一个指定格式的档案，包含命名的目录树的结构，并将其写入标准输出。 如果 <前缀> 被指定，它将被预置在归档文件的文件名上。
+
+与提交 ID 或标签 ID 相比，'git archive' 在提供目录树 ID 时的行为有所不同。提供树 ID 时，当前时间会被用作存档中每个文件的修改时间。另一方面，如果提供了提交 ID 或标记 ID，则会使用引用的提交对象中记录的提交时间。 此外，如果使用 tar 格式，提交 ID 会存储在全局扩展 pax 标头中；可以使用 'git get-tar-commit-id' 提取。在 ZIP 文件中，它被存储为文件注释。
+
+选项
+--
+
+--format=<格式>::
+	归档文件的格式。可能的值是 `tar`, `zip`, `tar.gz`, `tgz`, 以及使用配置选项 `tar.<格式>.command` 定义的任何格式。如果没有给出 `--format`，并且指定了输出文件，如果可能的话，将从文件名中推断出格式（例如，写入`foo.zip` 会使输出为`zip`格式）。否则，输出格式为`tar`。
+
+-l::
+--list::
+	显示所有可用的格式。
+
+-v::
+--verbose::
+	向标准错误流报告进度。
+
+--prefix=<前缀>/::
+	Prepend <prefix>/ to paths in the archive. Can be repeated; its rightmost value is used for all tracked files. See below which value gets used by `--add-file`.
+
+-o <文件>::
+--output=<文件>::
+	将存档写入 <文件> 而不是标准输出流。
+
+--add-file=<文件>::
+	添加一个非跟踪的文件到存档。 可以重复添加多个文件。 归档文件的路径是由这个 `--add-file` 之前的最后一个 `--prefix` 选项（如果有的话）的值和 <文件> 的基本名称连接而成的。
+
+--add-virtual-file=<路径>:<内容>::
+	将指定的内容添加到存档中。可以重复此操作以添加多个文件。
++
+`<路径>` 参数可以以字面的双引号字符开始和结束；包含的文件名被解释为 C 风格的字符串，即反斜杠被解释为转义字符。如果路径包含一个冒号，则必须加引号，以避免冒号被误解为路径和内容之间的分隔符，或者如果路径以双引号字符开始或结束。
++
+文件模式被限制为普通文件，该选项可能会受到依赖平台的命令行的限制。对于非复杂的情况，写一个非跟踪的文件并使用 `--add-file` 代替。
++
+请注意，与 `--add-file` 不同，在存档中创建的路径不受 `--prefix` 选项的影响，因为可以将完整的 `<路径>` 作为选项的值给出。
+
+--worktree-attributes::
+	也可以在工作区中的 .gitattributes 文件中寻找属性（见 <<ATTRIBUTES>>）。
+
+--mtime=<时间>::
+	设置存档条目的修改时间。 如果没有这个选项，如果 `<树状对象>` 是一个提交或标签，则使用提交者的时间，如果是一个树，则使用当前时间。
+
+<extra>::
+	这可以是存档器后端能理解的任何选项。 见下一节。
+
+--remote=<仓库>::
+	与其从本地版本库制作一个 tar 归档，不如从远程版本库检索一个 tar 归档。注意，远程仓库可能会对 `<树状对象>` 中允许的 sha1 表达式进行限制。详情见 linkgit:git-upload-archive[1]。
+
+--exec=<git-upload-archive>::
+	与 --remote 一起使用，指定远程端的 "git-upload-archive" 的路径。
+
+<tree-ish>::
+	要制作存档的树目录或提交。
+
+<路径>::
+	如果没有可选的路径参数，当前工作目录下的所有文件和子目录都会包括在存档中。 如果指定了一个或多个路径，则只包括这些路径。
+
+后台额外选项
+------
+
+zip
+~~~
+-<数字 0-9>::
+	指定压缩级别。 较大的值允许命令花费更多的时间来压缩到较小的尺寸。 支持的值从 `-0`（只存储）到 `-9`（最佳比例）。 如果没有给出，默认为 `-6'。
+
+tar
+~~~
+-<数>::
+	指定压缩级别。该值将被传递给 `tar.<格式>.command` 中配置的压缩命令。如果没有指定这个选项，请参阅配置的命令的手册页，了解支持的级别和默认级别。
+
+配置
+--
+
+tar.umask::
+	这个变量可以用来限制 tar 存档条目的权限位。 默认值是 0002，它关闭了世界写入位。 特殊值 "user" 表示将使用归档用户的 umask 来代替。 详情见 umask(2)。 如果使用 `--remote`，那么只有远程仓库的配置才会生效。
+
+tar.<格式>.command::
+	这个变量指定了一个 shel l命令，由 `git archive` 产生的 tar 输出应该通过管道。该命令使用 shell 执行，在其标准输入中生成 tar 文件，并应在其标准输出中产生最终输出。任何压缩级别的选项将被传递给该命令（例如，`-9'）。
++
+`tar.gz` 和 `tgz` 格式是自动定义的，默认使用神奇的命令 `git archive gzip`，它调用了 gzip 的内部实现。
+
+tar.<格式>.remote::
+	如果为真，则通过 linkgit:git-upload-archive[1] 启用该格式供远程客户端使用。对于用户定义的格式，默认为 false，但对于 `tar.gz` 和 `tgz` 格式为 true。
+
+[[ATTRIBUTES]]
+属性
+--
+
+export-ignore::
+	带有 export-ignore 属性的文件和目录不会被添加到存档文件中。 详情见 linkgit:gitattributes[5]。
+
+export-subst::
+	如果为一个文件设置了 export-subst 属性，那么当把这个文件添加到存档时，Git 会展开几个占位符。 详情见 linkgit:gitattributes[5]。
+
+注意，默认情况下，属性来自被归档的树中的 `.gitattributes` 文件。 如果你想在事后调整输出的方式（例如，你提交时没有在其 `.gitattributes` 中添加适当的 export-ignore ），请根据需要调整检查出来的 `.gitattributes` 文件并使用 `--worktree-attributes` 选项。 另外，你也可以在你的 `$GIT_DIR/info/attributes` 文件中保留归档任何树时应该适用的必要属性。
+
+实例
+--
+`git archive --format=tar --prefix=junk/ HEAD | (cd /var/tmp/ && tar xf -)`::
+
+	创建一个包含当前分支上最新提交内容的 tar 归档文件，并将其解压到 `/var/tmp/junk` 目录中。
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0 | gzip >git-1.4.0.tar.gz`::
+
+	为 v1.4.0 版本创建一个压缩的压缩包。
+
+`git archive --format=tar.gz --prefix=git-1.4.0/ v1.4.0 >git-1.4.0.tar.gz`::
+
+	和上面一样，但使用内置的 tar.gz 处理。
+
+`git archive --prefix=git-1.4.0/ -o git-1.4.0.tar.gz v1.4.0`::
+
+	与上述相同，但格式是从输出文件中推断出来的。
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0^{tree} | gzip >git-1.4.0.tar.gz`::
+
+	为 v1.4.0 版本创建一个压缩的 tarball，但没有全局扩展的 pax 头。
+
+`git archive --format=zip --prefix=git-docs/ HEAD:Documentation/ > git-1.4.0-docs.zip`::
+
+	将当前头文件或目录下的所有内容放入 'git-1.4.0-docs.zip'，前缀为 'git-docs/'。
+
+`git archive -o latest.zip HEAD`::
+
+	创建一个包含当前分支上最新提交内容的 Zip 档案。注意，输出格式是由输出文件的扩展名推断出来的。
+
+`git archive -o latest.tar --prefix=build/ --add-file=configure --prefix= HEAD`::
+
+	创建一个 tar 归档文件，其中包含当前分支上的最新提交内容，无前缀，以及无跟踪的文件 'configure'，前缀为 'build/'。
+
+`git config tar.tar.xz.command "xz -c"`::
+
+	配置一个 "tar.xz" 格式来制作 LZMA 压缩的 tarf 文件。 你可以指定 `--format=tar.xz` 来使用它，或者通过创建一个像 `-o foo.tar.xz` 这样的输出文件。
+
+
+参见
+--
+linkgit:gitattributes[5]
+
+GIT
+---
+属于 linkgit:git[1] 文档

@@ -1,0 +1,619 @@
+git-rev-parse(1)
+================
+
+名称
+--
+git-rev-parse - 挑选并调整参数
+
+
+概述
+--
+[verse]
+'git rev-parse' [<options>] <arg>...
+
+描述
+--
+
+Many Git porcelainish commands take a mixture of flags (i.e. parameters that begin with a dash '-') and parameters meant for the underlying 'git rev-list' command they use internally and flags and parameters for the other commands they use downstream of 'git rev-list'. The primary purpose of this command is to allow calling programs to distinguish between them. There are a few other operation modes that have nothing to do with the above "help parse command line options".
+
+除非另有说明，大多数选项和操作模式要求您在 git 仓库内部或由 git 仓库控制的个工作树中运行此命令，否则将给出致命错误。
+
+
+选项
+--
+
+操作模式
+~~~~
+
+这些选项都必须在命令行中首先出现。
+
+--parseopt::
+	在选项解析模式下使用 'git rev-parse'（参见下面的 PARSEOPT 部分）。在此模式下，即使不在仓库内部或由仓库控制的工作树中，也可以使用该命令。
+
+--sq-quote::
+	Use 'git rev-parse' in shell quoting mode (see SQ-QUOTE section below). In contrast to the `--sq` option below, this mode only does quoting. Nothing else is done to command input. The command in this mode can be used outside a repository or a working tree controlled by a repository.
+
+--parseopt 的选项
+~~~~~~~~~~~~~~
+
+--keep-dashdash::
+	仅在 `--parseopt` 模式下有效。告诉选项解析器回显第一个`--` 而不是跳过它。
+
+--stop-at-non-option::
+	仅在 `--parseopt` 模式下有效。 让选项解析器在第一个非选项参数时停止。 这可用于解析本身包含选项的子命令。
+
+--stuck-long::
+	仅在 `--parseopt` 模式下有效。如果有的话，以长形式输出选项，并保留参数。
+
+筛选选项
+~~~~
+
+--revs-only::
+	不输出与 'git rev-list' 命令无关的标志和参数。
+
+--no-revs::
+	不输出用于 'git rev-list' 命令的标志和参数。
+
+--flags::
+	不输出非标志参数。
+
+--no-flags::
+	不输出标记参数。
+
+输出选项
+~~~~
+
+--default <参数>::
+	如果用户没有提供参数，则使用 `<参数>` 代替。
+
+--prefix <参数>::
+	就像从工作树的 `<参数>` 子目录调用 'git rev-parse'一样。 任何相对文件名都会被解析为以 `<参数>` 为前缀，并以这种形式打印。
++
+这可用于转换在子目录中运行的命令的参数，以便在移动到仓库顶层后仍可使用。 例如：
++
+----
+prefix=$(git rev-parse --show-prefix)
+cd "$(git rev-parse --show-toplevel)"
+# rev-parse 提供 'set' 所需的 --
+eval "set $(git rev-parse --sq --prefix "$prefix" -- "$@")"
+----
+
+--verify::
+	验证是否正好提供了一个参数，并且该参数可以转化为原始的 20 字节 SHA-1 用于访问对象数据库。如果可以，则将其输出到标准输出；否则，出错。
++
+如果您想确保输出结果确实命名了对象数据库中的对象，并且/或者可以用作您需要的特定类型的对象，您可以在参数中添加 `^{type}` 剥离运算符。 例如，`git rev-parse "$VAR^{commit}"` 将确保 `$VAR` 命名的现有对象是一个类似提交的对象（即一个提交，或一个指向提交的注释标记）。 要确保 `$VAR` 命名的是任何类型的现有对象，可以使用 `git rev-parse "$VAR^{object}"。
++
+请注意，如果要验证来自不可信来源的名称，最好使用 `--end-of-options`，以免名称参数被误认为其他选项。
+
+-q::
+--quiet::
+	仅在 `--verify` 模式下有效。如果第一个参数不是有效的对象名，则不输出错误信息；而是以非零状态无声退出。 成功时，有效对象名称的 SHA-1 会打印到标准输出流。
+
+--sq::
+	通常情况下，每个标志和参数的输出为一行。 该选项使输出成为单行，并适当加引号供 shell 使用。 当你希望你的参数包含空格和换行符时（例如在使用 pickaxe `-S` 和 'git diff-{asterisk}'时），这个选项很有用。与 `--sq-quote` 选项相反，命令输入仍按常规解释。
+
+--short[=<length>]::
+	与 `--verify` 模式相同，但会将对象名称缩短为至少包含 `长度` 字符的唯一前缀。最小长度为 4，默认值为配置变量 `core.abbrev` 的有效值（参见 linkgit:git-config[1]）。
+
+--not::
+	显示对象名称时，以 '{caret}' 作为前缀，并从已有前缀的对象名称中去掉 '{caret}'。
+
+--abbrev-ref[=(strict|loose)]::
+	对象名称的非含混简称。 选项 core.warnAmbiguousRefs 用于选择严格缩写模式。
+
+--symbolic::
+	通常情况下，对象名称以 SHA-1 形式输出（可能带有 '{caret}' 前缀）；该选项使其输出形式尽可能接近原始输入。
+
+--symbolic-full-name::
+	这与 --symbolic 类似，但它会省略非引用输入（即分支或标记名称；或更明确的消歧义 "heads/master" 形式，当你想命名 "master" 分支时，却有一个不幸命名为 "master" 的标记），而显示为完整的引用名称（例如 "refs/heads/master"）。
+
+--output-object-format=(sha1|sha256|storage)::
+
+	允许从当前仓库支持的任何对象格式输入对象 ID（oids）。
+
+	指定 "sha1" 会进行必要的转换并返回一个 sha1 对象 ID（oid）。
+
+	指定 "sha256" 会进行必要的转换并返回一个 sha256 对象 ID（oid）。
+
+	指定 "storage" 会进行必要的转换并返回一个使用存储哈希算法编码的对象 ID（oid）。
+
+对象选项
+~~~~
+
+--all::
+	显示在 `refs/` 中找到的所有引用。
+
+--branches[=<模式>]::
+--tags[=<模式>]::
+--remotes[=<模式>]::
+	分别显示所有分支、标记或远程跟踪分支（即分别在 `refs/heads`、`refs/tags` 或 `refs/remotes`中找到的引用）。
++
+如果给定了 `pattern`, 则只显示与给定 shell glob 匹配的引用。 如果模式不包含 globing 字符（ `?`、 `*` 或 `[` ），则通过添加 `/*` 将其转换为前缀匹配。
+
+--glob=<pattern>::
+	显示与 shell glob 模式 `模式` 匹配的所有引用。如果模式不以 `refs/` 开头，则会自动预输入。 如果模式不包含 globing 字符（ `?` 、 `*` 或 `[` ），则会通过添加 `/*` 将其转换为前缀匹配。
+
+--exclude=<通配符模式>::
+	不包括匹配"<glob-pattern>"的参考文献，否则下一个`--all`、`--branches`、`--tags`、`--remotes`或`--glob`会考虑这些参考文献。重复这个选项可以累积排除模式，直到下一个`----all`、`---branches`、`---tags`、`---remotes`或`---glob`选项（其他选项或参数不清除累积模式）。
++
+当应用于 `--branches`、 `--tags` 或 `--remotes` 时，所给出的模式不应以 `refs/heads`、`refs/tags` 或 `refs/remotes` 开头；当应用于 `--glob` 或 `--all` 选项时，必须以 `refs/` 开头。如果要使用尾部的 '/{asterisk}'，则必须明确给出。
+
+--exclude-hidden=(fetch|receive|uploadpack)::
+	通过查阅相应的 `fetch.hideRefs` 、`receive.hideRefs` 或 `uploadpack.hideRefs` 配置和 `transfer.hideRefs` 配置（参见 linkgit:git-config[1]），不要包含会被 `git-fetch` 、`git-receive-pack` 或 `git-upload-pack` 隐藏的引用。该选项会影响下一个伪引用选项 `--all` 或 `--glob`，并在处理后清除。
+
+--disambiguate=<前缀>::
+	显示名称以给定前缀开头的所有对象。 <前缀> 的长度必须至少为 4 个十六进制数字，以避免错误地列出仓库中的每个对象。
+
+文件选项
+~~~~
+
+--local-env-vars::
+	列出仓库本地的 GIT_* 环境变量（例如 GIT_DIR 或 GIT_WORK_TREE，但不包括 GIT_EDITOR）。 只列出变量名，不列出变量值，即使变量已被设置。
+
+--path-format=(absolute|relative)::
+	控制某些其他选项的行为。如果指定为绝对路径，这些选项打印的路径将是绝对和规范的。如果指定为相对路径，路径将相对于当前工作目录（如果可能）。 默认情况下，路径将与选项相关。
++
+该选项可以多次指定，并且只影响命令行中该选项后面的参数，要么影响到命令行的末尾，要么影响到该选项的下一个实例。
+
+以下选项会被 `--path-format` 修改：
+
+--git-dir::
+	如果已定义，则显示 `$GIT_DIR`。否则显示 .git 目录的路径。如果是相对路径，则显示当前工作目录的相对路径。
++
+如果未定义 `$GIT_DIR`，且未检测到当前目录位于 Git 仓库或工作区中，则向标准错误流打印一条信息，并以非零状态退出。
+
+--git-common-dir::
+	如果定义了 `$GIT_COMMON_DIR`，则显示 `$GIT_COMMON_DIR` ，否则显示 `$GIT_DIR`。
+
+--resolve-git-dir <路径>::
+	检查 <路径> 是否为有效的版本库或指向有效仓库的 gitfile，并打印仓库的位置。 如果 <路径> 是 gitfile，则打印指向真实仓库的解析路径。
+
+--git-path <路径>::
+	解析 "$GIT_DIR/<路径>"，并考虑其他路径重定位变量，如 $GIT_OBJECT_DIRECTORY、$GIT_INDEX_FILE...。例如，如果 $GIT_OBJECT_DIRECTORY 设置为 /foo/bar，那么 "git rev-parse --git-path objects/abc" 就会返回 /foo/bar/abc。
+
+--show-toplevel::
+	显示工作树顶层目录的路径（默认为绝对路径）。如果没有工作区，则会报错。
+
+--show-superproject-working-tree::
+	显示使用当前仓库作为子模块的父项目工作区（如果存在）根目录的绝对路径。 如果当前仓库未被任何项目用作子模块，则不输出任何内容。
+
+--shared-index-path::
+	在分割索引模式下显示共享索引文件的路径，如果不在分割索引模式下则显示空路径。
+
+以下选项不受 `--path-format` 影响：
+
+--absolute-git-dir::
+	类似于 `--git-dir`，但其输出始终是规范化的绝对路径。
+
+--is-inside-git-dir::
+	当当前工作目录低于仓库目录时，打印 "true"，否则打印 "false"。
+
+--is-inside-work-tree::
+	当当前工作目录位于仓库工作区内时，打印 "true"，否则打印 "false"。
+
+--is-bare-repository::
+	当仓库为裸仓库时，打印 "true"，否则打印 "false"。
+
+--is-shallow-repository::
+	当仓库是浅克隆时打印 "true"，否则打印 "false"。
+
+--show-cdup::
+	从子目录调用命令时，显示顶层目录相对于当前目录的路径（通常是 ".../" 序列或空字符串）。
+
+--show-prefix::
+	从子目录调用命令时，显示当前目录相对于顶层目录的路径。
+
+--show-object-format[=(storage|input|output)]::
+	显示用于存储在 `.git` 目录内、输入或输出的仓库的对象格式（散列算法）。对于输入，可打印多种算法，以空格分隔。 如果未指定，默认为 “存储”。
+
+--show-ref-format::
+	显示仓库使用的参考存储格式。
+
+
+其他选项
+~~~~
+
+--since=<datestring>::
+--after=<datestring>::
+	解析日期字符串，并为 'git rev-list' 输出相应的 --max-age= 参数。
+
+--until=<datestring>::
+--before=<datestring>::
+	解析日期字符串，并为 'git rev-list' 输出相应的 --min-age= 参数。
+
+<arg>...::
+	要解析的标志和参数。
+
+
+规定修订
+----
+
+修订参数 '<rev>' 通常（但不一定）命名一个提交对象。 它使用所谓的 ‘扩展 SHA-1’ 语法。 这里有多种对象名称的拼写方式。 本列表末尾列出的对象名称用于命名提交中包含的树和二进制对象。
+
+NOTE: 本文档显示的是 git 所看到的 “原始” 语法。shell 和其他用户界面可能需要额外的引号来保护特殊字符和避免分词。
+
+'<sha1>', e.g. 'dae86e1950b1277e545cee180551750029cfe735', 'dae86e'::
+  完整的 SHA-1 对象名称（40 字节十六进制字符串），或在仓库中唯一的前导子串。 例如，如果仓库中没有其他对象名称以 dae86e 开头的对象，则 dae86e1950b1277e545cee180551750029cfe735 和 dae86e 都是同一个提交对象的名称。
+
+'<describeOutput（描述输出）>'，例如 'v1.7.4.2-679-g3bee7fb'::
+  来自 `git describe` 的输出；即一个最接近的标记，后面可选择一个破折号和提交次数，再后面是一个破折号、一个 'g' 和一个缩写的对象名称。
+
+'<引用名>'， 例如 'master', 'heads/master', 'refs/heads/master'::
+  符号引用名称。 例如，'master' 通常指 'refs/heads/master' 引用的提交对象。 如果你同时拥有 'heads/master' 和 'tags/master' ，你可以明确地说 'heads/master' 来告诉 Git 你指的是哪一个。 当 '<引用名>' 有歧义时，会根据以下规则取第一个匹配项来消除歧义：
++
+  . 如果'$GIT_DIR/<引用名>' 存在，这就是你的意思（这通常只对 `HEAD`、`FETCH_HEAD`、`ORIG_HEAD`、`MERGE_HEAD`、`REBASE_HEAD`、`REVERT_HEAD`、`CHERRY_PICK_HEAD`、`BISECT_HEAD` 和 `AUTO_MERGE` 有用）;
+
+  . 否则，如果存在，则使用 'refs/<引用名>';
+
+  . 否则，如果存在 'refs/tags/<引用名>'，则使用 'refs/tags/<引用名>';
+
+  . 否则，如果存在 'refs/heads/<引用名>'，则使用 'refs/heads/<引用名>';
+
+  . 否则，如果存在 'refs/remotes/<引用名>'，则使用 'refs/remotes/<引用名>';
+
+  . 否则，如果存在 'refs/remotes/<引用名>/HEAD'，则使用 'refs/remotes/<引用名>/HEAD'。
+
++
+  `HEAD`:::
+    命名工作区中的更改所基于的提交。
+  `FETCH_HEAD`:::
+    记录您上次调用 `git fetch` 时
+    从远程仓库获取的分支。
+  `ORIG_HEAD`:::
+    命令（`git am`、`git merge`、`git rebase`、`git reset`）时创建的，
+    用于记录这些命令执行前`HEAD`的位置，
+    以便于将分支的顶端
+    改回执行这些命令前的状态。
+  `MERGE_HEAD`:::
+    记录您在运行 `git merge` 时
+    要合并到分支中的提交。
+  `REBASE_HEAD`:::
+    会记录当前停止操作的提交，
+    原因可能是冲突或
+    交互式变基中的 `edit` 命令。
+  `REVERT_HEAD`:::
+    记录您在运行 `git revert` 时要还原的提交。
+  `CHERRY_PICK_HEAD`:::
+    会记录您在运行 `git cherry-pick` 时
+    要 cherry-pick 的提交。
+  `BISECT_HEAD`:::
+    记录运行 `git bisect --no-checkout` 时
+    要测试的当前提交。
+  `AUTO_MERGE`:::
+    当合并操作导致冲突时，
+    记录与 'ort' 合并策略写入工作树的状态
+    相对应的树对象。
+
++
+请注意，上述任何 'refs/*' 都可能来自 `$GIT_DIR/refs` 目录或 `$GIT_DIR/packed-refs` 文件。 虽然引用名称编码未指定，但 UTF-8 是首选，因为某些输出处理可能会假定引用名称为 UTF-8 编码。
+
+'@'::
+  '@' 本身就是 `HEAD` 的快捷方式。
+
+'[<引用名>]@{<日期>}', 例如： 'master@\{yesterday\}', 'HEAD@{5 minutes ago}'::
+  在后缀为'@' 的引用后，用一对括号括起来的日期说明（例如 '\{yesterday/}'、'{1 个月 2 周 3 天 1 小时 1 秒前}' 或 '{1979-02-26 18:30:00}'）指定了引用在之前某个时间点的值。 该后缀只能紧跟在引用名称之后使用，且引用必须有现存日志（'$GIT_DIR/logs/<ref>'）。需要注意的是，这个后缀查找的是*本地*引用在给定时间内的状态；例如，上周本地 'master' 分支中的情况。如果要查看特定时间内的提交，请参阅 `--since` 和 `--until`。
+
+'<引用名>@{<n>}', e.g. 'master@\{1\}'::
+  在后缀为 '@' 的引用后，用一对括号（如 '\{1\}'、'\{15\}'）括起来的序号说明指定了该引用的 n 次先验值。 例如，'master@\{1\}' 是 'master' 的直接先验值，而 'master@\{5\}' 是 'master' 的第 5 个先验值。该后缀只能紧跟在引用名称之后使用，并且引用必须有现存日志（'$GIT_DIR/logs/<引用名>'）。
+
+'@{<n>}', e.g. '@\{1\}'::
+  你可以使用带有空引用部分的"@"结构来获取当前分支的引用日志条目。例如，如果你在分支 'blabla' 上，那么 '@\{1\}' 与 'blabla@\{1\}' 的意思相同。
+
+'@{-<n>}', e.g. '@{-1}'::
+  结构体 '@{-<n>}' 表示在当前分支/提交之前签出的第 <n> 个分支/提交。
+
+'[<分支名>]@\{upstream\}', e.g. 'master@\{upstream\}', '@\{u\}'::
+  分支 B 可以设置为在远程 R 的分支 X（使用 `branch.<名称>.merge` 配置）（使用 `branch.<名称>.remote`配置）之上构建。B@{u} 指的是远程 R 分支 X 的远程跟踪分支，通常位于 `refs/remotes/R/X`。
+
+'[<分支名>]@\{push\}', e.g. 'master@\{push\}', '@\{push\}'::
+  后缀 '@\{push}' 报告的是在 `branchname` 签出时运行 `git push` 时 “我们会推送到哪里” 的分支（如果没有指定分支名，则报告当前的 `HEAD`）。就像 '@\{upstream\}' 一样，我们会报告与该分支相对应的远程跟踪分支。
++
+这里有一个例子，可以更清楚地说明这一点:
++
+------------------------------
+$ git config push.default current
+$ git config remote.pushdefault myfork
+$ git switch -c mybranch origin/master
+
+$ git rev-parse --symbolic-full-name @{upstream}
+refs/remotes/origin/master
+
+$ git rev-parse --symbolic-full-name @{push}
+refs/remotes/myfork/mybranch
+------------------------------
++
+请注意，我们在示例中设置了一个三角工作流，即从一个位置提取数据，然后推送到另一个位置。在非三角工作流中，'@\{push}' 与 '@\{upstream}' 相同，没有必要使用。
++
+这个后缀用大写字母拼写时也被接受，无论大小写，意思都一样。
+
+'<修订号>{caret}[<n>]'，例如 'HEAD{caret}, v1.5.1{caret}0'::
+  修订参数的后缀 '{caret}' 表示该提交对象的第一个父对象。 '{caret}<n>'表示第 <n> 个父提交（即 '<rev>{caret}' 等同于 '<rev>{caret}1'）。 作为一条特殊规则，'<rev>{caret}0' 表示提交本身，在 '<rev>' 是指向提交对象的标记对象的对象名时使用。
+
+'<修订>{tilde}[<n>]', e.g. 'HEAD{tilde}, master{tilde}3'::
+  修订参数的后缀 '{tilde}' 表示该提交对象的第一代父对象。 修订参数的后缀 '{tilde}<n>' 表示该提交对象的 <n> 代祖先，仅次于第一代父对象。 例如，'<rev>{tilde}3' 等同于 '<rev>{caret}{caret}{caret}'，后者等同于 '<rev>{caret}1{caret}1{caret}1'。 请参阅下面的示例，了解这种形式的用法。
+
+'<修订>{caret}{<类型>}', e.g. 'v0.99.8{caret}\{commit\}'::
+  后缀 '{caret}' 后跟有一对括号的对象类型名称，表示在 '<修订>' 处递归引用该对象，直到找到 '<类型>' 类型的对象或该对象无法再被引用（在这种情况下，barf）。 例如，如果 '<修订>' 是一个提交对象，那么 '<修订>{caret}/{commit/}' 就描述了相应的提交对象。 同样，如果 '<修订>' 是一个树对象，那么 '<修订>{caret}/{tree/}' 就描述了相应的树对象。 '<修订>{caret}0' 是 '<rev>{caret}/{commit/}' 的简写。
++
+'<修订>{caret}/{object/}' 可以用来确保 '<修订>' 命名了一个存在的对象，而不要求 '<修订>' 是一个标记，也不需要取消引用 '<修订>'；因为一个标记已经是一个对象，所以即使取消引用一次也不一定能找到一个对象。
++
+可以使用 '<修订>{caret}/{tag\}' 来确保 '<修订>' 标识现有的标记对象。
+
+'<rev>{caret}{}', e.g. 'v0.99.8{caret}{}'::
+  后缀 '{caret}' 后跟一个空括号对，表示该对象可能是一个标记，并递归引用该标记，直到找到一个非标记对象。
+
+'<修订>{caret}{/<文本>}'，例如 'HEAD^{/fix nasty bug（修复讨厌的 BUG）}'::
+  版本参数的后缀 '{caret}'，后面是包含以斜线为首的文本的括号对，与下面的 ':/fix nasty bug' 语法相同，但它返回的是 '{caret}' 之前的 '<修订>' 中最年轻的匹配提交。
+
+':/<文本>'，例如 ':/fix nasty bug'::
+  冒号后的斜线和文本，用于命名提交信息与指定正则表达式匹配的提交。 该名称会返回可从任何引用（包括 HEAD）到达的最年轻的匹配提交。 正则表达式可以匹配提交信息的任何部分。要匹配以字符串开头的提交信息，可以使用 ':/^foo'。特殊序列 ':/!' 用于修饰匹配内容。':/!-foo' 执行负匹配，而 ':/!!foo' 则匹配字面意义上的 '!' 字符，后接 'foo'。以 ':/!' 开头的其他序列暂时保留。 根据给定的文本，shell 的分词规则可能需要额外的引号。
+
+'<修订>:<路径>'，例如 'HEAD:README', 'master:./README'::
+  后缀 ':' 和路径会在冒号前的树状对象中命名给定路径上的 blob 或树。 以'./' 或 '../' 开头的路径是相对于当前工作目录的。 给定路径将转换为相对于工作树根目录的路径。 这对于从与工作树具有相同树形结构的提交或树中查找 blob 或树最为有用。
+
+':[<n>:]<路径>', e.g. ':0:README', ':README'::
+  一个冒号（可选）后面跟一个阶段编号（0 至 3）和一个冒号，冒号后面跟一个路径，用于命名索引中位于给定路径的 Blob 对象。如果缺少阶段号（以及后面的冒号），则命名为阶段 0 条目。在合并过程中，阶段 1 是共同祖先，阶段 2 是目标分支的版本（通常是当前分支），阶段 3 是被合并分支的版本。
+
+下面是 Jon Loeliger 绘制的一幅插图。 提交节点 B 和 C 都是提交节点 A 的父节点。 父提交从左到右排序。
+
+........................................
+G   H   I   J
+ \ /     \ /
+  D   E   F
+   \  |  / \
+    \ | /   |
+     \|/    |
+      B     C
+       \   /
+        \ /
+         A
+........................................
+
+    A =      = A^0
+    B = A^   = A^1     = A~1
+    C =      = A^2
+    D = A^^  = A^1^1   = A~2
+    E = B^2  = A^^2
+    F = B^3  = A^^3
+    G = A^^^ = A^1^1^1 = A~3
+    H = D^2  = B^^2    = A^^^2  = A~2^2
+    I = F^   = B^3^    = A^^3^
+    J = F^2  = B^3^2   = A^^3^2
+
+
+指定范围
+----
+
+历史记录遍历命令，如 `git log` 会对一组提交进行操作，而不仅仅是单个提交。
+
+对于这些命令，使用上一节中描述的符号指定一个修订版本，意味着从给定的提交开始 `可达到` 的一组提交。
+
+指定多个修订版本指的是可从任何给定的提交版本到达的提交版本集。
+
+提交的可达集合是指提交本身及其祖先链中的提交。
+
+有几种符号可以指定一组相连的提交（称为 “修订范围”），如下图所示。
+
+
+排除提交
+~~~~
+
+'{caret}<修订号>'（catet）表示::
+ 要排除某个提交中可触及的提交，可使用前缀 '{caret}' 表示。 例如，'{caret}r1 r2' 表示可从 'r2' 到达的提交，但不包括可从 'r1' 到达的提交（即 'r1' 及其祖先）。
+
+虚线范围符号
+~~~~~~
+
+'..'（双点）范围符号::
+ 由于 '{caret}r1 r2' 的设置操作经常出现，所以有了一种速记方法。 当你有两个提交 'r1' 和 'r2'（根据上文 “指定修订” 中解释的语法命名）时，你可以通过 '{caret}r1 r2' 请求从 r2 可以访问的提交，但不包括从 r1 可以访问的提交，可以写成 'r1...r2'。
+
+'\...'（三点）对称差符号::
+ 类似的符号 'r1\...r2' 被称为 'r1' 和 'r2' 的对称差值，定义为 'r1 r2 --not $(git merge-base --all r1 r2)'。 它是可以从 'r1'（左侧）或 'r2'（右侧）之一到达，但不能同时从两处到达的提交的集合。
+
+在这两种速记符号中，你可以省略一端，让它默认为 HEAD。 例如，'origin..' 是 'origin..HEAD' 的简写，问的是 “我从起源分支分叉后做了什么？” 同样，'..origin' 是 'HEAD..origin' 的简写，问的是 “我从起源分支分叉后做了什么？” 请注意，'..' 指的是 'HEAD..HEAD'，它是一个空范围，既可从 HEAD 访问，也不可从 HEAD 访问。
+
+也有专门针对两个不同范围的命令（例如 "git range-diff R1 R2"，用于比较两个范围），但它们都是例外。 除非另有说明，否则所有对一组提交进行操作的 "git" 命令都是针对单一修订范围的。 换句话说，将两个 “双点范围符号” 写在一起，例如。
+
+    $ git log A..B C..D
+
+*不* 会为大多数命令指定两个修订范围。 取而代之的是，它将命名单个相连的提交集，即那些从 B 或 D 可以到达，但从 A 或 C 都不能到达的提交集：
+
+    ---A---B---o---o---C---D
+
+因为 A 和 B 可以从 C 处到达，所以这两个虚线范围指定的修订范围是单一的提交 D。
+
+
+其他 <修订号>{caret}父级速记符号
+~~~~~~~~~~~~~~~~~~~~~
+还有其他三种简称，特别适用于合并提交，用于命名由提交及其父提交组成的集合。
+
+'r1{caret}@' 表示 'r1' 的所有父代。
+
+'r1{caret}!' 表示包含提交 'r1'，但不包括其所有父提交。 就其本身而言，该符号表示单个提交 'r1'。
+
+'<修订号>{caret}-[<n>]' 符号包括 '<修订号>' ，但不包括第 <n> 次父提交（即 '<修订号>{caret}<n>..<修订号>' 的速记形式），如果没有给出，则 '<n>'= 1。这对合并提交非常有用，只需传递 '<提交号>{caret}-'，就能获得在合并提交 '<提交号>' 中被合并的分支的所有提交（包括 '<提交号>' 本身）。
+
+虽然 '<修订号>{caret}<n>' 是指定单个提交的父提交，但这三种符号也会考虑其父提交。例如，你可以说 'HEAD{caret}2{caret}@'，但不能说 'HEAD{caret}@{caret}2'。
+
+修订范围摘要
+------
+
+'<rev>'::
+	包括可从 <修订号> 到达的提交（即 <修订号> 及其祖先）。
+
+'{caret}<修订号>'::
+	排除可从 <修订号> 到达的提交（即 <修订号> 及其祖先）。
+
+'<rev1>..<rev2>'::
+	包括可从 <修订号2> 进入的提交，但不包括可从 <修订号1> 进入的提交。 如果省略 <修订号1> 或 <修订号2>，则默认为 `HEAD`。
+
+'<修订号1>\...<修订号2>'::
+	包括 <修订号1> 或 <修订号2> 均可访问的提交，但不包括 <修订号1> 和 <修订号2> 均可访问的提交。 省略 <修订号1> 或 <修订号2> 时，默认为 `HEAD`。
+
+'<修订>{caret}@', e.g. 'HEAD{caret}@'::
+  后缀 '{caret}' 后跟一个 at(@) 符号，就等于列出了 '<修订号>' 的所有父提交（意思是，包括父提交中可触及的任何内容，但不包括提交本身）。
+
+'<修订号>{caret}!'，例如 'HEAD{caret}!'::
+  带感叹号的后缀 '{caret}' 与提交 '<修订号>' 及其所有前缀为 '{caret}' 的父节点相同，都是为了排除它们（及其祖先）。
+
+'<修订号>{caret}-<n>'，例如 'HEAD{caret}-, HEAD{caret}-2'::
+	等价于 '<修订号>{caret}<n>..<修订号>'，如果未给出，则 '<n>'= 1。
+
+下面是一些使用上述 Loeliger 插图的示例，其中仔细说明了符号扩展和选择的每个步骤：
+
+....
+   参数   扩展参数    选定的提交
+   D                            G H D
+   D F                          G H I J D F
+   ^G D                         H D
+   ^D B                         E I J F B
+   ^D B C                       E I J F B C
+   C                            I J F C
+   B..C   = ^B C                C
+   B...C  = B ^F C              G H D E B C
+   B^-    = B^..B
+	  = ^B^1 B              E I J F B
+   C^@    = C^1
+	  = F                   I J F
+   B^@    = B^1 B^2 B^3
+	  = D E F               D G H E F I J
+   C^!    = C ^C^@
+	  = C ^C^1
+	  = C ^F                C
+   B^!    = B ^B^@
+	  = B ^B^1 ^B^2 ^B^3
+	  = B ^D ^E ^F          B
+   F^! D  = F ^I ^J D           G H D F
+....
+[]
+
+PARSEOPT
+--------
+
+在 `--parseopt` 模式下，'git rev-parse' 可以帮助处理选项，为 shell 脚本带来与 C 语言内置程序相同的功能。它可以作为一个选项规范化器工作（例如分割单值和总值），有点像 `getopt(1)`。
+
+它在标准输入端接收要解析和理解的选项说明，并在标准输出端回声一个适合 `sh(1)` `eval` 的字符串，以便用规范化参数替换参数。 如果出现错误，它会在标准错误流中输出使用情况，并以代码 129 退出。
+
+注意：在将结果传递给 `eval` 时，请务必加上引号。 请参阅下面的示例。
+
+输入格式
+~~~~
+
+'git rev-parse --parseopt' 输入格式完全基于文本。它由两部分组成，中间用只包含 `--` 的行隔开。分隔符前的几行（应为一行或多行）用于说明用法。 分隔符之后的行描述选项。
+
+每行选项的格式如下：
+
+------------
+<指定选项><标记>*<参数提示>? SP+ help LF
+------------
+
+`<opt-spec>`::
+	其格式是短选项字符，然后是用逗号分隔的长选项名称。两部分都不是必需的，但至少有一部分是必需的。不得包含任何 `<标记>` 字符。 `h,help` 、 `dry-run` 和 `f` 是正确的 `<指定选项>` 的例子。
+
+`<标志>`::
+	`<标志>` 是 `*`, `=`, `?` 或 `!` 其中一个。
+	* 如果选项需要一个参数，则使用 `=`。
+
+	* 使用 `?` 表示选项包含一个可选参数。你可能希望使用 `--stuck-long` 模式来明确地解析可选参数。
+
+	* 使用 `*` 表示该选项不应列在为 `-h` 参数生成的用法中。linkgit:gitcli[7] 中记录了 `--help-all` 的用法。
+
+	* 使用 `!` 不提供相应的否定长选项。
+
+`<参数提示>`::
+	如果指定了 `<arg-hint>`，则在帮助输出中用作参数的名称。`<arg-hint>` 以第一个空格结束。 通常使用破折号分隔多字参数提示中的单词。
+
+去掉空格后的剩余部分将用作与该选项相关的帮助。
+
+空行将被忽略，不符合此规范的行将用作选项组标题（以空格开头，以便有意创建此类行）。
+
+示例
+~~
+
+------------
+OPTS_SPEC="\
+some-command [<选项>] <参数>...
+
+some-command 会执行 foo 和 bar!
+--
+h,help! 显示帮助
+
+foo 一些简便的选项 --foo bar= 一些很酷的选项 --bar 带着一个参数 baz=arg 其他很酷的选项 --baz 带着指定名称的参数 qux?path qux 会带上一个 path 参数，但是对它自己有意义
+
+  一个选项组头
+C?        带着一个可选参数的 C 选项
+
+eval "$(echo "$OPTS_SPEC" | git rev-parse --parseopt -- "$@" || echo exit $?)"
+------------
+
+
+使用文本
+~~~~
+
+当 `"$@"` 为上例中的 `-h`或 `--help` 时，将显示以下使用文本：
+
+------------
+usage: some-command [<选项>] <参数>...
+
+    some-command 会执行 foo 和 bar!
+
+    -h, --help            显示磅帮助
+    --[no-]foo            一些简便的选项 --foo
+    --[no-]bar ...        一些很酷的选项 --bar 带着一个参数
+    --[no-]baz <arg>      另外很酷的选项 --baz 带着指定名称的参数
+    --[no-]qux[=<路径>]   qux 可能会带上一个对它自己有意义的路径参数
+
+一个选项组的头部
+    -C[...]               带着一个可选参数的选项 C
+------------
+
+SQ-QUOTE
+--------
+
+在 `--sq-quote` 模式下，'git rev-parse' 会在标准输出中输出一行适合 `sh(1)` `eval` 的参数。这一行是通过将 `--sq-quote` 后面的参数规范化而生成的。除了给参数加引号之外，不会做任何其他操作。
+
+如果希望在输出被 shell 引述之前，'git rev-parse' 仍能像往常一样解释命令输入，请参阅 `--sq` 选项。
+
+示例
+~~
+
+------------
+$ cat >your-git-script.sh <<\EOF
+#!/bin/sh
+args=$(git rev-parse --sq-quote "$@")   # 引用用户提供的参数
+command="git frotz -n24 $args"          # 并手动将它在内部使用
+					# 命令行
+eval "$command"
+EOF
+
+$ sh your-git-script.sh "a b'c"
+------------
+
+实例
+--
+
+* 打印当前提交的对象名称：
++
+------------
+$ git rev-parse --verify HEAD
+------------
+
+* 在 $REV shell 变量中打印修订版本中的提交对象名称：
++
+------------
+$ git rev-parse --verify --end-of-options $REV^{commit}
+------------
++
+如果 $REV 为空或不是有效版本，则会出错。
+
+* 与上述类似：
++
+------------
+$ git rev-parse --default master --verify --end-of-options $REV
+------------
++
+但如果 $REV 为空，则会打印 master 中的提交对象名称。
+
+GIT
+---
+属于 linkgit:git[1] 文档

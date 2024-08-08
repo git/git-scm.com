@@ -1,0 +1,116 @@
+git-update-ref(1)
+=================
+
+NOME
+----
+git-update-ref - Atualize o nome do objeto armazenado em uma "ref" com segurança
+
+RESUMO
+------
+[verse]
+'git update-ref' [-m <motivo>] [--no-deref] (-d <ref> [<valorantigo>] | [--create-reflog] <ref> <novovalor> [<valorantigo>] | --stdin [-z])
+
+DESCRIÇÃO
+---------
+Com dois argumentos, armazena o <novo-valor> na <ref>, possivelmente removendo as referências das referências simbólicas. Por exemplo, `git update-ref HEAD <novo-valor>` atualiza o cabeçalho do ramo atual para o novo objeto.
+
+Com três argumentos, armazena o <novo-valor> na <ref>, possivelmente removendo a referência das referências simbólicas, após verificar se o valor atual da <ref> corresponde ao <valor-antigo>. Por exemplo, `git update-ref refs/heads/master <novo-valor> <valor-antigo>` atualiza o cabeçalho do ramo master para <novo-valor> somente se o seu valor atual for <valor-antigo>. Você pode especificar 40 "0" ou uma cadeia de caracteres vazia como <valor-antigo> para garantir que a referência que você está criando não exista.
+
+Ele também permite que um arquivo "ref" seja um ponteiro simbólico para um outro arquivo "ref", iniciando com a sequência de quatro bytes do cabeçalho "ref:".
+
+Mais importante ainda, ele permite que a atualização de um arquivo de referência siga estes ponteiros simbólicos, sejam eles links simbólicos ou essas "referências simbólicas de arquivos regulares". Ele segue links simbólicos *reais* apenas se eles começarem com 'refs/': caso contrário, ele tentará lê-los e atualizá-los como um arquivo normal (ou seja, permitirá que o sistema de arquivos os siga, mas sobrescreverá esse link simbólico em outro lugar com um nome de arquivo normal).
+
+Caso a opção `--no-deref` seja utilizado, a própria <ref> será substituída, em vez do resultado de seguir os ponteiros simbólicos.
+
+Em geral, utilizando
+
+	git update-ref HEAD "$head"
+
+deve ser _muito mais_ seguro do que fazer
+
+	echo "$head" > "$GIT_DIR/HEAD"
+
+Tanto do ponto de vista do acompanhamento do link simbólico *quanto* do ponto de vista da verificação de erros. A regra "refs/" para os links simbólicos significa que os links simbólicos que apontam para "fora" da árvore são seguros: eles serão seguidos para leitura, mas não para gravação (portanto, nunca escreveremos por meio de um link simbólico de referência para outra árvore, se você tiver copiado um arquivo inteiro criando uma árvore de links simbólicos).
+
+Com a opção `-d`, exclui o nome <ref> após a verificação que ainda contenha o <valorantigo>.
+
+Com a opção `--stdin`, o comando 'update-ref' lê as instruções da entrada predefinida e executa todas as modificações juntas. Especifique os comandos do formulário:
+
+	update SP <ref> SP <novovalor> [SP <valorantigo>] LF
+	create SP <ref> SP <novovalor> LF
+	delete SP <ref> [SP <valorantigo>] LF
+	verify SP <ref> [SP <valorantigo>] LF
+	option SP <opt> LF
+	start LF
+	prepare LF
+	commit LF
+	abort LF
+
+Com a opção `--create-reflog`, o 'update-ref' criará um reflog para cada "ref", mesmo que um não seja criado normalmente.
+
+Cite os campos que contêm espaços em branco como se fossem strings no código-fonte C, ou seja, entre aspas duplas e com escapes de barra invertida. Use 40 caracteres "0" ou uma string vazia para especificar um valor zero. Para especificar um valor ausente, omita totalmente o valor e o SP anterior.
+
+Como alternativa, utilize a opção `-z` para definir no formato terminado por `NUL`, sem citar:
+
+	update SP <ref> NUL <novovalor> NUL [<valorantigo>] NUL
+	create SP <ref> NUL <novovalor> NUL
+	delete SP <ref> NUL [<valorantigo>] NUL
+	verify SP <ref> NUL [<valorantigo>] NUL
+	option SP <opt> NUL
+	start NUL
+	prepare NUL
+	commit NUL
+	abort NUL
+
+Neste formato, utilize 40 '0' para definir um valor zero e utilize texto cazio para definir um valor ausente.
+
+Em ambos os formatos, os valores podem ser especificados em qualquer maneira que o Git reconheça como um nome de objeto. Comandos em qualquer outro formato ou um <ref> repetido geram um erro. Os significados dos comandos são:
+
+update::
+	Defina <ref> como <novo-valor> após verificar <valor-antigo>, se fornecido. Especifique um <novo-valor> zero para garantir que a referência não exista após a atualização e/ou um <valor-antigo> zero para garantir que a referência não exista antes da atualização.
+
+create::
+	Crie <ref> com <novo-valor> após verificar se ele não existe. O <novo-valor> fornecido não pode ser zero.
+
+delete::
+	Exclua <ref> após verificar se ela existe com <valor-antigo>, se fornecido. Se fornecido, <valor-antigo> pode não ser zero.
+
+verify::
+	Verifique <ref> em relação a <valor-antigo>, mas não o altere. Se <valor-antigo> for zero ou estiver ausente, a referência não deve existir.
+
+option::
+	Modifica o comportamento do próximo comando que nomeia uma <ref>. A única opção válida é `no-deref` para evitar a referência a uma referência simbólica.
+
+start::
+	Inicie uma transação. Em contraste com uma sessão não transacionada, uma transação irá interromper automaticamente caso a cessão se encerre sem um commit explícito. Este comando pode criar uma nova transação vazia quando o commit tenha sido feito no atual ou já tenha sido cancelado.
+
+prepare::
+	Prepare para transacionar o commit. Isto criará uma trava nos arquivos em todas as atualizações das referências que estiverem na fila. No caso de uma referência não puder ser travada, a transação irá ser encerrada.
+
+commit::
+	Faça o commit de todas as atualizações da referência na fila para a transação, finalizando a mesma.
+
+abort::
+	Interrompa a transação, liberando todos os bloqueios caso a transação esteja na condição de preparado.
+
+Se todas as <ref>s puderem ser bloqueadas com <valor-antigo>s correspondentes simultaneamente, todas as modificações serão executadas. Caso contrário, nenhuma modificação é realizada. Observe que, embora cada <ref> individual seja atualizado ou excluído atomicamente, um leitor simultâneo ainda pode ver um subconjunto das alterações.
+
+ATUALIZAÇÕES DOS REGISTROS DOS EVENTOS
+--------------------------------------
+Se o parâmetro de configuração "core.logAllRefUpdates" for verdadeiro e o ref for um em `refs/heads/`, `refs/remotes/`, `refs/notes/`, ou um "pseudoref" como `HEAD` ou `ORIG_HEAD`; ou o arquivo `$GIT_DIR/logs/<ref>` existir, então o `git update-ref` anexará uma linha ao arquivo de registro `$GIT_DIR/logs/<ref>` (tirando a referência de todas as referências simbólicas antes de criar o nome do registro) descrevendo a alteração no valor da ref. As linhas de registro são formatadas como:
+
+    oldsha1 SP newsha1 SP committer LF
+
+Onde "sha1antigo" é o valor hexadecimal com 40 caracteres armazenado anteriormente na <ref>, o "novosha1" é o valor hexadecimal com 40 caracteres do <novovalor> e "committer" é o nome de quem fez o commit, o endereço de e-mail e a data no formato Git predefinido da identificação de quem faz o commit.
+
+Opcionalmente com `-m`:
+
+    oldsha1 SP newsha1 SP committer TAB message LF
+
+Onde todos os campos são como descritos acima e a "mensagem" é o valor informado para a opção '-m'.
+
+Uma atualização irá falhar (sem alterar a <ref>) caso o usuário atual não consiga criar um novo arquivo de registro log, anexá-lo ao arquivo log já existente ou caso não haja informações disponíveis.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

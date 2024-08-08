@@ -1,0 +1,337 @@
+git-clone(1)
+============
+
+NUME
+----
+git-clone - Clonează un depozit într-un nou director
+
+
+REZUMAT
+-------
+[verse]
+'git clone' [--template=<template-directory>]
+	  [-l] [-s] [--no-hardlinks] [-q] [-n] [--bare] [--mirror]
+	  [-o <name>] [-b <name>] [-u <upload-pack>] [--reference <repository>]
+	  [--dissociate] [--separate-git-dir <git-dir>]
+	  [--depth <depth>] [--[no-]single-branch] [--no-tags]
+	  [--recurse-submodules[=<pathspec>]] [--[no-]shallow-submodules]
+	  [--[no-]remote-submodules] [--jobs <n>] [--sparse] [--[no-]reject-shallow]
+	  [--filter=<filter> [--also-filter-submodules]] [--] <repository>
+	  [<directory>]
+
+DESCRIERE
+---------
+
+Clonează un depozit într-un director nou creat, creează branșe de urmărire la distanță pentru fiecare branșă din depozitul clonat (vizibile folosind `git branch --remotes`) și creează și extrage o branșă inițială care este bifurcată din branșa activă a depozitului clonat.
+
+După clonare, un simplu `git fetch` fără argumente va actualiza toate branșele de urmărire de la distanță, iar un `git pull` fără argumente va unifica în plus branșa master de la distanță în branșa master curentă, dacă există (acest lucru nu este adevărat atunci când se dă "--single-branch"; vezi mai jos).
+
+Această configurație implicită este realizată prin crearea de referințe la capetele de branșă la distanță în `refs/remotes/origin` și prin inițializarea variabilelor de configurare `remote.origin.url` și `remote.origin.fetch`.
+
+
+OPȚIUNI
+-------
+-l::
+--local::
+	Atunci când depozitul din care se clonează se află pe o mașină locală, acest indicator ocolește mecanismul normal de transport "Git aware" și clonează depozitul prin copierea lui HEAD și a tot ceea ce se află în directoarele objects și refs. Fișierele din directorul `.git/objects/` sunt legate prin hardlinking pentru a economisi spațiu atunci când este posibil.
++
+Dacă depozitul este specificat ca fiind o cale locală (de exemplu, `/path/to/repo`), aceasta este calea implicită, iar --local este în esență o opțiune fără efect. Dacă depozitul este specificat ca o adresă URL, atunci acest indicator este ignorat (și nu vom folosi niciodată optimizările locale). Dacă se specifică `--no-local`, se va anula valoarea implicită atunci când se indică `/path/to/repo`, utilizând în schimb transportul Git obișnuit.
++
+If the repository's `$GIT_DIR/objects` has symbolic links or is a symbolic link, the clone will fail. This is a security measure to prevent the unintentional copying of files by dereferencing the symbolic links.
++
+*NOTA*: această operațiune se poate întrece cu modificarea concurentă a fișierului
+depozitului sursă, similar cu rularea `cp -r src dst` în timp ce se modifică
+`src`.
+
+--no-hardlinks::
+	Forțează procesul de clonare de la un depozit pe un sistem de fișiere local să copieze fișierele din directorul `.git/objects` în loc să folosească hardlink-uri. Acest lucru poate fi de dorit dacă încercați să faceți o copie de siguranță a depozitului dumneavoastră.
+
+-s::
+--shared::
+	Atunci când depozitul de clonat se află pe calculatorul local, în loc să folosiți legături dure, configurați automat `.git/objects/info/alternates` pentru a partaja obiectele cu depozitul sursă. Depozitul rezultat pornește fără niciun obiect propriu.
++
+*NOTA*: aceasta este o operațiune care poate fi periculoasă; *nu* folosiți
+dacă nu înțelegeți ce face. Dacă vă clonați
+depozitul folosind această opțiune și apoi ștergeți ramuri (sau folosiți orice
+altă comandă Git care face ca orice comitere existentă să nu mai aibă referință) în
+depozit sursă, este posibil ca unele obiecte să nu mai aibă referințe (sau să fie suspendate).
+Aceste obiecte pot fi eliminate prin operațiuni Git normale (cum ar fi `git commit`)
+care apelează automat `git maintenance run --auto`. (A se vedea
+linkgit:git-maintenance[1].) În cazul în care aceste obiecte sunt eliminate și au fost menționate
+de către depozitul clonat, atunci depozitul clonat va deveni corupt.
++
+Rețineți că rularea `git repack` fără opțiunea `--local` într-un depozit clonat cu `--shared` va copia obiectele din depozitul sursă într-un pachet din depozitul clonat, eliminând economiile de spațiu pe disc realizate de `clone --shared`. Cu toate acestea, este sigur să rulați `git gc`, care utilizează opțiunea `--local` în mod implicit.
++
+Dacă doriți să întrerupeți dependența unui depozit clonat cu `--shared` de depozitul sursă, puteți rula pur și simplu `git repack -a` pentru a copia toate obiectele din depozitul sursă într-un pachet din depozitul clonat.
+
+--reference[-if-able] <depozit>::
+	În cazul în care depozitul de referință se află pe calculatorul local, configurați automat `.git/objects/info/alternates` pentru a obține obiecte din depozitul de referință. Utilizarea unui depozit deja existent ca alternativă va necesita mai puține obiecte care să fie copiate din depozitul clonat, reducând costurile de rețea și de stocare locală. Atunci când se utilizează `--reference-if-able`, un director inexistent este sărit cu un avertisment în loc să se anuleze clonarea.
++
+*NOTA*: a se vedea NOTA pentru opțiunea `--shared` și, de asemenea, opțiunea
+`--dissociate`.
+
+--dissociate::
+	Împrumutați obiectele din depozitele de referință specificate cu opțiunile `--reference` numai pentru a reduce transferul de rețea și încetați să mai împrumutați din acestea după ce se face o clonă, făcând copiile locale necesare ale obiectelor împrumutate. Această opțiune poate fi utilizată și atunci când se clonează local dintr-un depozit care împrumută deja obiecte de la un alt depozit - noul depozit va împrumuta obiecte din același depozit, iar această opțiune poate fi utilizată pentru a opri împrumutul.
+
+-q::
+--quiet::
+	Funcționează în liniște. Progresul nu este raportat la fluxul de eroare standard.
+
+-v::
+--verbose::
+	Se execută la nivel verbal. Nu afectează raportarea stării de progres către fluxul de eroare standard.
+
+--progress::
+	Starea de progres este raportată în mod implicit pe fluxul de eroare standard atunci când este atașat la un terminal, cu excepția cazului în care se specifică `--quiet`. Acest indicator forțează starea de progres chiar dacă fluxul de eroare standard nu este direcționat către un terminal.
+
+--server-option=<option>::
+	Transmite serverului șirul de caractere dat atunci când se comunică folosind versiunea 2 a protocolului. Șirul dat nu trebuie să conțină un caracter NUL sau LF. Gestionarea de către server a opțiunilor serverului, inclusiv a celor necunoscute, este specifică serverului. Atunci când sunt date mai multe `--server-option=<option>`, toate sunt trimise celeilalte părți în ordinea listată pe linia de comandă.
+
+-n::
+--no-checkout::
+	După finalizarea clonei, nu se efectuează nicio verificare a lui HEAD.
+
+--[no-]reject-shallow::
+	Eșuează dacă depozitul sursă este un depozit superficial. Variabila de configurare "clone.rejectShallow" poate fi utilizată pentru a specifica valoarea implicită.
+
+--bare::
+	Creați un depozit Git "gol". Adică, în loc să creați `<directory>` și să plasați fișierele administrative în `<directory>/.git`, faceți din `<directory>` însuși `<directory>` `$GIT_DIR`. Acest lucru implică în mod evident `--no-checkout`, deoarece nu există niciun loc unde să se verifice structura de lucru. De asemenea, capetele de branșă de la distanță sunt copiate direct în capetele de branșă locale corespunzătoare, fără a le cartografia în `refs/remotes/origin/`. Când se utilizează această opțiune, nu se creează nici branșele de urmărire la distanță, nici variabilele de configurare aferente.
+
+--sparse::
+	Employ a sparse-checkout, with only files in the toplevel directory initially being present. The linkgit:git-sparse-checkout[1] command can be used to grow the working directory as needed.
+
+--filter=<filter-spec>::
+	Utilizați funcția de clonare parțială și solicitați ca serverul să trimită un subset de obiecte accesibile în funcție de un anumit filtru de obiecte. Atunci când se utilizează `--filter`, se utilizează `<filter-spec>` furnizat pentru filtrul de clonare parțială. De exemplu, `--filter=blob:none` va filtra toate blob-urile (conținutul fișierelor) până când Git va avea nevoie de ele. De asemenea, `--filter=blob:limit=<size>` va filtra toate blob-urile cu o dimensiune de cel puțin `<size>`. Pentru mai multe detalii despre specificațiile filtrelor, consultați opțiunea `--filter` din linkgit:git-rev-list[1].
+
+--also-filter-submodules::
+	Also apply the partial clone filter to any submodules in the repository. Requires `--filter` and `--recurse-submodules`. This can be turned on by default by setting the `clone.filterSubmodules` config option.
+
+--mirror::
+	Configurați o oglindă a depozitului sursă. Acest lucru implică `--bare`. În comparație cu `--bare`, `--mirror` nu numai că mapează branșele locale ale sursei în branșele locale ale țintei, ci mapează toate referințele (inclusiv branșele de urmărire la distanță, notele etc.) și stabilește o configurație refspec astfel încât toate aceste referințe să fie suprascrise de o `git remote update` în depozitul țintă.
+
+-o <name>::
+--origin <nume>::
+	În loc să folosiți numele de la distanță `origin` pentru a ține evidența depozitului din upstream, folosiți `<name>`. Suprascrie `clone.defaultRemoteName` din configurare.
+
+-b <name>::
+--branch <name>::
+	În loc să direcționați HEAD nou creat către branșa indicată de HEAD-ul depozitului clonat, direcționați-l către ramura `<name>`. Într-un depozit non-bare, aceasta este branșa care va fi verificată. `--branch` poate, de asemenea, să primească etichete și detașează HEAD la acea confirmare în depozitul rezultat.
+
+-u <upload-pack>::
+--upload-pack <pachet de încărcare>::
+	Atunci când este dată, iar depozitul din care se clonează este accesat prin ssh, aceasta specifică o cale diferită de cea implicită pentru comanda executată la celălalt capăt.
+
+--template=<template-directory>::
+	Specificați directorul din care vor fi utilizate șabloanele; (Consultați secțiunea "TEMPLATE DIRECTORY" din linkgit:git-init[1])
+
+-c <key>=<value>::
+--config <key>=<valoare>::
+	Setați o variabilă de configurare în depozitul nou-creat; aceasta intră în vigoare imediat după ce depozitul este inițializat, dar înainte ca istoricul de la distanță să fie preluat sau ca orice fișier să fie verificat. Cheia este în același format ca cel așteptat de linkgit:git-config[1] (de exemplu, `core.eol=true`). Dacă sunt date mai multe valori pentru aceeași cheie, fiecare valoare va fi scrisă în fișierul de configurare. Acest lucru face ca, de exemplu, să fie sigură adăugarea unor refspecs suplimentare de preluare la remote origin.
++
+Din cauza limitărilor implementării actuale, unele variabile de configurare nu intră în vigoare decât după preluarea și verificarea inițială. Se știe că variabilele de configurare care nu își fac efectul sunt: `remote.<name>.mirror` și `remote.<name>.tagOpt`. Utilizați în schimb opțiunile corespunzătoare `--mirror` și `--no-tags`.
+
+--depth <adâncime>::
+	Creează o clonă "superficială" cu un istoric trunchiat la numărul specificat de comenzi. Implică `--single-branch`, cu excepția cazului în care se specifică `--no-single-branch` pentru a prelua istoricul din apropierea vârfurilor tuturor ramurilor. Dacă doriți să clonați submodulele superficial, treceți și `--shallow-submodules`.
+
+--shallow-since=<data>::
+	Creează o clonă superficială cu un istoric după timpul specificat.
+
+--shallow-exclude=<revizie>::
+	Creează o clonă superficială cu un istoric, excluzând comenzile care pot fi accesate de la o branșă sau etichetă la distanță specificată. Această opțiune poate fi specificată de mai multe ori.
+
+--[no-]single-branch::
+	Clonează numai istoricul care duce la vârful unei singure branșe, fie că este specificat de opțiunea `--branch`, fie că este vorba de ramura principală la care indică `HEAD` de la distanță. Preluările ulterioare în depozitul rezultat vor actualiza numai branșa de urmărire de la distanță pentru branșa pentru care această opțiune a fost utilizată pentru clonarea inițială. În cazul în care HEAD de la distanță nu a indicat nicio branșă atunci când s-a efectuat clonarea `--single-branch`, nu se creează nicio branșă de urmărire la distanță.
+
+--no-tags::
+	Nu clonați niciun tag și setați `remote.<remote>.tagOpt=--no-tags` în configurație, asigurându-vă că viitoarele operațiuni `git pull` și `git fetch` nu vor urmări niciun tag. Recuperările ulterioare explicite de etichete vor funcționa în continuare (a se vedea linkgit:git-fetch[1]).
++
+Poate fi utilizat împreună cu `--single-branch` pentru a clona și a menține o branșă fără alte referințe decât o singură branșă clonată. Acest lucru este util, de exemplu, pentru a menține un număr minim de clone ale branșei implicite a unui depozit pentru indexarea căutărilor.
+
+--recurse-submodules[=<path-specificații>]::
+	După ce clona este creată, inițializați și clonați submodulele din cadrul acesteia pe baza specificației de traseu furnizate. Dacă nu este furnizată nicio specificație de traseu, toate submodulele sunt inițializate și clonate. Această opțiune poate fi furnizată de mai multe ori pentru specificațiile de traseu compuse din mai multe intrări. Clona rezultată are `submodule.active` setat la specificația de traseu furnizată sau "." (însemnând toate submodulele) dacă nu este furnizată nicio specificație de traseu.
++
+Submodulele sunt inițializate și clonate folosind setările lor implicite. Acest lucru este echivalent cu rularea `git submodule update --init --recursive <pathspec>` imediat după ce clona este terminată. Această opțiune este ignorată dacă depozitul clonat nu are un registru de lucru/checkout (de exemplu, dacă se dă oricare dintre `--no-checkout`/`-n`, `--bare` sau `--mirror`)
+
+--[no-]shallow-submodules::
+	Toate submodulele care sunt clonate vor fi superficiale, cu o adâncime de 1.
+
+--[no-]remote-submodules::
+	Toate submodulele care sunt clonate vor utiliza starea branșei de urmărire la distanță a submodulelor pentru a actualiza submodulele, mai degrabă decât SHA-1 înregistrat de superproiect. Echivalent cu trecerea `--remote` la `git submodule update`.
+
+--separate-git-dir=<git-dir>::
+	În loc să plasați depozitul clonat acolo unde ar trebui să fie, plasați depozitul clonat în directorul specificat, apoi creați o legătură simbolică Git agnostică pentru sistemul de fișiere. Rezultatul este că depozitul Git poate fi separat de structura de lucru.
+
+-j <n>::
+--jobs <n>::
+	Numărul de submodule preluate în același timp. Valoarea implicită este cea a opțiunii `submodule.fetchJobs`.
+
+<repository>::
+	Depozitul (eventual la distanță) din care se clonează. Consultați secțiunea <<URLS,GIT URLS>> de mai jos pentru mai multe informații despre specificarea depozitelor.
+
+<directory>::
+	Numele unui nou director în care se clonează. Partea "humanish" a depozitului sursă este utilizată dacă nu se indică în mod explicit un director (`repo` pentru `/path/to/repo.git` și `foo` pentru `host.xz:foo/.git`). Clonarea într-un director existent este permisă numai dacă directorul este gol.
+
+--bundle-uri=<uri>::
+	Before fetching from the remote, fetch a bundle from the given `<uri>` and unbundle the data into the local repository. The refs in the bundle will be stored under the hidden `refs/bundle/*` namespace. This option is incompatible with `--depth`, `--shallow-since`, and `--shallow-exclude`.
+
+:git-clone: 1
+GIT URLS[[URLS]]
+----------------
+
+In general, URLs contain information about the transport protocol, the address of the remote server, and the path to the repository. Depending on the transport protocol, some of this information may be absent.
+
+Git supports ssh, git, http, and https protocols (in addition, ftp and ftps can be used for fetching, but this is inefficient and deprecated; do not use them).
+
+Transportul nativ (adică git:// URL) nu face autentificare și ar trebui utilizat cu precauție în rețelele nesecurizate.
+
+Următoarele sintaxe pot fi utilizate cu acestea:
+
+- ssh://{startsb}user@{endsb}host.xz{startsb}:port{endsb}/path/to/repo.git/
+- git://host.xz{startsb}:port{endsb}/path/to/repo.git/
+- http{startsb}s{endsb}://host.xz{startsb}:port{endsb}/path/to/repo.git/
+- ftp{startsb}s{endsb}://host.xz{startsb}:port{endsb}/path/to/repo.git/
+
+O sintaxă alternativă de tip scp poate fi utilizată, de asemenea, cu protocolul ssh:
+
+- {startsb}user@{endsb}host.xz:path/to/repo.git/
+
+Această sintaxă este recunoscută numai dacă nu există bariere înaintea primelor două puncte. Acest lucru ajută la diferențierea unei căi locale care conține două puncte. De exemplu, calea locală `foo:bar` ar putea fi specificată ca o cale absolută sau `./foo:bar` pentru a evita să fie interpretată greșit ca o adresă url ssh.
+
+Protocoalele ssh și git acceptă, în plus, extinderea ~username:
+
+- ssh://{startsb}utilizator@{endsb}host.xz{startsb}:port{endsb}/~{startsb}user{endsb}/path/to/repo.git/
+- git://host.xz{startsb}:port{endsb}/~{startsb}user{endsb}/path/to/repo.git/
+- {startsb}utilizator@{endsb}host.xz:/~{startsb}user{endsb}/path/to/repo.git/
+
+Pentru depozitele locale, de asemenea suportate nativ de Git, se pot folosi următoarele sintaxe:
+
+- /path/to/repo.git/
+- \file:///path/to/repo.git/
+
+ifndef::git-clone[]
+Aceste două sintaxe sunt în mare parte echivalente, cu excepția clonării, când prima implică opțiunea --local. Consultați linkgit:git-clone[1] pentru detalii.
+endif::git-clone[]
+
+ifdef::git-clone[]
+Aceste două sintaxe sunt în mare parte echivalente, cu excepția faptului că prima implică opțiunea --local.
+endif::git-clone[]
+
+'git clone', 'git fetch' și 'git pull', dar nu și 'git push', vor accepta, de asemenea, un fișier bundle adecvat. A se vedea linkgit:git-bundle[1].
+
+Atunci când Git nu știe cum să gestioneze un anumit protocol de transport, încearcă să utilizeze ajutorul de la distanță "remote-<transport>", dacă există unul. Pentru a solicita în mod explicit un ajutor la distanță, se poate utiliza următoarea sintaxă:
+
+- <transport>::<address>
+
+unde <address> poate fi o cale, un server și o cale sau un șir arbitrar de tip URL recunoscut de ajutorul specific de la distanță care este invocat. Pentru detalii, consultați linkgit:gitremote-helpers[7].
+
+Dacă există un număr mare de depozite la distanță cu nume similare și doriți să utilizați un format diferit pentru acestea (astfel încât URL-urile pe care le utilizați să fie rescrise în URL-uri care funcționează), puteți crea o secțiune de configurare a formularului:
+
+------------
+	[url "<actual-url-base>"]
+		insteadOf = <other-url-base>
+------------
+
+De exemplu, cu aceasta:
+
+------------
+	[url "git://git.host.xz/"]
+		insteadOf = host.xz:/path/to/
+		insteadOf = work:
+------------
+
+o adresă URL de tipul "work:repo.git" sau "host.xz:/path/to/repo.git" va fi rescrisă în orice context care consideră că o adresă URL este "git://git.host.xz/repo.git".
+
+Dacă doriți să rescrieți URL-urile doar pentru push, puteți crea o secțiune de configurare a formularului:
+
+------------
+	[url "<actual-url-base>"]
+		pushInsteadOf = <other-url-base>
+------------
+
+De exemplu, cu aceasta:
+
+------------
+	[url "ssh://example.org/"]
+		pushInsteadOf = git://example.org/
+------------
+
+o adresă URL de tipul "git://example.org/path/to/repo.git" va fi rescrisă în "ssh://example.org/path/to/repo.git" pentru împingeri, dar pentru extrageri se va utiliza în continuare adresa URL originală.
+[]
+
+EXEMPLE
+-------
+
+* Clonă din upstream:
++
+------------
+$ git clone git://git.kernel.org/pub/scm/.../linux.git my-linux
+$ cd my-linux
+$ make
+------------
+
+
+* Realizează o clonă locală care împrumută din directorul curent, fără a verifica lucrurile:
++
+------------
+$ git clone -l -s -n . ../copy
+$ cd ../copy
+$ git show-branch
+------------
+
+
+* Clonarea din upstream în timp ce împrumutați dintr-un director local existent:
++
+------------
+$ git clone --reference /git/linux.git \
+	git://git.kernel.org/pub/scm/.../linux.git \
+	my-linux
+$ cd my-linux
+------------
+
+
+* Creați un depozit gol pentru a vă publica modificările în mod public:
++
+------------
+$ git clone --bare -l /home/proj/.git /pub/scm/proj.git
+------------
+
+CONFIGURATION
+-------------
+
+
+
+[WARNING]
+====
+Missing `ro/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `ro/config/init.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `ro/config/clone.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+GIT
+---
+Parte a suitei linkgit:git[1]

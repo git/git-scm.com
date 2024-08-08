@@ -1,0 +1,225 @@
+git-http-backend(1)
+===================
+
+名称
+--
+git-http-backend - Git 在 HTTP 上的服务器端实现
+
+概述
+--
+[verse]
+'git http-backend'
+
+描述
+--
+一个简单的 CGI 程序，为通过 http:// 和 https:// 协议访问仓库的 Git 客户提供内容。 该程序支持客户端使用智能 HTTP 协议和向后兼容的哑 HTTP 协议获取内容，以及客户端使用智能 HTTP 协议推送内容。如果配置得当，它还支持 Git 更高效的 "v2" 协议；见下文环境部分关于`GIT_PROTOCOL` 的讨论。
+
+它验证该目录是否有魔术文件 "git-daemon-export-ok"，它将拒绝导出任何没有明确标记为这种方式导出的 Git 目录（除非设置了 `GIT_HTTP_EXPORT_ALL` 环境变量）。
+
+默认情况下，只有 `upload-pack` 服务被启用，它为 'git fetch-pack' 和 'git ls-remote' 客户端服务，这些客户端被 'git fetch'、'git pull' 和 'git clone' 调用。 如果客户端经过认证，`receive-pack` 服务将被启用，它为 'git send-pack' 客户端服务，该服务由 'git push' 调用。
+
+服务
+--
+这些服务可以使用每个库的配置文件来启用/禁用：
+
+http.getanyfile::
+	这是为 1.6.6 版本以上的 Git 客户端提供服务，它们无法使用上传包服务。 启用后，客户端能够读取仓库内的任何文件，包括不再能从分支到达但仍然存在的对象。 默认情况下是启用的，但仓库可以通过将此配置项设置为 `false` 来禁用它。
+
+http.uploadpack::
+	这为 'git fetch-pack' 和 'git ls-remote' 客户端服务。 它在默认情况下是启用的，但仓库可以通过将此配置项设置为`false`来禁用它。
+
+http.receivepack::
+	这为 'git send-pack' 客户提供服务，允许推送。 默认情况下，它对匿名用户是禁用的，而对通过网络服务器认证的用户是启用的。 可以通过设置该项为 `false` 来禁用它，或者通过设置为 `true` 来为所有用户（包括匿名用户）启用。
+
+地址翻译
+----
+为了确定磁盘上仓库的位置，'git http-backend' 将环境变量 PATH_INFO 和 GIT_PROJECT_ROOT 连接起来，前者由 Web 服务器自动设置，后者则必须在 Web 服务器配置中手动设置。 如果 GIT_PROJECT_ROOT 没有设置，'git http-backend '会读取 PATH_TRANSLATED，这也是由网络服务器自动设置的。
+
+实例
+--
+下面所有的例子都把 `http://$hostname/git/foo/bar.git` 映射到 `/var/www/git/foo/bar.git`。
+
+Apache 2.x::
+	确保 mod_cgi、mod_alias 和 mod_env被 启用，适当地设置 GIT_PROJECT_ROOT（或 DocumentRoot），并为 CGI 创建一个 ScriptAlias：
++
+----------------------------------------------------------------
+SetEnv GIT_PROJECT_ROOT /var/www/git
+SetEnv GIT_HTTP_EXPORT_ALL
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+
+# 这在使用 Apache 和现代版本的
+# git-http-backend，因为网络服务器会把头信息在
+# 环境中作为 HTTP_GIT_PROTOCOL 传递，而 http-backend 会将其复制到
+# git_protocol。但你可能需要这一行（或类似的东西，如果你
+# 使用不同的 webserver），或者如果你想支持旧的 Git
+# 版本没有做这样的复制。
+#
+# 让 webserver 设置 GIT_PROTOCOL 是完全可以的，即使在
+# 现代版本也是如此（并且优先于 HTTP_GIT_PROTOCOL，
+# 这意味着它可以被用来覆盖客户端的请求）。
+SetEnvIf Git-Protocol ".*"GIT_PROTOCOL=$0
+----------------------------------------------------------------
++
+为了实现匿名的读取访问，但要有认证的写入访问，需要对最初的引用广播（我们通过查询字符串中的服务参数检测为推送）和接收包调用本身进行授权：
++
+----------------------------------------------------------------
+RewriteCond %{QUERY_STRING} service=git-receive-pack [OR]
+RewriteCond %{REQUEST_URI} /git-receive-pack$
+RewriteRule ^/git/ - [E=AUTHREQUIRED:yes]
+
+<LocationMatch "^/git/">
+	Order Deny,Allow
+	Deny from env=AUTHREQUIRED
+
+	AuthType Basic
+	AuthName "Git Access"
+	Require group committers
+	Satisfy Any
+	...
+</LocationMatch>
+----------------------------------------------------------------
++
+如果你没有 `mod_rewrite` 可用来匹配查询字符串，只需保护 `git-receive-pack` 本身即可，比如：
++
+----------------------------------------------------------------
+<LocationMatch "^/git/.*/git-receive-pack$">
+	AuthType Basic
+	AuthName "Git Access"
+	Require group committers
+	...
+</LocationMatch>
+----------------------------------------------------------------
++
+在这种模式下，服务器将不会请求认证，直到客户端实际开始推送的对象协商阶段，而不是在最初的接触中。 由于这个原因，你必须在任何应该接受推送的存储库中启用 `http.receivepack` 配置选项。如果没有设置 `http.receivepack`，默认行为是拒绝任何未经认证的用户的推送；因此初始请求将向客户端报告 `403 Forbidden`，甚至不给认证机会。
++
+要对读和写都要求认证，可以在仓库或它的一个父目录周围使用 Location 指令：
++
+----------------------------------------------------------------
+<Location /git/private>
+	AuthType Basic
+	AuthName "Private Git Access"
+	Require group committers
+	...
+</Location>
+----------------------------------------------------------------
++
+要在同一个网址上为 gitweb 提供服务，使用 ScriptAliasMatch，只对那些 'git http-backend' 可以处理的网址进行匹配，其余的转发给 gitweb：
++
+----------------------------------------------------------------
+ScriptAliasMatch \
+	"(?x)^/git/(.*/(HEAD | \
+			info/refs | \
+			objects/(info/[^/]+ | \
+				 [0-9a-f]{2}/[0-9a-f]{38} | \
+				 pack/pack-[0-9a-f]{40}\.(pack|idx)) | \
+			git-(upload|receive)-pack))$" \
+	/usr/libexec/git-core/git-http-backend/$1
+
+ScriptAlias /git/ /var/www/cgi-bin/gitweb.cgi/
+----------------------------------------------------------------
++
+在一个仓库中为来自不同 linkgit:gitnamespaces[7] 的多个仓库提供服务：
++
+----------------------------------------------------------------
+SetEnvIf Request_URI "^/git/([^/]*)" GIT_NAMESPACE=$1
+ScriptAliasMatch ^/git/[^/]*(.*) /usr/libexec/git-core/git-http-backend/storage.git$1
+----------------------------------------------------------------
+
+加速静态 Apache 2.x::
+	与上述情况类似，但 Apache 可以用来返回存储在磁盘上的静态文件。 在许多系统上，这可能更有效率，因为 Apache 可以要求内核将文件内容从文件系统直接复制到网络上：
++
+----------------------------------------------------------------
+SetEnv GIT_PROJECT_ROOT /var/www/git
+
+AliasMatch ^/git/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$          /var/www/git/$1
+AliasMatch ^/git/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$ /var/www/git/$1
+ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+----------------------------------------------------------------
++
+这可以与 gitweb 的配置相结合：
++
+----------------------------------------------------------------
+SetEnv GIT_PROJECT_ROOT /var/www/git
+
+AliasMatch ^/git/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$          /var/www/git/$1
+AliasMatch ^/git/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$ /var/www/git/$1
+ScriptAliasMatch \
+	"(?x)^/git/(.*/(HEAD | \
+			info/refs | \
+			objects/info/[^/]+ | \
+			git-(upload|receive)-pack))$" \
+	/usr/libexec/git-core/git-http-backend/$1
+ScriptAlias /git/ /var/www/cgi-bin/gitweb.cgi/
+----------------------------------------------------------------
+
+Lighttpd::
+	确保 `mod_cgi`、`mod_alias`、`mod_auth`、`mod_setenv` 已经加载，然后适当设置 `GIT_PROJECT_ROOT`，并将所有请求重定向到 CGI：
++
+----------------------------------------------------------------
+alias.url += ( "/git" => "/usr/lib/git-core/git-http-backend" )
+$HTTP["url"] =~ "^/git" {
+	cgi.assign = ("" => "")
+	setenv.add-environment = (
+		"GIT_PROJECT_ROOT" => "/var/www/git",
+		"GIT_HTTP_EXPORT_ALL" => ""
+	)
+}
+----------------------------------------------------------------
++
+要启用匿名的读取访问，但要有认证的写入访问：
++
+----------------------------------------------------------------
+$HTTP["querystring"] =~ "service=git-receive-pack" {
+	include "git-auth.conf"
+}
+$HTTP["url"] =~ "^/git/.*/git-receive-pack$" {
+	include "git-auth.conf"
+}
+----------------------------------------------------------------
++
+其中 `git-auth.conf` 看起来像：
++
+----------------------------------------------------------------
+auth.require = (
+	"/" => (
+		"method" => "basic",
+		"realm" => "Git Access",
+		"require" => "valid-user"
+	       )
+)
+# ...并在此设置auth.backend
+----------------------------------------------------------------
++
+要求对读和写都进行认证：
++
+----------------------------------------------------------------
+$HTTP["url"] =~ "^/git/private" {
+	include "git-auth.conf"
+}
+----------------------------------------------------------------
+
+
+环境变量
+----
+'git http-backend' 依赖于调用网络服务器设置的 `CGI` 环境变量，包括：
+
+* PATH_INFO（如果设置了 GIT_PROJECT_ROOT，否则为 PATH_TRANSLATED）
+* REMOTE_USER
+* REMOTE_ADDR
+* CONTENT_TYPE
+* QUERY_STRING
+* REQUEST_METHOD
+
+`GIT_HTTP_EXPORT_ALL` 环境变量可以传递给 'git-http-backend'，以绕过在允许导出每个仓库前对 "git-daemon-export-ok" 文件的检查。
+
+`GIT_HTTP_MAX_REQUEST_BUFFER` 环境变量（或 `http.maxRequestBuffer` 配置变量）可以被设置为改变 git 在获取过程中所处理的最大引用协商请求；任何需要更大缓冲区的获取将不会成功。 这个值通常不需要改变，但如果你从一个有大量引用的仓库中获取，可能会有帮助。 这个值可以指定一个单位（例如，`100M` 表示 100 兆字节）。默认是 10 兆字节。
+
+客户端可以使用 `Git-Protocol` HTTP 头来探测可选的协议能力（如 v2 协议）。为了支持这些，该标头的内容必须出现在 `GIT_PROTOCOL` 环境变量中。大多数网络服务器将通过 `HTTP_GIT_PROTOCOL` 变量把这个头传递给 CGI，`git-http-backend` 将自动把它复制到 `GIT_PROTOCOL`。然而，一些网络服务器可能对他们要传递的头信息更有选择性，在这种情况下，他们需要明确配置（见前面例子部分的 Apache 配置中对 `Git-Protocol` 的提及）。
+
+后台进程将 GIT_COMMITTER_NAME 设置为 '$REMOTE_USER'，将 GIT_COMMITTER_EMAIL 设置为 '$\{REMOTE_USER}\@http.${REMOTE_ADDR\}'，确保任何由 'git-receive-pack' 创建的引用日志包含执行推送的远程用户的一些识别信息。
+
+所有 `CGI` 环境变量对 'git-receive-pack' 调用的每个钩子都是可用的。
+
+GIT
+---
+属于 linkgit:git[1] 文档

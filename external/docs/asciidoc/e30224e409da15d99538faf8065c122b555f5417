@@ -1,0 +1,951 @@
+git-rebase(1)
+=============
+
+NOME
+----
+git-rebase - Reaplique os commits em cima do topo de outra base
+
+RESUMO
+------
+[verse]
+'git rebase' [-i | --interactive] [<options>] [--exec <cmd>]
+	[--onto <newbase> | --keep-base] [<upstream> [<branch>]]
+'git rebase' [-i | --interactive] [<options>] [--exec <cmd>] [--onto <newbase>]
+	--root [<branch>]
+'git rebase' (--continue|--skip|--abort|--quit|--edit-todo|--show-current-patch)
+
+DESCRIÇÃO
+---------
+Se o `<ramo>` for especificado, o `git rebase` executará um `git switch <ramo>` automático antes de fazer qualquer outra coisa. Caso contrário, ele permanecerá no ramo atual.
+
+Se o `<upstream>` não for especificado, será utilizado o "upstream" configurado nas opções `branch.<nome>.remote` e `branch.<nome>.merge` (para mais detalhes consulte linkgit:git-config[1]) e a opção `--fork-point` será assumida. Se você não estiver em nenhuma ramificação no momento ou se a ramificação atual não tiver um "upstream" configurado, o rebase será abortado.
+
+Todas as alterações feitas por commits no ramo atual, mas que não estão no `<upstream>`, são salvos numa área temporária. Esse é o mesmo conjunto de commits que seria exibido pelo comando `git log <upstream>..HEAD`; ou pelo comando `git log 'fork_point'..HEAD`, se a opção `--fork-point` estiver ativa (consulte abaixo a descrição sobre a opção `--fork-point`); ou pelo `git log HEAD`, caso a opção `--root` seja usada.
+
+O ramo atual é redefinido para `<upstream>` ou `<newbase>` caso a opção `--onto` tenha sido usada. Isso tem exatamente o mesmo efeito que `git reset --hard <upstream>` (ou `<newbase>`). O `ORIG_HEAD` é definido para apontar para o cume do ramo antes da reinicialização.
+
+[NOTE]
+Não é garantido que `ORIG_HEAD` ainda aponte para o cume de uma ramificação anterior no final do "rebase" caso os outros comandos que escrevem essa pseudo-ref (`git reset` por exemplo) sejam usados durante o "rebase". O cume da ramificação anterior, no entanto, é acessível usando o "reflog" da ramificação atual (ou seja, `@{1}`, consulte linkgit:gitrevisions[7]).
+
+Os commits que foram salvos anteriormente na área temporária são reaplicadas no ramo atual, uma por uma e em ordem. Observe que quaisquer commits no `HEAD` que introduzam as mesmas alterações textuais que um commit no `HEAD..<upstream>` são omitidas (ou seja, um patch já aceito na inicial com uma mensagem de commit ou carimbo de data e hora diferente, serão ignorados).
+
+É possível que uma falha na mesclagem impeça que este processo seja totalmente automático. Você terá que resolver qualquer falha na mesclagem e executar o comando `git rebase --continue`. Outra opção é ignorar o commit que causou a falha na mesclagem com comando `git rebase --skip`. Para verificar o `<ramo>` original e remover os arquivos de trabalho `.git/rebase-apply`, use o comando `git rebase --abort`.
+
+Suponha que o seguinte histórico exista e que o ramo atual seja "topic":
+
+------------
+          A---B---C topic
+         /
+    D---E---F---G master
+------------
+
+A partir deste ponto, o resultado de um dos seguintes comandos:
+
+
+    git rebase master
+    git rebase master topic
+
+seria:
+
+------------
+                  A'--B'--C' topic
+                 /
+    D---E---F---G master
+------------
+
+*OBSERVAÇÃO:* A última maneira é apenas uma abreviação do comando `git checkout topic` seguido de `git rebase master`. Quando o "rebase" for encerrado, o `topic` continuará sendo o ramo com o check-out.
+
+Se o ramo "upstream" já tiver uma alteração que você fez (porque você enviou uma correção que foi aplicado no "upstream" por exemplo), este commit será ignorado e serão emitidos avisos (se o backend 'merge' for usado). Por exemplo, executar o comando `git rebase master` no seguinte histórico (onde `A'` e `A` introduzem o mesmo conjunto de alterações, mas têm informações diferentes de quem fez o commit):
+
+------------
+          A---B---C topic
+         /
+    D---E---A'---F master
+------------
+
+vai resultar em:
+
+------------
+                   B'---C' topic
+                  /
+    D---E---A'---F master
+------------
+
+Aqui está como você transplantaria um ramo do tópico com base num ramo para outro, para fingir que você bifurcou o ramo do tópico deste último ramo, utilizando `rebase --onto`.
+
+Primeiro, vamos supor que seu 'tópico' tenha como base o ramo 'next'. Por exemplo, um recurso desenvolvido no 'tópico' depende de alguma funcionalidade encontrada em 'next'.
+
+------------
+    o---o---o---o---o  master
+         \
+          o---o---o---o---o  next
+                           \
+                            o---o---o  topic
+------------
+
+Queremos criar um 'tópico' bifurcado no ramo 'master'; porque a funcionalidade da qual o 'tópico' depende foi mesclado na ramificação 'master' mais estável. Queremos que a nossa árvore fique assim:
+
+------------
+    o---o---o---o---o  master
+        |            \
+        |             o'--o'--o'  topic
+         \
+          o---o---o---o---o  next
+------------
+
+Podemos conseguir isso utilizando o seguinte comando:
+
+    git rebase --onto master next topic
+
+
+Outro exemplo da opção `--onto` é fazer o rebase de uma parte de um ramo. Se tivermos a seguinte situação:
+
+------------
+                            H---I---J topicB
+                           /
+                  E---F---G  topicA
+                 /
+    A---B---C---D  master
+------------
+
+então o comando
+
+    git rebase --onto master topicA topicB
+
+resultaria em:
+
+------------
+                 H'--I'--J'  topicB
+                /
+                | E---F---G  topicA
+                |/
+    A---B---C---D  master
+------------
+
+É útil quando o 'topicB' não depender do 'topicA'.
+
+Uma série de commits também pode ser removida com o rebase. Se tivermos a seguinte situação:
+
+------------
+    E---F---G---H---I---J  topicA
+------------
+
+então o comando
+
+    git rebase --onto topicA~5 topicA~3 topicA
+
+resultaria na remoção dos commits 'F' e 'G':
+
+------------
+    E---H'---I'---J'  topicA
+------------
+
+Isso é útil se F e G tiverem alguma falha ou não devam fazer parte do "topicA". Observe que o argumento para a opção `--onto` e o parâmetro `<upstream>` podem ser qualquer tipo válido de commit.
+
+Em caso de conflito, o comando `git rebase` encerrará no primeiro commit problemático e deixará marcadores de conflito na árvore. Você pode usar o comando `git diff` para localizar os marcadores (<<<<<<) e fazer as edições para resolver o conflito. Para cada arquivo editado, você precisa informar ao Git que o conflito foi resolvido; normalmente, isso seria feito com
+
+
+    git add <nome-do-arquivo>
+
+
+Depois de resolver o conflito manualmente e atualizar o índice com a resolução desejada, você pode continuar o processo de reconstrução com o comando
+
+
+    git rebase --continue
+
+
+Como alternativa, você pode desfazer o 'git rebase' com
+
+
+    git rebase --abort
+
+MAIS OPÇÕES
+-----------
+
+As opções nesta seção, não podem ser usadas com nenhuma outra opção, inclusive entre si:
+
+--continue::
+	Reinicie o processo de reformulação após resolver um conflito de mesclagem.
+
+--skip::
+	Reinicie o processo de reconstrução da fundação ignorando o patch atual.
+
+--abort::
+	Interrompa a operação de reconstrução da fundação e redefina o `HEAD` para o ramo original. Caso `<ramo>` seja informado quando a operação de reconstrução da fundação seja iniciada, o `HEAD` será redefinido para `<ramo>`. Caso contrário, o `HEAD` será redefinido para onde estava quando a operação de reconstrução foi iniciada.
+
+--quit::
+	Interrompa a operação de reconstrução, porém o `HEAD` não será redefinido para o ramo original. Como resultado, o índice e a árvore de trabalho também permanecem inalterados. Caso uma entrada temporária "stash" seja criada utilizando `--autostash`, ela será salva na lista "stash".
+
+--edit-todo::
+	Edite a lista de tarefas durante uma nova reconstrução interativa.
+
+--show-current-patch::
+	Exiba o patch atual numa nova recuperação interativa ou quando a nova recuperação for interrompida por causa de conflitos. É o equivalente ao `git show REBASE_HEAD`.
+
+OPÇÕES
+------
+--onto <nova-base>::
+	Ponto de partida para a criação de novos commits. Se a opção `--onto` não for usada, o ponto de partida será `<upstream>`. Pode ser qualquer commit válido, e não apenas um nome já existente do ramo.
++
+Como um caso especial, você pode utilizar "A\...B" como um atalho para a base de mesclagem 'A' e 'B' caso haja exatamente uma base para mesclagem. Você pode deixar de fora no máximo um de 'A' e 'B'; nesse caso, a predefinição retorna para `HEAD`.
+
+--keep-base::
+	Defina o ponto de partida para criar os novos commits para a mesclagem base do `<upstream>` e `<ramo>`. Executando o comando `git rebase --keep-base <upstream> <ramo>` é o mesmo que executar o comando `git rebase --reapply-cherry-picks --no-fork-point --onto <upstream>...<ramo> <upstream> <ramo>`.
++
+Esta opção é útil no caso onde se está desenvolvendo um recurso em cima de um ramo 'upstream'. Enquanto o recurso está sendo trabalhado, o ramo 'upstream' pode avançar e talvez não seja a melhor ideia continuar reconstruindo no topo do 'upstream', porém manter a base do commit como está. Como a base do commit permanece inalterado, esta opção implica no uso da opção `--reapply-cherry-picks` para evitar a perda dos commits.
++
+Embora esta opção e o `--fork-point` encontrem a base da mesclagem entre `<upstream>` e `<ramo>`, esta opção utiliza a base da mesclagem como o _ponto inicial_ onde os novos commits serão criados, enquanto `--fork-point` utiliza a mesclagem da base para determinar o _conjunto dos commits_ que serão reconstruídos.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+<upstream>::
+	O ramo upstream para fazer comparação. Pode ser qualquer commit válido, e não apenas um nome já existente do ramo. A predefinição retorna ao upstream configurado para a ramificação atual.
+
+<ramo>::
+	Ramo de trabalho; A predefinição retorna para `HEAD`.
+
+--apply::
+	Use estratégias de aplicação para fazer o rebase (invocando o comando `git-am` internamente). Esta opção pode se tornar inútil no futuro, uma vez que o backend da mesclagem lida com tudo o que o backend de aplicação faz.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--empty=(drop|keep|stop)::
+	How to handle commits that are not empty to start and are not clean cherry-picks of any upstream commit, but which become empty after rebasing (because they contain a subset of already upstream changes):
++
+--
+`drop`;;
+	The commit will be dropped. This is the default behavior.
+`keep`;;
+	The commit will be kept. This option is implied when `--exec` is specified unless `-i`/`--interactive` is also specified.
+`stop`;;
+`ask`;;
+	The rebase will halt when the commit is applied, allowing you to choose whether to drop it, edit files more, or just commit the empty changes. This option is implied when `-i`/`--interactive` is specified. `ask` is a deprecated synonym of `stop`.
+--
++
+Observe que, os commits que começam vazios são mantidos (a menos que a opção `--no-keep-empty` seja utilizado) e os commits que são escolhas limpas (conforme determinado pelo comando `git log --cherry-mark ...`) são detectados e descartados como uma etapa preliminar (a menos que a opção `--reapply-cherry-picks` ou `--keep-base` seja utilizado).
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--no-keep-empty::
+--keep-empty::
+	Não mantenha os commits que começam vazios antes do rebase (ou seja, que não alteram nada em relação ao commit principal) no resultado. A predefinição é manter os commits que começam vazios, uma vez que a criação de tais commits requer o uso da opção de substituição `--allow-empty` para o comando `git commit`, o que significa que um usuário está intencionalmente criando tal commit e, portanto, deseja mantê-lo.
++
+O uso desta opção é provavelmente raro, uma vez que você pode se livrar dos commits que começam vazios simplesmente iniciando um rebase interativo e removendo as linhas correspondentes aos commits que não deseja. Esta opção existe como um atalho conveniente, como nos casos onde as ferramentas externas geram muitos commits vazios e você deseja que todos sejam removidos.
++
+Para os commits que não começam vazios, mas ficam vazios após o 'rebase', consulte a opção `--empty`.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--reapply-cherry-picks::
+--no-reapply-cherry-picks::
+	Reaplique todas as escolhas seletivas que estejam limpas de qualquer commit "upstream" em vez inviabilizá-los por completo. (Então, caso estes commits se tornem vazios depois da reconstrução, por conter um subconjunto de alterações da "upstream", o comportamento em direção à eles é controlado através da opção `--empty`.)
++
+Na ausência da opção `--keep-base` (ou se `--no-reapply-cherry-picks` for usado), estes commits serão automaticamente descartados. Como isso exige a leitura de todos os commits "upstream", pode acabar saindo caro em repositórios com uma grande quantidade de commits "upstream" que precisam ser lidos. Ao usar o backend 'merge', serão emitidos avisos para cada commit descartado (a menos que a opção `--quiet` seja usada). O aviso também será emitido a menos que `advice.skippedCherryPicks` esteja definido como falso (consulte linkgit:git-config[1]).
++
+A opção `--reapply-cherry-picks` permite que a reconstrução anteceda a leitura de todos os commits "upstream", melhorando muito o desempenho.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--allow-empty-message::
+	Não operacional (no-op). O rebase dos commits com uma mensagem vazia costumava falhar e esta opção substituiria esse comportamento, permitindo o rebase dos commits com mensagens vazias. Agora, os commits com uma mensagem vazia não causam a interrupção do rebase.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+-m::
+--merge::
+	Usando estratégias de mesclagem para o rebase (padrão).
++
+Observe que uma mesclagem rebase funciona reproduzindo cada commit do ramo de trabalho sobre o ramo `<upstream>`. Por esse motivo, quando ocorre um conflito de mesclagem, o lado relatado como "nosso" é a série até então refeita, começando com `<upstream>`, e o "deles" é o ramo de trabalho. Em outras palavras, os lados são trocados.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+-s <estratégia>::
+--strategy=<estratégia>::
+	Usa a estratégia de mesclagem fornecida, em vez da predefinição `ort`. Implica no uso da opção `--merge`.
++
+Como o `git rebase` repete cada commit do ramo de trabalho no cume do ramo <upstream> utilizando a estratégia informada, o uso da `nossa` estratégia simplesmente esvazia todos os patches do `<ramo>`, que faz pouco sentido.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+-X <opção-da-estratégia>::
+--strategy-option=<opção-da-estratégia>::
+	Encaminhe a <opção-da-estratégia> para a estratégia de mesclagem. Implica no uso da opção `--merge` e, se nenhuma estratégia tiver sido especificada, a predefinição é `-s ort`. Observe a inversão de 'ours' (nosso) e 'theirs' (deles), conforme observado acima para a opção `-m`.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--rerere-autoupdate::
+--no-rerere-autoupdate::
+	Depois que o mecanismo 'rerere' reutilizar uma resolução registrada no conflito atual para atualizar os arquivos na árvore de trabalho, permita que ele também atualize o índice com o resultado da resolução. A opção `--no-rerere-autoupdate` é uma boa maneira de verificar novamente o que o `rerere` fez e detectar possíveis erros de mesclagem, antes de fazer o commit resultante no índice com um comando `git add` separado.
+[]
+
+-S[<keyid>]::
+--gpg-sign[=<keyid>]::
+--no-gpg-sign::
+	Commits assinados com o GPG O argumento `keyid` é opcional e a predefinição retorna para a identidade de quem fez o commit; caso seja utilizado, deve estar anexado a opção e sem espaço. A opção `--no-gpg-sign` é útil para revogar a variável de configuração `commit.gpgSign` e a anterior `--gpg-sign`.
+
+-q::
+--quiet::
+	Fique em silêncio. Implica no uso da opção `--no-stat`.
+
+-v::
+--verbose::
+	Seja loquaz. Implica no uso de `--stat`.
+
+--stat::
+	Exiba uma descrição do que mudou na upstream desde a última reconstrução (rebase). O diffstat também é controlado pela opção de configuração `rebase.stat`.
+
+-n::
+--no-stat::
+	Não mostre um "diffstat" como parte do processo de reconstrução da fundação (rebase).
+
+--no-verify::
+	Essa opção ignora o gancho rebase prévio. Consulte também linkgit:githooks[5].
+
+--verify::
+	Permite que o hook rebase prévio seja executado, que é a predefinição. Essa opção pode ser usada para substituir a opção `--no-verify`. Consulte também linkgit:githooks[5].
+
+-C<n>::
+	Certifique-se de que pelo menos `<n>` linhas do contexto circundante correspondam antes e após cada alteração. Quando houver menos linhas de contexto ao redor, todas elas devem corresponder. É predefinido que nenhum contexto seja ignorado. Implica no uso da opção `--apply`.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--no-ff::
+--force-rebase::
+-f::
+	Reproduz individualmente todos os commits refeitos em vez de avançar rapidamente sobre os que estiverem inalterados. Isso garante que todo o histórico da ramificação refeita através do "rebase" seja composto de novos commits.
++
+Pode ser útil após reverter uma mesclagem do ramo "topic", pois esta opção recria o ramo "topic" com os novos commits, para que possa ser recuperado com êxito sem precisar "reverter a reversão" (para mais detalhes, consulte o link:/docs/howto/revert-a-faulty-merge/pt_BR[Como reverter uma falha da mesclagem]).
+
+--fork-point::
+--no-fork-point::
+	Utilize reflog para encontrar um ancestral comum melhor entre a `<upstream>` e o `<ramo>` ao calcular quais os commits foram introduzidos pelo `<ramo>`.
++
+Quando a opção `--fork-point` estiver ativa, o 'fork_point' será utilizado em vez do `<upstream>` para calcular o conjunto de commits que serão refeitos via "rebase", onde o 'fork_point' é o resultado do comando `git merge-base --fork-point <upstream> <ramo>` (consulte linkgit:git-merge-base[1]). Se o 'fork_point' estiver vazio, o `<upstream>` será usado como contingência.
++
+Caso a `<upstream>` ou a opção `--keep-base` seja utilizada na linha de comando, a predefinição será `--no-fork-point`, caso contrário, a predefinição será `--fork-point`. Consulte também `rebase.forkpoint` em linkgit:git-config[1].
++
+Caso o seu ramo teve como base no `<upstream>`, porém `<upstream>` foi retrocedido e o seu ramo contém commits que foram eliminados, esta opção pode ser utilizada com a opção `--keep-base` para eliminar estes commits do seu ramo.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--ignore-whitespace::
+	Ignore as diferenças dos espaços ao tentar reconciliar as diferenças. Atualmente, cada estrutura implementa uma aproximação deste comportamento:
++
+aplica o "backend";;
+	Ao aplicar um patch, ignore as alterações no espaço das linhas do contexto. Infelizmente, isto significa que caso as linhas "antigas" sendo substituídas pelo patch difiram apenas pelo espaço do arquivo existente haverá um conflito de integração em vez da aplicação bem sucedida do patch.
++
+mescla o "backend";;
+	Trate as linhas apenas com alterações de espaço em branco como linhas inalteradas durante a mesclagem. Infelizmente, isso significa que todos os fragmentos das correções destinados a alterar os espaços em branco e nada mais será descartado, ainda que o outro lado não tenha feito alterações conflitantes.
+
+--whitespace=<opção>::
+	Esta opção é repassada para o comando `git apply` (consulte linkgit:git-apply[1]) que aplica a correção. Implica no uso da opção `--apply`.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--committer-date-is-author-date::
+	Em vez de usar a hora atual como a data de quem fez o commit, utilize a data do autor que fez o rebase do commit como a data do commit. Esta opção implica no uso de `--force-rebase`.
+
+--ignore-date::
+--reset-author-date::
+	Em vez de usar a data do autor do commit original, use a hora atual como a data do autor do commit refeito via "rebase". Implica no uso da opção `--force-rebase`.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--signoff::
+	Adicione uma resposta `Assinado-por` em todos os commits que tiveram a sua fundação reconstruída. Observe que caso a opção `--interactive` seja utilizada, apenas os commit marcados para serem selecionados, editados ou reformulados terão um caracteres de resposta adicionado.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+-i::
+--interactive::
+	Faça uma lista dos commits que estão prestes a ser refeitos com o "rebase". Deixe o usuário editar esta lista antes de realizar o "rebase". Esse modo também pode ser usado para dividir os commits (consulte 'DIVIDINDO OS COMMITS' abaixo).
++
+O formato da lista dos commits pode ser alterado ao definir a configuração ´rebase.instructionFormat`. Um formato de instrução personalizado terá automaticamente o hash do commit anexado ao formato.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+-r::
+--rebase-merges[=(rebase-cousins|no-rebase-cousins)]::
+--no-rebase-merges::
+	É predefinido que um "rebase" simplesmente eliminará a mesclagem dos commits da lista de tarefas e colocará os commits que foram refeitos num único ramo linear. Com `--rebase-merges`, a reconstrução com o "rebase" tentará preservar a estrutura da ramificação dentro dos commits que devem sofrer a reconstrução, recriando a mesclagem dos commits. Quaisquer conflitos resolvidos na mesclagem ou nas emendas manuais destas mesclagens dos commits terão que ser resolvidos ou aplicados manualmente. A opção `--no-rebase-merges` pode ser usada para anular a opção de configuração `rebase.rebaseMerges` e um `--rebase-merges` anterior.
++
+Ao refazer as mesclagens com o "rebase", existem dois modos: `rebase-cousins` e `no-rebase-cousins`. Se o modo não for especificado, a predefinição será `no-rebase-cousins`. No modo `no-rebase-cousins`, os commits que não têm `<upstream>` como ancestral direto manterão o seu ponto de ramificação original, ou seja, os commits que seriam excluídos pela opção `--ancestry-path` do linkgit:git-log[1] manterão a sua ancestralidade original automaticamente. No modo `rebase-cousins`, esses commits são rebaseados em `<upstream>` (ou `<onto>`, se especificado).
++
+Atualmente, só é possível recriar a mesclagem dos commits utilizando a estratégia de mesclagem `ort`; diferentes estratégias de mesclagem podem ser utilizadas somente através dos comandos explícitos como `exec git merge -s <strategy> [...]`.
++
+Consulte também 'RECONSTRUINDO AS MESCLAGENS' e 'OPÇÕES INCOMPATÍVEIS' abaixo.
+
+-x <cmd>::
+--exec <cmd>::
+	Anexe "exec <cmd>" após cada linha, criando um commit no final do histórico. O `<cmd>` será interpretado como um ou mais comandos do shell. Qualquer comando que falhar interromperá a reconstrução da fundação, encerrando com o código 1.
++
+É possível executar vários comandos utilizando uma instância da opção `--exec` com vários comandos:
++
+	git rebase -i --exec "cmd1 && cmd2 && ..."
++
+ou utilizando mais de um `--exec`:
++
+	git rebase -i --exec "cmd1" --exec "cmd2" --exec ...
++
+Caso a opção `--autosquash` seja utilizado, as linhas `exec` não serão anexadas aos commits intermediários e aparecerão apenas no final de cada série de compressão/correção.
++
+Utiliza o mecanismo `--interactive` internamente, porém pode ser executado sem a opção `--interactive` de forma explicita.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--root::
+	Refaça com "rebase" todos os commits acessíveis a partir do `<ramo>`, em vez de limitá-los com um `<upstream>`. Isso permite que você faça o rebase num ramo do(s) commit(s) raiz(es).
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--autosquash::
+--no-autosquash::
+	Automaticamente esmaga os commits com mensagens especialmente formatadas nos commits anteriores e que estão sendo refeitos com o "rebase". Se uma mensagem do commit começar com "squash! ", "fixup! " ou "amend! ", o restante da linha do assunto é considerado como um especificador de commit, que corresponda a um commit anterior caso corresponda à linha de assunto ou ao hash deste commit. Se nenhum commit corresponder totalmente, serão consideradas as correspondências do especificador com o início dos assuntos do commit.
++
+Na lista de tarefas do rebase, as ações dos commits 'squash', 'fixup' e 'amend' são alteradas de `pick` para `squash`, `fixup` ou `fixup -C`, respectivamente, e são movidas logo após o commit que eles modificam. A opção `--interactive` pode ser usada para revisar e editar a lista de tarefas antes de dar continuidade.
++
+A maneira recomendada de criar commits com marcadores 'squash' é usar as opções `--squash`, `--fixup`, `--fixup=amend:` ou `--fixup=reword:` do linkgit:git-commit[1], que usam o commit de destino como argumento e preenchem automaticamente a linha de assunto a partir do novo commit.
++
+Setting configuration variable `rebase.autoSquash` to true enables auto-squashing by default for interactive rebase. The `--no-autosquash` option can be used to override that setting.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+--autostash::
+--no-autostash::
+	Crie automaticamente uma entrada de armazenamento temporário antes do início da operação e aplique-a ao concluir a operação. Isso significa que você pode executar o "rebase" numa árvore de trabalho suja. No entanto, use-o com cuidado: o aplicativo de armazenamento final após um"rebase" bem-sucedido pode resultar em conflitos não triviais.
+
+--reschedule-failed-exec::
+--no-reschedule-failed-exec::
+	Reagende automaticamente os comandos `exec` que falharam. Isso só faz sentido no modo interativo (ou quando uma opção `--exec` for utilizada).
++
+Esta opção se aplica quando um "rebase" for iniciado. Ele é preservado com base para todo o "rebase", em ordem, na opção de linha de comando usada para o `git rebase` inicial, a configuração `rebase.rescheduleFailedExec` (consulte linkgit:git-config[1] ou "CONFIGURAÇÃO" abaixo), ou a predefinição é 'false'.
++
+O registro desta opção para todo o "rebase" é um recurso conveniente. Caso contrário, um `--no-reschedule-failed-exec` explícito no início seria substituído pela presença de uma configuração `rebase.rescheduleFailedExec=true` quando o `git rebase --continue` fosse invocado. Atualmente, você não pode passar `--[no-]reschedule-failed-exec` para o comando `git rebase --continue`.
+
+--update-refs::
+--no-update-refs::
+	Atualize automaticamente todas as ramificações que apontem para os commits onde os "rebases" estejam sendo feitos. Quaisquer ramificações forem verificadas numa árvore de trabalho não são atualizadas desta maneira.
++
+Caso a variável de configuração `rebase.updateRefs` esteja definida, então esta opção pode ser usada para substituir e desativar esta configuração.
++
+Consulte também a seção "OPÇÕES INCOMPATÍVEIS" logo abaixo.
+
+OPÇÕES INCOMPATÍVEIS
+--------------------
+
+As seguintes opções:
+
+ * --apply
+ * --whitespace
+ * -C
+
+são incompatíveis com as seguintes opções:
+
+ * --merge
+ * --strategy
+ * --strategy-option
+ * --autosquash
+ * --rebase-merges
+ * --interactive
+ * --exec
+ * --no-keep-empty
+ * --empty=
+ * --[no-]reapply-cherry-picks quando utilizado com --keep-base
+ * --update-refs
+ * --root quando utilizado sem o --onto
+
+Além disso, os seguintes pares de opções são incompatíveis:
+
+ * --keep-base e --onto
+ * --keep-base e --root
+ * --fork-point e --root
+
+DIFERENÇAS COMPORTAMENTAIS
+--------------------------
+
+O `git rebase` tem dois backends principais: 'apply' e 'merge'. (O backend 'apply' costumava ser conhecido como backend 'am', mas o nome gerou confusão, pois parece um verbo em vez de um substantivo. Além disso, o backend 'merge' costumava ser conhecido como backend interativo, mas agora também é usado para casos não interativos. Ambos foram renomeados com base na funcionalidade de baixo nível que sustentava cada um deles). Há algumas diferenças sutis na maneira de como estes dois backends se comportam:
+
+Os commits vazios
+~~~~~~~~~~~~~~~~~
+
+Infelizmente, o backend 'apply' descarta os commits vazios intencionalmente, ou seja, os commits que começaram vazios, embora isso seja raro na prática. Ele também descarta os commits que ficam vazios e não há opção para controlar este comportamento.
+
+É predefinido que a estrutura 'merge' mantenha os commits intencionalmente vazios (com `-i` são marcados como vazio no editor da lista de tarefas ou podem ser descartados automaticamente com a opção `--no-keep-empty`).
+
+Similar to the apply backend, by default the merge backend drops commits that become empty unless `-i`/`--interactive` is specified (in which case it stops and asks the user what to do). The merge backend also has an `--empty=(drop|keep|stop)` option for changing the behavior of handling commits that become empty.
+
+Detecção da renomeação do diretório
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Devido à falta de informações precisas sobre a árvore (decorrente da construção de ancestrais falsos com as informações limitadas disponíveis nas correções), a detecção da renomeação do diretório está desativada no backend 'apply'. A detecção desativada da renomeação do diretório significa que, se um lado do histórico renomear um diretório e o outro adicionar novos arquivos ao diretório antigo, os novos arquivos serão deixados para trás no diretório antigo sem nenhum aviso no momento do "rebase".
+
+A detecção da renomeação do diretório funciona com a estrutura 'merge', neste caso, fornecendo informações para você.
+
+Contexto
+~~~~~~~~
+
+O backend 'apply' funciona criando uma sequência de correções (chamando `format-patch` internamente) e, em seguida, aplicando as correções em sequência (chamando `am` internamente). As correções são compostas de vários pedaços, cada um com os números das linhas, uma região de contexto e as alterações reais. Os números das linha devem ser tomados com alguma cautela, pois o outro lado provavelmente terá linhas anteriores inseridas ou excluídos no arquivo. A região de contexto tem o objetivo de ajudar a descobrir como ajustar os números da linha visando aplicar as alterações nas linhas corretas. No entanto, se várias áreas do código tiverem as mesmas linhas de contexto ao redor, a área errada poderá ser escolhida. Há casos reais onde isso fez com que os commits fossem reaplicados incorretamente sem que nenhum conflito fosse relatado. Ao definir `diff.context` como um valor maior pode evitar estes tipos de problemas, mas aumenta a chance de conflitos espúrios (já que serão necessárias mais linhas de contexto correspondente para serem aplicadas).
+
+A estrutura 'merge' trabalha com a cópia completa de casa arquivo relevante isolando-os destes tipos de problemas.
+
+A rotulagem dos marcadores de conflitos
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Quando há conflitos no conteúdo, o mecanismo de mesclagem tenta anotar os marcadores de conflito de cada lado com os commits de onde o conteúdo veio. Como o backend 'apply' descarta as informações originais sobre os commits refeitos com rebase e as suas origens (e, em vez disso, gera novos commits falsos com base em informações limitadas nas correções geradas), estes commits não podem ser identificados; em vez disso, é necessário recorrer a um resumo do commit. Além disso, quando `merge.conflictStyle` for definido como `diff3` ou `zdiff3`, o backend 'apply' usará "constructed merge base" para rotular o conteúdo da base de mesclagem e, portanto, não fornecerá nenhuma informação sobre o commit da mesclagem da base.
+
+A estrutura 'merge' funciona com commits completos nos dois lados do histórico e portanto não possuem tais limitações.
+
+Ganchos
+~~~~~~~
+
+Tradicionalmente, o backend 'apply' não invoca o gancho pós commit, enquanto o backend 'merge' invoca. Ambos invocam o gancho "pós-checkout", embora o backend 'merge' tenha suprimido a sua criação. Além disso, ambos os "backends" só invocam o gancho "pós-checkout" com o commit do ponto inicial do rebase, não invoca nos commits intermediários nem no commit final. Em cada caso, a invocação destes hooks ocorreu por acidente de implementação e não por projeto (ambos os backends foram originalmente implementados como scripts de shell e invocaram outros comandos como `git checkout` ou `git commit` que invocariam os ganchos). Ambos os backends devem ter o mesmo comportamento, embora não esteja totalmente claro qual deles está correto, quando estiverem. Provavelmente faremos com que o rebase pare de invocar estes ganchos no futuro.
+
+Interruptabilidade
+~~~~~~~~~~~~~~~~~~
+
+O backend 'apply' tem problemas de segurança com uma interrupção inoportuna; se o usuário pressionar Ctrl-C no momento errado para tentar abortar o rebase, o rebase pode entrar num estado onde não pode ser abortado após um `git rebase --abort`. O backend 'merge' não parece sofrer da mesma deficiência. (Consulte https://lore.kernel.org/git/20200207132152.GC2868@szeder.dev/ para obter mais detalhes.)
+
+Reescrevendo os Commits
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Quando ocorre um conflito durante o rebase, ele é interrompido e o usuário é solicitado a resolver o problema. Como o usuário talvez precise fazer alterações importantes durante a resolução de conflitos, após a resoluão dos conflitos e o usuário tiver executado o comando `git rebase --continue`, o rebase deverá abrir um editor e solicitar que o usuário atualize a mensagem do commit. O backend 'merge' faz isso, enquanto o backend 'apply' aplica cegamente a mensagem original do commit.
+
+Diferenças diversas
+~~~~~~~~~~~~~~~~~~~
+
+Existem mais algumas diferenças comportamentais que a maioria das pessoas considerariam fazer de forma inconsequente, porém são mencionadas por questões de integridade:
+
+* Reflog: As duas estruturas que utilizarão palavras diferentes durante a descrição das alterações feitas no reflog, embora ambos façam a utilização da palavra "rebase".
+
+* Mensagens de progresso, informativas e de erro: Os dois backends fornecem mensagens ligeiramente diferentes de progresso e informacionais. Além disso, o backend 'apply' grava mensagens de erro (como "Seus arquivos seriam sobrescritos...") no stdout, enquanto o backend 'merge' as grava no stderr.
+
+* Diretórios de estado: As duas estruturas mantêm a sua condição em diferentes diretórios dentro do `.git/`
+
+ESTRATÉGIAS DE MESCLAGEM
+------------------------
+
+O mecanismo de mesclagem (os comandos `git merge` e `git pull`) permite que as 'estratégias de mesclagem' do backend sejam escolhidas com a opção `-s`. Algumas estratégias também podem ter as suas próprias opções, que podem ser passadas usando argumentos `-X<opção>` ao comando `git merge` e/ou `git pull`.
+
+ort::
+	Esta é a estratégia de mesclagem predefinida ao extrair ou ao mesclar um ramo. Esta estratégia só pode resolver dois `HEADS` usando um algoritmo de mesclagem de 3 vias. Quando há mais de um ancestral comum que pode ser usado para a mesclagem de 3 vias, ele cria uma árvore mesclada dos ancestrais comuns e a utiliza como uma árvore de referência para a mesclagem de 3 vias. Foi relatado que isso resulta em menos conflitos de mesclagem sem causar erros de mesclagem através dos testes feitos na mesclagem dos commits reais retirados do histórico de desenvolvimento do kernel do Linux 2.6. Além disso, esta estratégia pode detectar e lidar com as mesclagens que envolvam renomeações. Não faz uso de cópias detectadas. O nome desse algoritmo é um acrônimo ("Ostensibly Recursive's Twin") e surgiu do fato de que ele foi escrito como um substituto para o padrão di algoritmo anterior, `recursive`.
++
+A estratégia 'ort' pode adotar as seguintes opções:
+
+ours;;
+	Esta opção impõem a resolução automática dos conflitos de maneira limpa, favorecendo a 'nossa' versão. As alterações da outra árvore que não entram em conflito com o nosso lado são refletidas no resultado da mesclagem. Para um arquivo binário, todo o conteúdo é retirado a partir do nosso lado.
++
+Isso não deve ser confundido com a estratégia da 'nossa' mesclagem, que nem sequer analisa o que a outra árvore contém. Ela descarta tudo o que a outra árvore fez, declarando que a 'nossa' história contém tudo o que aconteceu nela.
+
+theirs;;
+	Este é o oposto do 'nosso'; observe que, diferentemente do 'nosso', não existe uma estratégia de mesclagem 'deles' para confundir esta opção de mesclagem.
+
+ignore-space-change;;
+ignore-all-space;;
+ignore-space-at-eol;;
+ignore-cr-at-eol;;
+	Trata as linhas com o tipo indicado de alteração do espaço em branco como inalteradas para os fins de uma mesclagem de três vias. As alterações do espaço em branco misturadas com as outras alterações numa linha não são ignoradas. Consulte também o comando linkgit:git-diff[1] `-b`, `-w`, `--ignore-space-at-eol`, e a opção `--ignore-cr-at-eol`.
++
+* Caso a versão 'their' (dele) introduzir apenas as alterações de espaço em uma linha, a 'our' (nossa) versão será utilizada;
+* Caso a 'our' (nossa) versão introduzir alterações nos espaços, porém a versão 'their' (dele) incluir uma alteração substancial, a versão 'their' (dele) será utilizada;
+* Caso contrário, a mesclagem continuará de forma usual.
+
+renormalize;;
+	Isso executa um "check-out" e um "check-in" virtual de todos os três estágios de um arquivo ao resolver uma mesclagem de três vias. Esta opção deve ser usada ao mesclar ramificações com diferentes filtros limpos ou com regras de normalização de fim de linha. Para mais detalhes consulte "Mesclando as ramificações com atributos de check-in/check-out diferentes" do comando linkgit:gitattributes[5].
+
+no-renormalize;;
+	Desativa a opção `renormalize`. Isso substitui a variável de configuração `merge.renormalize`.
+
+find-renames[=<n>];;
+	Ative a detecção de renomeação, definindo opcionalmente o limite de similaridade. Esta é a predefinição. Isso substitui a variável de configuração 'merge.renames'. Consulte também linkgit:git-diff[1] `--find-renames`.
+
+rename-threshold=<n>;;
+	É um sinônimo obsoleto para `find-renames=<n>`.
+
+subtree[=<caminho>];;
+	Esta opção é uma forma mais avançada de estratégia de 'subárvore', onde a estratégia faz uma estimativa de como as duas árvores devem ser deslocadas para coincidir uma com a outra durante a mesclagem. Em vez disso, o caminho especificado é prefixado (ou retirado do início) para fazer com que a forma das duas árvores coincida.
+
+recursive::
+	Isso só pode resolver dois cabeçalhos usando um algoritmo de mesclagem de 3 vias. Quando há mais de um ancestral comum que pode ser usado para a mesclagem de 3 vias, ele cria uma árvore mesclada dos ancestrais comuns e a utiliza como uma árvore de referência para a mesclagem de 3 vias. Foi relatado que isso resulta em menos conflitos de mesclagem sem causar erros de mesclagem através dos testes feitos na mesclagem dos commits reais retirados do histórico de desenvolvimento do kernel do Linux 2.6. Além disso, ele pode detectar e lidar com mesclagens que envolvam renomeações. Não faz uso de cópias detectadas. Essa era a estratégia padrão para resolver dois cabeçalhos do Git v0.99.9k até a v2.33.0.
++
+A estratégia 'recursiva' usa as mesmas opções que a 'ort'. Entretanto, há três opções adicionais que o 'ort' ignora (não documentadas acima) e que podem ser úteis com a estratégia 'recursiva':
+
+patience;;
+	É um sinônimo obsoleto para `diff-algorithm=patience`.
+
+diff-algorithm=[patience|minimal|histogram|myers];;
+	Use um algoritmo de comparação diferente durante a mesclagem, o que pode ajudar a evitar mesclagens incorretas que ocorrem devido a linhas correspondentes sem importância (como chaves de funções distintas). Consulte também linkgit:git-diff[1] `--diff-algorithm`. Observe que `ort` usa especificamente `diff-algorithm=histogram`, enquanto `recursive` usa como predefinição a configuração `diff.algorithm`.
+
+no-renames;;
+	Desativa a detecção de renomeação. Isto sobrepõem a variável de configuração `merge.renames` configuration. Consulte também linkgit:git-diff[1] `--no-renames`.
+
+resolve::
+	Isso só pode resolver duas cabeças (ou seja, o ramo atual e outro ramo do qual você retirou) usando um algoritmo de mesclagem de três vias. Ele tenta detectar cuidadosamente as ambiguidades de mesclagem cruzada. Ele não lida com renomeações.
+
+octopus::
+	Isso resolve casos com mais de dois cabeçalhos, mas se recusa a fazer uma mesclagem complexa que precise de uma resolução manual. Seu principal objetivo é ser usado para agrupar os tópicos dos cabeçalhos juntos. Esta é a estratégia de mesclagem predefinida ao obter (fazer um pull) ou ao mesclar um ramo.
+
+ours::
+	Isso resolve qualquer quantidade de cabeçalhos, mas a árvore resultante da mesclagem é sempre a do cabeçalho do ramo atual, ignorando efetivamente todas as alterações de todos os outros ramos. Ele deve ser usado para substituir o histórico de desenvolvimento antigo das ramificações paralelas. Observe que isso é diferente da opção `-Xours` para a estratégia de mesclagem da opção 'recursive'.
+
+subtree::
+	Esta é uma estratégia `ort` modificada. Ao mesclar as árvores 'A' e 'B', caso 'B' corresponda a uma subárvore de 'A', o 'B' será ajustado primeiro para coincidir à estrutura da árvore 'A', em vez de ler as árvores no mesmo nível. Esse ajuste também é feito na árvore ancestral comum.
+
+Com as estratégias que usam a mesclagem de 3 vias (incluindo a predefinição, 'ort'), se uma alteração for feita em ambos os ramos, mas posteriormente revertida num dos ramos, essa alteração estará presente no resultado da mesclagem; algumas pessoas acham este comportamento confuso. Isto ocorre porque somente os cabeçalhos e a base de mesclagem são considerados ao realizar uma mesclagem, e não os commits individuais. Portanto, o algoritmo de mesclagem considera a alteração revertida como se não houvesse nenhuma alteração e, em vez disso, substitui a versão alterada.
+[]
+
+OBSERVAÇÕES
+-----------
+
+Você deve entender as implicações de usar o comando `git rebase` num repositório que você compartilha. Consulte também SE RECUPERANDO DA RECONSTRUÇÃO DA FUNDAÇÃO INICIAL (UPSTREM REBASE) abaixo.
+
+Quando o rebase for executado, ele primeiro executará um gancho `pre-rebase`, caso exista um. Você pode usar esse gancho para fazer verificações de sanidade e rejeitar o rebase caso não seja apropriado. Consulte o script modelo do gancho do `pre-rebase` para ver um exemplo.
+
+Após a conclusão, o `<ramo>` será o ramo atual.
+
+MODO INTERATIVO
+---------------
+
+O rebase interativo significa que você tem a chance de editar os commits onde o rebase foi feito. Você pode reordenar os commits e removê-los (eliminando correções ruins ou indesejados).
+
+O modo interativo é destinado para este tipo de fluxo de trabalho:
+
+1. tenho uma ideia maravilhosa
+2. hackear o código
+3. preparar uma série para envio
+4. enviar
+
+onde o ponto 2. consiste em várias instâncias do
+
+a) uso regular
+
+ 1. termine algo digno de um commit
+ 2. commit
+
+b) correção independente
+
+ 1. perceber que algo não funciona
+ 2. conserte isso
+ 3. faça o commit
+
+Às vezes, o problema é corrigido na versão b.2. Não pode ser emendado no commit parcialmente perfeito que ele corrige, porque este commit está profundamente entranhado numa série de correções. É exatamente para isso que serve o rebase interativo: use-o após muitos "a" e "b", ao reorganizar e editar os commits e acumulando vários commits num só.
+
+Inicie-o com o último commit que você quer manter como está:
+
+	git rebase -i <após-este-commit>
+
+Um editor será acionado com todos os commits em seu ramo atual (ignorando a mesclagem dos commits), que vêm após o commit informado. Você pode reordenar os commits nesta lista como quiser e também é possível removê-los. A lista é mais ou menos assim:
+
+-------------------------------------------
+pick deadbee Uma linha deste commit
+pick fa1afe1 Uma linha do próximo commit
+...
+-------------------------------------------
+
+As descrições on-line são puramente para o seu prazer; o comando 'git rebase' não examinará eles, porém os nomes dos commits ("deadbee" e "fa1afe1" neste exemplo), portanto, não exclua ou edite os nomes.
+
+Ao substituir o comando "pick" pelo comando "edit", é possível dizer ao comando `git rebase` para parar após aplicar este commit, para que seja possível editar os arquivos e/ou a mensagem do commit, alterar o commit e continuar com a reconstrução.
+
+Para interromper um "rebase" (exatamente como um comando "edit" faria, mas sem fazer uma escolha seletiva de nenhum commit primeiro), use o comando "break".
+
+Caso apenas queira editar a mensagem do commit para um commit, substitua o comando `pick` pelo comando `reword`.
+
+Para eliminar um commit, substitua o comando "pick" por "drop" ou apenas exclua a linha coincidente.
+
+Se você quiser juntar dois ou mais commits num só, substitua o comando 'pick' para o segundo commit e os subsequentes com 'squash' ou 'fixup'. Se os commits tiverem autores diferentes, o commit agrupado será atribuído ao autor do primeiro commit. A mensagem sugerida do commit para o commit agrupado é a concatenação da mensagem do primeiro commit com aquelas identificadas pelos comandos 'squash', omitindo as mensagens dos commits identificados pelos comandos 'fixup', a menos que 'fixup -c' seja usado. Nesse caso, a mensagem sugerida do commit é apenas a mensagem do commit 'fixup -c', e um editor é aberto para que você possa editar a mensagem. O conteúdo (correção) do commit 'fixup -c' ainda é incorporado ao commit agrupado. Se houver mais de um commit 'fixup -c', será usada a mensagem do último commit. Você também pode usar 'fixup -C' para obter o mesmo comportamento de 'fixup -c', mas sem abrir um editor.
+
+O comando `git rebase` será interrompido quando o "pick" for substituído por "edit" ou quando um comando falhar devido aos erros da mesclagem. Quando você terminar de editar e/ou resolver os conflitos, será possível continuar utilizando `git rebase --continue`.
+
+Como por exemplo, caso você queira reordenar os últimos 5 commits de maneira onde o que era `HEAD~4` se torne o novo `HEAD`. Para conseguir isso, você chamaria o comando `git rebase` assim:
+
+----------------------
+$ git rebase -i HEAD~5
+----------------------
+
+E mova o primeiro patch para o ramo da lista.
+
+Convém recriar a mesclagem dos commits, por exemplo, caso tenha um histórico como este:
+
+------------------
+           X
+            \
+         A---M---B
+        /
+---o---O---P---Q
+------------------
+
+Suponha que queira reconstruir o lado do ramo ao lado começando em "A" para "Q". Verifique se o `HEAD` atual é "B" e chame
+
+-----------------------------
+$ git rebase -i -r --onto Q O
+-----------------------------
+
+A reordenação e a edição dos commits geralmente criam etapas intermediárias não testadas. Talvez você queira verificar se a edição do histórico não quebrou nada executando um teste ou, pelo menos, recompilando em pontos intermediários do histórico usando o comando 'exec' (o atalho é 'x'). Você pode fazer isso criando uma lista de tarefas como esta:
+
+-------------------------------------------
+pick deadbee Implement feature XXX
+fixup f1a5c00 Fix to feature XXX
+exec make
+pick c0ffeee The oneline of the next commit
+edit deadbab The oneline of the commit after
+exec cd subdir; make test
+...
+-------------------------------------------
+
+A reconstrução interativa será interrompida quando um comando falhar (ou seja, encerra com uma condição diferente de 0) oferecendo uma oportunidade para a correção do problema. Você pode continuar com o comando `git rebase --continue`.
+
+O comando 'exec' inicia o comando num shell (a ´predefinição, geralmente é /bin/sh), para que você possa usar os recursos do shell (como 'cd', '>', ';' ...). O comando é executado a partir da raiz da árvore de trabalho.
+
+----------------------------------
+$ git rebase -i --exec "make test"
+----------------------------------
+
+Esse comando permite que você verifique se os commits intermediários são compiláveis. A lista de tarefas fica assim:
+
+--------------------
+pick 5928aea one
+exec make test
+pick 04d0fda two
+exec make test
+pick ba46169 three
+exec make test
+pick f4593f9 four
+exec make test
+--------------------
+
+DIVIDINDO OS COMMITS	
+---------------------
+
+No modo interativo, você pode marcar commits com a ação 'edit' (editar). No entanto, isso não significa necessariamente que o comando `git rebase` espera que o resultado desta edição seja exatamente um commit. De fato, você pode desfazer o commit ou adicionar outros commits. Isso pode ser usado para dividir um commit em dois:
+
+- Inicie um rebase interativo com `git rebase -i <commit>^`, onde `<commit>` é o commit que você deseja dividir. Na verdade, qualquer intervalo do commit serve, desde que contenha este commit.
+
+- Marque o commit que deseja dividir com a ação "edit".
+
+- Quando for necessário editar esse commit, execute o comando `git reset HEAD^`. O efeito é que o `HEAD` é rebobinado num, e o índice segue o mesmo caminho. No entanto, a árvore de trabalho permanece a mesma.
+
+- Agora, adicione as alterações ao índice onde você deseja ter no primeiro commit. Você pode usar o comando `git add` (possivelmente de forma interativa) ou o comando `git gui` (ou ambos) para fazer isso.
+
+- Faça o commit do índice agora atual com qualquer mensagem do commit que seja apropriada.
+
+- Repita as duas últimas etapas até que a sua árvore de trabalho esteja limpa.
+
+- Continue a reconstrução com `git rebase --continue`.
+
+Caso não tenha certeza absoluta que as revisões intermediárias são consistentes (elas compilam, passam no conjunto de testes, etc.), você deve usar o `git stash` para armazenar o commit das alterações que ainda não foram feitas após cada commit, teste e corrija o commit caso correções sejam necessárias.
+
+
+SE RECUPERANDO DA RECONSTRUÇÃO DA FUNDAÇÃO INICIAL (UPSTREM REBASE)
+-------------------------------------------------------------------
+
+Fazer o rebase (ou qualquer outra forma de reescrita) de uma ramificação onde outras pessoas trabalharam é uma má ideia: qualquer pessoa que esteja a posteriori dela é forçada a corrigir seu histórico manualmente. Esta seção explica como fazer a correção do ponto de vista de quem fez depois. A verdadeira correção, no entanto, seria evitar o rebase da ponta em primeiro lugar.
+
+Para ilustrar, imagine que você esteja numa situação onde alguém desenvolve um 'subsystem' no ramo e você está trabalhando num 'topic' que depende deste 'subsystem'. Você pode acabar com um histórico como este:
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \
+	  o---o---o---o---o  subsystem
+			   \
+			    *---*---*  topic
+------------
+
+Caso a reconstrução da fundação do 'subsystem' seja realizada contra o 'master', o seguinte acontece:
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \			 \
+	  o---o---o---o---o	  o'--o'--o'--o'--o'  subsystem
+			   \
+			    *---*---*  topic
+------------
+
+Caso agora continue o desenvolvimento normalmente e eventualmente mescle o 'topic' para 'subsystem', os commits do 'subsystem' permanecerão duplicados para sempre:
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \			 \
+	  o---o---o---o---o	  o'--o'--o'--o'--o'--M	 subsystem
+			   \			     /
+			    *---*---*-..........-*--*  topic
+------------
+
+Estas duplicatas são geralmente desaprovadas, pois desorganizam o histórico, tornando-o mais difícil de acompanhar. Para limpar as coisas, você precisa transplantar os commits em 'topic' para o novo topo 'subsystem', ou seja, rebase 'topic'. Isso se torna um efeito cascata: qualquer pessoa que esteja após 'topic' é forçada a refazer a base também, e assim por diante!
+
+Existem dois tipos de correções, discutidos nas seguintes subseções:
+
+Caso fácil: as alterações são literalmente as mesmas.::
+
+	Isso acontece caso a reconstrução do 'subsystem' foi uma reconstrução simples e não houve conflitos.
+
+Caso difícil: as alterações não são as mesmas.::
+
+	Isso acontece caso a reconstrução da fundação (rebase) do 'subsistema' tiver conflitos ou utilizar o `--interactive` para omitir, editar, esmagar ou consertar consertos; ou se a inicial utilizou um dos comandos `commit --amend`, `reset` ou um histórico completo da reescrita como https://github.com/newren/git-filter-repo[`filter-repo`].
+
+
+O caso fácil
+~~~~~~~~~~~~
+
+Funciona apenas se as alterações (IDs do patch com base no conteúdo do diff) no 'subsystem' que forem literalmente as mesmas antes e depois da reconstrução do 'subsystem'.
+
+Nesse caso, a correção é fácil porque o comando 'git rebase' sabe ignorar as alterações que já estão presentes no novo 'upstream' (a menos que `--reapply-cherry-picks` seja utilizada). Então, se você diz (supondo que você esteja no 'topic')
+------------
+    $ git rebase subsystem
+------------
+você vai acabar com o histórico fixo
+------------
+    o---o---o---o---o---o---o---o  master
+				 \
+				  o'--o'--o'--o'--o'  subsystem
+						   \
+						    *---*---*  topic
+------------
+
+
+O caso difícil
+~~~~~~~~~~~~~~
+
+As coisas ficam mais complicadas caso as alterações do "subsistema" não coincidam de forma exata aquelas antes da reconstrução.
+
+NOTE: Embora uma "recuperação fácil dos casos" às vezes pareça ser bem-sucedida
+      mesmo no caso difícil, pode haver consequências não intencionais.  Para
+      Por exemplo, um commit que foi removido através do comando `git rebase
+      --interactive` será **ressuscitado**!
+
+A ideia é informar manualmente ao comando `git rebase` "onde o antigo 'subsystem' terminou e o seu 'topic' começou", ou seja, qual era a antiga mesclagem de base entre eles. Você terá que encontrar uma maneira de nomear o último commit do antigo 'subsystem', por exemplo:
+
+* Com o reflog do 'subsystem': após o comando `git fetch`, a ponta antiga do 'subsystem' está em `subsystem@{1}`. As buscas seguintes aumentarão o número. (Consulte linkgit:git-reflog[1].)
+
+* Em relação ao cume do 'topic': sabendo que o seu 'topic' tem três commits, o cume antigo do 'subsystem' deve ser `topic~3`.
+
+Você pode então transplantar o antigo `subsystem..topic` para o novo cume dizendo (para o caso do reflog e supondo que você já esteja no 'topic'):
+------------
+    $ git rebase --onto subsystem subsystem@{1}
+------------
+
+O efeito cascata de uma recuperação "difícil" (hard case) é especialmente ruim: 'todos' baixaram do 'topic' e agora terão que executar também uma reconstrução "difícil"!
+
+RECONSTRUINDO AS MESCLAGENS
+---------------------------
+
+O comando de reconstrução interativa foi originalmente projetado para lidar com séries de patches individuais. Como tal, faz sentido excluir a mesclagem dos commits da lista de tarefas, pois o desenvolvedor pode ter mesclado o `master` atual enquanto trabalhava no ramo, apenas para redefinir todos os commits para `master` eventualmente (ignorando a mesclagem dos commits).
+
+No entanto, existem razões legítimas pelas quais um desenvolvedor pode querer recriar as mesclagens dos commits: para manter a estrutura do ramo (ou a "topologia do commit") ao trabalhar em diversos ramos inter-relacionadas.
+
+No exemplo a seguir, o desenvolvedor trabalha em um tópico no ramo que refatora a maneira como os botões são definidos, em outro tópico do ramo que utilize esta refatoração para implementar um botão "Relatar um bug". A saída do `git log --graph --format=%s -5` pode ficar assim:
+
+------------
+*   Mescla o ramo 'report-a-bug'
+|\
+| * Adiciona o botão de feedback
+* | Mescla o ramo 'refactor-button'
+|\ \
+| |/
+| * Utiliza a classe do Botão para todos os botões
+| * Extrai o botão genérico do DownloadButton
+------------
+
+O desenvolvedor pode querer redefinir estes commits para um novo `master` enquanto mantém a topologia da ramificação. Quando se espera que o primeiro tópico do ramo que seja integrado ao` master` muito antes do segundo por exemplo. Para resolver os conflitos da mesclagem com as alterações para a classe `DownloadButton` que a transformou em `master` por exemplo.
+
+Esse rebase pode ser realizado com a opção `--rebase-merges`. Ele gerará uma lista de tarefas semelhante a esta:
+
+------------
+rotular para
+
+# Branch: refactor-button
+reset onto
+pick 123456 Extrai o botão genérico do DownloadButton
+pick 654321 Utiliza a classe do Botão para todos os botões
+label refactor-button
+
+# Branch: report-a-bug
+reset refactor-button # Utiliza a classe do Botão para todos os botões
+pick abcdef Adiciona o botão de feedback
+label report-a-bug
+
+reset onto
+merge -C a1b2c3 refactor-button # Mescla o 'refactor-button'
+merge -C 6f5e4d report-a-bug # Mescla o 'report-a-bug'
+------------
+
+Ao contrário de uma reconstrução interativa regular, existem os comandos `label`, `reset` e `merge` além dos comandos `pick`.
+
+O comando `label` associa um rótulo ao `HEAD` atual quando este comando for executado. Estes rótulos são criados como refs locais da árvore de trabalho (`refs/rewritten/<label>`) que serão excluídos quando a reconstrução terminar. Dessa forma, as operações da reconstrução em várias árvores de trabalho vinculadas ao mesmo repositório não interferem entre si. Caso o comando `label` falhe, este é imediatamente reagendado, com uma mensagem útil sobre como proceder.
+
+O comando `reset` redefine o `HEAD`, o índice e a árvore de trabalho para a revisão específica. É semelhante a um comando `exec git reset --hard <label>`, porém se recusa a sobrescrever os arquivos que não sejam monitorados. Se o comando `reset` falhar, ele será imediatamente reagendado, com uma mensagem útil sobre como editar a lista de tarefas (normalmente acontece quando um comando `reset` foi inserido manualmente na lista de tarefas e contém um erro de digitação).
+
+O comando `merge` mesclará revisões usadas no que seja `HEAD` naquele momento. Com `-C <original-commit>`, a mensagem do commit de um determinada mesclagem será usada. Quando o `-C` é alterado para minúsculo `-c`, a mensagem será aberta num editor após uma mesclagem bem-sucedida, para que o usuário possa editá-la.
+
+Se um comando `merge` falhar por qualquer motivo que não seja conflitos de mesclagem (ou seja, quando a operação de mesclagem nem sequer foi iniciada), ele será reagendado imediatamente.
+
+É predefinido que o comando `merge` use a estratégia de mesclagem `ort` para mesclagens regulares e `octopus` para mesclagens "octopus". É possível especificar uma estratégia predefinida para todas as mesclagens usando o a opção `--strategy` ao invocar o rebase, ou substituir mesclagens específicas na lista interativa de comandos usando um comando `exec` para invocar o comando `git merge` explicitamente com a opção `--strategy`. Observe que, ao invocar explicitamente o comando `git merge` dessa maneira, você pode usar o fato de que as etiquetas são referências locais da árvore de trabalho (a referência `refs/rewritten/onto` corresponderia a etiqueta `onto`, por exemplo) para se referir às ramificações que deseja mesclar.
+
+Observação: o primeiro comando (`label onto`) rotula a revisão onde os commits são refeitos; O nome `onto` é apenas uma convenção, como um aceno para a opção `--onto`.
+
+Também é possível introduzir commits para mesclagem completamente novos, adicionando um comando no formato `merge <merge-head>`. Este formulário gera uma mensagem de commit provisória e sempre abre um editor para permitir que o usuário a edite. Pode ser útil quando por exemplo, um ramo de um tópico acaba resolvendo mais de um problema e quer ser dividido em dois ou mais ramos de tópico. Considere esta lista de tarefas:
+
+------------
+pick 192837 Alterna do GNU Makefiles para o CMake
+pick 5a6c7e Documente a alteração para o CMake
+pick 918273 Corrija a detecção do OpenSSL no CMake
+pick afbecd http: adicione a compatibilidade com o TLS v1.3
+pick fdbaec Corrija a detecção da cURL no CMake no Windows
+------------
+
+O único commit nesta lista que não está relacionado ao CMake pode muito bem ter sido motivado ao trabalhar na correção de todos os erros introduzidos durante a mudança para o CMake, porém ele lida com um interesse diferente. Para dividir esse ramo em dois tópicos, a lista de tarefas pode ser editada desta maneira:
+
+------------
+rotular para
+
+escolha afbecd http: adicione a compatibilidade para o TLS v1.3
+label tlsv1.3
+
+redefinir para
+pick 192837 Alterna do GNU Makefiles para o CMake
+pick 918273 Corrija a detecção do OpenSSL no CMake
+pick fdbaec Corrija a detecção da cURL no CMake no Windows
+pick 5a6c7e Documente a alteração para o CMake
+label cmake
+
+reset onto
+merge tlsv1.3
+merge cmake
+------------
+
+CONFIGURAÇÃO
+------------
+
+
+
+[WARNING]
+====
+Missing `pt_BR/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `pt_BR/config/rebase.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+[WARNING]
+====
+Missing `pt_BR/config/sequencer.txt`
+
+See original version for this content.
+====
+
+[]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

@@ -1,0 +1,209 @@
+git-daemon(1)
+=============
+
+NOME
+----
+git-daemon - Um servidor realmente simples para os repositórios Git
+
+RESUMO
+------
+[verse]
+'git daemon' [--verbose] [--syslog] [--export-all]
+	     [--timeout=<n>] [--init-timeout=<n>] [--max-connections=<n>]
+	     [--strict-paths] [--base-path=<caminho>] [--base-path-relaxed]
+	     [--user-path | --user-path=<caminho>]
+	     [--interpolated-path=<pathtemplate>]
+	     [--reuseaddr] [--detach] [--pid-file=<arquivo>]
+	     [--enable=<serviço>] [--disable=<serviço>]
+	     [--allow-override=<serviço>] [--forbid-override=<service>]
+	     [--access-hook=<caminho>] [--[no-]informative-errors]
+	     [--inetd |
+	      [--listen=<host-or-ipaddr>] [--port=<n>]
+	      [--user=<usuário> [--group=<grupo>]]]
+	     [--log-destination=(stderr|syslog|none)]
+	     [<directory>...]
+
+DESCRIÇÃO
+---------
+É um daemon TCP Git bem simples que normalmente escuta na porta `DEFAULT_GIT_PORT` ou 9418. Ele aguarda uma conexão solicitando um serviço e atenderá a este serviço caso esteja ativado.
+
+Ele verifica se o diretório possui o arquivo mágico "git-daemon-export-ok" e se recusará a exportar qualquer diretório Git que não tenha sido explicitamente marcado para exportação dessa maneira (a menos que o parâmetro `--export-all` seja utilizado). Caso passe alguns caminhos de diretórios como argumentos 'git daemon', os caminhos serão limitados a repositórios dentro desses diretórios.
+
+É predefinido que apenas o serviço `upload-pack` esteja ativo, o que atende aos clientes são o 'git fetch-pack' e 'git ls-remote', que são chamados de 'git fetch', 'git pull' e 'git clone'.
+
+Isso é o ideal para as atualizações de somente leitura, ou seja, extrair dos repositórios Git.
+
+Também existe um `upload-archive` para servir o `git archive` .
+
+OPÇÕES
+------
+--strict-paths::
+	Corresponda exatamente aos caminhos (ou seja, não permita "/foo/repo" quando o caminho real for "/foo/repo.git" ou "/foo/repo/.git") e não use caminhos relativos ao usuário. O 'git daemon' se recusará a iniciar quando esta opção estiver ativada e nenhum argumento de diretório for usado.
+
+--base-path=<caminho>::
+	Remapeia todas as solicitações de caminho como sendo relativas ao caminho informado. Isso é meio que um "Git root" - se você executar o 'git daemon' com a opção '--base-path=/srv/git' no domínio example.com, então posteriormente tentar fazer um 'pull' em 'git://example.com/hello.git', o comando 'git daemon' interpretará o caminho como `/srv/git/hello.git`.
+
+--base-path-relaxed::
+	Se a opção '--base-path' estiver ativada e a pesquisa no repositório falhar, com esta opção o 'git daemon' tentará fazer a pesquisa sem prefixar o caminho base. Isso é útil para alternar para o uso da opção '--base-path', embora ainda assim permita os caminhos antigos.
+
+--interpolated-path=<modelo-de-caminho>::
+	Para dar suporte à hospedagem virtual, um modelo de caminho interpolado pode ser usado visando construir dinamicamente caminhos alternativos. O modelo é compatível com '%H' para o nome de destino do host, conforme ele for informado pelo cliente, porém é todo convertido em letras minúsculas, '%CH' para o nome do host canônico, '%IP' para o endereço IP do servidor, '%P' para o número da porta e '%D' para o caminho absoluto do repositório nomeado. Após a interpolação, o caminho é validado em relação à lista de diretórios.
+
+--export-all::
+	Permite puxar de todos os diretórios que se pareçam com os repositórios Git (possuem os subdiretórios 'objects' e 'refs'), mesmo que eles não tenham o arquivo 'git-daemon-export-ok'.
+
+--inetd::
+	Faça com que o servidor seja executado como um serviço 'inetd'. Implica no uso da opção `--syslog` (pode ser substituído por `--log-destination=`). É incompatível com as opções `--detach`, `--port`, `--listen`, `--user` e `--group`.
+
+--listen=<host-ou-endereço-IP>::
+	Escute num endereço IP ou host específico. Os endereços IP podem ser um endereço IPv4 ou um endereço IPv6, caso haja suporte. Se não houver suporte para o IPv6, então `--listen=<nome-do-host>` também será incompatível e a opção `--listen` deverá usar um endereço IPv4. Pode ser usado mais de uma vez É incompatível com a opção `--inetd`.
+
+--port=<n>::
+	Escuta numa porta alternativa. É incompatível com a opção `--inetd`.
+
+--init-timeout=<n>::
+	O Tempo limite (em segundos) entre o momento em que a conexão é estabelecida e a solicitação do cliente é recebida (geralmente um valor bastante baixo, pois esse deve ser imediato).
+
+--timeout=<n>::
+	Tempo limite (em segundos) para sub-solicitações específicas do cliente. Isso inclui o tempo que leva para o servidor processar a sub-solicitação e o tempo gasto aguardando a próxima solicitação do cliente.
+
+--max-connections=<n>::
+	Quantidade máxima de clientes simultâneos; o padrão é 32. Defina-o como zero para não haver limite.
+
+--syslog::
+	É um atalho para `--log-destination=syslog`.
+
+--log-destination=<destino>::
+	Envia mensagens do registro log para o destino informado. Observe que esta opção não obriga o uso da opção `--verbose`, portanto, é predefinido que apenas as condições de erro sejam registradas. O <destino> deve ser um dos seguintes:
++
+--
+stderr::
+	Registrar no erro predefinido. Observe que caso a opção `--detach` for usada, o processo se desconectará do erro real predefinido, tornando esse destino efetivamente equivalente a `none`.
+syslog::
+	Escreva para o syslog utilizando o identificador `git-daemon`.
+none::
+	Desativa todos os registros logs.
+--
++
+A predefinição para o destino é `syslog` caso `--inetd` ou `--detach` seja utilizado, caso contrário será o `stderr`.
+
+--user-path::
+--user-path=<caminho>::
+	Permite que a notação de usuário {~} (tilde) (til) seja usada nas solicitações. Quando especificado sem parâmetro, uma solicitação para `git://host/{tilde}alice/foo` seja considerada como uma solicitação para acessar o repositório 'foo' no diretório raiz do usuário `alice`. Se a opção `--user-path=<caminho>` for especificada, a mesma solicitação será considerada como uma solicitação para acessar o repositório `<path>/foo` no diretório raiz do usuário `alice`.
+
+--verbose::
+	Registre os detalhes sobre as conexões recebidas e os arquivos solicitados.
+
+--reuseaddr::
+	Use 'SO_REUSEADDR' ao vincular o soquete de escuta. Isso permite que o servidor seja reiniciado sem esperar o tempo limite das conexões antigas.
+
+--detach::
+	Desanexe do shell; Implica no uso da opção `--syslog`.
+
+--pid-file=<arquivo>::
+	Salva a ID o processo no 'arquivo'. É ignorado quando o daemon é executado com a opção `--inetd`.
+
+--user=<usuário>::
+--group=<grupo>::
+	Altere o uid e o gid do daemon antes de entrar no loop de serviço. Quando apenas a opção `--user` usada e sem a opção `--group`, será usada a ID do grupo primário do usuário. Os valores da opção são repassadas ao `getpwnam(3)` e ao `getgrnam(3)` não há suporte para IDs numéricas.
++
+Usar estas opções é um erro quando utilizado em conjunto com `--inetd`; utilize o recurso do inet daemon para obter o mesmo efeito antes de gerar o 'git daemon', caso seja necessário.
++
+Como muitos programas que alternam o ID do usuário, o daemon não redefine as variáveis de ambiente como `$HOME` quando executa programas como o git, por exemplo, o `upload-pack` e `receive-pack`. Ao usar esta opção, você também pode definir e exportar `HOME` para apontar para o diretório inicial do `<usuário>` antes de iniciar o daemon e verifique se todos os arquivos da configuração do Git nesse diretório são legíveis pelo `<usuário>`.
+
+--enable=<serviço>::
+--disable=<serviço>::
+	Por predefinição, ativa ou desativa o serviço em todo o site. Observe que um serviço desativado em todo o site ainda pode ser ativado por repositório caso estiver marcado como substituível e o repositório ativar o serviço com um item de configuração.
+
+--allow-override=<serviço>::
+--forbid-override=<serviço>::
+	Permite ou proibe a substituição da predefinição em todo o site com a configuração por repositório. É predefinido que todos os serviços possam ser sobrescrito.
+
+--[no-]informative-errors::
+	Quando os erros informativos estiverem ativados, o 'git-daemon' relatará ao cliente erros mais detalhados, diferenciando as condições como "não existe tal repositório" de "repositório não exportado". Isso é bem mais conveniente para os clientes, contudo, pode vazar informações sobre a existência de repositórios que não foram exportados. Quando os erros informativos não estão ativados, todos os erros informam "acesso negado" ao cliente. A predefinição é `--no-informative-errors`.
+
+--access-hook=<caminho>::
+	Toda vez que um cliente se conectar, primeiro execute um comando externo especificado pelo `<caminho>` com o nome do serviço ("upload-pack" por exemplo), o caminho para o repositório, o nome do host ('%H'), o nome do host canônico ('%CH'), o endereço IP ('%IP') e a porta TCP ('%IP') como seus argumentos de linha de comando. O comando externo pode decidir recusar o serviço, encerrando com uma condição diferente de zero (ou permitindo, encerrando com uma condição igual a zero). Ele também pode examinar as variáveis de ambiente `$REMOTE_ADDR` e `$REMOTE_PORT` para saber mais sobre o solicitante ao tomar esta decisão.
++
+O comando externo pode, opcionalmente, gravar uma única linha em sua saída padrão para ser enviada ao solicitante como uma mensagem de erro quando ele recusar o serviço.
+
+<diretório>::
+	Os argumentos restantes fornecem uma lista de diretórios. Caso algum diretório seja definido, então o processo `git-daemon` ofertará um diretório solicitado somente se este estiver contido num destes diretórios. Caso a opção `--strict-paths` seja informada, o diretório solicitado deve corresponder exatamente a um destes diretórios.
+
+SERVIÇOS
+--------
+
+Estes serviços podem ser ativados ou desativados globalmente usando as opções de linha de comando deste comando. Caso queira um controle mais refinado (para permitir que o 'git archive' seja executado apenas em alguns repositórios selecionados que o daemon atenda por exemplo), o arquivo de configuração por repositório pode ser usado para ativá-los ou desativá-los.
+
+upload-pack::
+	Isso oferece aos clientes 'git fetch-pack' e 'git ls-remote'. Ele é ativado por padrão, mas um repositório pode desativá-lo definindo o item de configuração `daemon.uploadpack` como `false`.
+
+upload-archive::
+	This oferece 'git archive --remote'. Ele é desativado por padrão, mas um repositório pode ativá-lo definindo o item de configuração `daemon.uploadarch` como `true`.
+
+receive-pack::
+	Isso oferece aos clientes 'git send-pack', permitindo um `push` anônimo. Ele é desativado por padrão, pois não há nenhuma autenticação no protocolo (em outras palavras, qualquer pessoa pode enviar qualquer coisa para o repositório, inclusive a remoção das referências). Isso se destina exclusivamente a uma configuração com LAN fechada onde todos sejam conhecidos. Esse serviço pode ser ativado definindo o item de configuração `daemon.receivepack` como `true`.
+
+EXEMPLOS
+--------
+Assumimos o seguinte em `/etc/services`::
++
+------------
+$ grep 9418 /etc/services
+git		9418/tcp		# Controle de Versão do Sistema Git
+------------
+
+'git daemon' como um servidor inetd::
+	Para configurar o 'git daemon' como um serviço inetd que lida com qualquer repositório dentro de `/pub/foo` ou `/pub/bar`, insira uma entrada como demonstrado abaixo em `/etc/inetd`, tudo numa linha só:
++
+------------------------------------------------
+	git stream tcp nowait nobody  /usr/bin/git
+		git daemon --inetd --verbose --export-all
+		/pub/foo /pub/bar
+------------------------------------------------
+
+
+'git daemon' como servidor inetd para hosts virtuais::
+	Para configurar o 'git daemon' como um serviço inetd que lida com repositórios com diferentes hosts virtuais, `www.example.com` e `www.example.org`, coloque uma entrada como a seguinte em `/etc/inetd` tudo numa linha:
++
+------------------------------------------------
+	git stream tcp nowait nobody /usr/bin/git
+		git daemon --inetd --verbose --export-all
+		--interpolated-path=/pub/%H%D
+		/pub/www.example.org/software
+		/pub/www.example.com/software
+		/software
+------------------------------------------------
++
+Neste exemplo, o diretório de nível raiz `/pub` terá um subdiretório para cada nome de host virtual suportado. Além disso, ambos os hosts anunciam os repositórios simplesmente como `git://www.example.com/software/repo.git`. Para clientes anteriores à versão 1.4.0, também é possível criar um link simbólico de `/software` para o repositório padrão apropriado.
+
+
+O 'git daemon' como daemon regular para hosts virtuais::
+	Para configurar o 'git daemon' como um serviço regular e não como inetd que lida com repositórios para vários hosts virtuais com base em seus endereços IP, inicie o daemon desta maneira:
++
+------------------------------------------------
+	git daemon --verbose --export-all
+		--interpolated-path=/pub/%IP/%D
+		/pub/192.168.1.200/software
+		/pub/10.10.220.23/software
+------------------------------------------------
++
+Neste exemplo, o diretório de nível raiz `/pub` terá um subdiretório para cada endereço IP de host virtual suportado. No entanto, os repositórios ainda podem ser acessados pelo nome do host, desde que correspondam a estes endereços IP.
+
+ativar ou desativar seletivamente os serviços por repositório::
+	Para ativar faça `git archive --remote` e desative o `git fetch` num repositório, faça o seguinte no arquivo de configuração no repositório (que é o arquivo 'config' próximo ao `HEAD`, 'refs' e 'objects ').
++
+----------------------------------------------------------------
+	[daemon]
+		uploadpack = false
+		uploadarch = true
+----------------------------------------------------------------
+
+
+VARIÁVEIS DO AMBIENTE
+---------------------
+O `git daemon` configurará o `REMOTE_ADDR` para o endereço IP do cliente conectado a ele caso o endereço IP esteja disponível. O `REMOTE_ADDR` estará disponível no ambiente dos chamados ganchos quando os serviços forem executados.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

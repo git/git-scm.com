@@ -1,0 +1,133 @@
+git-checkout-index(1)
+=====================
+
+NOME
+----
+git-checkout-index - Copie os arquivos do índice para a árvore de trabalho
+
+
+RESUMO
+------
+[verse]
+'git checkout-index' [-u] [-q] [-a] [-f] [-n] [--prefix=<texto>]
+		   [--stage=<número>|all]
+		   [--temp]
+		   [--ignore-skip-worktree-bits]
+		   [-z] [--stdin]
+		   [--] [<arquivo>...]
+
+DESCRIÇÃO
+---------
+Copia todos os arquivos listados no índice para o diretório de trabalho (não sobrescrevendo os arquivos já existentes).
+
+OPÇÕES
+------
+-u::
+--index::
+	atualiza as informações das estatísticas para as entradas com check-out no arquivo do índice.
+
+-q::
+--quiet::
+	fique em silêncio caso os arquivos já existirem ou não estiverem no índice
+
+-f::
+--force::
+	impõem que os arquivos existentes sejam sobrescritos
+
+-a::
+--all::
+	verifica todos os arquivos no índice, exceto aqueles com o bit skip-worktree definido (consulte `--ignore-skip-worktree-bits`). Não pode ser usado junto com nomes de arquivos específicos.
+
+-n::
+--no-create::
+	Não faça a verificação dos novos arquivos, apenas renove os arquivos já verificados.
+
+--prefix=<texto>::
+	Ao criar os arquivos, anexe uma `<texto>` (geralmente um diretório incluindo uma barra `/`)
+
+--stage=<número>|all::
+	Em vez de fazer a verificação das entradas que não foram mescladas, copie os arquivos do estágio informado. <number> deve ser entre 1 e 3. Observação: `--stage=all` automaticamente implica no uso da opção `--temp`.
+
+--temp::
+	Em vez de copiar os arquivos para o diretório de trabalho, grave o conteúdo em arquivos temporários. As associações do nome temporário serão gravadas no stdout.
+
+--ignore-skip-worktree-bits::
+	Verifica todos os arquivos, incluindo aqueles com o bit skip-worktree definido.
+
+--stdin::
+	Em vez de pegar a lista dos caminhos da linha de comando, leia a lista dos caminhos na entrada padrão. É predefinido que os caminhos sejam separados por LF (ou seja, um caminho por linha).
+
+-z::
+	Somente faz sentido se utilizado junto com a opção `--stdin`; os caminhos são separados com caracteres `NUL` em vez de `LF`.
+
+\--::
+	Não interprete mais argumentos como opções.
+
+A ordem das opções costumava importar, agora não mais.
+
+Agora ao executar o comando `git checkout-index`, ele não faz nada. Você provavelmente quis utilizar `git checkout-index -a`. E caso queira impor a sua utilização, utilize `git checkout-index -f -a`.
+
+A intuição não é o objetivo aqui. A repetibilidade é. A razão para o comportamento "sem argumentos significa que não há trabalho" é que, a partir dos scripts que você deve ser capaz de executar:
+
+----------------
+$ find . -name '*.h' -print0 | xargs -0 git checkout-index -f --
+----------------
+
+o que irá impor a reposição de todos os arquivos `* .h` pelas suas cópias no cache. Uma linha de comando vazia implica em "all", isso impõem que a renovação ocorra em tudo o que estava no índice, o que não era o caso. Mas como 'git checkout-index' aceita `--stdin`, seria muito mais rápido utilizar:
+
+----------------
+$ find . -name '*.h' -print0 | git checkout-index -f -z --stdin
+----------------
+
+O `--` apenas é uma boa ideia quando você sabe que o resto será um nome do arquivo; isso evitará problemas com um nome do arquivo de, por exemplo, `-a`. Utilizar `--` provavelmente é uma boa política nos scripts.
+
+
+Utilizando `--temp` ou `--stage=all`
+------------------------------------
+Quando o `--temp` é utilizado (ou de forma implícita por `--stage=all`), o comando 'git checkout-index' cria um arquivo temporário para cada entrada do índice que está sendo retirado. O índice não será atualizado com as informações das estatísticas. Estas opções podem ser úteis caso quem chame, precise de todos os estágios, de todas as entradas não mescladas para que os arquivos não mesclados possam ser processados por uma ferramenta de mesclagem externa.
+
+Uma lista será gravada no stdout, fornecendo a associação dos nomes dos arquivos temporários para os nomes dos caminhos rastreados. O formato da listagem possui duas variações:
+
+    . tempname TAB path RS
++
+O primeiro formato é o que é utilizado quando o `--stage` for omitido ou não seja um `--stage=all`. O campo `tempname` é o nome do arquivo temporário que contenha o conteúdo do arquivo e `path` é o nome do caminho monitorado no índice. O campo `tempname` é o arquivo com o nome temporário que armazena o conteúdo do arquivo, o `path` e o nome do caminho monitorado no índice. Apenas as entradas solicitadas são produzidas.
+
+    . stage1temp SP stage2temp SP stage3tmp TAB path RS
++
+O segundo formato é o que é utilizado quando a opção for `--stage=all`. Os campos temporários dos três estágios (stage1temp, stage2temp, stage3temp) listam o nome do arquivo temporário caso haja uma entrada no estágio, no índice ou em `.`, caso não haja uma entrada do estágio. Os caminhos que possuem apenas uma entrada do estágio 0 sempre serão omitidos da saída.
+
+Nos dois formatos, o RS (separador de registros) por predefinição é a nova linha, mas será o byte nulo caso `-z` seja utilizado na linha de comando. Os nomes dos arquivos temporários são sempre gerados de forma segura com uma cadeia de caracteres; eles nunca conterão separadores de diretório ou caracteres de espaço. O campo do caminho é sempre relativo ao diretório atual e os nomes dos arquivos temporários são sempre relativos ao cume do diretório.
+
+Caso o objeto que está sendo copiado para um arquivo temporário seja um link simbólico, o conteúdo do link será registrado num arquivo normal. Cabe ao usuário final ou a Porcelana a responsabilidade do que fazer com essa informação.
+
+
+EXEMPLOS
+--------
+Para atualizar e renovar somente os arquivos já verificados::
++
+----------------
+$ git checkout-index -n -f -a && git update-index --ignore-missing --refresh
+----------------
+
+Utilizando 'git checkout-index' para "exportar uma árvore inteira"::
+	A habilidade do prefixo basicamente torna trivial a utilização do comando 'git checkout-index' como uma função "exportar como árvore". Leia apenas a árvore desejada no índice e faça:
++
+----------------
+$ git checkout-index --prefix=git-export-dir/ -a
+----------------
++
+O comando `git checkout-index` irá "exportar" o índice para um determinado diretório.
++
+O "/" no final é importante. O nome que foi exportado é literalmente prefixado com a cadeia de caracteres definida. Faça o contraste disso com o seguinte exemplo.
+
+Exportar os arquivos com um prefixo::
++
+----------------
+$ git checkout-index --prefix=.merged- Makefile
+----------------
++
+Verifica se a cópia disponível no cache do `Makefile` está no arquivo `.merged-Makefile`.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

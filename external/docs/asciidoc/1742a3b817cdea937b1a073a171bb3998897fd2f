@@ -1,0 +1,203 @@
+git-range-diff(1)
+=================
+
+NOM
+---
+git-range-diff - Comparer deux plages de commits (par exemple deux versions d'une branche)
+
+SYNOPSIS
+--------
+[verse]
+'git range-diff' [--color=[<quand>]] [--no-color] [<options-de-diff>]
+	[--no-dual-color] [--creation-factor=<facteur>]
+	[--left-only | --right-only]
+	( <plage1> <plage2> | <rev1>...<rev2> | <base> <rev1> <rev2> )
+	[[--] <chemin>...]
+
+DESCRIPTION
+-----------
+
+Cette commande affiche les différences entre deux versions d'une série de rustines, ou plus généralement, entre deux plages de commits (en ignorant les commits de fusion).
+
+En présence d'arguments `<chemin>`, ces plages de commits sont restreintes en conséquence.
+
+À cette fin, elle recherche les paires de commits depuis les deux plages de commits qui se correspondent. Deux commit sont dits correspondre quand les diffs entres leurs rustines (c-à-d. les information d'auteur, les messages de commit et les diffs des commits) sont raisonnablement petites par rapport à la taille des rustines. Voir ``Algorithme`` ci-dessous pour plus de détails.
+
+Enfin, la liste des commits en correspondance est affichée dans l'ordre de la deuxième plage de commits, avec les commits sans correspondance insérés après que tous leurs ancêtres ont été affichés.
+
+Il existe trois moyens de spécifier les plages de commit :
+
+- `<plage1><plage2>` : la plage de commits peut être de la forme `<base>..<rev>`, `<rev>^!-<n>`. Voir `SPECIFIER LES PLAGES` dans linkgit:gitrevisions[7] pour de plus amples détails.
+
+- `<rév1>...<rév2>`. C'est équivalent à `<rév2>..<rév1> <rév1>..<rév2>`.
+
+- `<base> <rev1> <rev2>` : C'estquivalent à `<base>..<rev1> <base>..<rev2>`.
+
+OPTIONS
+-------
+--no-dual-color::
+	Quand les diffs de commit diffèrent, `git range-diff` recrée le coloriage original des diffs et ajoute les marqueurs de diff externes -/+ avec le *fond* en rouge/vert pour le rendre plus visible, par exemple lorsqu'il y a eu une modification et quelles lignes ont été ajoutées.
++
+En outre, les lignes diff de commit qui sont seulement présentes dans la plage du premier commit sont montrées "atténuées" (ceci peut être surchargé à l'aide du réglage de configuration`color.diff.<créneau>` où `<créneau>` peut être `contextDimmed`, `oldDimmed` ou`newDimmed`), et les lignes du diff de commit qui ne sont présentes que dans la plage du second commit sont montrées en gras (ce qui peut être surchargé à l'aide du réglage de configuration`color.diff.<créneau>` où `<créneau>` peut être `contextBold`, `oldBold` ou`newBold`).
++
+Ceci est connu par `range-diff` sous le nom de « coloration double ». Utilisez `--no-dual-color` pour retourner à la coloration de toutes les lignes selon les marqueurs de diff externes (et ignorer complètement la colorisation du diff interne).
+
+--creation-factor=<pourcentage>::
+	Définir le facteur de coût de création/de suppression à `<pourcent>`. Par défaut à 60. Essayez une plus grande valeur si `git range-diff` considère erronément une réécriture totale comme un grand changement (la suppression d'un commit et l'ajout d'un autre), et une plus petite dans le cas inverse. Voir la section ``Algorithme`` ci-dessous pour une explication de pourquoi cela est nécessaire.
+
+--left-only::
+	Supprimer les commits qui manquent dans la première plage spécifiée (ou dans la « plage de gauche » lors de l'utilisation du format `<rév1>...<rév2>`).
+
+--right-only::
+	Supprimer les commits qui manquent dans la deuxième plage spécifiée (ou dans la « plage de droite » lors de l'utilisation du format `<rév1>...<rév2>`).
+
+--[no-]notes[=<ref>]::
+	Ce drapeau est passé au programme `git log` (voir linkgit:git-log[1]) qui génère les rustines.
+
+<plage1><plage2>::
+	Comparer les commits spécifiés par les deux plages, où `<plage1 >` est considéré comme une version ancienne de `<plage2>` .
+
+<rév1>...<rév2>::
+	Equivalent à passer `<rév2>..<rév1>` et `<rév1>..<rév2>`.
+
+<base> <rév1> <rév2>::
+	Équivalent à passer `<base>..<rév1>` et `<base>..<rév2>`. Notez que `<base>` n'a pas besoin d'être le point exact d'embranchement des branches. Par exemple : après avoir rebasé une branche `mon-sujet`, `git range-diff my-topic@{u} mon-sujet@{1} mon-sujet` montrerait les différences introduites par le rebasage.
+
+`git range-diff` accepte aussi les options normales de diff (voir linkgit:git-diff[1]), notablement les options `--color=[<quand>]` et `--no-color`. Ces options sont utilisées lors de la génération du " diff entre rustines", c-à-d pour comparer l'auteur, le message de validation et la diff de commits anciens/nouveaux correspondants. Il n'y a actuellement aucun moyen de bricoler la plupart des options de diff passées à `git log` lors de la génération de ces rustines.
+
+STABILITÉ DE LA SORTIE
+----------------------
+
+La sortie de la commande `range-diff` est sujette à changement. Elle est destiné à être la production de porcelaine humainement lisible, pas quelque chose qui peut être utilisé à travers les versions de Git pour obtenir un `range-diff` textuellement stable (par opposition à quelque chose comme l'option `--stable` de linkgit:git-patch-id[1]). Il n'y a pas d'équivalent de linkgit:git-apply[1] pour `range-diff`, la sortie n'est pas destinée à être consommable par une machine.
+
+C'est particulièrement vrai lors du passage d'options à diff. Actuellement, certaines options comme `--stat` peuvent, comme effet émergent, produire des sorties qui sont assez inutiles dans les contexte de `range-diff`. Des versions futures de `range-diff` peuvent apprendre à intercepter de telles options d'un manière spécifique à `range-diff` (c-à-d pour `--stat` produisant une sortie humaine qui résume comment les stats de diff ont changé).
+
+CONFIGURATION
+-------------
+Cette commande utilise les réglages `diff.color.*` et `pager.range-diff` (ce dernier activé par défaut). Voir linkgit:git-config[1].
+
+
+EXEMPLES
+--------
+
+Quand un rebasage nécessite la résolution d'un conflit de fusion, comparer les modifications introduites par le rebasage directement après, en utilisant :
+
+------------
+$ git range-diff @{u} @{1} @
+------------
+
+
+Une sortie typique de `git range-diff` ressemblerait à ceci  :
+
+------------
+-:  ------- > 1:  0ddba11 Prepare for the inevitable!
+1:  c0debee = 2:  cab005e Add a helpful message at the start
+2:  f00dbal ! 3:  decafe1 Describe a bug
+    @@ -1,3 +1,3 @@
+     Author: A U Thor <author@example.com>
+
+    -TODO: Décrire un bogue
+    +Décrire un bogue
+    @@ -324,5 +324,6
+      C'est attendu.
+
+    -+Ce qui est inattendu est il va aussi se crasher
+    ++Étonnamment, il se crash aussi. C'est un bogue et le jury
+    ++délibère toujours pour le corriger. Voir ticket #314 pour plus de détails.
+
+      Contact
+3:  bedead < -:  ------- À-DÉFAIRE
+------------
+
+Dans cet exemple, il y a 3 commits anciens et 3 nouveaux, où le développeur a supprimé le 3^ème^, en ajouté un nouveau avant les deux premiers, et a modifié le message de validation du 2^ème^ commit ainsi que son diff.
+
+Lorsque la sortie va à un terminal, elle est codée en couleur par défaut, tout comme la sortie `git diff' normale. En outre, la première ligne (ajout d'un commit) est verte, la dernière ligne (suppression d'un commit) est rouge, la deuxième ligne (avec une correspondance parfaite) est jaune comme l'en-tête de commit de la sortie de `git show`, et la troisième ligne colore l'ancien commit en rouge, le nouveau en vert et le reste comme l'en-tête de commit `git show`.
+
+Une diff naïve de diffs codée en couleur est en fait un peu difficile à lire, cependant, car elle colorie l'ensemble des lignes rouges ou vertes. La ligne qui a ajouté "Ce qui est inattendu" dans l'ancien commit, par exemple, est complètement rouge, même si l'intention de l'ancien commit était d'ajouter quelque chose.
+
+Pour arranger cela, `range` utilise le mode `--dual-color` par défaut. Dans ce mode, la diff de diffs conservera les couleurs diff originales, et préfixera les lignes avec des marqueurs -/+ qui ont leur *fond* en rouge ou vert, pour rendre plus évident qu'ils décrivent comment la diff elle-même a changé.
+
+
+Algorithme
+----------
+
+L'idée générale est ceci : nous générons une matrice de coûts entre les commits dans les deux plages de commits, puis résolvons l'affectation la moins coûteuse.
+
+La matrice de coûts est peuplée ainsi : pour chaque paire de commits, les deux diffs sont générés et le « diff des diffs » est généré, avec 3 lignes de contexte, puis le nombre de lignes dans ce diff est utilisé comme coût.
+
+Pour éviter les faux positifs (par exemple lorsqu'une rustine a été enlevée, et qu'une rustine non liée a été ajoutée entre deux itérations de la même série de rustines), la matrice de coût est étendue pour permettre cela, en ajoutant des entrées à coût fixe pour les grosses suppressions/ajouts.
+
+Exemple : supposons que les commits `1--2` sont la première itération d'une série de rustines et que `A--C` sont ceux de la deuxième itération. Supposons que `A` est un picorage de `2,` et `C` est un picorage de `1` mais avec une petite modification (disons, une correction de frappe). Visualisons les commits comme un graphique bipartite :
+
+------------
+    1            A
+
+    2            B
+
+		 C
+------------
+
+Nous cherchons une « meilleure » explication de la nouvelle série à partir de l'ancienne. Nous pouvons représenter une « explication » comme un lien dans le graphe :
+
+
+------------
+    1            A
+	       /
+    2 --------'  B
+
+		 C
+------------
+
+Cette explication est « gratuite » parce qu'il n'y avait pas de changement. De même `C` peut être expliqué en utilisant `1`, mais cela vient à un certain coût c>0 en raison de la modification :
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+	  |
+	  `----- C
+	  c>0
+------------
+
+En termes mathématiques, ce que nous cherchons est une sorte de coût minimum bipartite correspondant ; `1` est égal à `C` à un certain coût, etc. Le graphe sous-jacent est en fait un graphe bipartite complet ; le coût que nous associons à chaque arête est la taille de la diff entre les rustines des deux commits. Pour expliquer aussi les nouveaux commits, nous présentons des nœuds vides des deux côtés :
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+	  |
+    o     `----- C
+	  c>0
+    o            o
+
+    o            o
+------------
+
+Le coût d'une arête `o--C` est la taille de la diff `c`, modifiée d'un facteur d'adaptation qui devrait être inférieur à 100%. Une arête `o--o` est gratuite. Le facteur d'adaptation est nécessaire parce que même si `1` et`C` n'ont rien en commun, ils peuvent tout de même contenir des lignes vides et autres, rendant probablement l'affectation `1--C`, `o--o` légèrement moins chère que `1--o`, `o--C` même si `1` et `C` n'ont rien en commun. Avec le facteur d'adaptation, nous exigeons qu'une part plus importante soit commune pour considérer les rustines comme correspondantes.
+
+Le temps total nécessaire au calcul de cet algorithme est le temps nécessaire au calcul de n+m diffs de commits, suivi de m*n diffs de rustines, plus le temps nécessaire au calcul de l'affectation de moindre coût entre n et m diffs. Git utilise un implantation de l'algorithme de Jonker-Volgenant pour résoudre le problème d'affectation, qui de complexité cubique. La correspondance trouvée dans ce cas ressemble à ceci :
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+       .--+-----'
+    o -'  `----- C
+	  c>0
+    o ---------- o
+
+    o ---------- o
+------------
+
+
+VOIR AUSSI
+----------
+linkgit:git-log[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

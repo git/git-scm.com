@@ -1,0 +1,1681 @@
+git-config(1)
+=============
+
+名称
+--
+git-config - 获取和设置仓库或全局选项
+
+
+概述
+--
+[verse]
+'git config list' [<文件选项>] [<展示选项>] [--includes]
+'git config get' [<文件选项>] [<display-option>] [--includes] [--all] [--regexp=<正则表达式>] [--value=<value>] [--fixed-value] [--default=<default>] <名称>
+'git config set' [<文件选项>] [--type=<类型>] [--all] [--value=<value>] [--fixed-value] <名称> <value>
+'git config unset' [<文件选项>] [--all] [--value=<value>] [--fixed-value] <名称> <value>
+'git config rename-section' [<文件选项>] <旧名称> <新名称>
+'git config remove-section' [<文件选项>] <名称>
+'git config edit' [<文件选项>]
+'git config' [<文件选项>] --get-colorbool <名称> [<标准输出是否是终端>]
+
+描述
+--
+你可以用这个命令查询/设置/替换/取消选项。名称(name)实际上是用点隔开的节和键，值(value)会被转义。
+
+Multiple lines can be added to an option by using the `--append` option. If you want to update or unset an option which can occur on multiple lines, a `value-pattern` (which is an extended regular expression, unless the `--fixed-value` option is given) needs to be given. Only the existing values that match the pattern are updated or unset. If you want to handle the lines that do *not* match the pattern, just prepend a single exclamation mark in front (see also <<EXAMPLES>>), but note that this only works when the `--fixed-value` option is not in use.
+
+`--type=<类型>` 选项指示 'git config' 确保传入和传出的值在给定的 <类型> 下是可以被规范化的。 如果没有给定 `--type=<类型>`，将不执行规范化。调用者可以用 `--no-type` 选项取消现有 `--type` 选项的指定。
+
+读取配置时，默认从系统、全局和资源库的本地配置文件中读取数值，选项 `--system`、`--global`、`--local`、`--worktree` 和 `--file<文件名>` 可以用来告诉命令只从选定的位置读取（见<<FILES>>）。
+
+写入时，新值默认写入仓库的本地配置文件，选项 `--system`、`--global`、`--worktree`、`--file <文件名>` 可以用来告诉命令写到那个位置（你可以给出 `--local` 选项，但是默认选项就是本地(local)）。
+
+该命令出错时将以非零状态失败。 以下是一些退出代码：
+
+- 该节或键无效（退出代码为1），
+- 没有提供节或键（退出值为2），
+- 配置文件无效（退出代码为3），
+- 配置文件无法写入（退出代码为4），
+- 你试图取消一个不存在的选项（退出代码为5），
+- 你试图取消/设置一个多行匹配的选项（退出代码为5），或
+- 试图使用一个无效的正则表达式（退出代码为6）。
+
+执行成功时，该命令返回退出代码0。
+
+所有可用配置变量的列表可以通过 `git help --config` 命令获取。
+
+命令
+--
+
+list::
+	列出配置文件中设置的所有变量，以及它们的值。
+
+get::
+	发出指定键的值。如果配置中键出现多次，则发出最后一个值。如果指定了 `--all`，则发出与键关联的所有值。如果键不存在，则返回错误代码 1。
+
+set::
+	为一个或多个配置选项设置值。默认情况下，此命令拒绝写入多值配置选项。传递 `--all` 将用新值替换所有多值配置选项，而 `--value=` 将替换所有其值与给定模式匹配的配置选项。
+
+unset::
+	取消设置一个或多个配置选项的值。默认情况下，此命令拒绝取消设置多值键。传递 `--all` 将取消设置所有多值配置选项，而 `--value` 将取消设置所有其值与给定模式匹配的配置选项。
+
+rename-section::
+	将给定的节重命名为一个新的名称。
+
+remove-section::
+	从配置文件中删除了该节。
+
+edit::
+	Opens an editor to modify the specified config file; either `--system`, `--global`, `--local` (default), `--worktree`, or `--file <config-file>`.
+
+[[OPTIONS]]
+选项
+--
+
+--replace-all::
+	默认行为是最多替换一行。这将会替换所有与键（以及可选的 `value-pattern` ）匹配的行。
+
+--append::
+	Adds a new line to the option without altering any existing values. This is the same as providing '--value=^$' in `set`.
+
+--comment <message>::
+	在新的或修改过的行末尾添加注释。
+
+	如果 _<消息>_ 以一个或多个空白字符后跟 "#" 开头，它将按原样使用。如果它以 "#" 开头，则在使用前会添加一个空格。否则，会在其前面加上字符串 " # "（一个空格后跟一个井号，再后跟一个空格）。生成的字符串将紧随变量定义的值之后放置。_<消息>_ 不能包含换行符（不允许多行注释）。
+
+--all::
+	With `get`, return all values for a multi-valued key.
+
+---regexp::
+	With `get`, interpret the name as a regular expression. Regular expression matching is currently case-sensitive and done against a canonicalized version of the key in which section and variable names are lowercased, but subsection names are not.
+
+--url=<URL>::
+	当给定一个由两部分组成的名称 section.key 时，返回 section.<URL>.key 的值，其 <URL> 部分是给定的最相匹配的 URL（如果没有这样的键存在，section.key 的值将作为备用值）。 当只给出 section 的名称时，对 section 中的所有 key 进行处理，并将其列出。 如果没有找到值，返回错误代码 1（section: 节，key:键；在配置文件中是这样的 [section] key=value）。
+
+--global::
+	对于写入选项：写入全局的 `~/.gitconfig` 文件而不是仓库的 `.git/config` 文件，如果该文件存在而 `~/.gitconfig` 文件不存在，则写入 `$XDG_CONFIG_HOME/git/config` 文件。
++
+对于读取选项：只从全局的 `~/.gitconfig` 和 `$XDG_CONFIG_HOME/git/config` 中读取，而不是从所有可用文件中读取。
++
+另请参见<<FILES>>。
+
+--system::
+	对于写选项：写到系统范围内的 `$(prefix)/etc/gitconfig` 文件中，而不是仓库中的 `.git/config` 文件。
++
+对于读取选项：只从系统范围内的 `$(prefix)/etc/gitconfig` 读取，而不是从所有可用文件中读取。
++
+另请参见<<FILES>>。
+
+--local::
+	对于写选项：写到仓库的 `.git/config` 文件中。 这是默认行为。
++
+对于读取选项：只从仓库 `.git/config` 文件中读取，而不是从所有可用文件中读取。
++
+另请参见<<FILES>>。
+
+--worktree::
+	与 `--local` 选项类似，只是如果启用了 `extensions.worktreeConfig` ，则从 `$GIT_DIR/config.worktree` 读取或写入。如果没有，则与 `--local` 选项行为相同。注意，对于主工作区， `$GIT_DIR` 等于 `$GIT_COMMON_DIR`，但对于其他工作区，它的形式是 `$GIT_DIR/worktrees/<id>/`。了解如何启用 `extensions.worktreeConfig`，参见 linkgit:git-worktree[1] 。
+
+-f <配置文件>::
+--file <配置文件>::
+	对于写入选项：写到指定的文件，而不是仓库 `.git/config` 文件。
++
+对于读取选项：只从指定的文件而不是从所有可用的文件中读取。
++
+另请参见<<FILES>>。
+
+--blob <blob>::
+	类似于 `--file` 选项，但使用指定的二进制对象而不是文件。例如，你可以使用 'master:.gitmodules' 来读取主分支中 '.gitmodules' 文件中的值。参见 linkgit:gitrevisions[7] 中的 “指定的修正” 部分，以获得更完整的二进制对象名称拼写方式。
+
+--fixed-value::
+	当与 `value-pattern` 参数一起使用时，将 `value-pattern` 视为精确的字符串，而不是正则表达式。这将使得被匹配的名称/值对只有那些值与 `value-pattern` 完全相等的名称/值对。
+
+--type <类型>::
+  'git config' 将确保任何输入或输出在给定的类型约束下是有效的，并将以 `<类型>` 的规范形式将输出的值规范化。
++
+有效的 `<类型>` 包括：
++
+- 'bool'：将数值规范化为 "true" 或 "false"。
+- 'int'：将数值规范化为简单的十进制数字。可选的后缀 'k'、'm' 或 'g'将导致输入的值被乘以 1024、1048576 或 1073741824。
+- 'bool-or-int'：如上所述，根据 'bool '或 'int' 进行规范化。
+- 'path'：通过在 `$HOME` 和 `~user` 的值中添加前导 `~` 来规范化指定用户的主目录。在设置值时，该说明符没有任何作用（但可以在命令行中使用 `git config section.variable ~/` 让 shell 进行扩展）。
+- 'expiry-date'：通过将固定或相对日期字符串转换为时间戳进行规范化。这个指定符在设置值时没有影响。
+- 'color'： 当获得一个值时，通过转换为 ANSI 颜色转义序列进行规范化。当设置一个值时，会进行理智检查，以确保给定的值可以被规范化为 ANSI 颜色，但它会按原样写入。
++
+
+--bool::
+--int::
+--bool-or-int::
+--path::
+--expiry-date::
+  选择类型指定器的历史选项。更倾向于选择 `--type`（见上文）。
+
+--no-type::
+  取消先前设置的类型指定器（如果先前有的话）。这个选项要求 'git config' 不对检索的变量进行规范化处理。 `--no-type` 在没有 `--type=<类型>` 或 `--<类型>` 选项的情况下没有作用。
+
+-z::
+--null::
+	对于所有输出值和/或键的选项，总是用空字符（而不是换行）结束值。使用换行符作为键和值之间的分隔符。这样可以安全地解析输出，而不会被包含换行的值所混淆。
+
+--name-only::
+	Output only the names of config variables for `list` or `get`.
+
+--show-origin::
+	用来源类型（文件、标准输入、blob、命令行）和实际来源（配置文件路径、引用或 blob id（如适用））对所有查询到的配置选项的输出进行扩充。
+
+--show-scope::
+	类似于 `--show-origin` 选项，它用该值的范围（工作区、本地、全局、系统、命令）来增加所有查询的配置选项的输出。
+
+--get-colorbool <名称> [<stdout-is-tty>]::
+
+	找到 `<名称>` 的颜色设置（例如 `color.diff`），并输出 "true" 或 "false"。 `<stdout-is-tty>` 应该是 "true" 或 "false"，同样考虑配置为 "auto" 的情况。 如果 `<stdout-is-tty>` 缺失，则检查命令本身的标准输出，如果要使用颜色则以状态 0 退出，否则以状态 1 退出。 当 `名称` 的颜色设置未被定义时，该命令使用 `color.ui` 作为回退（stdout 是 "standard output" 的缩写，而 tty 是 "teletypewriter" 的缩写，通常指的是终端或控制台。）。
+
+--[no-]includes::
+	在查找数值时尊重配置文件中的 `include.*` 指令。当给出一个特定的文件时，默认为 `off`（例如，使用 `--file`、`--global` 等），当搜索所有配置文件时，默认为 `on`。
+
+--default <值>::
+  When using `get`, and the requested variable is not found, behave as if <value> were the value assigned to that variable.
+
+DEPRECATED MODES
+----------------
+
+以下模式已不再推荐使用，建议改用子命令。推荐迁移到新的语法。
+
+'git config <配置名称>'::
+	已由 `git config get <配置名称>` 替代。
+
+'git config <配置名称> <值> [<值模式>]'::
+	已由 `git config set [--value=<模式>] <配置名称> <值>` 替代。
+
+-l::
+--list::
+	已由 `git config list` 替代。
+
+--get <name> [<value-pattern>]::
+	已由 `git config get [--value=<模式>] <配置名称>` 替代。
+
+--get-all <name> [<value-pattern>]::
+	已由 `git config get [--value=<模式>] --all --show-names <名称>` 替代。
+
+--get-regexp <name-regexp>::
+	已由 `git config get --all --show-names --regexp <名称正则表达式>` 替代。
+
+--get-urlmatch <名称> <URL>::
+	已由 `git config get --all --show-names --url=<URL> <配置名称>` 替代。
+
+--get-color <名称> [<默认值>]::
+	已由 `git config get --type=color [--default=<默认值>] <配置名称>` 替代。
+
+--add <name> <value>::
+	已由 `git config set --append <配置名称> <值>` 替代。
+
+--unset <name> [<value-pattern>]::
+	已由 `git config unset [--value=<模式>] <名称>` 替代。
+
+--unset-all <name> [<value-pattern>]::
+	已由 `git config unset [--value=<模式>] --all <配置名称>` 替代。
+
+--rename-section <旧配置名称> <新配置名称>::
+	已由 `git config rename-section <旧配置名称> <新配置名称>` 替代。
+
+--remove-section <name>::
+	已由 `git config remove-section <配置名称>` 替代。
+
+-e::
+--edit::
+	已由 `git config edit` 替代。
+
+配置
+--
+`pager.config` is only respected when listing configuration, i.e., when using `list` or `get` which may return multiple results. The default is to use a pager.
+
+[[FILES]]
+文件
+--
+
+默认情况下，'git config' 会从多个文件中读取配置选项：
+
+$(prefix)/etc/gitconfig::
+	全系统的配置文件。
+
+$XDG_CONFIG_HOME/git/config::
+~/.gitconfig::
+	用户特定的配置文件。当 XDG_CONFIG_HOME 环境变量没有设置或为空时，$HOME/.config/ 被用作 $XDG_CONFIG_HOME。
++
+这些文件也被称为 “全局” 配置文件。如果这两个文件都存在，就按照上面的顺序读取这两个文件。
+
+$GIT_DIR/config::
+	仓库特定的配置文件。
+
+$GIT_DIR/config.worktree::
+	这是可选的，只有当 $GIT_DIR/config 中存在 `extensions.worktreeConfig` 时才会被搜索到。
+
+你也可以在运行任何 git 命令时通过使用 `-c` 选项提供额外的配置参数。详情见 linkgit:git[1]。
+
+选项将从所有这些可用的文件中读取。如果全局或全系统的配置文件丢失或不可读，它们将被忽略。如果版本库的配置文件丢失或不可读，'git config' 将以非零的错误代码退出。如果文件不可读，会产生一个错误信息，但如果文件丢失，则不会产生错误信息。
+
+文件是按照上述顺序读取的，最后发现的值优先于之前读取的值。 当有多个值时，将使用所有文件中某个键的所有值。
+
+By default, options are only written to the repository specific configuration file. Note that this also affects options like `set` and `unset`. *'git config' will only ever change one file at a time*.
+
+你可以通过使用 `--file` 选项指定文件路径，或者使用 `--system`、`--global`、`--local` 或 `--worktree` 指定配置范围，来限制从哪些配置源读取或写入。 更多内容请参见上面的 <<OPTIONS>>。
+
+[[SCOPES]]
+范围
+--
+
+每个配置源都属于一个配置范围。这些范围包括：
+
+system::
+	$(prefix)/etc/gitconfig
+
+global::
+	$XDG_CONFIG_HOME/git/config
++
+~/.gitconfig
+
+local::
+	$GIT_DIR/config
+
+工作区::
+	$GIT_DIR/config.worktree
+
+命令::
+	GIT_CONFIG_{COUNT,KEY,VALUE} 环境变量（见下文 <<ENVIRONMENT>>）
++
+`-c` 选项
+
+除了 'command' 之外，每个范围都对应于一个命令行选项：`--system`、`--global`、`--local`、`--worktree`。
+
+当读取选项时，指定一个范围将只从该范围内的文件读取选项。当写选项时，指定一个范围将写到该范围内的文件（而不是仓库的特定配置文件）。参见上面的<<OPTIONS>>以获得完整的描述。
+
+大多数配置选项无论在哪个作用域中定义都会被尊重，但有些选项只在某些作用域中被尊重。完整的细节请参见相应选项的文档。
+
+受保护的配置
+~~~~~~
+
+受保护的配置指的是 'system'、'global' 和 'command' 范围。 出于安全考虑，某些选项只有在受保护的配置中指定时才会被尊重，否则会被忽略。
+
+Git 将这些作用域视为由用户或可信的管理员控制。这是因为控制这些作用域的攻击者可以在不使用 Git 的情况下造成实质性的伤害，所以假定用户的环境会保护这些作用域免受攻击。
+
+[[ENVIRONMENT]]
+环境变量
+----
+
+GIT_CONFIG_GLOBAL::
+GIT_CONFIG_SYSTEM::
+	从给定的文件中获取配置，而不是从全局或系统级配置中获取。详情见 linkgit:git[1]。
+
+GIT_CONFIG_NOSYSTEM::
+	是否跳过从全系统 $(prefix)/etc/gitconfig 文件中读取设置。详见 linkgit:git[1]。
+
+另请参见<<FILES>>。
+
+GIT_CONFIG_COUNT::
+GIT_CONFIG_KEY_<n>::
+GIT_CONFIG_VALUE_<n>::
+	如果 GIT_CONFIG_COUNT 被设置为一个正数，所有环境对 GIT_CONFIG_KEY_<n> 和 GIT_CONFIG_VALUE_<n> 到这个数字都将被添加到进程的运行时配置中。配置对是零索引的。任何缺失的键或值都被视为一个错误。空的 GIT_CONFIG_COUNT 与 GIT_CONFIG_COUNT=0 的处理方式相同，即不处理配置对。这些环境变量将覆盖配置文件中的值，但会被通过 `git -c` 传递的任何明确选项所覆盖。
++
+这在你想用一个共同的配置催生多个 git 命令，但又不能依赖一个配置文件的情况下很有用，例如在编写脚本时。
+
+GIT_CONFIG::
+	如果 `git config` 没有提供 `--file` 选项，则命令会使用 `GIT_CONFIG` 提供的文件，就像通过 `--file` 选项提供的一样。这个变量对其他 Git 命令没有影响，主要是为了兼容历史版本；通常不会用它来代替 `--file` 选项。
+
+[[EXAMPLES]]
+实例
+--
+
+给出一个这样的 .git/config：
+
+------------
+#
+# 这就是配置文件，并且
+# 一个'#' 或 ';' 字符表示
+# 一个注释
+#
+
+; 核心变量
+[core]
+	; 不信任文件模式
+	filemode = false
+
+; 我们的差异算法
+[diff]
+	external = /usr/local/bin/diff-wrapper
+	rename = true
+
+; 代理设置
+[core]
+	gitproxy=proxy-command for kernel.org
+	gitproxy=default-proxy ; 适用于其他所有网站
+
+; HTTP
+[http]
+	sslVerify
+[http "https://weak.example.com"]
+	sslVerify = false
+	cookiFile= /tmp/cookie.txt
+------------
+
+你可以用以下方法将文件模式设置为真
+
+------------
+% git config set core.filemode true
+------------
+
+假设的代理命令条目实际上有一个后缀来辨别它们适用于什么URL。下面是如何将 kernel.org 的条目改为 "ssh"。
+
+------------
+% git config set --value='for kernel.org$' core.gitproxy '"ssh" for kernel.org'
+------------
+
+这确保了只有 kernel.org 的键/值对被替换。
+
+要删除重名的条目，请执行
+
+------------
+% git config unset diff.renames
+------------
+
+如果你想删除一个多变量的条目（如上面的 core.gitproxy），你必须提供一个与恰好一行的值相匹配的正则表达式。
+
+要查询一个给定键的值，可以这样做
+
+------------
+% git config get core.filemode
+------------
+
+或者，要查询一个多变量：
+
+------------
+% git config get --value="for kernel.org$" core.gitproxy
+------------
+
+如果你想知道一个多变量的所有值，可以这么做：
+
+------------
+% git config get --all --show-names core.gitproxy
+------------
+
+如果你喜欢危险操作，你可以用一个新的 core.gitproxy 来取代 *所有* core.gitproxy
+
+------------
+% git config set --all core.gitproxy ssh
+------------
+
+然而，如果你真的只想替换默认代理，即没有 "for ..." 后缀的那一行，可以这样做：
+
+------------
+% git config set --value='! for ' core.gitproxy ssh
+------------
+
+为了真正地只匹配带有感叹号的值，你必须
+
+------------
+% git config set --value='[!]' section.key value
+------------
+
+要添加一个新的代理，而不改变任何现有的代理，使用
+
+------------
+% git config set --append core.gitproxy '"proxy-command" for example.com'
+------------
+
+一个例子是在你的脚本中使用配置的自定义颜色：
+
+------------
+#!/bin/sh
+WS=$(git config get --type=color --default="blue reverse" color.diff.whitespace)
+RESET=$(git config get --type=color --default="reset" "")
+echo "${WS}your whitespace color or blue reverse${RESET}"
+------------
+
+对于 `https://weak.example.com` 中的 URL，`http.sslVerify` 被设置为 false，而对于所有其他的 URL，它被设置为 `true`：
+
+------------
+% git config get --type=bool --url=https://good.example.com http.sslverify
+true
+% git config get --type=bool --url=https://weak.example.com http.sslverify
+false
+% git config get --url=https://weak.example.com http
+http.cookieFile /tmp/cookie.txt
+http.sslverify false
+------------
+
+配置文件
+----
+
+Git 配置文件包含了一些影响 Git 命令行为的变量。每个仓库中的文件 `.git/config` 和可选的 `config.worktree`（见linkgit:git-worktree[1]的 “配置文件” 部分）用于存储该仓库的配置，`$HOME/.gitconfig` 用于存储每个用户的配置，作为 `.git/config` 文件的后退值。文件 `/etc/gitconfig` 可以用来存储全系统的默认配置。
+
+配置变量同时被 Git 底层和上层命令使用。变量被分为几个部分，其中变量本身的完全合格的变量名是最后一个点分隔的部分，而部分名称是最后一个点之前的所有内容。变量名称不区分大小写，只允许使用字母数字字符和 `-`，并且必须以字母字符开头。 有些变量可能会出现多次；那么我们就说这个变量是多值的。
+
+语法
+~~
+
+The syntax is fairly flexible and permissive. Whitespace characters, which in this context are the space character (SP) and the horizontal tabulation (HT), are mostly ignored. The '#' and ';' characters begin comments to the end of line. Blank lines are ignored.
+
+该文件由章节和变量组成。 一个章节以方括号中的章节名称开始，一直到下一个章节开始。 节的名称是不区分大小写的。 在章节名称中只允许使用字母数字字符、`-` 和 `.`。 每个变量都必须属于某个部分，这意味着在第一次设置变量之前必须有一个部分标题。
+
+节可以进一步划分为子节。 要开始一个分节，请将其名称放在双引号中，与节的名称用空格隔开，放在节的标题中，如下面的例子：
+
+--------
+	[section "小节"]
+
+--------
+
+分节名称是区分大小写的，可以包含任何字符，除了换行和空字节。双引号 `"` 和反斜杠可以分别通过转义为 `\"` 和 `\\` 来包含。读取时，其他字符前面的反斜杠将被删除；例如，`\t` 被读作 `t`，`\0` 被读作 `0`。章节标题不能跨越多行。 变量可以直接属于某一节或某一小节。如果你有 `[section "小节"]`，你可以有 `[section]`，但不需要这样。
+
+还有一种废弃的 `[section.subsection]` 语法。在这种语法中，分节名称被转换为小写字母，并且也会敏感地比较大小写。这些分节名称遵循与章节名称相同的限制。
+
+所有其他行（以及部分标题之后的剩余行）都被认为是设置变量，形式为 'name = value'（或者只是 'name'，这是一个简写，表示变量是布尔值 "true"）。 变量名称不区分大小写，只允许使用字母数字字符和 `-`，并且必须以字母字符开头。
+
+围绕着 `name`、`=` 和 `value` 的空白字符会被丢弃。'value' 内部的空白字符会按原样保留。以 `#` 或 `;` 开始并延伸到行尾的注释会被丢弃。定义值的行可以通过以反斜杠（`\`）结尾来延续到下一行；反斜杠和行尾字符会被丢弃。
+
+If `value` needs to contain leading or trailing whitespace characters, it must be enclosed in double quotation marks (`"`). Inside double quotation marks, double quote (`"`) and backslash (`\`) characters must be escaped: use `\"` for `"` and `\\` for `\`.
+
+以下转义序列（除了 `\"` 和 `\\`）可以被识别：`\n` 表示换行符（NL），`\t` 表示水平制表（HT，TAB），`\b` 表示退格（BS）。 其他字符转义序列（包括八进制转义序列）是无效的。
+
+
+包括
+~~
+
+`include` 和 `includeIf` 部分允许你从另一个来源包含配置指令。这些部分的行为与其他部分相同，但如果 `includeIf` 部分的条件没有评估为真，则可以忽略；见下面的 “有条件的包含”。
+
+你可以通过设置特殊的 `include.path`（或 `includeIf.*.path` ）变量来包含另一个配置文件，即要包含的文件名。该变量将路径名作为其值，并接受 tilde 扩展。这些变量可以被多次赋予。
+
+被包含的文件的内容会被立即插入，就像它们是在 include 指令的位置被发现的一样。如果该变量的值是一个相对路径，则该路径被认为是相对于发现 include 指令的配置文件。 请看下面的例子。
+
+有条件的包括
+~~~~~~
+
+你可以通过设置 `includeIf.<条件>.path` 变量来有条件地包含另一个配置文件，即要包含的文件名称。
+
+条件以一个关键词开始，后面是冒号和一些数据，其格式和含义取决于关键词。支持的关键词有：
+
+`gitdir`::
+
+	关键字 `gitdir:` 后面的数据被用作匹配模式。如果. git 目录的位置与该模式相匹配，则满足包含条件。
++
+.git 位置可以是自动发现的，也可以来自 `$GIT_DIR` 环境变量。如果仓库是通过 .git 文件自动发现的（例如从子模块或链接的工作目录树），.git 位置将是 .git 目录的最终位置，而不是 .git 文件的位置。
++
+该模式可以包含标准的通配符和两个额外的通配符，`**/` 和 `/**`，可以匹配多个路径组件。详情请参考 linkgit:gitignore[5]。为了方便起见：
+
+ * 如果该模式以 `~/` 开头，`~` 将被替换为环境变量 `HOME` 的内容。
+
+ * 如果模式以 `./` 开头，它将被替换为包含当前配置文件的目录。
+
+ * 如果模式不以 `~/` 、`./` 或 `/` 开头，`**/` 将被自动添加。例如，模式 `foo/bar` 变成 `**/foo/bar`，将匹配 `/any/path/to/foo/bar`。
+
+ * 如果模式以 `/` 结尾，`**` 将被自动添加。例如，模式 `foo/` 变成 `foo/**`。换句话说，它匹配 "foo" 和里面的所有内容，是递归的。
+
+`gitdir/i`::
+	这与 `gitdir` 相同，只是匹配时不区分大小写（例如，在不区分大小写的文件系统上）
+
+`onbranch`::
+	关键词 `onbranch: ` 后面的数据被认为是一个带有标准通配符和两个额外的通配符的模式，`**/` 和 `/**`，可以匹配多个路径组件。 如果我们在一个工作树中，当前签出的分支的名称与该模式相匹配，则满足包含条件。
++
+如果模式以 `/` 结尾，`**` 将被自动添加。例如，模式 `foo/` 变成 `foo/**`。换句话说，它匹配所有以 "foo/" 开头的分支。如果你的分支是分层组织的，而你想将一个配置应用于该层级中的所有分支，这就很有用了。
+
+`hasconfig:remote.*.url:`::
+	这个关键词后面的数据被认为是一个带有标准的通配符和两个额外的通配符的模式，`**/` 和 `/**`，可以匹配多个组件。第一次看到这个关键词时，其余的配置文件将被扫描以寻找远程 URL（不应用任何值）。如果存在至少一个匹配该模式的远程 URL，则满足包含条件。
++
+由该选项包含的文件（直接或间接）不允许包含远程 URLs。
++
+请注意，与其他 includeIf 条件不同，解决这个条件依赖于读取条件时还不知道的信息。一个典型的用例是这个选项作为系统级或全局级的配置出现，而远程 URL 在本地级配置中；因此在解决这个条件时需要提前扫描。为了避免鸡生蛋蛋生鸡的问题，即潜在包含的文件会影响这些文件是否被潜在包含，Git 通过禁止这些文件影响这些条件的解决来打破这个循环（因此，禁止它们声明远程 URLs）。
++
+至于这个关键字的命名，是为了与支持更多基于变量的包含条件的命名方案相兼容，但目前 Git 只支持上述的确切关键字。
+
+关于通过 `gitdir` 和 `gitdir/i` 进行匹配的一些补充说明：
+
+ * `$GIT_DIR` 中的符号链接在匹配前没有被解决。
+
+ * 在 `$GIT_DIR` 之外，符号链接和实际路径版本的路径都将被匹配。例如，如果 ~/git 是 /mnt/storage/git 的符号链接，`gitdir:~/git` 和 `gitdir:/mnt/storage/git` 都会匹配。
++
+在 v2.13.0 版本中，这个功能的初始版本不是这样的，它只匹配 realpath 版本。想要与这个功能的初始版本兼容的配置，要么只指定 realpath 版本，要么就指定两个版本。
+
+ * 请注意，"../" 不是特殊的，将按字面意思匹配，这不太可能是你想要的。
+
+示例
+~~
+
+----
+# 核心变量
+[core]
+	; 不信任文件模式
+	filemode = false
+
+# 我们的差异算法
+[diff]
+	external = /usr/local/bin/diff-wrapper
+	renames = true
+
+[branch "devel"]
+	remote = origin
+	merge = refs/heads/devel
+
+# 代理设置
+[core]
+	gitProxy="ssh" for "kernel.org"
+	gitProxy=default-proxy ; 其余为
+
+[include]
+	path = /path/to/foo.inc ; 按绝对路径包含
+	path = foo.inc ; find "foo.inc" 相对于当前文件
+	path = ~/foo.inc ; 在您的 `$HOME` 目录中找到 "foo.inc"
+
+;如果 $GIT_DIR 是 /path/to/foo/.git 就包含
+[includeIf "gitdir:/path/to/foo/.git"]
+	path = /path/to/foo.inc
+
+;包括 /path/to/group 内的所有仓库
+[includeIf "gitdir:/path/to/group/"]
+	path = /path/to/foo.inc
+
+; 包括 $HOME/to/group 内的所有仓库
+[includeIf "gitdir:~/to/group/"]
+	path = /path/to/foo.inc
+
+; 相对路径总是相对于包括
+; 文件（如果条件为真）；其位置不受
+; 的位置不受条件的影响。
+[includeIf "gitdir:/path/to/group/"]
+	path = foo.inc
+
+; 只有工作区当前检出了 foo-branch 
+; 才包括
+[includeIf "onbranch:foo-branch"] 。
+	路径 = foo.inc
+
+; 只有在给定 URL 的远程仓库存在的情况下才包括（注意
+; 这样的URL可能在以后的文件中提供，或者在这个文件被读取后的一个
+; 文件中提供，正如在这个例子中看到的那样)
+[includeIf "hasconfig:remote.*.url:https://example.com/*" ]
+	路径 = foo.inc
+[remote "origin"]
+	url = https://example.com/git
+----
+
+值
+~
+
+许多变量的值都被当作一个简单的字符串，但有些变量取的是特定类型的值，对于如何拼写它们有一些规则。
+
+布尔::
+
+       当一个变量被称为采取布尔值时，许多同义词被接受为 'true' 和 'false' ；这些都是不分大小写的。
+
+	真;; 布尔真值是 `yes`、`on`、`true`和 `1`。 此外，一个没有 `= <值>` 的变量被认为是真。
+
+	假;; 布尔假值是 `no`、`off`、`false`、`0` 和空字符串。
++
+当使用 `--type=bool` 类型指定符将一个值转换为其规范形式时，'git config' 将确保输出为 "true" 或 "false"（用小写字母拼写）。
+
+整数::
+       许多指定各种尺寸的变量的值可以以 `k`、`M`...为后缀，表示 “以1024为比例的数字”、“以1024x1024为比例”，等等。
+
+color::
+       接受颜色的变量的值是一个颜色（最多两个，一个用于前景，一个用于背景）和属性（你想要多少就有多少）的列表，用空格分隔。
++
+接受的基本颜色是 `normal`、`black`、`red`、`green`、`yellow`、`blue`、`magenta`、`cyan`、`white` 和 `default`。 给出的第一种颜色是前景；第二种是背景。 除了`normal'和`default'之外，所有的基本颜色都有一个明亮的变体，可以通过在颜色前面加上`bright'来指定，比如`brightred'。
++
+颜色`normal`不会使颜色发生变化。它与空字符串相同，但在单独指定背景颜色时可以作为前景颜色（例如，"normal red"）。
++
+颜色`default` 明确地将颜色重置为终端的默认值，例如，指定一个清除的背景。虽然不同的终端有差异，但这通常与设置为 "white black" 不一样。
++
+Colors may also be given as numbers between 0 and 255; these use ANSI 256-color mode (but note that not all terminals may support this). If your terminal supports it, you may also specify 24-bit RGB values as hex, like `#ff0ab3`, or 12-bit RGB values like `#f1b`, which is equivalent to the 24-bit color `#ff11bb`.
++
+可接受的属性是 `bold`、`dim`、`ul`、`blink`、`reverse`、`italic` 和 `strike`（用于划掉的字母或 “删除线”）。 任何属性相对于颜色的位置（在前，在后，或在中间）并不重要。特定的属性可以通过在它们前面加上 `no` 或 `no-` 来关闭（例如，`noreverse`，`no-ul`，等等）。
++
+伪属性 `reset` 在应用指定的着色之前重置所有颜色和属性。例如，`reset green` 将导致一个绿色的前景和默认的背景，没有任何激活的属性。
++
+一个空的颜色字符串根本不会产生任何颜色效果。这可以用来避免给特定的元素上色而不完全禁用颜色。
++
+对于 git 的预定义颜色槽，属性是为了在彩色输出的每一项开始时被重置。所以将 `color.decorate.branch` 设置为 `black` 会将该分支名称涂成普通的 `black`，即使同一输出行中的前一个东西（例如`log --decorate`输出中的分支名称列表前的括号）被设置为 `bold` 或其他属性。 然而，自定义的日志格式可能会做更复杂和分层的着色，而否定的形式在那里可能很有用。
+
+路径名::
+	一个获取路径名值的变量可以被赋予一个以 "`~/`" 或 "`~user/`" 开头的字符串，通常的 tilde 扩展会发生在这样一个字符串上： `~/` 被扩展为 `$HOME` 的值，而 `~user/` 被扩展为指定用户的主目录。
++
+如果一个路径以 `%(prefix)/` 开头，其余部分将被解释为相对于 Gi t的 "运行时前缀" 的路径，即相对于 Git 本身安装的位置。例如，`%(prefix)/bin/` 指的是 Git 可执行文件本身所在的目录。如果 Git 在编译时不支持运行时前缀，那么编译时的前缀将被替代。在不太可能的情况下，如果需要指定一个不应该被扩展的字面路径，需要以 `./` 为前缀，就像这样： `./%（前缀）/bin`。
+
+
+变量
+~~
+
+请注意，这个列表并不全面，也不一定完整。 对于特定命令的变量，你会在相应的手册页中找到更详细的描述。
+
+其他与 git 相关的工具可能也确实使用了他们自己的变量。 当发明新的变量用于自己的工具时，要确保它们的名字不与 Git 本身和其他流行的工具所使用的名字冲突，并在你的文档中描述它们。
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/add.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/advice.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/alias.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/am.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/apply.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/attr.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/bitmap-pseudo-merge.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/blame.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/branch.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/browser.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/bundle.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/checkout.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/clean.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/clone.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/color.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/column.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/commit.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/commitgraph.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/completion.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/core.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/credential.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/diff.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/difftool.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/extensions.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/fastimport.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/feature.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/fetch.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/filter.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/format.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/fsck.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/fsmonitor--daemon.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/gc.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/gitcvs.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/gitweb.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/gpg.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/grep.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/gui.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/guitool.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/help.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/http.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/i18n.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/imap.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/includeif.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/index.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/init.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/instaweb.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/interactive.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/log.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/lsrefs.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/mailinfo.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/mailmap.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/maintenance.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/man.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/merge.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/mergetool.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/notes.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/pack.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/pager.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/pretty.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/promisor.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/protocol.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/pull.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/push.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/rebase.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/receive.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/reftable.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/remote.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/remotes.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/repack.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/rerere.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/revert.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/safe.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/sendemail.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/sequencer.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/showbranch.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/sparse.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/splitindex.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/ssh.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/stash.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/status.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/submodule.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/tag.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/tar.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/trace2.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/transfer.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/uploadarchive.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/uploadpack.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/url.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/user.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/versionsort.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/web.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/worktree.txt`
+
+See original version for this content.
+====
+
+[]
+[]
+
+漏洞
+--
+当使用废弃的 `[section.subsection]` 语法时，如果 subsection 至少有一个大写字母，改变一个值将导致添加一个多行键而不是改变。例如，有以下配置
+
+--------
+  [section.subsection]
+    key = value1
+--------
+
+并运行 `git config section.Subsection.key value2` 将导致如下的结果
+
+--------
+  [section.subsection]
+    key = value1
+    key = value2
+--------
+
+
+GIT
+---
+属于 linkgit:git[1] 文档

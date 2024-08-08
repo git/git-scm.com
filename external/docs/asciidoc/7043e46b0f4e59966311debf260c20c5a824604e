@@ -1,0 +1,119 @@
+git-credential(1)
+=================
+
+NOME
+----
+git-credential - Recupere e armazene as credenciais do usuário
+
+RESUMO
+------
+------------------
+'git credential' (fill|approve|reject)
+------------------
+
+DESCRIÇÃO
+---------
+
+O Git possui uma interface interna para armazenar e recuperar as credenciais dos ajudantes específicos do sistema, além de solicitar ao usuário os nomes dos usuários e as suas respectivas senhas. O comando `git-credential` expõe essa interface a scripts que podem recuperar, armazenar ou solicitar credenciais da mesma maneira que o Git. O design dessa interface programável modela ao API C interno; consulte o `credential.h` para obter mais informações sobre os conceitos.
+
+O `git-credential` usa uma "ação" como opção na linha de comando (uma das opções `fill`, `aprove` ou `reject`) e lê uma descrição da credencial no "stdin" (consulte <<IOFMT,INPUT/OUTPUT FORMAT>>).
+
+Caso a ação seja `fill`, git-credential tentará adicionar os atributos "username" e "password" à descrição lendo os arquivos de configuração ao contactar qualquer auxiliar de credencial configurado ou solicitando ao usuário. Os atributos de nome de usuário e senha da descrição da credencial são impressos para "stdout" junto com os atributos já informados.
+
+Caso a ação for `approve` (aprovar), o comando `git-credential` enviará a descrição a todos os auxiliares de credenciais configurados, que poderão armazenar a credencial para uso posterior.
+
+Caso a ação seja `reject`, o comando `git-credential` enviará a descrição para qualquer auxiliar de credencial já configurado, o que poderá apagar quaisquer credenciais que coincidam com a descrição.
+
+Caso a ação seja `approve` ou `reject`, nenhum alerta será emitido.
+
+UTILIZAÇÃO TÍPICA DO GIT CREDENTIAL
+-----------------------------------
+
+Um aplicativo que utilize o comando `git-credential` normalmente usa `git credential` seguindo estas etapas:
+
+  1. Gere um descritivo da credencial com base no contexto.
++
+Por exemplo, caso queira uma senha para `https://example.com/foo.git`, poderemos gerar o seguinte descritivo para a credencial (não se esqueça da linha em branco no final; informa `git credential` que o aplicativo terminou de encaminhar todas as informações que ele tinha):
+
+	 protocol=https
+	 host=exemplo.com.br
+	 path=foo.git
+
+  2. Peça à `git-credential` para nos fornecer um nome de usuário e senha para esta descrição. Isso é feito executando o comando `git credential fill`, alimentando a descrição da etapa (1) para a sua entrada predefinido. O descritivo completo da credencial (incluindo a credencial em si, ou seja, o login e a senha) será produzida como:
+
+	protocol=https
+	host=exemplo.com.br
+	username=bob
+	password=secr3t
++
+Na maioria dos casos, isso significa que os atributos informados na entrada serão repetidos na saída, mas o Git também poderá modificar a descrição da credencial, por exemplo, removendo o atributo `path` quando o protocolo for HTTP(s) e a variável `credential.useHttpPath` seja falsa.
++
+Caso o comando `git credential` saiba sobre a senha, esta etapa pode não ter o envolvimento do usuário que esteja digitando esta senha (o usuário pode ter digitado uma senha para desbloquear o chaveiro ou nenhuma interação do usuário foi feita caso o chaveiro já tenha sido desbloqueado) antes de retornar `password=secr3t`.
+
+  3. Utilize a credencial (por exemplo, acesse a URL com o nome de usuário e a senha da etapa (2)) e verifique se ela é aceita.
+
+  4. Relate o sucesso ou falha da senha. Caso a credencial permita que a operação seja concluída com sucesso, ela pode ser marcada com uma ação "approve" para passar ao `git credential` para ser reutilizada na próxima invocação. Caso a credencial seja rejeitada durante a operação, utilize a ação "reject" para que o comando `git credential` solicite uma nova senha na próxima invocação. Em qualquer um dos casos, o comando `git credential` deve ser alimentado com o descritivo da credencial obtida na etapa (2) (que também contém os campos informados na etapa (1)).
+
+[[IOFMT]]
+FORMATO DE ENTRADA/SAÍDA
+------------------------
+
+O `git credential` lê e/ou grava (dependendo da ação utilizada) informações das credenciais em sua entrada/saída predefinida. Estas informações podem corresponder às chaves para as quais o `git credential` obterá as informações de login (host, protocolo, caminho por exemplo) ou aos dados reais da credencial a serem obtidos (nome de usuário/senha).
+
+A credencial é dividida em um conjunto de atributos informados, com um atributo por linha. Cada atributo é especificado por um par de valores-chave, separado por um sinal de `=` (igual), seguido por uma nova linha.
+
+A chave pode conter quaisquer bytes, exceto `=`, nova linha ou NUL. O valor pode conter quaisquer bytes, exceto uma nova linha ou NUL.
+
+Os atributos com chaves que terminam com colchetes de matriz no estilo C `[]` podem ter diversos valores. Cada instância de um atributo com diversos valores forma uma lista ordenada de valores - a ordem dos atributos repetidos define a ordem dos valores. Um atributo multivalorado vazio (`key[]=\n`) atua para limpar quaisquer entradas anteriores e redefinir a lista.
+
+Em todos os casos, todos os bytes são tratados como estão (ou seja, não há aspas e não é possível transmitir um valor com nova linha ou NUL nela). A lista de atributos é finalizada por uma linha em branco ou no final do arquivo.
+
+O Git entende os seguintes atributos:
+
+`protocol`::
+
+	O protocolo sobre o qual a credencial será utilizada (por exemplo, `https`).
+
+`host`::
+
+	O nome do host remoto para uma credencial de rede. Isso inclui o número da porta, caso tenha sido especificado ("example.com:8088" por exemplo).
+
+`path`::
+
+	O caminho com o qual a credencial será utilizada. Por exemplo, para acessar um repositório https remoto, este será o caminho do repositório no servidor.
+
+`username`::
+
+	O nome de usuário da credencial, caso já tenhamos um (por exemplo, de uma URL, da configuração do usuário ou de um auxiliar executado anteriormente).
+
+`password`::
+
+	A senha da credencial, caso estejamos solicitando o seu armazenamento.
+
+`password_expiry_utc`::
+
+	As senhas geradas, como um token de acesso 'OAuth', podem ter uma data de validade. Ao ler as credenciais dos auxiliares, o comando `git credential fill` ignora as senhas expiradas. Representado como hora segundos UTC do Unix, desde 1970.
+
+`oauth_refresh_token`::
+
+	Um token de atualização do OAuth pode acompanhar uma senha que é um token de acesso do OAuth. Os assistentes devem tratar este atributo como confidencial, assim como os atributos de senha. O próprio Git não possui nenhum comportamento especial para este atributo.
+
+`url`::
+
+	Quando esse atributo especial é lido através do `git credential`, o valor é analisado como uma URL e tratado como se as suas partes constituintes fossem lidas (por exemplo, `url=https://example.com` se comportaria como se o `protocol = https` e `host=example.com` tenham sido fornecidos). Isso pode ajudar quem chama a evitar a análise das URLs eles mesmos.
++
+Observe que a definição de um protocolo é obrigatório e caso a URL não informe o nome do host ("cert:///caminho/para/o/arquivo") o conteúdo da credencial terá o atributo do nome do host cujo valor seja vazio.
++
+Os componentes ausentes na URL (não há um nome de usuário no exemplo acima por exemplo) serão deixados por sem uma definição.
+
+`wwwauth[]`::
+
+	Quando o Git receber uma resposta HTTP que inclua um ou mais cabeçalhos de autenticação "WWW-Authenticate", o Git passará estes cabeçalhos para os assistentes de credenciais.
++
+Cada valor do cabeçalho "WWW-Authenticate" é passado em forma de i, atributo com vários valores "wwwauth[]", onde a ordem dos atributos é a mesma que aparece na resposta HTTP. Esse atributo do Git é "unidirecional" para passar informações adicionais aos assistentes de credenciais.
+
+Todos os atributos não reconhecidos são descartados silenciosamente.
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

@@ -1,0 +1,504 @@
+git-merge(1)
+============
+
+NOME
+----
+git-merge - Une dois ou mais históricos de desenvolvimento
+
+
+RESUMO
+------
+[verse]
+'git merge' [-n] [--stat] [--no-commit] [--squash] [--[no-]edit]
+	[--no-verify] [-s <estratégia>] [-X <opção-da-estratégia>] [-S[<keyid>]]
+	[--[no-]allow-unrelated-histories]
+	[--[no-]rerere-autoupdate] [-m <msg>] [-F <arquivo>] [<commit>...]
+	[--into-name <ramo>] [<commit>...]
+'git merge' (--continue | --abort | --quit)
+
+DESCRIÇÃO
+---------
+Incorpora as alterações mencionadas dos commits (desde o momento onde seus históricos divergiram do ramo atual) no ramo atual. Esse comando é usado pelo `git pull` para incorporar alterações de outro repositório e pode ser usado manualmente para mesclar alterações de um ramo em outro.
+
+Suponha que exista o seguinte histórico e o ramo atual seja `master`:
+
+------------
+	  A---B---C topic
+	 /
+    D---E---F---G master
+------------
+
+Em seguida, o comando `git merge topic` reproduzirá as alterações feitas na ramificação `topic` desde o momento que houve divergência do `master` (ou seja, `E`) até o commit atual (`C`) no topo do `master` e registrará o resultado num novo commit, juntamente com os nomes dos dois commits principais e uma mensagem de registro log do usuário descrevendo as alterações. Antes da operação, `ORIG_HEAD` é definido como a ponta do ramo atual (`C`).
+
+------------
+	  A---B---C topic
+	 /         \
+    D---E---F---G---H master
+------------
+
+Uma mesclagem será interrompida se houver um conflito que não possa ser resolvido automaticamente ou se a opção `--no-commit` tiver sido fornecido ao iniciar a mesclagem. Nesse ponto, você pode executar o comando `git merge --abort` ou `git merge --continue`.
+
+O comando `git merge --abort` interromperá o processo de mesclagem e tentará reconstruir o estado anterior à mesclagem. No entanto, se houver alterações não confirmadas quando a mesclagem for iniciada (e especialmente se essas alterações forem modificadas depois que a mesclagem for iniciada), o comando `git merge --abort` não conseguirá, em alguns casos, reconstruir as alterações originais (anteriores à mesclagem). Portanto:
+
+*Aviso*: É desencorajado executar o comando `git merge` com alterações não-triviais dos commits que não foram feitos: isso pode deixá-lo numa condição difícil de sair em casos de conflito.
+
+OPÇÕES
+------
+:git-merge: 1
+
+--commit::
+--no-commit::
+	Execute a mesclagem e faça o commit com o resultado. Esta opção pode ser usada para substituir a opção `--no-commit`.
+ifdef::git-pull[]
+	Útil apenas quando for mesclar.
+endif::git-pull[]
++
+Com a opção `--no-commit`, executa a mesclagem e para imediatamente antes de criar a mesclagem de um commit, para dar ao usuário a chance de inspecionar e ajustar ainda mais o resultado da mesclagem antes de fazer o commit.
++
+Observe que as atualizações de avanço rápido não criam a mesclagem de um commit e, portanto, não há como interromper estas mesclagens com a opção `--no-commit`. Portanto, se você quiser garantir que o seu ramo não seja alterado ou atualizado pelo comando de mesclagem, use a opção `--no-ff` com `--no-commit`.
+
+--edit::
+-e::
+--no-edit::
+	Chame um editor antes de fazer a mesclagem mecânica de um commit bem sucedido para editar ainda mais a mensagem da mesclagem que foi gerada automaticamente, para que o usuário possa explicar e justificar a mesclagem. A opção `--no-edit` pode ser utilizada para aceitar a mensagem que foi gerada automaticamente (em geral isso é desencorajado).
+ifndef::git-pull[]
+A opção `--edit` (ou `-e`) ainda é útil caso esteja enviando uma mensagem de rascunho com a opção `-m` na linha de comando e queira editá-la no editor.
+endif::git-pull[]
++
+Os scripts mais antigos podem depender do comportamento histórico de não permitir que o usuário edite a mensagem do registro log da mesclagem. Eles verão um editor aberto quando executar o `git merge`. Para facilitar o ajuste destes scripts para o comportamento que foi atualizado, a variável de ambiente `GIT_MERGE_AUTOEDIT` pode ser definido como `no` no início deles.
+
+--cleanup=<modo>::
+	Esta opção determina como a mensagem da mesclagem será limpa antes da confirmação. Para mais detalhes consulte linkgit:git-commit[1]. Além disso, caso o valor de `scissors` seja dado ao '<mode>' , o `scissors` (tesouras) será anexada ao `MERGE_MSG` antes de ser repassada para o mecanismo de commit caso exista mesclagens conflitantes.
+
+ifdef::git-merge[]
+--ff::
+--no-ff::
+--ff-only::
+	Especifica como uma mesclagem é tratada quando o histórico mesclado já for um descendente do histórico atual. A opção `--ff` é o padrão, a menos que uma etiqueta anotada esteja mesclanda (e possivelmente assinada) e que não esteja armazenada em seu lugar natural na hierarquia `refs/tags/`, caso onde se assume que a opção `--no-ff` tenha sido usada.
+endif::git-merge[]
+ifdef::git-pull[]
+--ff-only::
+	Apenas atualize para o novo histórico se não houver um histórico divergente local. Esta é a predefinição quando nenhum método de reconciliação dos históricos divergentes for fornecido (através das opções `--rebase=*`).
+
+--ff::
+--no-ff::
+	Ao fazer a mesclagem em vez do rebase, especifica como uma mesclagem é tratada quando o histórico que foi mesclado já for um descendente do histórico atual. Se a mesclagem for solicitada, a opção `--ff` é o padrão, a menos que a uma etiqueta mesclada esteja anotada (e possivelmente assinada) e que não esteja armazenada em seu lugar natural na hierarquia `refs/tags/`, caso onde se assume que a opção `--no-ff` tenha sido usada.
+endif::git-pull[]
++
+Com a opção `--ff`, quando for possível, resolve a mesclagem como um avanço rápido (atualize apenas o ponteiro do ramo para corresponder ao ramo mesclado; e não cria a mesclagem de um commit). Quando não for possível (quando o histórico mesclado não for um descendente do histórico atual), cria a mesclagem de um commit.
++
+Com `--no-ff`, crie um commit da mesclagem em todos os casos, mesmo quando a mesclagem puder ser resolvida como um avanço rápido.
+ifdef::git-merge[]
++
+Com a opção `--ff-only`, resolva a mesclagem como um avanço rápido quando for possível. Quando não for possível, recuse a mesclagem e encerre com uma condição de encerramento diferente de zero.
+endif::git-merge[]
+
+-S[<keyid>]::
+--gpg-sign[=<keyid>]::
+--no-gpg-sign::
+	Assine a mesclagem resultante do commit com o GPG. O argumento `keyid` é opcional e a predefinição retorna para a identidade de quem fez o commit; se utilizado, deve estar anexado a opção sem espaço. A opção `--no-gpg-sign` é útil para revogar a variável de configuração `commit.gpgSign` e a anterior `--gpg-sign`.
+
+--log[=<n>]::
+--no-log::
+	Além dos nomes dos ramos, preencha a mensagem do registro log com descrições de uma linha com no máximo <n> commits atuais que estão sendo mesclados. Consulte também linkgit:git-fmt-merge-msg[1].
+ifdef::git-pull[]
+	Útil apenas quando for mesclar.
+endif::git-pull[]
++
+Com '--no-log', não liste as descrições de uma linha vindas do commits que estão atualmente sendo mescladas.
+
+ifdef::git-commit[]
+-s::
+endif::git-commit[]
+--signoff::
+--no-signoff::
+	Adicione uma linha `Signed-off-by` de quem fez o commit no final da mensagem de registro do commit. O significado de uma aprovação depende do projeto onde você está fazendo o commit. Por exemplo, ele pode certificar que quem fez o commit tem o direito de enviar o trabalho sob a licença do projeto ou concorda com alguma representação do contribuinte, como um certificado de origem do desenvolvedor. (Consulte https://developercertificate.org para saber qual é a usada pelo kernel do Linux e pelos projetos Git). Consulte a documentação ou a liderança do projeto para onde está contribuindo para compreender como as assinaturas são usadas nesse projeto.
++
+A opção --no-signoff pode ser usada para contra-ordenar uma opção --signoff anterior na linha de comando.
+[]
+
+--stat::
+-n::
+--no-stat::
+	Exiba um "diffstat" no final da mesclagem. O 'diffstat' também é controlado pela opção da configuração merge.stat.
++
+Com `-n` ou `--no-stat`, não mostre o 'diffstat' no final da mesclagem.
+
+--squash::
+--no-squash::
+	Produz a árvore de trabalho e condição do índice como se uma mesclagem real tivesse acontecido (exceto pelas informações da mesclagem), mas não faz um commit, move o `HEAD` ou registra o `$GIT_DIR/MERGE_HEAD` (para fazer com que o próximo comando `git commit` crie a mesclagem de um commit). Isso permite que você crie um único commit sobre o ramo atual, cujo efeito é o mesmo que mesclar um outro ramo (ou mais, no caso de um "octopus").
++
+Com a opção `--no-squash`, execute a mesclagem e faça o commit com o resultado. Esta opção pode ser usada para substituir a opção `--squash`.
++
+Com a opção `--squash`, a opção `--commit` não é permitida e irá falhar.
+ifdef::git-pull[]
++
+Útil apenas quando for mesclar.
+endif::git-pull[]
+
+--[no-]verify::
+	É predefinido que os ganchos 'pre-merge' e 'commit-msg' sejam executados. Quando a opção `--no-verify` é usada, isso é ignorado. Consulte também linkgit:githooks[5].
+ifdef::git-pull[]
+	Útil apenas quando for mesclar.
+endif::git-pull[]
+
+-s <estratégia>::
+--strategy=<estratégia>::
+	Use a estratégia fornecida de mesclagem; mais de uma pode ser fornecida mais de uma vez para especificá-las na ordem em que devem ser testadas. Se não houver a opção `-s`, uma lista integrada de estratégias será usada em seu lugar (`ort` ao mesclar um único `HEAD`, caso contrário, `octopus`).
+
+-X <opção>::
+--strategy-option=<opção>::
+	Passe a opção específica da estratégia através da estratégia de mesclagem.
+
+--verify-signatures::
+--no-verify-signatures::
+	Verifique se o commit do cume do ramo lateral que está sendo mesclado está assinado com uma chave válida, ou seja, uma chave que tenha uma UID válida: no modelo de confiança predefinido, isso significa que a chave da assinatura foi assinada por uma chave confiável. Se o commit do cume do ramo secundário não for assinado com uma chave válida, a mesclagem será abortada.
+ifdef::git-pull[]
++
+Útil apenas quando for mesclar.
+endif::git-pull[]
+
+--summary::
+--no-summary::
+	É um sinônimos para `--stat` e `--no-stat`; estas opções foram descontinuadas e serão removidas no futuro.
+
+ifndef::git-pull[]
+-q::
+--quiet::
+	Opere em silêncio. Implica no uso da opção `--no-progress`.
+
+-v::
+--verbose::
+	Seja loquaz.
+
+--progress::
+--no-progress::
+	Ativar/desativar explicitamente o progresso. Se nenhum dos dois for usado, o progresso será mostrado se o erro predefinido estiver conectado a um terminal. Observe que nem todas as estratégias de mesclagem podem ser compatíveis com os relatórios de progresso.
+
+endif::git-pull[]
+
+--autostash::
+--no-autostash::
+	Crie automaticamente uma entrada temporária de armazenamento antes do início da operação, registre-a na 'ref' `MERGE_AUTOSTASH` e aplique-a ao concluir a operação. Isso significa que você pode executar a operação numa árvore de trabalho suja. No entanto, use-o com cuidado: o aplicativo de armazenamento final após uma mesclagem bem-sucedida pode resultar em conflitos não triviais.
+
+--allow-unrelated-histories::
+	É predefinido que o comando `git merge` se recuse a mesclar os históricos que não compartilham de um ancestral comum. Esta opção pode ser usada para substituir este tipo de segurança ao mesclar os históricos de dois projetos que começaram suas vidas de forma independente. Como essa é uma ocasião muito rara, não existe nenhuma variável de configuração para ativar isso por padrão e ela também não será adicionada.
+ifdef::git-pull[]
++
+Útil apenas quando for mesclar.
+endif::git-pull[]
+[]
+
+-m <msg>::
+	Defina a mensagem do commit que será utilizada para a mesclagem do commit (no caso de uma ser criada).
++
+Caso `--log` seja utilizado, um atalho dos commits que estão sendo mesclados será anexado à mensagem informada.
++
+O comando `git fmt-merge-msg` pode ser usado para fornecer um bom padrão para invocações automatizadas do comando `git merge`. A mensagem automática pode incluir a descrição da agência.
+
+--into-name <ramo>::
+	Prepare a mensagem predefinida da mesclagem como se fosse uma mesclagem para a ramificação `<ramificação>` em vez do nome da ramificação real para onde a mesclagem for feita.
+
+-F <arquivo>::
+--file=<arquivo>::
+	Leia a mensagem de commit que será utilizada para mesclar o commit (no caso de uma ser criada).
++
+Caso `--log` seja utilizado, um atalho dos commits que estão sendo mesclados será anexado à mensagem informada.
+
+--rerere-autoupdate::
+--no-rerere-autoupdate::
+	Depois que o mecanismo 'rerere' reutilizar uma resolução registrada no conflito atual para atualizar os arquivos na árvore de trabalho, permita que ele também atualize o índice com o resultado da resolução. A opção `--no-rerere-autoupdate` é uma boa maneira de verificar novamente o que o `rerere` fez e detectar possíveis erros de mesclagem, antes de fazer o commit resultante no índice com um comando `git add` separado.
+[]
+
+--overwrite-ignore::
+--no-overwrite-ignore::
+	Silently overwrite ignored files from the merge result. Este é o comportamento predefinido. Use `--no-overwrite-ignore` to abort.
+
+--abort::
+	Interrompa o processo atual da resolução de conflitos e tente reconstruir a condição de pré-mesclagem. Caso uma entrada de "autostash" esteja presente, aplique-a à árvore de trabalho.
++
+Se houver alterações sem commits na árvore de trabalho quando a mesclagem for iniciada, o comando `git merge --abort` não conseguirá, em alguns casos, reconstruir estas alterações. Portanto, é recomendável fazer o commit ou armazenar as suas alterações antes de executar o comando `git merge`.
++
+O comando `git merge --abort` é equivalente ao comando `git reset --merge` quando o `MERGE_HEAD` está presente, a menos que o `MERGE_AUTOSTASH` também esteja presente, caso onde o comando `git merge --abort` aplica a entrada de stash à árvore de trabalho, enquanto o comando `git reset --merge` salvará as alterações armazenadas na lista de armazenamento (stash).
+
+--quit::
+	Não se preocupe com a mesclagem em andamento. Mantenha o índice e a árvore de trabalho como estão. Caso `MERGE_AUTOSTASH` esteja presente, os lançamentos armazenados serão salvos na lista "stash".
+
+--continue::
+	Após a interrupção de um comando`git merge` devido a conflitos, é possível concluir a mesclagem executando o comando `git merge --continue` (consulte a seção "COMO RESOLVER CONFLITOS" abaixo).
+
+<commit>...::
+	Os commits, geralmente vindo dos cabeçalhos de outras ramificações, para mesclar em nossa ramificação. Ao especificar mais de um commit criará uma mesclagem com mais de duas origens (carinhosamente chamada de mesclagem Octopus).
++
+Se nenhum commit for informado na linha de comando, mescle os ramos rastreados remotamente que o ramo atual está configurado para usar como o seu upstream. Consulte também a seção de configuração nesta página do manual.
++
+Quando `FETCH_HEAD` (e nenhum outro commit) for definido, as ramificações registradas no arquivo `.git/FETCH_HEAD` através da invocação anterior para mesclagem com o comando `git fetch`, serão mescladas no ramo atual.
+
+
+VERIFICAÇÕES PRÉVIAS DA MESCLAGEM
+---------------------------------
+
+Antes de aplicar alterações externas, você deve deixar seu próprio trabalho em bom estado e confirmá-lo localmente, para que ele não seja prejudicado se houver conflitos. Consulte também linkgit:git-stash[1]. O comando `git pull` e o `git merge` serão interrompidos quando as alterações locais não confirmadas se sobrepuserem aos arquivos que os comandos `git pull`/`git merge` talvez precisem atualizar.
+
+Para evitar o registro de alterações não relacionadas na mesclagem do commit, o comando `git pull` e o comando `git merge` também serão interrompidos se houver alterações registradas no índice em relação ao commit `HEAD`. (Podem existir exceções especiais a essa regra, dependendo da estratégia de mesclagem que estiver sendo usada, mas, em geral, o índice deve corresponder ao HEAD.)
+
+Se todos os commits nomeados já forem ancestrais de `HEAD`, o comando `git merge` será encerrado antecipadamente com a mensagem "Already up to date."
+
+MESCLAGEM COM AVANÇO RÁPIDO
+---------------------------
+
+Muitas vezes, o cabeçalho do ramo atual é um ancestral do commit nomeado. Esse é o caso mais comum, especialmente quando invocado a partir do comando `git pull`: você está rastreando um repositório "upstream", não fez nenhuma alteração local e agora deseja atualizar para uma revisão upstream mais recente. Nesse caso, não é necessário um novo commit para armazenar o histórico combinado; em vez disso, o `HEAD` (junto com o índice) é atualizado para apontar para determinado commit, sem criar um commit extra de mesclagem.
+
+Este comportamento pode ser suprimido ao usar a opção `--no-ff`.
+
+MESCLAGEM REAL
+--------------
+
+Exceto numa mesclagem de avanço rápido (veja acima), as ramificações que serão mescladas devem ser vinculadas através de uma consolidação da mesclagem que tenha ambas como as suas origens.
+
+Um commit é feito de uma versão mesclada que reconcilia as alterações de todos os ramos a serem mesclados, e seu `HEAD`, o índice e a árvore de trabalho são atualizados nela. É possível ter alterações na árvore de trabalho, desde que elas não se sobreponham; assim, a atualização as preservará.
+
+Quando não é óbvio como reconciliar as alterações, acontece o seguinte:
+
+1. O indicador do `HEAD` se mantém o mesmo.
+2. O "ref" do `MERGE_HEAD` é definido para indicar o `HEAD` do outro ramo.
+3. Os caminhos que foram mesclados corretamente são atualizados no arquivo do índice e na sua árvore de trabalho.
+4. Para caminhos conflitantes, o arquivo de índice registra até três versões: o estágio 1 armazena a versão do ancestral comum, o estágio 2 de `HEAD` e o estágio 3 de `MERGE_HEAD` (você pode inspecionar os estágios com o comando `git ls-files -u`). Os arquivos da árvore de trabalho contêm o resultado da operação da mesclagem, ou seja, os resultados da mesclagem de três vias com marcadores de conflito familiares `<<<` `===` `>>>`.
+5. Uma referência denominada `AUTO_MERGE` é gravada, apontando para uma árvore correspondente ao conteúdo atual da árvore de trabalho (incluindo marcadores de conflito para conflitos textuais). Observe que essa referência só é gravada quando a estratégia de mesclagem "ort" é usada (que é a predefinição).
+6. Nenhuma outra alteração é feita. Em particular, as modificações locais que você tinha antes de iniciar a mesclagem permanecerão as mesmas e as entradas de índice para elas permanecerão como estavam, ou seja, correspondendo a `HEAD`.
+
+Caso tenha tentado uma mesclagem que resultou em conflitos complexos e queira recomeçar, execute o comando `git merge --abort`.
+
+MESCLANDO TAG
+-------------
+
+Ao mesclar uma etiqueta anotada (e possivelmente assinada), o Git sempre cria a mesclagem de um commit, mesmo que seja possível uma mesclagem rápida, e o modelo da mensagem do commit é preparada com a mensagem da etiqueta. Além disso, se a tag for assinada, a verificação da assinatura será relatada como um comentário no modelo da mensagem. Consulte também linkgit:git-tag[1].
+
+Quando você deseja apenas integrar-se ao trabalho que leva ao commit que está marcado, por exemplo, sincronizando com um ponto de liberação upstream, talvez você não queira fazer uma consolidação desnecessária da mesclagem.
+
+Neste caso, você pode "desembrulhar" a etiqueta antes de encaminhá-la para o comando `git merge` ou passar ao `--ff-only` quando você não tiver nenhum trabalho feito por conta própria. por exemplo.
+
+----
+git fetch origin
+git merge v1.2.3^0
+git merge --ff-only v1.2.3
+----
+
+
+COMO OS CONFLITOS SÃO APRESENTADOS
+----------------------------------
+
+Durante uma mesclagem, os arquivos da árvore de trabalho são atualizados para refletir o resultado da mesclagem. Entre as alterações feitas na versão do ancestral comum, as que não se sobrepõem (ou seja, você alterou uma área do arquivo enquanto o outro lado deixou essa área intacta, ou vice-versa) são incorporadas literalmente ao resultado final. No entanto, quando ambos os lados fizeram alterações na mesma área, o Git não pode escolher aleatoriamente um lado em detrimento do outro e pede que você resolva a questão deixando o que ambos os lados fizeram nessa área.
+
+É predefinido que o Git utilize o mesmo estilo que o utilizado pelo programa "merge" (mesclar) do conjunto RCS para apresentar um pedaço conflitante, como este:
+
+------------
+Aqui estão as linhas que não são alteradas em relação ao ancestral
+comum ou resolvido de maneira limpa porque apenas um lado foi alterado
+ou foi resolvido de forma limpa porque ambos os lados foram igualmente alterados.
+<<<<<<< yours:sample.txt
+A resolução de conflitos é difícil;
+vamos às compras.
+=======
+O Git facilita a resolução de conflitos.
+>>>>>>> theirs:sample.txt
+E aqui está outra linha que foi claramente resolvida ou não foi modificada.
+------------
+
+A área onde ocorreu um par de alterações conflitantes é marcada com os marcadores `<<<<<<<`, `=======` e `>>>>>>>`. A parte antes do `=======` é normalmente o seu lado, e a parte após geralmente é o lado deles.
+
+O formato predefinido não mostra o que o original dizia na área conflitante. Não dá para saber quantas linhas foram excluídas e substituídas pelo comentário da Barbie do seu lado. A única coisa que você pode dizer é que o seu lado quer dizer que é difícil e que você prefere ir às compras, enquanto o outro lado quer dizer que é fácil.
+
+Um estilo alternativo pode ser usado definindo a variável de configuração `merge.conflictStyle` como "diff3" ou "zdiff3". No estilo "diff3", o conflito acima pode ter a seguinte aparência:
+
+------------
+Aqui estão as linhas que não são alteradas em relação ao ancestral
+comum ou foi resolvido de maneira limpa porque apenas um lado foi alterado.
+<<<<<<< seu:sample.txt
+ou resolvidos de forma limpa porque ambos os lados foram alterados igualmente.
+A resolução de conflitos é difícil;
+vamos às compras.
+||||||| base:sample.txt
+ou resolvidos de forma limpa porque ambos os lados foram igualmente alterados.
+A resolução de conflitos é difícil.
+=======
+ou resolvidos de forma limpa porque ambos os lados foram alterados igualmente.
+O git facilita a resolução de conflitos.
+>>>>>>> deles:sample.txt
+E aqui está outra linha que foi resolvida ou não foi modificada.
+------------
+
+enquanto no estilo "zdiff3", por ficar assim:
+
+------------
+Aqui estão as linhas que não são alteradas a partir do ancestral
+comum ou foi resolvido de maneira limpa porque apenas um lado foi alterado,
+ou foi resolvido de maneira limpa porque apenas um lado foi alterado.
+<<<<<<< seu:sample.txt
+A resolução de conflitos é difícil;
+vamos às compras.
+||||||| base:sample.txt
+ou resolvidos de forma limpa porque ambos os lados foram igualmente alterados.
+A resolução de conflitos é difícil;
+=======
+O Git facilita a resolução de conflitos.
+>>>>>>> deles:sample.txt
+E aqui está outra linha que foi claramente resolvida ou não foi modificada.
+------------
+
+Além dos marcadores `<<<<<<<`, `=======` e `>>>>>>>`, ele usa outro marcador `|||||||` que é seguido pelo texto original. Você pode dizer que o original apenas declarou um fato, e o seu lado simplesmente cedeu a essa declaração e desistiu, enquanto o outro lado tentou ter uma atitude mais positiva. Às vezes, você pode chegar a uma resolução melhor visualizando o original.
+
+
+COMO RESOLVER OS CONFLITOS
+--------------------------
+
+Após encontrar um conflito, você pode fazer duas coisas:
+
+ * Decidir não fazer a mesclagem. As únicas limpezas necessárias são redefinir o arquivo de índice para o commit `HEAD` para reverter 2. E para limpar as alterações na árvore de trabalho feitas pelo 2. E 3.; o `git merge --abort` pode ser usado para isso.
+
+ * Resolver os conflitos. O Git marcará os conflitos na árvore de trabalho. Edite os arquivos e adicione-os ao índice através do comando `git add`. Use o comando `git commit` ou `git merge --continue` para passar a régua. O último comando verifica se há uma mesclagem (interrompida) em andamento antes de invocar o comando `git commit`.
+
+Você pode trabalhar o conflito com uma quantidade de ferramentas:
+
+ * Use o mergetool. O comando `git mergetool` para iniciar um mergetool gráfico que trabalhará com você durante a mesclagem.
+
+ * Visualizando os diffs. O `git diff` mostrará um diff de três vias, destacando as alterações das versões `HEAD` e `MERGE_HEAD`. O comando `git diff AUTO_MERGE` mostrará as alterações que você fez até o momento para resolver conflitos textuais.
+
+ * Veja as diferenças de cada ramo. O comando `git log --merge -p <caminho>` exibirá as diferenças primeiro para a versão `HEAD` e depois para a versão `MERGE_HEAD`.
+
+ * Visualizando os originais. O comando `git show :1:filename` mostra o ancestral comum, o comando `git show :2:filename` mostra a versão `HEAD` e o comando `git show :3:filename` mostra a versão `MERGE_HEAD`.
+
+
+EXEMPLOS
+--------
+
+* Mescla as ramificações `fixes` e `enhancements` no cume do ramo atual, fazendo um conjunto de mesclagens:
++
+------------------------------------------------
+$ git merge fixes enhancements
+------------------------------------------------
+
+* Mescle o ramo `obsolete` (obsoleto) no ramo atual, utilizando a `nossa` estratégia de mesclagem:
++
+------------------------------------------------
+$ git merge -s ours obsolete
+------------------------------------------------
+
+* Mescla o ramo `maint` no ramo atual, porém não faça um novo commit de forma automática:
++
+------------------------------------------------
+$ git merge --no-commit maint
+------------------------------------------------
++
+Isso pode ser utilizado quando você queira incluir outras alterações na mesclagem ou se deseja, grave a sua própria mensagem do commit na mesclagem.
++
+Você não deve abusar desta opção para inserir alterações substanciais na mesclagem de um commit. Pequenas correções, como o acréscimo do nome da versão, seriam aceitáveis.
+
+
+ESTRATÉGIAS DE MESCLAGEM
+------------------------
+
+O mecanismo de mesclagem (os comandos `git merge` e `git pull`) permite que as 'estratégias de mesclagem' do backend sejam escolhidas com a opção `-s`. Algumas estratégias também podem ter as suas próprias opções, que podem ser passadas usando argumentos `-X<opção>` ao comando `git merge` e/ou `git pull`.
+
+ort::
+	Esta é a estratégia de mesclagem predefinida ao extrair ou ao mesclar um ramo. Esta estratégia só pode resolver dois `HEADS` usando um algoritmo de mesclagem de 3 vias. Quando há mais de um ancestral comum que pode ser usado para a mesclagem de 3 vias, ele cria uma árvore mesclada dos ancestrais comuns e a utiliza como uma árvore de referência para a mesclagem de 3 vias. Foi relatado que isso resulta em menos conflitos de mesclagem sem causar erros de mesclagem através dos testes feitos na mesclagem dos commits reais retirados do histórico de desenvolvimento do kernel do Linux 2.6. Além disso, esta estratégia pode detectar e lidar com as mesclagens que envolvam renomeações. Não faz uso de cópias detectadas. O nome desse algoritmo é um acrônimo ("Ostensibly Recursive's Twin") e surgiu do fato de que ele foi escrito como um substituto para o padrão di algoritmo anterior, `recursive`.
++
+A estratégia 'ort' pode adotar as seguintes opções:
+
+ours;;
+	Esta opção impõem a resolução automática dos conflitos de maneira limpa, favorecendo a 'nossa' versão. As alterações da outra árvore que não entram em conflito com o nosso lado são refletidas no resultado da mesclagem. Para um arquivo binário, todo o conteúdo é retirado a partir do nosso lado.
++
+Isso não deve ser confundido com a estratégia da 'nossa' mesclagem, que nem sequer analisa o que a outra árvore contém. Ela descarta tudo o que a outra árvore fez, declarando que a 'nossa' história contém tudo o que aconteceu nela.
+
+theirs;;
+	Este é o oposto do 'nosso'; observe que, diferentemente do 'nosso', não existe uma estratégia de mesclagem 'deles' para confundir esta opção de mesclagem.
+
+ignore-space-change;;
+ignore-all-space;;
+ignore-space-at-eol;;
+ignore-cr-at-eol;;
+	Trata as linhas com o tipo indicado de alteração do espaço em branco como inalteradas para os fins de uma mesclagem de três vias. As alterações do espaço em branco misturadas com as outras alterações numa linha não são ignoradas. Consulte também o comando linkgit:git-diff[1] `-b`, `-w`, `--ignore-space-at-eol`, e a opção `--ignore-cr-at-eol`.
++
+* Caso a versão 'their' (dele) introduzir apenas as alterações de espaço em uma linha, a 'our' (nossa) versão será utilizada;
+* Caso a 'our' (nossa) versão introduzir alterações nos espaços, porém a versão 'their' (dele) incluir uma alteração substancial, a versão 'their' (dele) será utilizada;
+* Caso contrário, a mesclagem continuará de forma usual.
+
+renormalize;;
+	Isso executa um "check-out" e um "check-in" virtual de todos os três estágios de um arquivo ao resolver uma mesclagem de três vias. Esta opção deve ser usada ao mesclar ramificações com diferentes filtros limpos ou com regras de normalização de fim de linha. Para mais detalhes consulte "Mesclando as ramificações com atributos de check-in/check-out diferentes" do comando linkgit:gitattributes[5].
+
+no-renormalize;;
+	Desativa a opção `renormalize`. Isso substitui a variável de configuração `merge.renormalize`.
+
+find-renames[=<n>];;
+	Ative a detecção de renomeação, definindo opcionalmente o limite de similaridade. Esta é a predefinição. Isso substitui a variável de configuração 'merge.renames'. Consulte também linkgit:git-diff[1] `--find-renames`.
+
+rename-threshold=<n>;;
+	É um sinônimo obsoleto para `find-renames=<n>`.
+
+subtree[=<caminho>];;
+	Esta opção é uma forma mais avançada de estratégia de 'subárvore', onde a estratégia faz uma estimativa de como as duas árvores devem ser deslocadas para coincidir uma com a outra durante a mesclagem. Em vez disso, o caminho especificado é prefixado (ou retirado do início) para fazer com que a forma das duas árvores coincida.
+
+recursive::
+	Isso só pode resolver dois cabeçalhos usando um algoritmo de mesclagem de 3 vias. Quando há mais de um ancestral comum que pode ser usado para a mesclagem de 3 vias, ele cria uma árvore mesclada dos ancestrais comuns e a utiliza como uma árvore de referência para a mesclagem de 3 vias. Foi relatado que isso resulta em menos conflitos de mesclagem sem causar erros de mesclagem através dos testes feitos na mesclagem dos commits reais retirados do histórico de desenvolvimento do kernel do Linux 2.6. Além disso, ele pode detectar e lidar com mesclagens que envolvam renomeações. Não faz uso de cópias detectadas. Essa era a estratégia padrão para resolver dois cabeçalhos do Git v0.99.9k até a v2.33.0.
++
+A estratégia 'recursiva' usa as mesmas opções que a 'ort'. Entretanto, há três opções adicionais que o 'ort' ignora (não documentadas acima) e que podem ser úteis com a estratégia 'recursiva':
+
+patience;;
+	É um sinônimo obsoleto para `diff-algorithm=patience`.
+
+diff-algorithm=[patience|minimal|histogram|myers];;
+	Use um algoritmo de comparação diferente durante a mesclagem, o que pode ajudar a evitar mesclagens incorretas que ocorrem devido a linhas correspondentes sem importância (como chaves de funções distintas). Consulte também linkgit:git-diff[1] `--diff-algorithm`. Observe que `ort` usa especificamente `diff-algorithm=histogram`, enquanto `recursive` usa como predefinição a configuração `diff.algorithm`.
+
+no-renames;;
+	Desativa a detecção de renomeação. Isto sobrepõem a variável de configuração `merge.renames` configuration. Consulte também linkgit:git-diff[1] `--no-renames`.
+
+resolve::
+	Isso só pode resolver duas cabeças (ou seja, o ramo atual e outro ramo do qual você retirou) usando um algoritmo de mesclagem de três vias. Ele tenta detectar cuidadosamente as ambiguidades de mesclagem cruzada. Ele não lida com renomeações.
+
+octopus::
+	Isso resolve casos com mais de dois cabeçalhos, mas se recusa a fazer uma mesclagem complexa que precise de uma resolução manual. Seu principal objetivo é ser usado para agrupar os tópicos dos cabeçalhos juntos. Esta é a estratégia de mesclagem predefinida ao obter (fazer um pull) ou ao mesclar um ramo.
+
+ours::
+	Isso resolve qualquer quantidade de cabeçalhos, mas a árvore resultante da mesclagem é sempre a do cabeçalho do ramo atual, ignorando efetivamente todas as alterações de todos os outros ramos. Ele deve ser usado para substituir o histórico de desenvolvimento antigo das ramificações paralelas. Observe que isso é diferente da opção `-Xours` para a estratégia de mesclagem da opção 'recursive'.
+
+subtree::
+	Esta é uma estratégia `ort` modificada. Ao mesclar as árvores 'A' e 'B', caso 'B' corresponda a uma subárvore de 'A', o 'B' será ajustado primeiro para coincidir à estrutura da árvore 'A', em vez de ler as árvores no mesmo nível. Esse ajuste também é feito na árvore ancestral comum.
+
+Com as estratégias que usam a mesclagem de 3 vias (incluindo a predefinição, 'ort'), se uma alteração for feita em ambos os ramos, mas posteriormente revertida num dos ramos, essa alteração estará presente no resultado da mesclagem; algumas pessoas acham este comportamento confuso. Isto ocorre porque somente os cabeçalhos e a base de mesclagem são considerados ao realizar uma mesclagem, e não os commits individuais. Portanto, o algoritmo de mesclagem considera a alteração revertida como se não houvesse nenhuma alteração e, em vez disso, substitui a versão alterada.
+[]
+
+CONFIGURAÇÃO
+------------
+
+branch.<nome>.mergeOptions::
+	Define as opções predefinidas para a mesclagem no ramo <nome>. A sintaxe e as opções suportadas são as mesmas do comando `git merge`, não são compatíveis no momento valores da opção que contenha caracteres de espaço em branco.
+
+
+
+[WARNING]
+====
+Missing `pt_BR/includes/cmd-config-section-rest.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `pt_BR/config/merge.txt`
+
+See original version for this content.
+====
+
+[]
+
+VEJA TAMBÉM
+-----------
+linkgit:git-fmt-merge-msg[1], linkgit:git-pull[1], linkgit:gitattributes[5], linkgit:git-reset[1], linkgit:git-diff[1], linkgit:git-ls-files[1], linkgit:git-add[1], linkgit:git-rm[1], linkgit:git-mergetool[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

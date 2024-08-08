@@ -1,0 +1,781 @@
+git-pull(1)
+===========
+
+NOME
+----
+git-pull - Busque e integre-se a outro repositório ou num ramo local
+
+
+RESUMO
+------
+[verse]
+'git pull' [<opções>] [<repositório> [<refspec>...]]
+
+
+DESCRIÇÃO
+---------
+
+Incorpora alterações de um repositório remoto no ramo atual. Se o ramo atual estiver atrás do ramo remoto, então, é predefinido que, ele avançará rapidamente o ramo atual para que corresponda ao ramo remoto. Se o ramo atual e o ramo remoto tiverem divergências, o usuário precisará especificar como reconciliar os ramos divergentes com as opções `--rebase` ou `--no-rebase` (ou a opção de configuração correspondente em `pull.rebase`).
+
+Mais precisamente, o comando `git pull` executa `git fetch` com os parâmetros determinados e em seguida, dependendo das opções de configuração ou das sinalizações da linha de comando, invocará o comando `git rebase` ou `git merge` para conciliar os ramos divergentes.
+
+O <repositório> deve ser o nome de um repositório remoto conforme é repassado para linkgit:git-fetch[1]. O <refspec> pode nomear uma referência remota arbitrária (o nome de uma etiqueta por exemplo) ou até mesmo uma coleção de referências com ramificações correspondentes rastreadas remotamente (refs/heads/{asterisk}:refs/remotes/origin/{asterisk} por exemplo), mas geralmente é o nome de uma ramificação no repositório remoto.
+
+Os valores predefinidos para o <repositório> e o <ramo> eles são lidos na configuração "remote" e "merge" do ramo atual, conforme for definido pelo linkgit:git-branch[1] `--track`.
+
+Suponha que exista o seguinte histórico e o ramo atual seja `master`:
+
+------------
+	  A---B---C master on origin
+	 /
+    D---E---F---G master
+	^
+	origin/master no seu repositório
+------------
+
+Em seguida, o comando "`git pull`" buscará e reproduzirá as alterações do ramo remoto `master` a partir do momento que divergiu do `master` local (ou seja, `E`) até o commit atual (`C`) no topo do `master` e registrará o resultado num novo commit, juntamente com os nomes dos dois commits principais e uma mensagem de registro log do usuário descrevendo as alterações.
+
+------------
+	  A---B---C origin/master
+	 /         \
+    D---E---F---G---H master
+------------
+
+Para mais detalhes incluindo informações de como os conflitos são gerenciados e como eles são exibidos, consulte linkgit:git-merge[1].
+
+No Git 1.7.0 ou posterior, para cancelar uma mesclagem conflitante, use o comando `git reset --merge`. *Aviso*: Nas versões mais antigas do Git, não é recomendável executar o comando 'git pull' com alterações onde o commit não tenha sido feito: embora seja possível, isso o deixa num estado onde pode ser difícil sair em casos de conflitos.
+
+Se alguma das alterações remotas se sobrepuser às alterações locais onde o commit não tenha sido feito, a mesclagem será automaticamente cancelada e a árvore de trabalho permanecerá intacta. Em geral, é melhor colocar todas as alterações locais em ordem de funcionamento antes de retirá-las ou armazená-las com linkgit:git-stash[1].
+
+OPÇÕES
+------
+
+-q::
+--quiet::
+	Isso é passado para ambos os comandos subjacentes do `git-fetch` para abafar o relatório do processo durante a transferência assim como do git-merge silenciando sua saída durante a mesclagem.
+
+-v::
+--verbose::
+	Encaminhe a opção --verbose para o 'git-fetch' e 'git-merge'.
+
+--[no-]recurse-submodules[=(yes|on-demand|no)]::
+	Esta opção controla se os novos commits dos submódulos populados devem ser buscados ou não e se as árvore de trabalho dos submódulos ativos devem ser atualizados também (consulte linkgit:git-fetch[1], linkgit:git-config[1] e linkgit:gitmodules[5]).
++
+Caso a averiguação seja feita através da reconstrução "rebase", os commits do submódulo local também serão refeitas.
++
+Caso a atualização seja feita através de uma mesclagem, os conflitos do sub-módulo serão resolvidos e retirados.
+
+Opções relacionadas a mesclagem
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:git-pull: 1
+
+--commit::
+--no-commit::
+	Execute a mesclagem e faça o commit com o resultado. Esta opção pode ser usada para substituir a opção `--no-commit`.
+ifdef::git-pull[]
+	Útil apenas quando for mesclar.
+endif::git-pull[]
++
+Com a opção `--no-commit`, executa a mesclagem e para imediatamente antes de criar a mesclagem de um commit, para dar ao usuário a chance de inspecionar e ajustar ainda mais o resultado da mesclagem antes de fazer o commit.
++
+Observe que as atualizações de avanço rápido não criam a mesclagem de um commit e, portanto, não há como interromper estas mesclagens com a opção `--no-commit`. Portanto, se você quiser garantir que o seu ramo não seja alterado ou atualizado pelo comando de mesclagem, use a opção `--no-ff` com `--no-commit`.
+
+--edit::
+-e::
+--no-edit::
+	Chame um editor antes de fazer a mesclagem mecânica de um commit bem sucedido para editar ainda mais a mensagem da mesclagem que foi gerada automaticamente, para que o usuário possa explicar e justificar a mesclagem. A opção `--no-edit` pode ser utilizada para aceitar a mensagem que foi gerada automaticamente (em geral isso é desencorajado).
+ifndef::git-pull[]
+A opção `--edit` (ou `-e`) ainda é útil caso esteja enviando uma mensagem de rascunho com a opção `-m` na linha de comando e queira editá-la no editor.
+endif::git-pull[]
++
+Os scripts mais antigos podem depender do comportamento histórico de não permitir que o usuário edite a mensagem do registro log da mesclagem. Eles verão um editor aberto quando executar o `git merge`. Para facilitar o ajuste destes scripts para o comportamento que foi atualizado, a variável de ambiente `GIT_MERGE_AUTOEDIT` pode ser definido como `no` no início deles.
+
+--cleanup=<modo>::
+	Esta opção determina como a mensagem da mesclagem será limpa antes da confirmação. Para mais detalhes consulte linkgit:git-commit[1]. Além disso, caso o valor de `scissors` seja dado ao '<mode>' , o `scissors` (tesouras) será anexada ao `MERGE_MSG` antes de ser repassada para o mecanismo de commit caso exista mesclagens conflitantes.
+
+ifdef::git-merge[]
+--ff::
+--no-ff::
+--ff-only::
+	Especifica como uma mesclagem é tratada quando o histórico mesclado já for um descendente do histórico atual. A opção `--ff` é o padrão, a menos que uma etiqueta anotada esteja mesclanda (e possivelmente assinada) e que não esteja armazenada em seu lugar natural na hierarquia `refs/tags/`, caso onde se assume que a opção `--no-ff` tenha sido usada.
+endif::git-merge[]
+ifdef::git-pull[]
+--ff-only::
+	Apenas atualize para o novo histórico se não houver um histórico divergente local. Esta é a predefinição quando nenhum método de reconciliação dos históricos divergentes for fornecido (através das opções `--rebase=*`).
+
+--ff::
+--no-ff::
+	Ao fazer a mesclagem em vez do rebase, especifica como uma mesclagem é tratada quando o histórico que foi mesclado já for um descendente do histórico atual. Se a mesclagem for solicitada, a opção `--ff` é o padrão, a menos que a uma etiqueta mesclada esteja anotada (e possivelmente assinada) e que não esteja armazenada em seu lugar natural na hierarquia `refs/tags/`, caso onde se assume que a opção `--no-ff` tenha sido usada.
+endif::git-pull[]
++
+Com a opção `--ff`, quando for possível, resolve a mesclagem como um avanço rápido (atualize apenas o ponteiro do ramo para corresponder ao ramo mesclado; e não cria a mesclagem de um commit). Quando não for possível (quando o histórico mesclado não for um descendente do histórico atual), cria a mesclagem de um commit.
++
+Com `--no-ff`, crie um commit da mesclagem em todos os casos, mesmo quando a mesclagem puder ser resolvida como um avanço rápido.
+ifdef::git-merge[]
++
+Com a opção `--ff-only`, resolva a mesclagem como um avanço rápido quando for possível. Quando não for possível, recuse a mesclagem e encerre com uma condição de encerramento diferente de zero.
+endif::git-merge[]
+
+-S[<keyid>]::
+--gpg-sign[=<keyid>]::
+--no-gpg-sign::
+	Assine a mesclagem resultante do commit com o GPG. O argumento `keyid` é opcional e a predefinição retorna para a identidade de quem fez o commit; se utilizado, deve estar anexado a opção sem espaço. A opção `--no-gpg-sign` é útil para revogar a variável de configuração `commit.gpgSign` e a anterior `--gpg-sign`.
+
+--log[=<n>]::
+--no-log::
+	Além dos nomes dos ramos, preencha a mensagem do registro log com descrições de uma linha com no máximo <n> commits atuais que estão sendo mesclados. Consulte também linkgit:git-fmt-merge-msg[1].
+ifdef::git-pull[]
+	Útil apenas quando for mesclar.
+endif::git-pull[]
++
+Com '--no-log', não liste as descrições de uma linha vindas do commits que estão atualmente sendo mescladas.
+
+ifdef::git-commit[]
+-s::
+endif::git-commit[]
+--signoff::
+--no-signoff::
+	Adicione uma linha `Signed-off-by` de quem fez o commit no final da mensagem de registro do commit. O significado de uma aprovação depende do projeto onde você está fazendo o commit. Por exemplo, ele pode certificar que quem fez o commit tem o direito de enviar o trabalho sob a licença do projeto ou concorda com alguma representação do contribuinte, como um certificado de origem do desenvolvedor. (Consulte https://developercertificate.org para saber qual é a usada pelo kernel do Linux e pelos projetos Git). Consulte a documentação ou a liderança do projeto para onde está contribuindo para compreender como as assinaturas são usadas nesse projeto.
++
+A opção --no-signoff pode ser usada para contra-ordenar uma opção --signoff anterior na linha de comando.
+[]
+
+--stat::
+-n::
+--no-stat::
+	Exiba um "diffstat" no final da mesclagem. O 'diffstat' também é controlado pela opção da configuração merge.stat.
++
+Com `-n` ou `--no-stat`, não mostre o 'diffstat' no final da mesclagem.
+
+--squash::
+--no-squash::
+	Produz a árvore de trabalho e condição do índice como se uma mesclagem real tivesse acontecido (exceto pelas informações da mesclagem), mas não faz um commit, move o `HEAD` ou registra o `$GIT_DIR/MERGE_HEAD` (para fazer com que o próximo comando `git commit` crie a mesclagem de um commit). Isso permite que você crie um único commit sobre o ramo atual, cujo efeito é o mesmo que mesclar um outro ramo (ou mais, no caso de um "octopus").
++
+Com a opção `--no-squash`, execute a mesclagem e faça o commit com o resultado. Esta opção pode ser usada para substituir a opção `--squash`.
++
+Com a opção `--squash`, a opção `--commit` não é permitida e irá falhar.
+ifdef::git-pull[]
++
+Útil apenas quando for mesclar.
+endif::git-pull[]
+
+--[no-]verify::
+	É predefinido que os ganchos 'pre-merge' e 'commit-msg' sejam executados. Quando a opção `--no-verify` é usada, isso é ignorado. Consulte também linkgit:githooks[5].
+ifdef::git-pull[]
+	Útil apenas quando for mesclar.
+endif::git-pull[]
+
+-s <estratégia>::
+--strategy=<estratégia>::
+	Use a estratégia fornecida de mesclagem; mais de uma pode ser fornecida mais de uma vez para especificá-las na ordem em que devem ser testadas. Se não houver a opção `-s`, uma lista integrada de estratégias será usada em seu lugar (`ort` ao mesclar um único `HEAD`, caso contrário, `octopus`).
+
+-X <opção>::
+--strategy-option=<opção>::
+	Passe a opção específica da estratégia através da estratégia de mesclagem.
+
+--verify-signatures::
+--no-verify-signatures::
+	Verifique se o commit do cume do ramo lateral que está sendo mesclado está assinado com uma chave válida, ou seja, uma chave que tenha uma UID válida: no modelo de confiança predefinido, isso significa que a chave da assinatura foi assinada por uma chave confiável. Se o commit do cume do ramo secundário não for assinado com uma chave válida, a mesclagem será abortada.
+ifdef::git-pull[]
++
+Útil apenas quando for mesclar.
+endif::git-pull[]
+
+--summary::
+--no-summary::
+	É um sinônimos para `--stat` e `--no-stat`; estas opções foram descontinuadas e serão removidas no futuro.
+
+ifndef::git-pull[]
+-q::
+--quiet::
+	Opere em silêncio. Implica no uso da opção `--no-progress`.
+
+-v::
+--verbose::
+	Seja loquaz.
+
+--progress::
+--no-progress::
+	Ativar/desativar explicitamente o progresso. Se nenhum dos dois for usado, o progresso será mostrado se o erro predefinido estiver conectado a um terminal. Observe que nem todas as estratégias de mesclagem podem ser compatíveis com os relatórios de progresso.
+
+endif::git-pull[]
+
+--autostash::
+--no-autostash::
+	Crie automaticamente uma entrada temporária de armazenamento antes do início da operação, registre-a na 'ref' `MERGE_AUTOSTASH` e aplique-a ao concluir a operação. Isso significa que você pode executar a operação numa árvore de trabalho suja. No entanto, use-o com cuidado: o aplicativo de armazenamento final após uma mesclagem bem-sucedida pode resultar em conflitos não triviais.
+
+--allow-unrelated-histories::
+	É predefinido que o comando `git merge` se recuse a mesclar os históricos que não compartilham de um ancestral comum. Esta opção pode ser usada para substituir este tipo de segurança ao mesclar os históricos de dois projetos que começaram suas vidas de forma independente. Como essa é uma ocasião muito rara, não existe nenhuma variável de configuração para ativar isso por padrão e ela também não será adicionada.
+ifdef::git-pull[]
++
+Útil apenas quando for mesclar.
+endif::git-pull[]
+[]
+
+-r::
+--rebase[=(false|true|merges|interactive)]::
+	Quando for verdadeiro, reorganize a fundação do ramo atual no topo da ramificação upstream após a busca. Caso haja uma ramificação monitorado remotamente correspondente à ramificação upstream e a ramificação upstream foi reconstruído desde a última busca, a reconstrução da fundação utilizará estas informações para evitar reconstruir as alterações que não fora locais.
++
+Quando definido como `merges`, a reconstrução da fundação (rebase) utilizando o comando `git rebase --rebase-merges` para que as mesclagem dos commits locais sejam incluídas na reconstrução (para mais detalhes, consulte linkgit:git-rebase[1]).
++
+Quando for falso, mescle a ramificação upstream na ramificação atual.
++
+Quando `interactive` (interativo) , ative o modo interativo da reconstrução da fundação.
++
+Consulte `pull.rebase`, `branch.<nome>.rebase` e `branch.autoSetupRebase` no linkgit:git-config[1] caso queira fazer o `git pull`, sempre utilize o comando `--rebase` em vez de mesclar .
++
+[NOTE]
+Este é um modo de operação potencialmente _perigoso_. Ele reescreve o histórico, o que não é um bom presságio quando você já o publicou. *Não* use esta opção a menos que você tenha lido linkgit:git-rebase[1] atentamente.
+
+--no-rebase::
+	Este é um atalho para a opção --rebase=false.
+
+Opções relacionadas à busca
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--[no-]all::
+	Busque todas os `refs` remotos. Isso substitui a variável de configuração `fetch.all`.
+
+-a::
+--append::
+	Acrescenta os nomes das refs e os nomes dos objetos das refs obtidas ao conteúdo existente do `.git/FETCH_HEAD`. Sem essa opção, os dados antigos em `.git/FETCH_HEAD` serão substituídos.
+
+--atomic::
+	Utilize uma transação atômica para atualizar as refs locais. Ou todas as refs são atualizadas ou por erro, nenhuma será.
+
+--depth=<profundidade>::
+	Limite a captura para uma quantidade específica de commits na ponta do histórico de cada ramificação remota. Caso esteja capturando um repositório 'shallow' (superficial) criado pelo `git clone` com a opção `--depth=<profundidade>` (consulte linkgit:git-clone[1]), aprofunde ou encurte o histórico para a quantidade usada de commits. As tags para os commits aprofundados não são capturados.
+
+--deepen=<profundidade>::
+	Semelhante a opção `--depth`, exceto que especifica a quantidade de commits do limite raso atual em vez da ponta de cada histórico do ramo remoto.
+
+--shallow-since=<data>::
+	Aprofunde ou encurte o histórico de um repositório raso para incluir todas os commits acessíveis após a <data>.
+
+--shallow-exclude=<revisão>::
+	Aprofunde ou reduza o histórico de um repositório superficial para excluir os commits acessíveis a partir de um ramo ou tag remoto informada. Esta opção pode ser utilizada várias vezes.
+
+--unshallow::
+	Caso o repositório de origem esteja completo, converta um repositório raso num completo, removendo todas as limitações impostas pelos repositórios rasos.
++
+Caso o repositório de origem seja superficial, busque o máximo possível para que o repositório atual tenha o mesmo histórico que o repositório de origem.
+
+--update-shallow::
+	É predefinido que durante a captura num repositório superficial, o `git fetch` recuse os refs que exijam a atualização do `.git/shallow`. Esta opção atualiza o `.git/shallow` e aceita tais refs.
+
+--negotiation-tip=<commit|glob>::
+	É predefinido que o Git relate ao servidor os commits acessíveis a partir de todas as refs locais para encontrar commits comuns numa tentativa de reduzir o tamanho do pacote dos arquivos que serão recebidos. Se for especificado, o Git relatará apenas os commits acessíveis a partir das dicas fornecidas. Isso é útil para acelerar as obtenções quando o usuário sabe qual ref local provavelmente terá commits em comum com a ref upstream que está sendo buscada.
++
+Esta opção pode ser utilizada mais de uma vez; Se assim for, o Git irá reportar os commits de qualquer um dos commits informados.
++
+O argumento para esta opção pode ser um "ref" aos nomes de referência, uma referência ou o (possivelmente abreviado) SHA-1 de um commit. Especificar um agrupamento é o equivalente a utilizar esta opção várias vezes, uma para cada nome "ref" coincidente.
++
+Consulte também a variável de configuração `fetch.negotiationAlgorithm` e `push.negotiate` documentada em linkgit:git-config[1] e na opção `--negotiate-only` abaixo.
+
+--negotiate-only::
+	Não busque nada do servidor e imprima os argumentos `--negotiation-tip=*` fornecidos anteriormente e que nós temos em comum com o servidor.
++
+Isso é incompatível com `--recurse-submodules=[yes|on-demand]`. Internamente, isso é usado para implementar a opção `push.negotiate`, para mais detalhes consulte linkgit:git-config[1].
+
+--dry-run::
+	Exiba apenas o que seria feito, sem fazer quaisquer alterações.
+
+--porcelain::
+	Imprima na saída padrão num formato fácil para scripts. Consulte a seção OUTPUT em linkgit:git-fetch[1] para obter mais detalhes.
++
+Isso é compatível com a opção `--recurse-submodules=[yes|on-demand]` e tem precedência sobre a opção de configuração `fetch.output`.
+
+ifndef::git-pull[]
+--[no-]write-fetch-head::
+	Escreva a lista de refs remotas obtidas no arquivo `FETCH_HEAD` diretamente em `$GIT_DIR`. Esta é a predefinição. Usar a opção `--no-write-fetch-head` na linha de comando diz ao Git para não escrever o arquivo. Na opção `--dry-run`, o arquivo nunca é gravado.
+endif::git-pull[]
+
+-f::
+--force::
+	Quando 'git fetch' é utilizado com `<src>:<dst>` "refspec", ele pode se recusar a atualizar o ramo local como discutido
+ifdef::git-pull[]
+	na parte `<refspec>` da documentação do
+	linkgit:git-fetch[1].
+endif::git-pull[]
+ifndef::git-pull[]
+	na parte `<refspec>` abaixo.
+endif::git-pull[]
+	Esta opção sobrescreve esta verificação.
+
+-k::
+--keep::
+	Mantenha o pacote que foi baixado.
+
+ifndef::git-pull[]
+--multiple::
+	Permita que vários argumentos <repositório> e <grupo> sejam utilizados. Nenhum `<refspec>` pode ser utilizado.
+
+--[no-]auto-maintenance::
+--[no-]auto-gc::
+	Execute `git maintenance run --auto` no final para realizar a manutenção automática do repositório, caso seja necessário. (`--[no-]auto-gc` é um sinônimo.) A predefinição é ativado.
+
+--[no-]write-commit-graph::
+	Grave um grafo do commit após a captura remota. Este sobrescreve a configuração `fetch.writeCommitGraph`.
+endif::git-pull[]
+
+--prefetch::
+	Altere o refspec configurado para colocar todos os refs no namespace `refs/prefetch/`. Consulte a tarefa `prefetch` em linkgit:git-maintenance[1].
+
+-p::
+--prune::
+	Antes de obter, remova todas as referências de rastreamento remoto que não existam mais no ramo remoto. As tags não estão sujeitas à poda se forem apenas obtidas devido ao acompanhamento automático da tag predefinida ou devido a uma opção `--tags`. No entanto, se as tags forem obtidas através de uma refspec explícita (na linha de comando ou na configuração remota, por exemplo, se o ramo remoto tiver sido clonado com a opção `--mirror`), elas também estarão sujeitas à poda. Usar a opção `--prune-tags` é um atalho para fornecer a tag refspec.
+ifndef::git-pull[]
++
+Consulte a seção de PRUNING abaixo para mais detalhes.
+
+-P::
+--prune-tags::
+	Antes de capturar, remova as tags locais que não existam mais remotamente caso a opção `--prune` esteja ativa. Esta opção deve ser utilizada com mais cuidado, ao contrário da opção `--prune`, ela removerá todas as referências locais (tags locais) que forem criadas. Esta opção é um atalho para informar a tag explícita refspec junto com a opção `--prune`, consulte a discussão sobre isso em sua documentação.
++
+Consulte a seção de PRUNING abaixo para mais detalhes.
+
+endif::git-pull[]
+
+ifndef::git-pull[]
+-n::
+endif::git-pull[]
+--no-tags::
+	É predefinido que as tags que apontam para objetos que são baixados do repositório remoto são obtidas e armazenadas localmente. Essa opção desativa o acompanhamento automático de tags. O comportamento padrão de um ramo remoto pode ser especificado com a configuração remote.<nome>.tagOpt. Consulte linkgit:git-config[1].
+
+ifndef::git-pull[]
+--refetch::
+	Em vez de negociar com o servidor para evitar a transferência dos commits e dos objetos associados que já estão presentes no local, esta opção faz a busca de todos os objetos da mesma maneira que seria feito com um novo clone. Use isso para reaplicar um filtro de clone parcial da configuração ou usando `--filter=` quando a definição do filtro for alterada. A manutenção automática pós-busca realizará a consolidação do pacote no banco de dados dos objetos para seja removido quaisquer objetos duplicados.
+endif::git-pull[]
+
+--refmap=<refspec>::
+	Ao obter as refs listadas na linha de comando, use o refspec especificado (pode ser usado mais de uma vez) para mapear as refs nas ramificações de rastreamento remoto, em vez dos valores das variáveis de configuração `remote.*.fetch` do repositório remoto. Fornecer um `<refspec>` vazio para a opção `--refmap` faz com que o Git ignore os refspecs configurados e confie inteiramente nos refspecs fornecidos como argumentos da linha de comando. Consulte a seção "Configurações dos Ramos Monitorados Remotamente" para obter detalhes.
+
+-t::
+--tags::
+	Obtém todas as tags do ramo remoto (ou seja, obtém as tags remotas `refs/tags/*` em tags locais com o mesmo nome), além de tudo o que seria obtido de outra maneira. O uso dessa opção por si só não sujeita as tags à poda, mesmo que a opção --prune seja usada (embora as tags possam ser podadas de qualquer forma se também forem o destino de um "refspec" explícito; consulte `--prune`).
+
+ifndef::git-pull[]
+--recurse-submodules[=(yes|on-demand|no)]::
+	Essa opção controla se e sob quais condições os novos commits dos submódulos também devem ser obtidos. Ao percorrer os submódulos, o `git fetch` sempre tenta obter os submódulos "alterados", ou seja, um submódulo que tenha commits referenciados por um commit de superprojeto recém-buscado, mas que esteja faltando no clone do submódulo local. Um submódulo alterado pode ser buscado desde que esteja presente localmente, por exemplo, em `$GIT_DIR/modules/` (consulte linkgit:gitsubmodules[7]); se o upstream adicionar um novo submódulo, esse submódulo não poderá ser buscado até que seja clonado, por exemplo, pelo comando `git submodule update`.
++
+Quando for definido como 'sob demanda', apenas os submódulos que tenham sido alterados são buscados. Quando for definido como 'yes', todos os submódulos que tenham sido colonizados ou não, assim como tenham sido alterados, todos eles serão buscados . Quando for definido como 'no', os submódulos nunca serão buscados.
++
+Quando não especificado, utiliza o valor de `fetch.recurseSubmodules` se estiver definido (consulte linkgit:git-config[1]), tendo como predefinição 'on-demand' caso não esteja definido. Quando essa opção é usada sem nenhum valor, a predefinição é 'yes'.
+endif::git-pull[]
+
+-j::
+--jobs=<n>::
+	A quantidade de processos paralelos que serão utilizados para todas as formas de captura.
++
+Caso a opção `--multiple` seja utilizada, os diferentes ramos remotos serão capturados em paralelo. Caso vários submódulos sejam capturados, estes serão capturados em paralelo. Para controlá-los de forma independente, utilize as definições da configuração `fetch.parallel` e `submodule.fetchJobs` (consulte linkgit:git-config[1]).
++
+Normalmente, as capturas remotas dos múltiplos ramos de forma paralela e recursiva serão mais rápidas. A predefinição é realizar as capturas em sequência e não em paralelo.
+
+ifndef::git-pull[]
+--no-recurse-submodules::
+	Desative a captura recursiva dos submódulos (tem o mesmo efeito que utilizar a opção `--recurse-submodules=no`).
+endif::git-pull[]
+
+--set-upstream::
+	Caso a captura remota seja bem sucedida, uma referência de rastreamento `add` será adicionada ao upstream, utilizado pelo argumento `less` linkgit:git-pull[1] e outros comandos. Para mais informações, consulte `branch.<nome>.merge` e `branch.<nome>.remote` em linkgit:git-config[1].
+
+ifndef::git-pull[]
+--submodule-prefix=<caminho>::
+	Acrescenta <caminho> aos caminhos impressos nas mensagens informativas, como "Fetching submodule foo". Essa opção é usada internamente quando se recorre a submódulos.
+
+--recurse-submodules-default=[yes|on-demand]::
+	Essa opção é usada internamente para fornecer temporariamente um valor predefinido não negativo para a opção `--recurse-submodules`. Todos os outros métodos de configuração da recursão do submódulo fetch (como as configurações do comando linkgit:gitmodules[5] e linkgit:git-config[1]) substituem essa opção, assim como especificar `--[no-]recurse-submodules` diretamente.
+
+-u::
+--update-head-ok::
+	É predefinido que o comando "git fetch" se recuse a atualizar o cabeçalho correspondente ao ramo atual. Esta opção desativa a verificação. Isso serve apenas para uso interno do comando "git pull" para se comunicar com o comando "git fetch" e, a menos que você esteja implementando a sua própria porcelana, você não deve usá-lo.
+endif::git-pull[]
+
+--upload-pack <pacote-para-envio>::
+	Quando o repositório é informado para capturar e que seja manipulado por 'git fetch-pack', o `--exec=<upload-pack>` é passado para o comando utilizar um caminho alternativo para o comando executado na outra extremidade.
+
+ifndef::git-pull[]
+-q::
+--quiet::
+	Repasse a opção `--quiet` para o `git-fetch-pack` e silencie qualquer outro comando git utilizado internamente. O progresso não é relatado para o fluxo de erro predefinido.
+
+-v::
+--verbose::
+	Seja loquaz.
+endif::git-pull[]
+
+--progress::
+	É predefinido que a condição geral do progresso seja relatada no fluxo de erros quando estiver conectado num terminal, a menos que `-q` seja utilizado. Esta opção impõem a condição geral do progresso, mesmo que o fluxo de erro predefinido não seja direcionado para um terminal.
+
+-o <opção>::
+--server-option=<opção>::
+	Transmita a sequência usada para o servidor ao se comunicar utilizando o protocolo versão 2. A sequência informada não deve conter um caractere `NUL` ou `LF`. O tratamento das opções do servidor, incluindo os desconhecidos, é específico do servidor. Quando a opção `--server-option=<opção>` forem utilizadas várias vezes, todos serão enviados para o outro lado na ordem listada na linha de comando.
+
+--show-forced-updates::
+	É predefinido que o git verifique se uma ramificação é atualizada à força durante o fetch. Isso pode ser desativado através do fetch.showForcedUpdates, mas a opção `--show-forced-updates` garante que essa verificação ocorra. Consulte linkgit:git-config[1].
+
+--no-show-forced-updates::
+	É predefinido que o Git verifique se a atualização do ramo foi imposta durante uma captura. Utilize a opção `--no-show-forced-updates` ou defina `fetch.showForcedUpdates` como to `false` para ignorar esta verificação por questões de desempenho. Se utilizada durante o `git-pull`, a opção `--ff-only` ainda verificará quais as atualizações foram impostas antes de tentar uma atualização rápida. Consulte linkgit:git-config[1].
+
+-4::
+--ipv4::
+	Utilize apenas os endereços IPv4, ignorando os endereços IPv6.
+
+-6::
+--ipv6::
+	Utilize apenas os endereços IPv6, ignorando os endereços IPv4.
+[]
+
+<repositório>::
+	O repositório "remote" é a fonte de uma operação 'fetch' ou 'pull'. Este parâmetro pode ser uma URL (consulte a seção <<URLS,GIT URLS>> abaixo) ou o nome de um controle remoto (consulte a seção <<REMOTES,RAMOS REMOTOS>> abaixo).
+
+ifndef::git-pull[]
+<grupo>::
+	Um nome referente a uma lista de repositórios remotos como o valor de `remotes.<grupo>` no arquivo de configuração. (consulte linkgit:git-config[1]).
+endif::git-pull[]
+
+<refspec>::
+	Especifica quais as refs que devem ser obtidas via 'fetch' e quais as refs locais devem ser atualizadas. Quando não houver um `<refspec>` na linha de comando, as refs que serão obtidas com 'fetch' serão lidas a partir das variáveis `remote.<repositório>.fetch`
+ifndef::git-pull[]
+	(consulte <<CRTB,CONFIGURAÇÕES DOS RAMOS MONITORADOS REMOTAMENTE>> below).
+endif::git-pull[]
+ifdef::git-pull[]
+	(consulte a seção "CONFIGURAÇÕES DOS RAMOS MONITORADOS REMOTAMENTE"
+	in linkgit:git-fetch[1]).
+endif::git-pull[]
++
+O formato de um parâmetro `<refspec>` é um sinal de adição opcional `+`, seguido pela origem `<src>`, seguido por dois-pontos `:`, seguido pela referência de destino `<dst>`. Os dois-pontos podem ser omitidos quando o valor de `<dst>` estiver vazio. O valor de `<src>` normalmente é uma referência, mas também pode ser um nome de um objeto hexadecimal inteiramente escrito.
++
+Uma <refspec> pode conter um `*` na sua origem <src> para indicar uma simples combinação de padrões. Tal "refspec" funciona como um "glob" que combina com qualquer ref de mesmo prefixo. Um padrão <refspec> deve conter um `*` tanto origem <src> quanto no destino <dst>. Ele irá mapear os reffs para o destino substituindo o `*` pelo conteúdo correspondente da fonte.
++
+Se um 'refspec' for prefixado por `^`, ele será interpretado como um refspec negativo. Em vez de especificar quais as 'refs' devem ser obtidas com 'fetch' ou quais as refs locais devem ser atualizadas, esta refspec especificará as refs que serão excluídas. Uma ref será considerada compatível se corresponder a pelo menos uma refspec positiva e não corresponder a nenhuma refspec negativa. As refspecs negativas podem ser úteis para restringir o escopo de um padrão refspec para que não inclua refs específicas. As refspecs negativas podem ser refspecs de padrão. No entanto, eles podem conter apenas um `<src>` e não especificar um `<dst>`. Também não há suporte para nomes de objetos hexadecimais totalmente mencionados.
++
+A `tag` significa o mesmo que `refs/tags/<tag>:refs/tags/<tag>`; ele solicita a buscaa de tudo até a tag informada.
++
+A "ref" remota que coincida com <src> é buscada e se <dst> não seja uma sequência vazia, é feita uma tentativa de atualizar a referência local que coincida com ela.
++
+Caso a atualização seja permitida sem a opção `--force` depende do espaço de nomes da ref onde está sendo buscada, do tipo do objeto que está sendo buscado e se a atualização é considerada um avanço rápido. Geralmente, as mesmas regras se aplicam à busca e ao impulsionar, consulte a seção `<refspec>...` do linkgit:git-push[1] para saber o que são. As exceções para estas regras específicas para o comando 'git fetch' são anotadas abaixo.
++
+Até a versão 2.20 do Git, e ao contrário do que ocorre quando se faz um push com linkgit:git-push[1], quaisquer atualizações para `refs/tags/*` seriam aceitas sem `+` no refspec (ou a opção `--force`). Ao fazer a obtenção com 'fetch', consideramos promiscuamente todas as atualizações das etiquetas de um ramo remoto como sendo um 'fetch' forçado. Desde a versão 2.20 do Git, a busca para atualizar `refs/tags/*` funciona da mesma forma que o push. Ou seja, todas as atualizações serão rejeitadas sem `+` no refspec (ou `--force`).
++
+Ao contrário quando impulsionamos com o linkgit:git-push[1], qualquer atualização fora do `refs/{tags,heads}/*` será aceito sem o sinal `+` no refspec (ou `--force`), seja trocando, por exemplo, um objeto de árvore para uma bolha ou um commit para outro commit que não tenha o commit anterior como ancestral, etc.
++
+Ao contrário quando impulsionamos com o linkgit:git-push[1], não existe uma configuração que corrija estas regras, e nada como um gancho `pre-fetch` análogo ao gancho `pre-receive`.
++
+Assim como impulsionar com linkgit:git-push[1], todas as regras descritas acima sobre o que não é permitido como uma atualização pode ser sobrescrito ao adicionar um caractere opcional no "refspec" começando com `+` (ou ao utilizar a opção `--force` na linha de comando). A única exceção a isso é que nenhuma quantidade de imposição fará com que o espaço de nomes `refs/heads/*` aceite um objeto que não seja um commit.
++
+[NOTE]
+Quando o ramo remoto que você deseja obter com 'fetch' for conhecido por ser rebobinado ter feito um 'rebase' regularmente, espera-se que o novo cume não seja descendente do cume anterior (conforme foi armazenado no último 'fetch' que você fez no ramo rastreado remotamente). Você deve usar o sinal `+` para indicar que serão necessárias atualizações que não sejam de avanço rápido para estas ramificações. Não há nenhuma maneira de determinar ou declarar que um ramo será disponibilizado num repositório com este comportamento; o usuário que o extrai simplesmente deve saber que esse é o padrão de uso esperado para um ramo.
+ifdef::git-pull[]
++
+[NOTE]
+Há uma diferença entre listar os vários `<refspec>` diretamente na linha de comando com 'git pull' e ter várias entradas `remote.<repositório>.fetch` em sua configuração para um `<repositório>` e executar um comando 'git pull' sem nenhum parâmetro `<refspec>` explícito. Os `<refspec>` listados explicitamente na linha de comando são sempre mesclados no ramo atual após um 'fetch'. Em outras palavras, se você listar mais de uma referência remota, o comando "git pull" criará uma mesclagem Octopus. Por outro lado, se você não listar nenhum parâmetro `<refspec>` explícito na linha de comando, o 'git pull' buscará todos os `<refspec>` encontrados na configuração `remote.<repository>.fetch` e mesclará apenas o primeiro `<refspec>` encontrado no ramo atual. Isso ocorre porque a criação de um "Octopus" a partir de refs remotos raramente é feito, ao passo que manter o controle de vários cabeçalhos remotos de uma só vez, ao obter mais de um com o 'fetch', isso costuma ser útil.
+endif::git-pull[]
+[]
+
+GIT URLS[[URLS]]
+----------------
+
+Em geral as URLs contêm informações sobre o protocolo de transporte, o endereço do servidor remoto e o caminho para o repositório. Dependendo do protocolo de transporte, algumas dessas informações podem estar ausentes.
+
+O Git suporta os protocolos ssh, git, http e https (além do ftp e ftps podem ser utilizados para captura (feching), porém é ineficiente e obsoleto; não os utilize).
+
+O transporte nativo (ou seja, git:// URL) não faz a autenticação e deve ser utilizado com cuidado em redes sem segurança.
+
+As seguintes sintaxes podem ser utilizadas com eles:
+
+- ssh://{startsb}user@{endsb}host.xz{startsb}:port{endsb}/caminho/para/o/repositório.git/
+- git://host.xz{startsb}:port{endsb}/caminho/para/o/repositório.git/
+- http{startsb}s{endsb}://host.xz{startsb}:port{endsb}/caminho/para/o/repositório.git/
+- ftp{startsb}s{endsb}://host.xz{startsb}:port{endsb}/caminho/para/o/repositório.git/
+
+Uma sintaxe alternativa como scp também pode ser utilizada com o protocolo ssh:
+
+- {startsb}user@{endsb}host.xz:caminho/para/o/repositório.git/
+
+Essa sintaxe apenas é reconhecida caso não haja barras antes dos primeiros dois pontos. Isso ajuda a diferenciar um caminho local que contém dois pontos. Por exemplo, o caminho local `foo:bar` pode ser utilizado como um caminho absoluto ou `./foo:bar` para evitar ser mal interpretado como uma url ssh.
+
+Os protocolos ssh e git também oferecem suporte à expansão do ~nome do usuário:
+
+- ssh://{startsb}user@{endsb}host.xz{startsb}:port{endsb}/~{startsb}user{endsb}/caminho/para/o/repositório.git/
+- git://host.xz{startsb}:port{endsb}/~{startsb}user{endsb}/caminho/para/o/repositório.git/
+- {startsb}user@{endsb}host.xz:/~{startsb}user{endsb}/caminho/para/o/repositório.git/
+
+Para os repositórios locais, as seguintes sintaxes podem ser utilizadas que também são compatíveis de forma nativa pelo Git:
+
+- /caminho/para/o/repositório.git/
+- \file:///caminho/para/o/repositório.git/
+
+ifndef::git-clone[]
+Estas duas sintaxes são basicamente equivalentes, exceto durante a clonagem, quando a primeira implica no uso da opção `--local`. Para mais detalhes, consulte linkgit:git-clone[1].
+endif::git-clone[]
+
+ifdef::git-clone[]
+Essas duas sintaxes são basicamente equivalentes, exceto que a primeira implica no uso da opção `--local`.
+endif::git-clone[]
+
+O 'git clone', 'git fetch' e 'git pull', mas não o 'git push', também aceitarão um arquivo do pacote adequado. Consulte linkgit:git-bundle[1].
+
+Quando o Git não sabe como lidar com um determinado protocolo de transporte, quando existe, ele tenta usar o auxiliar `remote-<transporte>`. Para os repositórios locais, as seguintes sintaxes podem ser utilizadas:
+
+- <transporte>::<endereço>
+
+onde <endereço> pode ser um caminho, um servidor e um caminho ou uma sequência arbitrária semelhante a uma URL reconhecida por um auxiliar remoto em específico que está sendo chamado. Para mais detalhes, consulte linkgit:gitremote-helpers[7].
+
+Se houver um grande número de repositórios remotos com nomes semelhantes e caso queira usar um formato diferente para eles (de modo que as URLs utilizadas sejam reescritas nas URLs que funcionam), você poderá criar uma seção de configuração da opção:
+
+------------
+	[url "<url-da-base-atual>"]
+		insteadOf = <url-da-outra-base>
+------------
+
+Por exemplo, com isso:
+
+------------
+	[url "git://git.host.xz/"]
+		insteadOf = host.xz:/path/to/
+		insteadOf = work:
+------------
+
+uma URL como "work:repo.git" ou como "host.xz:/caminho/para/o/repositório.git" será reescrito em qualquer contexto onde a URL seja "git://git.host.xz/repo.git".
+
+Caso queira reescrever apenas as URLs para envio por "push" (impulsionamento), é possível criar uma seção de configuração da opção:
+
+------------
+	[url "<url da base atual>"]
+		pushInsteadOf = <a url da outra base>
+------------
+
+Por exemplo, com isso:
+
+------------
+	[url "ssh://exemplo.org/"]
+		pushInsteadOf = git://exemplo.org/
+------------
+
+uma URL como "git://exemplo.org/caminho/para/o/repositório.git" será reescrito para "ssh://exemplo.org/caminho/para/o/repositório.git" para os "pushes" (impulsionamentos), porém os "pulls" (obtenções) ainda usarão a URL original.
+[]
+
+REMOTOS[[REMOTES]]
+------------------
+
+O nome de um dos seguintes pode ser usado em vez de uma URL como argumento do `<repositório>`:
+
+* um ramo remoto no arquivo de configuração do Git: `$GIT_DIR/config`,
+* um arquivo no diretório `$GIT_DIR/remotes` ou
+* um arquivo no diretório `$GIT_DIR/branches`.
+
+Tudo isso também permite seja omitido o refspec da linha de comando, pois cada um contém um refspec que o git utilizará de maneira predefinida.
+
+Ramo remoto nomeado no arquivo de configuração
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Você pode optar por mencionar o nome de um ramo remoto que você configurou anteriormente usando o comando linkgit:git-remote[1], linkgit:git-config[1] ou até mesmo por uma edição manual no arquivo `$GIT_DIR/config`. A URL deste ramo remoto será usada para acessar o repositório. O "refspec" deste ramo remoto será usado por padrão quando você não fornecer um "refspec" na linha de comando. A entrada no arquivo de configuração teria a seguinte aparência:
+
+------------
+	[remote "<nome>"]
+		url = <URL>
+		pushurl = <pushurl>
+		push = <refspec>
+		fetch = <refspec>
+------------
+
+O `<pushurl>` é usado somente para envios. É opcional e o padrão é `<URL>`. O envio para um controle remoto afeta todos os pushurls definidos ou todos as urls definidas se não houver pushurls definidos. No entanto, o Fetch só buscará a primeira url definida caso haja várias urls definidas.
+
+Arquivo nomeado no `$GIT_DIR/remotes`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Você pode optar por fornecer o nome de um arquivo em `$GIT_DIR/remotes`. A URL nesse arquivo será usado para acessar o repositório. O "refspec" neste arquivo será usado como padrão quando você não fornecer um "refspec" na linha de comando. Este arquivo deve ter os seguintes formatos:
+
+------------
+	URL: um dos formatos da URL acima
+	Push: <refspec>
+	Pull: <refspec>
+
+------------
+
+As linhas `Push:` são usadas pelo comando 'git push' e as linhas `Pull:` são usadas pelo comando 'git pull' e pelo comando 'git fetch'. Várias linhas `Push:` e `Pull:` podem ser especificadas para fazer os mapeamentos das ramificações adicionais.
+
+Arquivo informado em `$GIT_DIR/branches`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Você pode optar por fornecer o nome de um arquivo em `$GIT_DIR/branches`. A URL nesse arquivo será usado para acessar o repositório. Este arquivo deve ter os seguintes formatos:
+
+
+------------
+	<URL>#<head>
+------------
+
+A `<URL>` é necessária; `#<head>` é opcional.
+
+Dependendo da operação, o git usará um dos seguintes "refspecs", caso você não forneça um na linha de comando. O `<ramo>` é o nome desse arquivo em `$GIT_DIR/branches` e `<cabeçalho>` tem como `master` como predefinição.
+
+O git fetch usa:
+
+------------
+	refs/heads/<head>:refs/heads/<ramo>
+------------
+
+O comando `git push` usa:
+
+------------
+	HEAD:refs/heads/<head>
+------------
+
+
+
+
+[]
+
+ESTRATÉGIAS DE MESCLAGEM
+------------------------
+
+O mecanismo de mesclagem (os comandos `git merge` e `git pull`) permite que as 'estratégias de mesclagem' do backend sejam escolhidas com a opção `-s`. Algumas estratégias também podem ter as suas próprias opções, que podem ser passadas usando argumentos `-X<opção>` ao comando `git merge` e/ou `git pull`.
+
+ort::
+	Esta é a estratégia de mesclagem predefinida ao extrair ou ao mesclar um ramo. Esta estratégia só pode resolver dois `HEADS` usando um algoritmo de mesclagem de 3 vias. Quando há mais de um ancestral comum que pode ser usado para a mesclagem de 3 vias, ele cria uma árvore mesclada dos ancestrais comuns e a utiliza como uma árvore de referência para a mesclagem de 3 vias. Foi relatado que isso resulta em menos conflitos de mesclagem sem causar erros de mesclagem através dos testes feitos na mesclagem dos commits reais retirados do histórico de desenvolvimento do kernel do Linux 2.6. Além disso, esta estratégia pode detectar e lidar com as mesclagens que envolvam renomeações. Não faz uso de cópias detectadas. O nome desse algoritmo é um acrônimo ("Ostensibly Recursive's Twin") e surgiu do fato de que ele foi escrito como um substituto para o padrão di algoritmo anterior, `recursive`.
++
+A estratégia 'ort' pode adotar as seguintes opções:
+
+ours;;
+	Esta opção impõem a resolução automática dos conflitos de maneira limpa, favorecendo a 'nossa' versão. As alterações da outra árvore que não entram em conflito com o nosso lado são refletidas no resultado da mesclagem. Para um arquivo binário, todo o conteúdo é retirado a partir do nosso lado.
++
+Isso não deve ser confundido com a estratégia da 'nossa' mesclagem, que nem sequer analisa o que a outra árvore contém. Ela descarta tudo o que a outra árvore fez, declarando que a 'nossa' história contém tudo o que aconteceu nela.
+
+theirs;;
+	Este é o oposto do 'nosso'; observe que, diferentemente do 'nosso', não existe uma estratégia de mesclagem 'deles' para confundir esta opção de mesclagem.
+
+ignore-space-change;;
+ignore-all-space;;
+ignore-space-at-eol;;
+ignore-cr-at-eol;;
+	Trata as linhas com o tipo indicado de alteração do espaço em branco como inalteradas para os fins de uma mesclagem de três vias. As alterações do espaço em branco misturadas com as outras alterações numa linha não são ignoradas. Consulte também o comando linkgit:git-diff[1] `-b`, `-w`, `--ignore-space-at-eol`, e a opção `--ignore-cr-at-eol`.
++
+* Caso a versão 'their' (dele) introduzir apenas as alterações de espaço em uma linha, a 'our' (nossa) versão será utilizada;
+* Caso a 'our' (nossa) versão introduzir alterações nos espaços, porém a versão 'their' (dele) incluir uma alteração substancial, a versão 'their' (dele) será utilizada;
+* Caso contrário, a mesclagem continuará de forma usual.
+
+renormalize;;
+	Isso executa um "check-out" e um "check-in" virtual de todos os três estágios de um arquivo ao resolver uma mesclagem de três vias. Esta opção deve ser usada ao mesclar ramificações com diferentes filtros limpos ou com regras de normalização de fim de linha. Para mais detalhes consulte "Mesclando as ramificações com atributos de check-in/check-out diferentes" do comando linkgit:gitattributes[5].
+
+no-renormalize;;
+	Desativa a opção `renormalize`. Isso substitui a variável de configuração `merge.renormalize`.
+
+find-renames[=<n>];;
+	Ative a detecção de renomeação, definindo opcionalmente o limite de similaridade. Esta é a predefinição. Isso substitui a variável de configuração 'merge.renames'. Consulte também linkgit:git-diff[1] `--find-renames`.
+
+rename-threshold=<n>;;
+	É um sinônimo obsoleto para `find-renames=<n>`.
+
+subtree[=<caminho>];;
+	Esta opção é uma forma mais avançada de estratégia de 'subárvore', onde a estratégia faz uma estimativa de como as duas árvores devem ser deslocadas para coincidir uma com a outra durante a mesclagem. Em vez disso, o caminho especificado é prefixado (ou retirado do início) para fazer com que a forma das duas árvores coincida.
+
+recursive::
+	Isso só pode resolver dois cabeçalhos usando um algoritmo de mesclagem de 3 vias. Quando há mais de um ancestral comum que pode ser usado para a mesclagem de 3 vias, ele cria uma árvore mesclada dos ancestrais comuns e a utiliza como uma árvore de referência para a mesclagem de 3 vias. Foi relatado que isso resulta em menos conflitos de mesclagem sem causar erros de mesclagem através dos testes feitos na mesclagem dos commits reais retirados do histórico de desenvolvimento do kernel do Linux 2.6. Além disso, ele pode detectar e lidar com mesclagens que envolvam renomeações. Não faz uso de cópias detectadas. Essa era a estratégia padrão para resolver dois cabeçalhos do Git v0.99.9k até a v2.33.0.
++
+A estratégia 'recursiva' usa as mesmas opções que a 'ort'. Entretanto, há três opções adicionais que o 'ort' ignora (não documentadas acima) e que podem ser úteis com a estratégia 'recursiva':
+
+patience;;
+	É um sinônimo obsoleto para `diff-algorithm=patience`.
+
+diff-algorithm=[patience|minimal|histogram|myers];;
+	Use um algoritmo de comparação diferente durante a mesclagem, o que pode ajudar a evitar mesclagens incorretas que ocorrem devido a linhas correspondentes sem importância (como chaves de funções distintas). Consulte também linkgit:git-diff[1] `--diff-algorithm`. Observe que `ort` usa especificamente `diff-algorithm=histogram`, enquanto `recursive` usa como predefinição a configuração `diff.algorithm`.
+
+no-renames;;
+	Desativa a detecção de renomeação. Isto sobrepõem a variável de configuração `merge.renames` configuration. Consulte também linkgit:git-diff[1] `--no-renames`.
+
+resolve::
+	Isso só pode resolver duas cabeças (ou seja, o ramo atual e outro ramo do qual você retirou) usando um algoritmo de mesclagem de três vias. Ele tenta detectar cuidadosamente as ambiguidades de mesclagem cruzada. Ele não lida com renomeações.
+
+octopus::
+	Isso resolve casos com mais de dois cabeçalhos, mas se recusa a fazer uma mesclagem complexa que precise de uma resolução manual. Seu principal objetivo é ser usado para agrupar os tópicos dos cabeçalhos juntos. Esta é a estratégia de mesclagem predefinida ao obter (fazer um pull) ou ao mesclar um ramo.
+
+ours::
+	Isso resolve qualquer quantidade de cabeçalhos, mas a árvore resultante da mesclagem é sempre a do cabeçalho do ramo atual, ignorando efetivamente todas as alterações de todos os outros ramos. Ele deve ser usado para substituir o histórico de desenvolvimento antigo das ramificações paralelas. Observe que isso é diferente da opção `-Xours` para a estratégia de mesclagem da opção 'recursive'.
+
+subtree::
+	Esta é uma estratégia `ort` modificada. Ao mesclar as árvores 'A' e 'B', caso 'B' corresponda a uma subárvore de 'A', o 'B' será ajustado primeiro para coincidir à estrutura da árvore 'A', em vez de ler as árvores no mesmo nível. Esse ajuste também é feito na árvore ancestral comum.
+
+Com as estratégias que usam a mesclagem de 3 vias (incluindo a predefinição, 'ort'), se uma alteração for feita em ambos os ramos, mas posteriormente revertida num dos ramos, essa alteração estará presente no resultado da mesclagem; algumas pessoas acham este comportamento confuso. Isto ocorre porque somente os cabeçalhos e a base de mesclagem são considerados ao realizar uma mesclagem, e não os commits individuais. Portanto, o algoritmo de mesclagem considera a alteração revertida como se não houvesse nenhuma alteração e, em vez disso, substitui a versão alterada.
+[]
+
+COMPORTAMENTO PREDEFINIDO
+-------------------------
+
+Muitas vezes, as pessoas usam o comando `git pull` sem informar nenhum parâmetro. Tradicionalmente, isso é o mesmo que `git pull origin`. No entanto, quando a configuração `branch.<nome>.remote` está presente na ramificação `<nome>`, este valor é usado em vez de `origin`.
+
+Para determinar de qual URL usar, o valor da configuração `remote.<origin>.url` é consultado e caso não haja nenhuma variável, o valor na linha `URL:` em `$GIT_DIR/remotes/<origin>` é utilizado.
+
+Para determinar quais ramificações remotas devem ser obtidas (e opcionalmente armazenadas nas ramificações rastreadas remotamente) quando o comando for executado sem nenhum parâmetro `refspec` na linha de comando, os valores na variável de configuração `remote.<origin>.fetch` são consultados e, se não houver nenhum, o `$GIT_DIR/remotes/<origin>` é consultado e suas linhas `Pull:` são utilizadas. Além dos formatos `refspec` descritos na seção OPTIONS, você pode ter um `refspec globbing` parecido com este:
+
+------------
+refs/heads/*:refs/remotes/origin/*
+------------
+
+Um "refspec globbing" deve ter um RHS não vazio (ou seja, deve armazenar o que foi obtido em ramificações de rastreamento remoto), e seu LHS e RHS devem terminar com `/*`. A instrução acima especifica que todas as ramificações remotas são rastreadas usando as ramificações rastreadas remotamente na hierarquia `refs/remotes/origin/` com o mesmo nome.
+
+A regra para determinar qual a ramificação remota deve ser mesclada após a captura é um pouco complexo, para que não prejudique a compatibilidade com as versões anteriores.
+
+Caso "refspecs" explícitos sejam informados para o comando `git pull`, todos eles são mesclados.
+
+Quando nenhuma `refspec` é usada na linha de comando, o comando `git pull` usa a `refspec` da configuração ou o `$GIT_DIR/remotes/<origin>`. Nesses casos, as seguintes regras se aplicam:
+
+. Caso a configuração `branch.<nome>.merge` para o ramo atual `<nome>` exista, este é o nome do ramo no site remoto que é mesclado.
+
+. Caso o refspec seja um caractere curinga, nada será mesclado.
+
+. Caso contrário, a ramificação remota do primeiro refspec será mesclada.
+
+
+EXEMPLOS
+--------
+
+* Atualize as ramificações monitoradas remotamente para o repositório onde a clonagem foi feita e em seguida, mescle uma delas na sua ramificação atual:
++
+------------------------------------------------
+$ git pull
+$ git pull origin
+------------------------------------------------
++
+Normalmente o ramo mesclado fica no `HEAD` do repositório remoto, porém a escolha é determinada pelas opções `branch.<nome>.remote` e `branch.<nome>.merge`; para mais detalhes consulte linkgit:git-config[1].
+
+* Mescle na ramificação atual o ramo remoto `next`:
++
+------------------------------------------------
+$ git pull origin next
+------------------------------------------------
++
+Isso deixa uma cópia de `next` temporariamente em 'FETCH_HEAD' e atualiza o ramo rastreado remotamente `origin/next`. O mesmo pode ser feito invocando 'fetch' e 'merge':
++
+------------------------------------------------
+$ git fetch origin
+$ git merge origin/next
+------------------------------------------------
+
+
+Caso você tente fazer um "pull" que resultou em conflitos complexos e queira recomeçar, a recuperação pode ser feita com o comando 'git reset'.
+
+
+SEGURANÇA
+---------
+Os protocolos de busca e envio não foram projetados para impedir que um lado roube os dados do outro repositório que não deveriam ser compartilhado. Caso tenha dados particulares que precisam ser protegidos de um par malicioso, a sua melhor opção é armazená-los em um outro repositório. Isso se aplica aos clientes e aos servidores. Em particular, os espaço de nomes em um servidor não são eficazes para o controle de acesso de leitura; você só deve conceder acesso de leitura a um espaço de nomes para os clientes que você confiaria o acesso de leitura para todo o repositório.
+
+Os vetores de ataque informados são os seguintes:
+
+. A vítima envia as linhas "have" anunciando as IDs dos objetos que possui, que não são explicitamente planejados para serem compartilhados, porém podem ser usados para otimizar a transferência caso o par também os tenha. O atacante escolhe um ID do objeto 'X' para roubar e envia uma "ref" para 'X', porém não é necessário enviar o conteúdo do 'X' porque a vítima já o possui. Agora a vítima acredita que o atacante tem o 'X' e depois envia seu conteúdo de volta ao atacante. (Esse ataque é mais simples para um cliente executar em um servidor, criando uma "ref" para 'X' no espaço de nomes onde o cliente tem acesso e em seguida, buscando-o. A maneira mais provável de um servidor executá-lo em um cliente é "mesclar" 'X' em um ramo público e esperar que o usuário faça um trabalho adicional neste ramo, enviá-lo de volta ao servidor sem perceber a mesclagem.)
+
+. Como no item 1, o invasor escolhe a ID do objeto X para roubar. A vítima envia um objeto Y que o invasor já possui, e o invasor alega falsamente que possui X e não Y, então a vítima envia Y como um delta contra X. O delta revela ao invasor regiões de X que são semelhantes a Y.
+[]
+
+BUGS
+----
+Com a opção `--recurse-submodules` só pode buscar novos commits nos submódulos que já foram averiguados no momento. Quando, por exemplo, a "upstream" adicionou um novo submódulo nos commits recém-buscados do superprojeto, o submódulo em si não pode ser buscado, tornando impossível verificar o submódulo sendo necessário fazer uma nova busca mais tarde. Espera-se que isso seja corrigido em uma versão futura do Git.
+
+VEJA TAMBÉM
+-----------
+linkgit:git-fetch[1], linkgit:git-merge[1], linkgit:git-config[1]
+
+GIT
+---
+Parte do conjunto linkgit:git[1]

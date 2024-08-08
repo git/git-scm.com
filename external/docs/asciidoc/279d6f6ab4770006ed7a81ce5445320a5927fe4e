@@ -1,0 +1,955 @@
+git-rebase(1)
+=============
+
+NOM
+---
+git-rebase - Réapplique des commits sur le sommet de l'autre base
+
+SYNOPSIS
+--------
+[verse]
+'git rebase' [-i | --interactive] [<options>] [--exec <cmd>]
+	[--onto <nouvellebase> | --keep-base] [<amont> [<branche>]]
+'git rebase' [-i | --interactive] [<options>] [--exec <cmd>] [--onto <nouvellebase>]
+	--root [<branche>]
+'git rebase' (--continue|--skip|--abort|--quit|--edit-todo|--show-current-patch)
+
+DESCRIPTION
+-----------
+Si l ' on spécifie `<branche> ` , `git rebase` effectuera un `git switch <branche>` automatique avant de faire autre chose. Sinon, il reste sur la branche actuelle.
+
+Si `<amont>` n'est pas spécifié, on utilisera l'amont configuré dans les options `branch.<nom>. remote` et `branch.<nom>.merge` (voir linkgit:git-config[1] pour plus de détails) et on suppose l'option `--fork-point`. Si vous n'êtes actuellement sur aucune branche ou si la branche actuelle n'a pas d'amont configuré, le rebasage échouera.
+
+Tous les changements apportés par des commits dans la branche actuelle, mais qui ne sont pas dans `<amont>` sont enregistrés dans une zone temporaire. Il s'agit de la même série de commits qui serait affichée par `git log <amont>.HEAD` ; ou par `git log 'fork_point'.HEAD`, si `--fork-point` est actif (voir la description de `--fork-point` ci-dessous) ; ou par `git log HEAD` si l'option `--root` est spécifiée.
+
+La branche actuelle est réinitialisée à `<amont>` ou `<nouvellebase>` si l'option `--onto` a été fournie. Cela a le même effet que `git reset --hard <amont>` (ou `<nouvellebase>`). `ORIG_HEAD` est fixé pour pointer au sommet de la branche avant la réinitialisation.
+
+[NOTE]
+`ORIG_HEAD` n'est pas garanti de toujours pointer vers le sommet de la branche précédente à la fin du rebasage si d'autres commandes qui écrivent cette pseudo-réf (par exemple `git reset`) sont utilisées pendant le rebasage. La pointe de la branche précédente, cependant, est accessible en utilisant le reflog de la branche actuelle (i.e. `@{1}`, voir linkgit:gitrevisions[7]).
+
+Les commits qui ont été précédemment sauvés dans la zone temporaire sont ensuite réappliqués à la branche actuelle, un par un, dans l'ordre. Notez que tout commit dans `HEAD` qui introduit les mêmes changements textuels que ceux d'un commit dans `HEAD..<amont>` sont omis (c.-à-d. une rustine déjà acceptée en amont avec un autre message de validation ou un autre horodatage sera ignorée).
+
+Il est possible qu'un échec de fusion empêche ce processus d'être complètement automatique. Vous devrez résoudre un tel échec de fusion et exécuter `git rebase --continue`. Une autre option est de contourner le commit qui a causé l'échec de fusion avec `git rebase --skip`. Pour extraire la `<branche>`originale et supprimer les fichiers de travail de `.git/rebase-apply`, utilisez la commande `git rebase --abort` à la place.
+
+Supposons que l'historique suivant existe et que la branche actuelle est "topic" :
+
+------------
+          A---B---C sujet
+         /
+    D---E---F---G master
+------------
+
+À partir de là, le résultat de l'une des commandes suivantes :
+
+
+    git rebase master
+    git rebase master sujet
+
+serait :
+
+------------
+                  A'--B'--C' sujet
+                 /
+    D---E---F---G master
+------------
+
+*NOTE:* Cette dernière forme n'est qu'un raccourcis de`git checkout sujet` suivi par `git rebase master` . Lorsque rebase se termine, `sujet` restera à la branche extraite.
+
+Si la branche amont contient déjà un changement que vous avez fait (par exemple, parce que vous avez envoyé une rustine qui a été appliquée en amont), alors ce commit sera ignoré et des avertissements seront émis (si le backend 'merge' est utilisé). Par exemple, l'exécution de `git rebase master` sur l'historique suivant (dans lequel `A'` et `A` introduisent le même ensemble de modifications, mais ont des informations de validateur différentes) :
+
+------------
+          A---B---C sujet
+         /
+    D---E---A'---F master
+------------
+
+donnera :
+
+------------
+                   B'---C' sujet
+                  /
+    D---E---A'---F master
+------------
+
+Voici comment vous transplanteriez une branche de sujet basée sur une branche sur une autre, pour prétendre que vous avez fourché la branche de sujet de cette dernière branche, en utilisant `rebase --onto`.
+
+D'abord supposons que votre 'sujet' est basé sur la branche 'next'. Par exemple, une fonctionnalité développée en 'sujet' dépend de certaines fonctionnalités qui se trouvent dans 'next'.
+
+------------
+    o---o---o---o---o  master
+         \
+          o---o---o---o---o  next
+                           \
+                            o---o---o  topic
+------------
+
+Nous voulons rendre 'sujet' embranchée depuis la branche 'master'. ; par exemple, parce que la fonctionnalité sur laquelle 'sujet' dépend a été fusionnée dans la branche 'master' plus stable. Nous voulons que notre arbre ressemble à ça :
+
+------------
+    o---o---o---o---o  master
+        |            \
+        |             o'--o'--o'  sujet
+         \
+          o---o---o---o---o  next
+------------
+
+Nous pouvons l'obtenir en utilisant la commande suivante :
+
+    git rebase --onto master next sujet
+
+
+Un autre exemple de l'option --onto est de rebaser une partie d'une branche. Si nous avons la situation suivante :
+
+------------
+                            H---I---J sujetB
+                           /
+                  E---F---G  sujetA
+                 /
+    A---B---C---D  master
+------------
+
+puis la commande
+
+    git rebase --onto master sujetA sujetB
+
+aurait pour résultat :
+
+------------
+                 H'--I'--J'  sujetB
+                /
+                | E---F---G  sujetA
+                |/
+    A---B---C---D  master
+------------
+
+Ceci est utile lorsque le sujet B ne dépend pas du sujetA.
+
+Une plage de commits pourrait également être supprimée avec rebase. Si nous avons la situation suivante :
+
+------------
+    E---F---G---H---I---J  sujetA
+------------
+
+puis la commande
+
+    git rebase --onto sujetA~5 sujetA~3 sujetA
+
+entraînerait le retrait des commits F et G :
+
+------------
+    E---H'---I'---J'  sujetA
+------------
+
+Ceci est utile si F et G ont été corrompues d'une certaine manière, ou ne devraient pas faire partie de sujetA. Notez que l'argument pour `--onto` et le paramètre `<amont>` peuvent être n'importe quel commit-esque valide.
+
+En cas de conflit, `git rebase` s'arrêtera au premier commit problématique et laissera les marqueurs de conflit dans l'arbre. Vous pouvez utiliser `git diff` pour localiser les marqueurs (<<<<<<) et faire des modification pour résoudre le conflit. Pour chaque fichier que vous éditez, vous devez dire à Git que le conflit a été résolu, généralement cela serait fait avec
+
+
+    git add <fichier>
+
+
+Après avoir résolu le conflit manuellement et mis à jour l'index avec la résolution souhaitée, vous pouvez poursuivre le processus de rebasage avec
+
+
+    git rebase --continue
+
+
+Alternativement, vous pouvez défaire le 'git rebase' avec
+
+
+    git rebase --abort
+
+OPTIONS DE MODE
+---------------
+
+Les options de cette section ne peuvent être utilisées avec aucune autre option, y compris pas les unes avec les autres :
+
+--continue::
+	Redémarrer le processus de rebasage après avoir résolu un conflit de fusion.
+
+--skip::
+	Redémarrer le processus de rebasage en sautant la rustine actuelle.
+
+--abort::
+	Abandonner l'opération de rebasage et réinitialiser HEAD à la branche originale. Si `<branche>` a été fournie quand l'opération de rebasage a été lancée, `HEAD` sera réinitialisée à `<branche>`. Sinon `HEAD` sera réinitialisée vers où elle était lorsque l'opération de rebasage a été lancée.
+
+--quit::
+	Abandonner l'opération de rebasage mais `HEAD` n'est pas réinitialisé à la branche d'origine. L'index et l'arbre de travail sont également laissés inchangés en conséquence. Si une entrée de remisage temporaire a été créée à l'aide de `--autostash` , elle sera sauvegardée sur la liste des remisages.
+
+--edit-todo::
+	Éditer la liste à faire lors d'un rebasage interactif.
+
+--show-current-patch::
+	Afficher la rustine actuelle dans une rebasage interactive ou lorsque le rebasage est arrêté en raison de conflits. C'est l'équivalent de `git show REBASE_HEAD`.
+
+OPTIONS
+-------
+--onto <nouvellebase>::
+	Point de départ pour créer les nouveaux commits. Si l ' option `--onto` n'est pas spécifiée, le point de départ est `<amont>` . Peut être tout commit valide, et pas seulement un nom de branche existant.
++
+Autre cas spécial, vous pouvez utiliser « A\...B » comme raccourci pour la base de fusion de `A` et `B` s'il y a exactement une seule base de fusion. Vous pouvez ne pas spécifier `A` ou `B`, auquel cas ce sera `HEAD` par défaut.
+
+--keep-base::
+	Définir le point de départ pour créer les nouveaux commits à la base de fusion de `<amont>` et `<branche>`. Lancer `git rebase --keep-base <amont> <branche>` équivaut à lancer `git rebase --reapply-cherry-picks --no-fork-point --onto <amont>...<branche> <amont> <branche>`.
++
+Cette option est utile dans le cas où l'on développe une fonctionnalité au sommet d'une branche amont. Bien que la fonction soit en cours de travaux, la branche amont peut progresser et ce n'est peut-être pas la meilleure idée de continuer à rebaser sur le sommet de l'amont au lieu de garder la base telle quelle. Comme le commit de base est inchangé cette option implique `--reapply-cherry-picks` pour éviter de perdre des commits.
++
+Bien que cette option et `--fork-point` trouvent la base de fusion entre `<amont>` et `<branche>`, cette option utilise la base de fusion comme _point de départ_ sur lequel les nouveaux commits seront créés, tandis que `--fork-point` utilise la base de fusion pour déterminer l'_ensemble de commits` qui sera rebasé.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+<branche_amont>::
+	Branche en amont à comparer. Peut être n'importe quel commit valide, pas seulement un nom de branche existant. Par défaut à l'amont configuré pour la branche actuelle.
+
+<branche>::
+	Branche de travail ; la valeur par défaut est `HEAD`.
+
+--apply::
+	Utiliser des stratégies de rebasage (appelant `git-am` en interne). Cette option peut devenir un non-op dans le futur une fois que le moteur de fusion gère tout ce que 'apply' fait.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--empty=(drop|keep|stop)::
+	Comment gérer les commits qui ne sont pas vide au départ et ne sont pas des picorages propres d'un commit amont, mais qui deviennent vides plus tard après le rebasage (parce qu'ils contiennent un sous-ensemble de modifications déjà en amont) :
++
+--
+`drop`;;
+	Le commit sera abandonné. C'est le comportement par défaut.
+`keep`;;
+	Le commit sera gardé. Cette option est implicite lorsque `--exec` est spécifiée sauf si `-i`/`--interactive` est également spécifié.
+`stop`;;
+`ask`;;
+	La rebasage s'arrêtera lorsque le commit sera appliqué, vous permettant de choisir de l'abandonner, d'éditer encore des fichiers ou simplement de valider les modifications vides. Cette option est implicite lorsque `-i`/`--interactive` est spécifiée. `ask` est un synonyme obsolète de `stop`.
+--
++
+Notez que les commits qui sont déjà vides sont maintenus (à moins que `--no-keep-empty` soit spécifié), et les commits qui sont des propres picorages (comme déterminé par `git log --cherry-mark ...`) sont détectés et abandonnés à une étape préliminaire (sauf si `--reapply-cherry-picks` ou `--keep-base` est passé).
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--no-keep-empty::
+--keep-empty::
+	Ne pas garder les commits qui sont vides au départ avant le rebasage (c.-à-d. qui ne changent rien de leur parent) dans le résultat. La valeur par défaut est de garder les commits qui commencent à vide, puisque la création de tels commits nécessite le passage du drapeau de surcharge `--allow-empty` à `git commit`, signifiant qu'un utilisateur a très intentionnellement créé un tel commit et veut donc le garder.
++
+L'utilisation de ce drapeau sera probablement rare, puisque vous pouvez vous débarrasser des commits qui commencent vides en lançant simplement un rebasage interactif et en supprimant les lignes correspondant aux commits que vous ne voulez pas. Ce drapeau existe comme un raccourci pratique, pour les cas où des outils externes génèrent de nombreux commits vides et vous voulez qu'ils soient tous enlevés.
++
+Pour les commits qui ne démarrent pas vides mais deviennent vides après le rebasage, voir le drapeau `--empty`.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--reapply-cherry-picks::
+--no-reapply-cherry-picks::
+	Réappliquer tous les picorages propres de tous les commits amonts au lieu de le abandonner préventivement. (Si ces commit deviennent vides plus tard après le rebasage, parce qu'ils contiennent un sous-ensemble de modifications déjà en amont, le comportement les concernant est dicté par le drapeau `--empty`).
++
+En l'absence de `--keep-base` (ou si `--no-reapply-cherry-picks` est donné), ces commits seront automatiquement abandonnés. Parce que cela nécessite la lecture de tous les commits en amont, cela peut être coûteux dans les dépôts avec un grand nombre de commits en amont qui doivent être lus. Lors de l'utilisation du backend 'merge', des avertissements seront émis pour chaque commit abandonné (sauf `--quiet` est donnée). Des conseils seront également émis à moins que `advice.skippedCherryPicks` ne soit mis à false (voir linkgit:git-config[1]).
++
+`--reapply-cherry-picks` permet à rebase de sauter la lecture de tous les commits en amont, de manière à potentiellement améliorer les performances.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--allow-empty-message::
+	Opération blanche. Rebaser des commits avec un message vide échouaient auparavant et cette option remplacerait ce comportement, permettant aux commits avec des messages vides d'être rebaser. Maintenant, les commits avec un message vide ne font plus échouer un rebasage.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+-m::
+--merge::
+	Utiliser des stratégies de fusion pour rebaser (par défaut).
++
+Notez qu'un rebasage fusionne les travaux en rejouant chaque commit de la branche de travail sur le dessus de la branche `<amont>`. En raison de cela, lorsqu'un conflit de fusion se produit, le côté déclaré comme «nôtre» ('ours') est la série rebasée jusqu'ici, commençant par `<amont>` et «leurs» ('theirs') est la branche de travail. En d'autres termes, les côtés sont échangés.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+-s <stratégie>::
+--strategy=<strategie>::
+	Utiliser la stratégie de fusion donnée, au lieu du `ort` par défaut. Cela implique `--merge`.
++
+Parce que `git rebase` rejoue chaque commit de la branche de travail par dessus la branche _<amont>_ en utilisant la stratégie donnée, utiliser la stratégie `ours` vide simplement toutes les rustines de _<branche>_, ce qui n'a pas de sens.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+-X <option-de-strategie>::
+--strategy-option=<option-de-stratégie>::
+	Passer l'_<option-de-stratégie>_ à la stratégie de fusion. Cela implique `--merge` et, si aucune stratégie n'a été spécifiée, `-s ort`. Notez le renversement de 'ours' et 'theirs' comme indiqué ci-dessus pour l'option `-m`.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--rerere-autoupdate::
+--no-rerere-autoupdate::
+	Après que le mécanisme rerere réutilise une résolution enregistrée sur le conflit actuel pour mettre à jour les fichiers dans l'arbre de travail, lui permettre de mettre également à jour l'index avec le résultat de la résolution. `--no-rerere-autoupdate` est un bon moyen de revérifier ce que `rerere` a fait et de détecter des erreurs de fusion potentielles, avant de valider le résultat dans l'index avec un `git add` séparé.
+[]
+
+-S[<idclé>]::
+--gpg-sign[=<idclé>]::
+--no-gpg-sign::
+	Signer les commits avec GPG. L'argument `idclé` est optionnel avec par défaut l'identité du validateur ; si spécifiée, elle doit être collée à l'option sans aucun espace. `--no-gpg-sign` est utile pour annuler l'effet de la variable de configuration `commit.gpgSign` ainsi que tout `--gpg-sign` précédent.
+
+-q::
+--quiet::
+	Être silencieux. Implique `--no-stat`.
+
+-v::
+--verbose::
+	Mode bavard. Implique `--stat`.
+
+--stat::
+	Afficher un diffstat de ce qui a changé en amont depuis le dernier rebasage. Le diffstat est également contrôlé par l'option de configuration `rebase.stat`.
+
+-n::
+--no-stat::
+	Ne pas afficher un diffstat dans le cadre du processus de rebasage.
+
+--no-verify::
+	Cette option court-circuite le crochet pre-rebase. Voir aussi linkgit:githooks[5].
+
+--verify::
+	Permet l'exécution du crochet pre-rebase, qui est la valeur par défaut. Cette option peut être utilisée pour remplacer `--no-verify`. Voir aussi linkgit:githooks[5].
+
+-C<n>::
+	S'assurer qu'au moins `<n>` lignes du contexte environnant correspondent avant et après chaque modification. Lorsqu'il y a moins de lignes de contexte environnant, elles doivent toutes correspondre. Par défaut, aucun contexte n'est jamais ignoré. Implique `--apply`.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--no-ff::
+--force-rebase::
+-f::
+	Rejouer individuellement tous les commits rebasés au lieu d'aller en avance-rapide sur ceux inchangés. Cela garantit que toute l'historique de la branche rebasée est composé de nouveaux commits.
++
+Vous pouvez trouver cela utile après avoir annulé une fusion d'une branche de sujet, car cette option recrée la branche de sujet avec des commits frais afin qu'elle puisse être fusionnée avec succès sans avoir besoin d"'inverser l'inversion" (voir le link:/docs/howto/revert-a-faulty-merge/fr[Comment inverser une mauvaise fusion] pour plus de détails).
+
+--fork-point::
+--no-fork-point::
+	Utiliser le reflog pour trouver un meilleur ancêtre commun entre `<amont>` et `<branche>` lors du calcul des commits introduits par `<branche>`.
++
+Lorsque `--fork-point` est actif, 'fork_point' sera utilisé au lieu de `<amont>` pour calculer l'ensemble des commits à rebaser, où 'fork_point' est le résultat de la commande `git merge-base --fork-point <amont> <branche>` (voir linkgit:git-merge-base[1]). Si 'fork_point' finit par être vide, l'`<amont>` sera utilisé par défaut.
++
+Si `<amon>` ou `--keep-base` est fourni sur la ligne de commande, la valeur par défaut est `--no-fork-point`, sinon la valeur par défaut est `--fork-point`. Voir aussi `rebase.forkpoint ` dans linkgit:git-config[1].
++
+Si votre branche était basée sur _<amont>_ mais qu'_<amont>_ a été rembobinée et votre branche contient des commits qui ont été abandonnés, cette option peut être utilisée avec `--keep-base` afin de laisser tomber ces commits de votre branche.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--ignore-whitespace::
+	Ignorer les différences d'espace blanc en essayant de concilier les différences. Actuellement, chaque backend met en œuvre une approximation de ce comportement :
++
+appliquer le backend;;
+	Lors de l'application d'une rustine, ignorer les modifications d'espace blanc dans les lignes de contexte. Malheureusement, cela signifie que si les lignes « anciennes » remplacées par la rustine ne diffèrent que par des espace blanc du fichier existant, vous obtiendrez un conflit de fusion au lieu d'une application correcte réussie.
++
+backend de fusion;;
+	Traiter les lignes avec seulement des modifications d'espace blanc comme inchangées lors de la fusion. Malheureusement, cela signifie que toutes les sections de rustine qui étaient destinés à modifier les espaces blancs et rien d'autre seront abandonnés, même si l'autre côté n'avait aucune modification susceptible de générer un conflit.
+
+--whitespace=<option>::
+	Ce drapeau est passé au programme `git apply` (voir linkgit:git-apply[1]) qui applique la rustine. Implique `--apply`.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--committer-date-is-author-date::
+	Au lieu d'utiliser la date actuelle comme date de validateur, utilisez la date de l'auteur du commit comme date de validateur. Cette option implique `--force-rebase`.
+
+--ignore-date::
+--reset-author-date::
+	Au lieu d'utiliser la date d'auteur du commit d'origine, utiliser la date actuelle comme date de d'auteur du commit rebasé. Cette option implique `--force-rebase`.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--signoff::
+	Ajouter une ligne terminale `Signed-off-by` à tous les commits rebasés. Notez que si `--interactive` est donné alors seulement les commits marqués pour être sélectionnés, modifiés ou reformulés auront la ligne terminale ajoutée.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+-i::
+--interactive::
+	Faire une liste des commits qui sont sur le point d'être rebasés. Laisser l'utilisateur modifier cette liste avant de rebaser. Ce mode peut également être utilisé pour scinder les commits (voir SCINDER LES COMMITS ci-dessous).
++
+Le format de la liste de commits peut être modifié en définissant l'option de configuration rebase.instructionFormat. Un format d'instruction personnalisé aura automatiquement le hash de commit préfixé au format.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+-r::
+--rebase-merges[=(rebase-cousins|no-rebase-cousins)]::
+--no-rebase-merges::
+	Par défaut, un rebasage va simplement abandonner les commits de fusion de la liste de todo, et mettre les commits rebasés en une seule branche linéaire. Avec `--rebase-merges`, le rebasage tentera plutôt de préserver la structure de ramification dans les commits qui doivent être rebasés, en recréant les commits de fusion. Tout conflit de fusion résolu ou toute modification manuelle dans ces commits de fusion devra être résolu/reappliqué manuellement. `--no-rebase-merges` peut être utilisé pour contrecarrer à la fois l'option de config `rebase.rebaseMerges` et un `--rebase-merges` précédent.
++
+Quand le rebasage fait une fusion, il y a deux modes: `rebase-cousins` et `no-rebase-cousins`. Si le mode n'est pas spécifié, il vaut par défaut `no-rebase-cousins`. Dans le mode `no-rebase-cousins`, les commits qui n'ont pas d'_<amont>_ comme ancêtre direct garderont leur point de branche original, c'est-à-dire que les commits qui seraient exclus par l'option `--ancestry-path` de linkgit:git-log[1] garderont leurs ancêtres originaux par défaut. Dans le mode `rebase-cousins`, ces commits sont plutôt rebasés sur _<amont>_ (ou _<nouvellebase>_ de `--onto`, si spécifiée).
++
+Il est actuellement seulement possible de recréer des commits de fusion en utilisant la stratégie de fusion `ort` ; les différentes stratégies de fusion ne peuvent être utilisées que par des commandes explicites `exec git merge -s <strategie> [...]`.
++
+Voir aussi FUSIONS DE REBASAGE et OPTIONS INCOMPATIBLES ci-dessous.
+
+-x <cmd>::
+--exec <cmd>::
+	Ajouter "exec <cmd>" après chaque ligne créant un commit dans l'historique final. _<cmd>_ sera interprété comme une ou plusieurs commandes de shell. Toute commande qui échoue interrompra le rebasage, avec le code de sortie 1.
++
+Vous pouvez exécuter plusieurs commandes en utilisant une instance de `--exec` avec plusieurs commandes :
++
+	git rebase -i --exec "cmd1 && cmd2 && ..."
++
+ou en donnant plus d'un `--exec` :
++
+	git rebase -i --exec "cmd1" --exec "cmd2" --exec ...
++
+Si `--autosquash` est utilisé, les lignes `exec` ne seront pas ajoutées pour les commits intermédiaires, et n'apparaîtront qu'à la fin de chaque série squash/fixup.
++
+Cela utilise la machinerie `--interactive` interne, mais elle peut être exécutée sans un `--interactive` explicite.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--root::
+	Rebaser tous les commits atteignables à partir de _<branche>_, au lieu de les limiter avec _<amont>_. Cela vous permet de rebaser le ou les commits racines sur une branche.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--autosquash::
+--no-autosquash::
+	Écrase automatiquement les commits avec des messages spécialement formatés dans les commits précédents en cours de rebasage. Si un message de commit commence par "squash!", "fixup!" ou "amend!", le reste de la ligne de sujet est pris comme spécificateur de commit, qui correspond à un commit précédent si il correspond à la ligne de sujet ou l'empreinte de ce commit. Si aucun commit ne correspond exactement, les correspondances du spécificateur avec le début des sujets de commit sont envisagées.
++
+Dans la liste des à faire de rebase, les actions d'écrasement, de correction et de modification des commits sont changées de `pick` à `squash`, `fixup` ou `fixup -C`, respectivement, et elles sont déplacés juste après le commit ils modifient. L'option `--interactive` peut être utilisée pour examiner et modifier la liste à faire avant de procéder.
++
+La façon recommandée de créer des commits avec des marqueurs d'écrasement est d'utiliser les options `--squash`, `--fixup`, `--fixup=amend:` ou `--fixup=reword:` de linkgit:git-commit[1], qui prennent le commit cible comme argument et remplissent automatiquement la ligne de sujet du nouveau commit à partir de cela.
++
+Définir la variable de configuration `rebase.autoSquash` à true permet l'application d'autosquash par défaut pour le rebasage interactif. L'option `--no-autosquash` peut être utilisée pour remplacer ce réglage.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+--autostash::
+--no-autostash::
+	Créer automatiquement une entrée temporaire de remisage avant le début de l'opération et l'appliquer après la fin de l'opération. Cela signifie que vous pouvez exécuter l'opération sur un arbre de travail sale. Cependant, utilisez-le avec précaution : l'application finale du remisage après une fusion réussie peut entraîner des conflits non négligeables.
+
+--reschedule-failed-exec::
+--no-reschedule-failed-exec::
+	Reprogrammer automatiquement les commandes `exec` qui ont échoué. Cela n'a de sens qu'en mode interactif (ou lorsqu'une option `--exec` a été fournie).
++
+Cette option s'applique une fois qu'un rebasage est lancé. Il est conservé pour l'ensemble du rebasage en fonction, dans l'ordre, de l'option de ligne de commande fournie au `git rebase` initial, la configuration `rebase.rescheduleFailedExec` (voir linkgit:git-config[1] ou "CONFIGURATION" ci-dessous), ou par défaut false (faux).
++
+Enregistrer cette option pour tout le rebasage est une fonctionnalité de commodité. Sinon, une `--no-reschedule-failed-exec` explicite au début serait remplacée par la présence d'une configuration `rebase.rescheduleFailedExec=true` lorsque `git rebase --continue` est invoquée. Actuellement, vous ne pouvez pas passer `-[no-]reschedule-failed-exec` à `git rebase --continue`.
+
+--update-refs::
+--no-update-refs::
+	Mettre à jour en force automatiquement toute branche qui pointe sur les commits qui sont en train d'être rebasés. Toutes les branches qui sont extraites dans les arbre-de-travails ne sont pas ne sont pas mises à jour de cette manière.
++
+Si la variable de configuration `rebase.updateRefs` est définie, cette option peut être utilisée pour remplacer et désactiver ce réglage.
++
+Voir aussi OPTIONS INCOMPATIBLES ci-dessous.
+
+OPTIONS INCOMPATIBLES
+---------------------
+
+Les options suivantes :
+
+ * --apply
+ * --whitespace
+ * -C
+
+sont incompatibles avec les options suivantes :
+
+ * --merge
+ * --strategy
+ * --strategy-option
+ * --autosquash
+ * --rebase-merges
+ * --interactive
+ * --exec
+ * --no-keep-empty
+ * --empty=
+ * --[no-]reapply-cherry-picks lorsqu'utilisé sans --keep-base
+ * --update-refs
+ * --root lorsqu'il est utilisé sans --onto
+
+En outre, les paires d'options suivantes sont incompatibles :
+
+ * --keep-base et --onto
+ * --keep-base et --root
+ * --fork-point et --root
+
+DIFFÉRENCES DE COMPORTEMENT
+---------------------------
+
+`git rebase` a deux backends primaires : 'apply' et 'merge'. (Le backend 'apply' était connu comme le backend 'am', mais le nom a conduit à la confusion car il ressemble à un verbe au lieu d'un nom. De plus, le backend 'merge' était connu comme le backend interactif, mais il est maintenant utilisé aussi pour les cas non interactifs. Les deux ont été renommés en fonction de la fonctionnalité de bas niveau qui sous-tend chacun.) Il y a quelques différences subtiles dans la façon dont ces deux backends se comportent :
+
+Commits vides
+~~~~~~~~~~~~~
+
+Le backend 'apply' élimine malheureusement des commits intentionnellement vides, c'est-à-dire des commits qui ont commencé vides, bien qu'ils soient rares en pratique. Il élimine également des commits qui deviennent vides et il n'y a aucune option pour contrôler ce comportement.
+
+Le backend 'merge' conserve intentionnellement les commits vides par défaut (mais avec `-i` ils sont marqués comme vides dans l'éditeur de liste à faire, ou ils peuvent être éliminés automatiquement avec `--no-keep-empty`).
+
+De manière similaire au backend apply, par défaut le backend merge abandonne les commits qui deviennentt vides à moins que `-i`/`--interactive` ne soit spécifié (auquel cas il s'arrête et demande à l'utilisateur quoi faire). Le backend merge a également une option `--empty=(drop|keep|stop)` pour changer le comportement de gestion des commits qui deviennent vides.
+
+Détection de renommage de répertoire
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+En raison de l'absence d'informations précises sur les arbres (provenant de la construction d'ancêtres factices avec l'information limitée disponible dans les rustines), la détection de renommage est désactivée dans le backend 'apply'. La déactivation de renommage de répertoire signifie que si un côté de l'historique renomme un répertoire et que l'autre ajoute de nouveaux fichiers à l'ancien répertoire, alors les nouveaux fichiers seront laissés en arrière dans l'ancien répertoire sans avertir au moment de rebasage que vous pourriez vouloir déplacer ces fichiers dans le nouveau répertoire.
+
+La détection de renommage de répertoire fonctionne avec le backend 'merge' pour vous fournir des avertissements dans de tels cas.
+
+Contexte
+~~~~~~~~
+
+Le backend 'apply' fonctionne en créant une séquence de rustines (en appelant `format-patch` en interne), puis en appliquant les rustines en séquence (en appelant `am`en interne). Les rustines sont composées de plusieurs sections, chacune avec des numéros de ligne, une région de contexte et les changements réels. Les numéros de ligne doivent être pris avec une certaine incertitude, puisque l'autre côté aura probablement inséré ou supprimé des lignes plus haut dans le fichier. La région de contexte est destinée à aider à trouver comment ajuster les numéros de ligne afin d'appliquer les changements aux bonnes lignes. Cependant, si plusieurs zones du code ont les mêmes lignes de contexte, le mauvais peut être choisi. Il y a des cas réels où cela a causé la réapplication incorrecte de commits sans conflit signalé. Régler`diff.context` à une valeur plus grande peut éliminer ce type de problèmes, mais augmente les probabilités de conflits (puisque plus de lignes de contexte en correspondance seront nécessaires pour valider l'application de la rustine).
+
+Le backend 'merge' fonctionne avec une copie complète de chaque fichier pertinent, l'isolant de ces types de problèmes.
+
+Étiquetage des marqueurs de conflits
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Lorsqu'il y a des conflits de contenu, la machinerie de fusion tente d'annoter les marqueurs de conflit de chaque côté avec les commits d'où le contenu est venu. Comme le backend 'apply' laisse tomber les informations originales sur les commits rebasés et leurs parents (et génère plutôt de nouveaux faux commits basés sur des informations réduties dans les rustines générées), ces commits ne peuvent pas être identifiés ; au lieu de cela, il doit revenir à un résumé de commit. Aussi, quand `merge.conflictStyle` est défini à `diff3` ou `zdiff3`, le backend 'apply' utilisera une « base de fustion construite » pour étiqueter le contenu de la base de fusion, et donc ne fournir aucune information sur le commit de base de fusion.
+
+Le backend 'merge' fonctionne avec les commits complets des deux côtés de l'historique et n'a donc pas de telles limitations.
+
+Crochets
+~~~~~~~~
+
+Historiquement, le backend 'apply' n'appellait pas le crochet post-commit, tandis que le backend 'merge' le faisait. Les deux ont appelé le crochet post-checkout, bien que le backend 'merge' n'affiche pas sa sortie. De plus, les deux backends n'appellent le crochet post-checkout qu'avec le point de départ du rebasage, pas les commits intermédiaires ni le commit final. Dans chaque cas, l'appel de ces crochets était un accident d'implémentation plutôt qu'une volonté de conception (les deux backends ont été initialement mis en œuvre comme scripts shell et invoquait ainsi d'autres commandes comme `git checkout` ou `git commit` qui appellaient les crochets). Les deux backends devraient avoir le même comportement, bien qu'il ne soit pas entièrement clair lequel est correct, si tant est qu'il le soit. rebase va certainementarrêter d'appeler l'un de ces crochets à l'avenir.
+
+Interruptibilité
+~~~~~~~~~~~~~~~~
+
+Le backend 'apply' a des problèmes de sécurité avec une interruption au mauvais moment ; si l'utilisateur presse Ctrl-C au mauvais moment pour essayer d'annuler le rebasage, le rebasage peut entrer dans un état où il ne peut pas être annulé avec un `git rebase --abort` ultérieur. Le backend de fusion ne semble pas souffrir de la même définition . (Voir https://lore.kernel.org/git/20200207132152.GC2868@szeder.dev/ pour plus de détails.)
+
+Reformulation de commit
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Lorsqu'un conflit survient en rebasant, rebase s'arrête et demande à l'utilisateur de résoudre les conflits. Comme l'utilisateur peut avoir besoin de faire des changements notables tout en résolvant les conflits, après que les conflits sont réglés et que l'utilisateur a exécuté `git rebase --continue`, le rebasage devraitouvrir un éditeur et demander à l'utilisateur de mettre à jour le message de validation. Le backend 'merge' fait cela, alors que le backend 'apply' applique aveuglément le message de commit original.
+
+Diverses différences
+~~~~~~~~~~~~~~~~~~~~
+
+Il ya quelques différences comportementales supplémentaires que la plupart des gens considéreraient probablement peu fréquentes mais qui sont mentionnées pour être exhaustif :
+
+* Reflog : Les deux backends utiliseront des libellés différents pour décrire les modifications apportées au reflog, mais les deux utiliseront le mot "rebase".
+
+* Messages de progression, d'information et d'erreur : Les deux backends fournissent des messages d'information et de progrès légèrement différents. De plus, le backend apply écrit des messages d'erreur (comme « Vos fichiers seraient écrasés... ») sur stdout, tandis que le backend de fusion les écrit sur stderr.
+
+* Répertoires d'état : les deux backends conservent leur état dans différents répertoires sous `.git/`
+
+LES STRATÉGIES DE FUSION
+------------------------
+
+Le mécanisme de fusion (commandes `git merge` et `git pull`) permet de choisir les 'stratégies de fusion' du backend avec l'option `-s`. Certaines stratégies peuvent également prendre leurs propres options, qui peuvent être passées en donnant des arguments `-X<option>` à `git merge` et/ou `git pull`.
+
+ort::
+	C'est la stratégie de fusion par défaut lors du tirage ou de la fusion d'une branche. Cette stratégie ne peut résoudre que deux têtes en utilisant un algorithme de fusion à trois voies. Lorsqu'il y a plus d'un ancêtre commun qui peut être utilisé pour la fusion à trois, il crée un arbre fusionné des ancêtres communs et l'utilise comme arbre de référence pour la fusion à trois. Il a été rapporté que cela permettait de réduire les conflits de fusion sans provoquer de fausses fusions, grâce à des tests effectués sur de vraies fusions tirées de l'historique de développement du noyau Linux 2.6. En outre, cette stratégie permet de détecter et de gérer les fusions impliquant des renommages. Elle ne peut actuellement pas utiliser les copies détectées. Le nom de cet algorithme est un acronyme ("Ostensibly Recursive's Twin" : Jumeau ostensible de recurse) et vient du fait qu'il a été écrit pour remplacer l'algorithme par défaut précédent, `recursive`.
++
+La stratégie 'ort' peut prendre les options suivantes :
+
+ours;;
+	Cette option oblige à résoudre les sections en conflit de manière autonome et propre en favorisant notre version ('our'). Les modifications par rapport à l'autre arbre qui n'entrent pas en conflit avec notre version se reflètent dans le résultat de la fusion. Pour un fichier binaire, tout le contenu est pris de notre côté.
++
+Il ne faut pas la confondre avec la stratégie de fusion 'ours', qui ne tient même pas compte de ce que contient l'autre arbre. Elle rejette tout ce que l'autre arbre a fait, déclarant que "notre" historique ('our') contient tout ce qui s'y est passé.
+
+theirs;;
+	C'est le contraire de 'ours' ; notez que, contrairement à 'ours', il n'y a pas de stratégie de fusion 'theirs' avec laquelle confondre cette option de fusion.
+
+ignore-space-change;;
+ignore-all-space;;
+ignore-space-at-eol;;
+ignore-cr-at-eol;;
+	Traiter les lignes avec le type de changement d'espace indiqué comme inchangées dans l'intérêt d'une fusion à trois points. Les changements d'espacement mélangés à d'autres changements de ligne ne sont pas ignorés. Voir aussi linkgit:git-diff[1] `-b`, `-w`, `--ignore-space-at-eol`, et `--ignore-cr-at-eol`.
++
+* Si "leur" version ('theirs') n'introduit que des changements d'espacement sur une ligne, "notre" version ('our') est utilisée ;
+* Si "notre" version introduit des modifications dans l'espace blanc mais que "leur" version inclut un changement substantiel, "leur" version est utilisée ;
+* Dans le cas contraire, la fusion se déroule de la manière habituelle.
+
+renormalize;;
+	Il s'agit d'une extraction et d'un validation virtuelle des trois étapes d'un fichier lors de la résolution d'une fusion à trois points. Cette option est destinée à être utilisée lors de la fusion de branches avec différents filtres clean ou règles de normalisation de fin de ligne. Voir "Fusion de branches avec différents attributs de validation/extraction" dans linkgit:gitattributes[5] pour plus de détails.
+
+no-renormalize;;
+	Désactiver l'option `renormalize`. Cela surcharge la variable de configuration `merge.renormalize` .
+
+find-renames[=<n>];;
+	Activer la détection de renommage, en fixant éventuellement le seuil de similarité. C'est la valeur par défaut. Cela surcharge la variable de configuration `merge.renames`. Voir aussi linkgit:git-diff[1] `--find-renames`.
+
+rename-threshold=<n>;;
+	Synonyme obsolète pour `find-renames=<n>`.
+
+subtree[=<chemin>];;
+	Cette option est une forme plus avancée de stratégie 'subtree', où la stratégie fait une estimation de la façon dont deux arbres doivent être déplacés pour correspondre l'un à l'autre lors de la fusion. Au lieu de cela, le chemin spécifié est préfixé (ou tronqué au debut) pour faire correspondre la forme de deux arbres.
+
+recursive::
+	Cela ne peut résoudre que deux têtes en utilisant un algorithme de fusion à trois voies. Lorsqu'il y a plus d'un ancêtre commun qui peut être utilisé pour la fusion à trois, il crée un arbre fusionné des ancêtres communs et l'utilise comme arbre de référence pour la fusion à trois. Il a été rapporté que cela permettait de réduire les conflits de fusion sans provoquer de fausses fusions, grâce à des tests effectués sur de vraies fusions tirées de l'historique de développement du noyau Linux 2.6. En outre, cela permet de détecter et de gérer les fusions impliquant des renommages. Cela n'utilise les copies détectées. C'était la stratégie par défaut lors de la résolution de deux sommets pour Git depuis la version v0.99.9k jusqu'à v2.33.0.
++
+La stratégie 'recursive' utilise les mêmes options que 'ort'. Cependant, il y a trois options supplémentaires que 'ort' ignore (non documentées ci-dessus) et qui sont potentiellement utiles avec la stratégie 'recursive' :
+
+patience;;
+	Synonyme obsolète pour `diff-algorithm=patience`.
+
+diff-algorithm=[patience|minimal|histogram|myers];;
+	Utiliser un algorithme de diff différent lors des fusions, ce qui peut aider à éviter les erreurs de fusion dues à des lignes de correspondance sans importance (comme des accolades de fonctions distinctes). Voir aussi linkgit:git-diff[1] `--diff-algorithm`. Notez que `ort` utilise spécifiquement `diff-algorithm=histogram`, alors que `recursive` utilise par défaut le paramètre de configuration `diff.algorithm`.
+
+no-renames;;
+	Désactiver la détection de renommage. Ceci annule la variable de configuration `merge.renames`. Voir aussi linkgit:git-diff[1] `--no-renames`.
+
+resolve::
+	Cela ne peut résoudre que deux têtes (c'est-à-dire la branche actuelle et une autre branche dont vous avez tiré) en utilisant un algorithme de fusion à trois points. Cela essaie de détecter avec soin les ambiguïtés de la fusion croisée. Les renommages ne sont pas gérés.
+
+octopus::
+	Cela permet de résoudre les cas à plus de deux têtes, mais refuse de faire une fusion complexe qui nécessite une résolution manuelle. C'est principalement destiné à être utilisé pour regrouper les têtes de branches thématiques. C'est la stratégie de fusion par défaut lorsque l'on tire ou fusionne plusieurs branches.
+
+ours::
+	Cela résout un nombre quelconque de têtes, mais l'arbre résultant de la fusion est toujours celui de la tête de la branche actuelle, ignorant effectivement toutes les modifications provenant de toutes les autres branches. C'est censé être utilisé pour remplacer l'ancienne historique du développement des branches latérales. Notez que cette stratégie est différente de l'option -Xours de la stratégie de fusion 'recursive'.
+
+subtree::
+	Il s'agit d'une stratégie `ort` modifiée. Lors de la fusion des arbres A et B, si B correspond à un sous-arbre de A, B est d'abord ajusté pour correspondre à la structure arborescente de A, au lieu de lire les arbres au même niveau. Cet ajustement est également effectué sur l'arbre de l'ancêtre commun.
+
+Avec les stratégies qui utilisent la fusion à trois points (y compris la fusion par défaut, 'ort'), si une modification est effectuée sur les deux branches, mais qu'elle est ensuite inversée sur l'une des branches, ce changement sera présent dans le résultat de la fusion ; certaines personnes trouvent ce comportement déroutant. Cela se produit parce que seules les têtes et la base de la fusion sont prises en compte lors d'une fusion, et non le commit individuel. L'algorithme de fusion considère donc le changement inversé comme n'étant pas un changement du tout, et substitue la version modifiée à la place.
+[]
+
+NOTES
+-----
+
+Vous devriez comprendre les implications de l'utilisation de `git rebase` sur un dépôt partagé. Voir la section « RATTRAPER UN REBASAGE AMONT » ci-dessous.
+
+Lorsque le rebasage est exécuté, il exécutera d'abord un crochet `pre-rebase` si il existe. Vous pouvez utiliser ce crochet pour faire des vérifications de santé et rejeter le rebasage si il n'est pas approprié. Veuillez voir le modèle de script crochet`pre-rebase` pour un exemple.
+
+Une fois terminé, `<branche>` sera la branche actuelle.
+
+MODE INTERACTIF
+---------------
+
+Rebaser interactivement signifie que vous avez une possibilité de modifier les commits qui sont rebasés. Vous pouvez réordonner les commits, et vous pouvez les supprimer (en éliminant des rustines mauvaises ou autrement indésirables).
+
+Le mode interactif est destiné à ce type de flux de travail :
+
+1. avoir une merveilleuse idée
+2. travailler sur le code
+3. préparer une série pour propositions
+4. proposer
+
+où le point 2. se compose de plusieurs cas
+
+a) utilisation régulière
+
+ 1. finir quelque chose digne d'un commit
+ 2. valider
+
+b) correction indépendante
+
+ 1. réaliser que quelque chose ne fonctionne pas
+ 2. réparer ça
+ 3. le valider
+
+Parfois, la chose corrigée en b.2. ne peut pas être ajoutée au commit pas totalement parfait qu'elle corrige, parce que ce commit est enterré profondément dans une série de rustines. C'est exactement ce à quoi le rebasage interactif sert : utilisez-le après beaucoup de "a"s et "b"s, en réorganisant et en éditant des commits, et en combinant plusieurs commits en un.
+
+Commencez avec le dernier commit que vous voulez retenir tel quel :
+
+	git rebase -i <après-ce-commit>
+
+Un éditeur sera démarré avec tous les commits dans votre branche actuelle (en ignorant les commits de fusion), qui viennent après le commit donné. Vous pouvez réorganiser à votre goût les commits dans cette liste, et vous pouvez les supprimer. La liste ressemble plus ou moins à ceci :
+
+-------------------------------------------
+pick deadbee Le titre de ce commit
+pick fa1afe1 Le titre du commit suivant
+...
+-------------------------------------------
+
+Les titres sont purement pour votre usage ; 'git rebase' ne les regardera pas mais s'appuiera sur les noms de commit («deadbee» et «fa1afe1» dans cet exemple), donc ne supprimez pas ou ne modifiez pas les noms.
+
+En remplaçant la commande "pick" par la commande "edit", vous pouvez dire à `git rebase` de s'arrêter après l'application de ce commit, afin que vous puissiez modifier les fichiers et/ou le message de validation, modifier le commit, et continuer de rebaser.
+
+Pour interrompre le rebasage (comme une commande "edit" le ferait, mais sans picorer de commit d'abord), utilisez la commande "break".
+
+Si vous voulez simplement modifier le message de validation pour un commit, remplacez la commande "pick" par la commande "reword".
+
+Pour abandonner un commit, remplacer la commande "pick" par "drop", ou supprimez simplement la ligne correspondante.
+
+Si vous voulez replier deux ou plusieurs commits en un, remplacer la commande "pick" pour le second commit et les commits subséquents par "squash" ou "fixup". Si les commits avaient différents auteurs, le commit replié sera attribué à l'auteur du premier commit. Le message de commit proposé pour le commit replié est la concaténation du message du premier commit avec ceux identifiés par les commandes "squash", en omettant les messages de commits identifiés par les commandes "fixup", à moins que "fixup -c" ne soit utilisé. Dans ce cas, le message de validation proposé n'est que le message du commit appliqué par "fixup -c", et un éditeur est ouvert vous permettant de modifier le message. Le contenu (rustine) du commit "fixup -c" sont toujours incorporé dans le commit replié. S'il y a plus d'un commit "fixup -c", le message du dernier est utilisé. Vous pouvez également utiliser "fixup -C" pour obtenir le même comportement que "fixup -c" sauf sans ouvrir un éditeur.
+
+`git rebase` s'arrêtera lorsque "pick" a été remplacé par "edit" ou quand une commande échoue en raison d'erreurs de fusion. Lorsque vous avez terminé l'édition et/ou la résolution des conflits, vous pouvez continuer avec `git rebase --continue`.
+
+Par exemple, si vous voulez réorganiser les 5 derniers commits, de sorte que ce qui était `HEAD~4` devient le nouveau `HEAD`. Pour ce faire, vous appelez `git rebase` comme ceci :
+
+----------------------
+$ git rebase -i HEAD~5
+----------------------
+
+Et déplacer la première rustine jusqu'à la fin de la liste.
+
+Vous pourriez vouloir recréer des commits de fusion, par exemple si vous avez une histoire comme celle-ci :
+
+------------------
+           X
+            \
+         A---M---B
+        /
+---o---O---P---Q
+------------------
+
+Supposons que vous voulez rebaser la branche latérale à partir de "A" à "Q". Assurez-vous que la `HEAD`actuelle est "B", et appelez
+
+-----------------------------
+$ git rebase -i -r --onto Q O
+-----------------------------
+
+La réorganisation et l'édition des commits créent généralement des étapes intermédiaires non testées. Vous pouvez vérifier que votre édition d'historique n'a rien cassé en exécutant un test, ou au moins en recompilant à des points intermédiaires de l'historique en utilisant la commande "exec" (raccourci "x"). Vous pouvez le faire en créant une liste de todo comme celle-ci :
+
+-------------------------------------------
+pick deadbee Implement feature XXX
+fixup f1a5c00 Fix to feature XXX
+exec make
+pick c0ffeee The oneline of the next commit
+edit deadbab The oneline of the commit after
+exec cd subdir; make test
+...
+-------------------------------------------
+
+Le rebasage interactif s'arrêtera quand une commande échouera (c.-à-d. des sorties avec statut non-0) pour vous donner l'occasion de résoudre le problème. Vous pouvez continuer avec `git rebase --continue`.
+
+La commande "exec" lance la commande dans un shell (la commande par défaut, habituellement /bin/sh), de sorte que vous pouvez utiliser des fonctions de shell (comme "cd", ">", ";" ...). La commande est exécutée de la racine de l'arbre de travail.
+
+----------------------------------
+$ git rebase -i --exec "make test"
+----------------------------------
+
+Cette commande vous permet de vérifier que les commits intermédiaires sont compilables. La liste de todo devient ainsi :
+
+--------------------
+pick 5928aea one
+exec make test
+pick 04d0fda two
+exec make test
+pick ba46169 three
+exec make test
+pick f4593f9 four
+exec make test
+--------------------
+
+DÉCOUPAGE DE COMMITS
+--------------------
+
+En mode interactif, vous pouvez marquer des commits avec l'action "edit". Cependant, cela ne signifie pas nécessairement que `git rebase` s'attende à ce que le résultat de cette modification soit exactement un commit. En effet, vous pouvez défaire le commit, ou vous pouvez ajouter d'autres commits. Ceci peut être utilisé pour diviser un commit en deux :
+
+- Démarrez un rebasage interactif avec `git rebase -i <commit>`, où _<commit>_ est le commit que vous voulez partager. En fait, toute plage de commits fonctionne, tant qu'elle contient ce commit.
+
+- Marquez le commit que vous voulez diviser avec l'action "edit".
+
+- Au moment d'éditer ce commit, exécutez `git reset HEAD^`. L'effet est que le `HEAD` est rembobiné d'un cran et que l'index est mis à jour. Cependant, l'arbre de travail reste le même.
+
+- Maintenant ajoutez les modifications que vous voulez avoir dans le premier commit à l'index . Vous pouvez utiliser `git add` (possiblement interactivement) ou `git gui` (ou les deux) pour le faire.
+
+- Validez l'index actuel avec un message de commit approprié.
+
+- Répétez les deux dernières étapes jusqu'à ce que votre arbre de travail soit propre.
+
+- Continuez le rebasage avec `git rebase --continue`.
+
+Si vous n'êtes pas absolument sûr que les révisions intermédiaires sont cohérentes (qu'elles compilent, passent la suite de test, etc.) vous devriez utiliser `git stash` pour remiser les modifications pas encore validées après chaque commit, puis tester, et modifier le commit si des corrections sont nécessaires.
+
+
+SE RATTRAPER APRÈS UN REBASAGE AMONT
+------------------------------------
+
+Rebaser (ou réécrire sous toute autre forme) une branche sur laquelle d'autres ont basé le travail est une mauvaise idée : quiconque en aval est obligé de réparer manuellement son historique. Cette section explique comment corriger cet état du point de vue de l'aval. La vraie solution, cependant, serait d'éviter de rebaser en amont en premier lieu.
+
+Pour illustrer, supposez que vous êtes dans une situation où quelqu'un développe une branche 'sous-systeme', et que vous travaillez sur un 'sujet' qui dépend de ce 'sous-systeme'. Vous pourriez finir avec un historique comme suit :
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \
+	  o---o---o---o---o  sous-systeme
+			   \
+			    *---*---*  sujet
+------------
+
+Si 'sous-systeme' est rebasé sur 'master', il se produit ce qui suit :
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \			 \
+	  o---o---o---o---o	  o'--o'--o'--o'--o'  sous-systeme
+			   \
+			    *---*---*  sujet
+------------
+
+Si vous continuez maintenant le développement comme d'habitude, et finalement fusionnez 'sujet' à 'sous-systeme', les commits de 'sous-systeme' resteront dupliquées pour toujours :
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \			 \
+	  o---o---o---o---o	  o'--o'--o'--o'--o'--M	 sous-systeme
+			   \			     /
+			    *---*---*-..........-*--*  sujet
+------------
+
+De telles doublons sont généralement mal vus parce qu'ils encombrent l'historique, ce qui le rend plus difficile à suivre. Pour nettoyer, vous devez transplanter les commits sur 'sujet' au nouveau sommet de 'sous-systeme', c'est-à-dire rebaser 'sujet'. Cela s'applique en cascade : toute personne en aval de 'sujet' est obligée de rebaser aussi, et ainsi de suite !
+
+Il existe deux types de corrections, discutées dans les sections suivantes :
+
+Cas facile : Les modifications sont littéralement les mêmes.::
+
+	Cela se produit si le rebasage sur 'sous-systeme' était un simple rebasage et n'avait aucun conflit.
+
+Cas dur : les modifications ne sont pas les mêmes.::
+
+	Cela se produit si le rebasage sur 'sous-systeme' avait des conflits, ou a utilisé `--interactive` pour omettre, éditer, écraser, ou corriger des commits ; ou si l'amont a utilisé `commit --amend` ou `reset`, ou une commande de réécriture complète de l'historique comme https://github.com/newren/git-filter-repo[`filter-repo`].
+
+
+Le cas facile
+~~~~~~~~~~~~~
+
+Ne fonctionne que si les modifications (IDs de rustines basés sur le contenu des diffs) sur 'sous-systeme' sont littéralement les mêmes avant et après le rebasage fait sur `sous-systeme`.
+
+Dans ce cas, le correctif est facile car 'git rebase' sait sauter les changements qui sont déjà présents dans le nouvel amont (sauf si `--reapply-cherry-picks` est appliqué). Donc si vous dîtes (en supposant que vous êtes sur 'sujet')
+------------
+    $ git rebase sous-systeme
+------------
+vous terminerez avec l'historique réparé
+------------
+    o---o---o---o---o---o---o---o  master
+				 \
+				  o'--o'--o'--o'--o'  sous-systeme
+						   \
+						    *---*---*  sujet
+------------
+
+
+Le cas difficile
+~~~~~~~~~~~~~~~~
+
+Les choses deviennent plus compliquées si les changements de 'sous-systeme' ne correspondent pas exactement à ceux avant le rebasage.
+
+NOTE: Tandis qu'une "récupération de cas facile" semble parfois réussir
+même dans le cas difficile, il peut y avoir des conséquences imprévues. Par
+exemple, un commit qui a été enlevé via `git rebase
+--interactive` sera ** ressuscité** !
+
+L'idée est de dire manuellement à `git rebase` "où l'ancien 'sous-systeme' s'est terminé et votre 'sujet' a commencé", c'est-à-dire ce qu'était l'ancienne base de fusion entre eux. Vous devrez trouver un moyen de nommer le dernier commit de l'ancien 'sous-system', par exemple :
+
+* Avec le reflog de 'sous-system' : après `git fetch`, l'ancien sommet de 'sous-systeme' est à `sous-systeme@{1}`. Les récupérations subséquentes augmenteront le nombre. (Voir linkgit:git-reflog[1].)
+
+* Par rapport au sommet de 'sujet' : sachant que votre 'sujet' a trois commits, l'ancien sommet de 'sous-systeme' doit être `sujet~3`.
+
+Vous pouvez ensuite transplanter l'ancien `sous-systeme..sujet` au nouveau sommet en disant (pour le cas du reflog, et en supposant que vous êtes déjà sur 'sujet') :
+------------
+    $ git rebase --onto sous-systeme sous-systeme@{1}
+------------
+
+L'effet de bord d'une récupération de « cas difficile » est particulièrement terrible : 'tout le monde' en aval de 'sujet' devra maintenant effectuer une récupération de « cas difficile » aussi !
+
+REBASAGE DE FUSIONS
+-------------------
+
+La commande de rebasage interactive a été à l'origine conçue pour gérer des séries de rustines individuelles. En tant que tel, il est logique d'exclure les commits de fusion de la liste de todo, car le développeur a peut-être fusionné le `master` alors qu'il travaillait sur la branche, en attendant de rebaser tous les commits sur `master` à un moment (en sautant les commits de fusion).
+
+Cependant, il y a des raisons légitimes pour lesquelles un développeur peut vouloir recréer des commits de fusion : garder la structure de la branche (ou « topologie des commit ») lorsqu'il travaille sur plusieurs branches interconnectées.
+
+Dans l'exemple suivant, le développeur travaille sur une branche de sujet qui refactorise la façon dont les boutons sont définis, ainsi que sur une autre branche de sujet qui utilise cette refactorisation pour mettre en œuvre un bouton « Signaler un bug ». La sortie de `git log --graph --format=% -5' peut ressembler à ça :
+
+------------
+*   Merge branch 'report-a-bug'
+|\
+| * Add the feedback button
+* | Merge branch 'refactor-button'
+|\ \
+| |/
+| * Use the Button class for all buttons
+| * Extract a generic Button class from the DownloadButton one
+------------
+
+Le développeur pourrait vouloir rebaser ces commits sur un nouveau `master` tout en gardant la topologie de la branche, par exemple lorsque la première branche de sujet devrait être intégrée dans `master` beaucoup plus tôt que la seconde, par exemple, pour résoudre les conflits de fusion avec des modifications à la classe DownloadButton qui ont déjà été intégrées sur `master'.
+
+Ce rebasage peut être effectué en utilisant l'option `--rebase-merges`. Il générera une liste de todo qui ressemble à ceci :
+
+------------
+label onto
+
+# Branch: refactor-button
+reset onto
+pick 123456 Extract a generic Button class from the DownloadButton one
+pick 654321 Use the Button class for all buttons
+label refactor-button
+
+# Branch: report-a-bug
+reset refactor-button # Use the Button class for all buttons
+pick abcdef Add the feedback button
+label report-a-bug
+
+reset onto
+merge -C a1b2c3 refactor-button # Merge 'refactor-button'
+merge -C 6f5e4d report-a-bug # Merge 'report-a-bug'
+------------
+
+Contrairement à une base interactive régulière, il y a des commandes `label`, `reset` et `merge` en plus des commandes `pick`.
+
+La commande `label` associe une étiquette à la HEAD actuelle lorsque cette commande est exécutée. Ces étiquettes sont créées sous forme de refs local à l'arbre-de-travail (`refs/rewritten/<étiquette>`) qui seront supprimées lorsque le rebasage sera terminé. De cette façon, les opérations de rebasage dans plusieurs arbre-de-travail liés au même dépôt n'interfèrent pas les uns avec les autres. Si la commande `label` échoue, elle est reprogrammée immédiatement, avec un message indiquant comment procéder.
+
+La commande `reset` réinitialise la HEAD, l'index et l'abre de travail à la révision spécifiée. Il est semblable à un `exec git reset --hard <étiquette>`, mais refuse d'écraser des fichiers non suivis. Si la commande `reset` échoue, elle est reprogrammée immédiatement, avec un message indiquant comment modifier la liste de todo (cela arrive généralement quand une commande `reset` a été insérée dans la liste de todo manuellement et contient une typo).
+
+La commande `merge` fusionnera la ou les révisions spécifiées dans ce qui est HEAD à ce moment-là. Avec `-C <commit-original>`, le message de validation de la fusion spécifiée sera utilisé. Lorsque le `-C` est changé en minuscule `-c`, le message sera ouvert dans un éditeur après une fusion réussie afin que l'utilisateur puisse modifier le message.
+
+Si une commande `merge` échoue pour toute raison autre que des conflits de fusion (c.-à-d. lorsque l'opération de fusion n'a même pas commencé), elle est reprogrammée immédiatement.
+
+Par défaut, la commande `merge` utilisera la stratégie de fusion `ort` pour les fusions normales, et `octopus` pour les fusions de plusieurs branches. On peut spécifier une stratégie par défaut pour toutes les fusions en utilisant l'argument `--strategy` lorsqu'on invoque `rebase`, ou peut remplacer des fusions spécifiques dans la liste interactive des commandes en utilisant une commande `exec` pour appeler `git merge` explicitement avec un argument `--strategy`. Notez que lorsque vous appelez `git merge` explicitement comme cela, vous pouvez utiliser le fait que les étiquettes sont des réfs sont locales à l'arbre-de-travail (la réf `refs/rewritten/onto` correspondrait à l`étiquette `onto`, par exemple) afin de se référer aux branches que vous voulez fusionner.
+
+Note : la première commande (`label onto`) étiquette la révision sur laquelle les commits sont rebasés ; Le nom `onto` est juste une convention, comme un référence à l'option `--onto`.
+
+Il est également possible d'introduire des commits de fusion complètement nouveaux à partir de zéro en ajoutant une commande de la forme `merge <tête-de-fusion>`. Cette forme générera un message de validation provisoire et ouvrira toujours un éditeur pour laisser l'utilisateur l'éditer. Cela peut être utile, par exemple lorsqu'une branche de sujet traite plus d'un seul problème et doit être divisée en deux branches de thème ou plus. Considérez cette liste de todo :
+
+------------
+pick 192837 Switch from GNU Makefiles to CMake
+pick 5a6c7e Document the switch to CMake
+pick 918273 Fix detection of OpenSSL in CMake
+pick afbecd http: add support for TLS v1.3
+pick fdbaec Fix detection of cURL in CMake on Windows
+------------
+
+Le seul commit de cette liste qui n'est pas lié à CMake peut très bien avoir été motivé par le travail sur la correction de tous ces bugs introduits en passant à CMake, mais il répond à une préoccupation différente. Pour diviser cette branche en deux branches thématiques, la liste de todo pourrait être modifiée comme ceci :
+
+------------
+label onto
+
+pick afbecd http: add support for TLS v1.3
+label tlsv1.3
+
+reset onto
+pick 192837 Switch from GNU Makefiles to CMake
+pick 918273 Fix detection of OpenSSL in CMake
+pick fdbaec Fix detection of cURL in CMake on Windows
+pick 5a6c7e Document the switch to CMake
+label cmake
+
+reset onto
+merge tlsv1.3
+merge cmake
+------------
+
+CONFIGURATION
+-------------
+
+
+
+[WARNING]
+====
+Missing `fr/includes/cmd-config-section-all.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/rebase.txt`
+
+See original version for this content.
+====
+
+[]
+
+
+[WARNING]
+====
+Missing `fr/config/sequencer.txt`
+
+See original version for this content.
+====
+
+[]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

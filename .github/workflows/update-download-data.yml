@@ -1,0 +1,71 @@
+name: Update download data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # check daily for updates
+    - cron: '31 13 * * *'
+
+jobs:
+  update-download-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push changes (if any)
+      pages: write # to deploy to GitHub Pages
+      id-token: write # to verify that the deployment source is legit
+      issues: write # to open tickets upon broken links
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+            script
+      - name: ruby setup
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: update download data
+        run: |
+          # this seems to be needed to let `bundle exec` see `vendor/bundle/`
+          { bundle check || bundle install --frozen; } &&
+
+          # update download data
+          bundle exec ruby script/update-download-data.rb
+      - name: commit changes (if any)
+        id: commit
+        run: |
+          # Exit early if there are no changes
+          git update-index --ignore-submodules --refresh &&
+          git diff-files --quiet --ignore-submodules -- hugo.yml &&
+          exit 0
+
+          what="$(git diff hugo.yml |
+            sed -n '/^+ *filename: Git-\([.0-9]*\)-.*\.exe$/{s/.* Git-\([.0-9]*\)-.*/Git for Windows v\1/p;q}')"
+          mac="$(git diff hugo.yml |
+            sed -n 's/^+ *filename: git-\([.0-9]*\)-.*\.dmg$/Git for macOS v\1/p')"
+          test -z "$mac" || what="$what${what:+, }$mac"
+          commit_message="Update download data${what:+ ($what)}"
+          echo "result=$commit_message" >>$GITHUB_OUTPUT
+
+          git \
+            -c user.name=${{ github.actor }} \
+            -c user.email=${{ github.actor }}@noreply.github.com \
+            commit -m "$commit_message" \
+              -m 'Updated via the `update-download-data.yml` GitHub workflow.' \
+              -- hugo.yml
+      - name: verify that there are no uncommitted changes
+        run: |
+          git update-index --refresh &&
+          if test -n "$(git diff HEAD)$(git ls-files --exclude-standard --other)"
+          then
+            echo '::error::there are uncommitted changes!' >&2
+            git status >&2
+            exit 1
+          fi
+      - name: deploy to GitHub Pages
+        if: steps.commit.outputs.result != ''
+        id: deploy
+        uses: ./.github/actions/deploy-to-github-pages
