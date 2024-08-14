@@ -265,6 +265,9 @@ def local_genbook2(language_code, worktree_path)
   if language_code && worktree_path
     book = genbook(language_code) do |filename|
       File.open(File.join(worktree_path, filename), "r") { |infile| File.read(infile) }
+    rescue
+      puts "::error::#{filename} is missing!"
+      "**ERROR**: _#{filename} is missing_"
     end
     if language_code == 'en'
       latest_tag = `git -C "#{worktree_path}" for-each-ref --format '%(refname:short)' --sort=-committerdate --count=1 refs/tags/`.chomp
