@@ -38,7 +38,7 @@ group :development, :test do
   gem "rubocop", ">= 1.37.0"
   gem "rubocop-discourse", ">= 3.0.1"
   gem "rubocop-performance", ">= 1.11.1"
-  gem "rubocop-rails", ">= 2.17.0"
+  gem "rubocop-rails", ">= 2.26.0"
   gem "rubocop-rspec", ">= 2.14.0"
   gem "ruby-prof"
   gem "sqlite3"
