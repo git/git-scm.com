@@ -19,7 +19,7 @@ module Searchable
         "query" => {
           "bool" => {
             "should" => [],
-            "minimum_number_should_match" => 1
+            "minimum_should_match" => 1
           },
         },
         "highlight" => {
