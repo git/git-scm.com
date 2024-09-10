@@ -1,6 +1,9 @@
 const { test, expect, selectors } = require('@playwright/test')
 
-const url = 'https://git.github.io/git-scm.com/'
+const url = process.env.PLAYWRIGHT_TEST_URL
+  ? process.env.PLAYWRIGHT_TEST_URL.replace(/[^/]$/, '$&/')
+  : 'https://git-scm.com/'
+const isRailsApp = url === 'https://git-scm.com/'
 
 async function pretendPlatform(page, browserName, userAgent, platform) {
   if (browserName !== 'chromium') {
@@ -97,11 +100,19 @@ test('search', async ({ page }) => {
   await page.goto(`${url}docs/git-commit/fr`)
   await searchBox.fill('add')
   await searchBox.press('Shift')
-  await expect(searchResults.getByRole("link").nth(0)).toHaveAttribute('href', /\/docs\/git-add\/fr(\.html)?$/)
+  if (isRailsApp) {
+    await expect(searchResults.getByRole("link").nth(0)).toHaveAttribute('href', /\/docs\/git-add$/)
+  } else {
+    await expect(searchResults.getByRole("link").nth(0)).toHaveAttribute('href', /\/docs\/git-add\/fr(\.html)?$/)
+  }
 
   // pressing the Enter key should navigate to the full search results page
   await searchBox.press('Enter')
-  await expect(page).toHaveURL(/\/search.*language=fr/)
+  if (isRailsApp) {
+    await expect(page).toHaveURL(/\/search/)
+  } else {
+    await expect(page).toHaveURL(/\/search.*language=fr/)
+  }
 })
 
 test('manual pages', async ({ page }) => {
@@ -115,7 +126,11 @@ test('manual pages', async ({ page }) => {
   // Verify that the drop-downs are shown when clicked
   const previousVersionDropdown = page.locator('#previous-versions-dropdown')
   await expect(previousVersionDropdown).toBeHidden()
-  await page.getByRole('link', { name: 'Latest version' }).click()
+  if (isRailsApp) {
+    await page.getByRole('link', { name: /Version \d+\.\d+\.\d+/ }).click()
+  } else {
+    await page.getByRole('link', { name: 'Latest version' }).click()
+  }
   await expect(previousVersionDropdown).toBeVisible()
 
   const topicsDropdown = page.locator('#topics-dropdown')
