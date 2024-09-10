@@ -164,6 +164,10 @@ The [list of GUI clients](https://git-scm.com/downloads/guis) has been construct
 
 * https://lychee.cli.rs/
 
+### Playwright (website UI test framework)
+
+* https://playwright.dev/
+
 ## License
 
 The source code for the site is licensed under the MIT license, which you can find in
