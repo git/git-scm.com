@@ -158,6 +158,18 @@ test('manual pages', async ({ page }) => {
   await expect(gitRevisionsLink).toHaveAttribute('href', /\/docs\/gitrevisions\/fr$/)
   await gitRevisionsLink.click()
   await expect(page).toHaveURL(/\/docs\/gitrevisions$/)
+
+  // Ensure that the French mis-translation of `git remote renom` is not present
+  await page.goto(`${url}docs/git-remote/fr`)
+  const synopsis = page.locator('xpath=//h2[contains(text(), "SYNOPSIS")]/following-sibling::*[1]').first()
+  if (isRailsApp) {
+    // This is a bug in the Rails app, and it is unclear what the root cause is
+    await expect(synopsis).not.toHaveText(/git remote rename.*<ancien> <nouveau>/)
+    await expect(synopsis).toHaveText(/git remote renom.*<ancien> <nouveau>/)
+  } else {
+    await expect(synopsis).toHaveText(/git remote rename.*<ancien> <nouveau>/)
+    await expect(synopsis).not.toHaveText(/git remote renom.*<ancien> <nouveau>/)
+  }
 })
 
 test('book', async ({ page }) => {
