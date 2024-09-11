@@ -112,9 +112,26 @@ runs:
             return s.replace(/^([^]{0,65000}\n)[^]*\n(.+)\n?$/, '$1\n[...]\n\n$2')
           })(await fs.promises.readFile('lychee.md', 'utf8'))
 
-          const req = { owner: context.repo.owner, repo: context.repo.repo }
-          const q = `"Link+Checker+Report"+in:title+is:issue+label:linkchecker+is:open+repo:${req.owner}/${req.repo}`
-          const issues = await github.rest.search.issuesAndPullRequests({ ...req, q, sort: 'created', per_page: 1 })
+          const issues = await (async () => {
+            const req = { owner: context.repo.owner, repo: context.repo.repo }
+            const q = `"Link+Checker+Report"+in:title+is:issue+label:linkchecker+is:open+repo:${req.owner}/${req.repo}`
+            try {
+              return await github.rest.search.issuesAndPullRequests({ ...req, q, sort: 'created', per_page: 1 })
+            } catch (e) {
+              console.log(`Warning: ${e}; sleeping for 30 seconds and falling back to calling listForRepo()`)
+              await new Promise(r => setTimeout(r, 30000))
+
+              const issues = await github.rest.issues.listForRepo({...req, state: 'open', per_page: 100})
+              return {
+                data: {
+                  items: issues.data.filter(
+                    e => e.title === 'Link Checker Report'
+                    && e.labels.filter(l => l.name === 'linkchecker').length > 0
+                  )
+                }
+              }
+            }
+          })()
 
           if (issues.data.items.length === 0) {
             if (process.env.lychee_exit_code !== '0') {
