@@ -24,7 +24,7 @@ const mimeTypes = {
 };
 
 const handler = (request, response) => {
-    const pathname = url.parse(request.url).pathname;
+    const pathname = decodeURIComponent(url.parse(request.url).pathname);
     let filename = path.join(basePath, pathname === "/" ? "index.html" : pathname);
 
     let stats = fs.statSync(filename, { throwIfNoEntry: false });

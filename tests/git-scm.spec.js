@@ -193,4 +193,14 @@ test('book', async ({ page }) => {
   await page.getByRole('link', { name: 'Français' }).click()
   await expect(page).toHaveURL(/book\/fr/)
   await expect(page.getByRole('link', { name: 'Démarrage rapide' })).toBeVisible()
+
+  // Navigate to a page whose URL contains a question mark
+  await page.goto(`${url}book/az/v2/Başlanğıc-Git-Nədir?`)
+  if (isRailsApp) {
+    await expect(page).toHaveURL(/book\/az\/v2$/)
+    await page.goto(`${url}book/az/v2/Başlanğıc-Git-Nədir%3F`)
+  } else {
+    await expect(page).toHaveURL(/Ba%C5%9Flan%C4%9F%C4%B1c-Git-N%C9%99dir%3F/)
+  }
+  await expect(page.getByRole('document')).toHaveText(/Snapshot’lar, Fərqlər Yox/)
 })
