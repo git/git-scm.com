@@ -3,7 +3,7 @@
 source "https://rubygems.org"
 ruby "3.1.3"
 
-gem "rails", "~> 6.0"
+gem "rails", "~> 6.1"
 
 # hacks for rails6 + ruby 3.1
 gem 'net-imap', require: false
@@ -11,7 +11,7 @@ gem 'net-pop', require: false
 gem 'net-smtp', require: false
 
 gem "asciidoctor", "~> 2.0.0"
-gem "elasticsearch", "2.0.2"
+gem "elasticsearch", "7.13"
 gem "iso8601"
 gem "octokit"
 gem "puma"
