@@ -329,6 +329,12 @@ var Search = {
       showSubResults: true,
       showImages: false,
       language,
+      ranking: {
+        pageLength: 0.1, // boost longer pages
+        termFrequency: 0.1, // do not favor short pages
+        termSaturation: 2, // look for pages with more matches
+        termSimilarity: 9, // prefer exact matches
+      },
       processResult: function (result) {
         result.url = result.url.replace(/\.html$/, "")
 	return result
