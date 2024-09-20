@@ -22,6 +22,15 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 })
 
+test('generator is Hugo', async ({page}) => {
+  await page.goto(url)
+  if (isRailsApp) {
+    await expect(page.locator('meta[name="generator"]')).toHaveCount(0)
+  } else {
+    await expect(page.locator('meta[name="generator"]')).toHaveAttribute('content', /^Hugo /)
+  }
+})
+
 async function pretendPlatform(page, browserName, userAgent, platform) {
   if (browserName !== 'chromium') {
     await page.context().addInitScript({
