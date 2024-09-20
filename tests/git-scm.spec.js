@@ -5,6 +5,23 @@ const url = process.env.PLAYWRIGHT_TEST_URL
   : 'https://git-scm.com/'
 const isRailsApp = url === 'https://git-scm.com/'
 
+// Whenever a test fails, attach a screenshot to diagnose failures better
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    const screenshotPath =
+      testInfo.outputPath(`${testInfo.line}-${testInfo.column}-failure.png`)
+    testInfo.attachments.push({
+      name: 'screenshot',
+      path: screenshotPath,
+      contentType: 'image/png'
+    })
+    await page.screenshot({
+      path: screenshotPath,
+      timeout: 15000
+    })
+  }
+})
+
 async function pretendPlatform(page, browserName, userAgent, platform) {
   if (browserName !== 'chromium') {
     await page.context().addInitScript({
