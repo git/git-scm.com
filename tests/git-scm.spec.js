@@ -16,8 +16,8 @@ async function pretendPlatform(page, browserName, userAgent, platform) {
     // `Object.defineProperty()`, therefore we use the Chrome DevTools Protocol
     // with that browser (and only with that browser because it is proprietary
     // to that browser).
-    const cdpSession = await page.context().newCDPSession(page);
-    await cdpSession.send('Emulation.setUserAgentOverride', { platform, userAgent });
+    const cdpSession = await page.context().newCDPSession(page)
+    await cdpSession.send('Emulation.setUserAgentOverride', { platform, userAgent })
   }
 }
 
