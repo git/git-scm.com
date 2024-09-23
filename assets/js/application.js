@@ -24,7 +24,7 @@ const baseURLPrefix = (() => {
   const scripts = document.getElementsByTagName('script');
   const index = scripts.length - 1;
   const thisScript = scripts[index];
-  return thisScript.src.replace(/^.*:\/\/[^/]*(.*\/)js\/[^/]+.js(\?.*)?$/, '$1');
+  return thisScript.src.replace(/^.*:\/\/[^/]*(.*\/)(assets|js)\/[^/]+.js(\?.*)?$/, '$1');
 })();
 
 $(document).ready(function() {
