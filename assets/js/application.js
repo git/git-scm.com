@@ -362,6 +362,7 @@ var Search = {
 
     const ui = new PagefindUI({
       element: "#search-div",
+      showEmptyFilters: false,
       showSubResults: true,
       showImages: false,
       language,
