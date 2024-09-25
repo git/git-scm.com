@@ -201,9 +201,17 @@ test('manual pages', async ({ page }) => {
 test('book', async ({ page }) => {
   await page.goto(`${url}book`)
 
+  // the repository URL is correct
+  await expect(page.getByRole('link', { name: 'hosted on GitHub' }))
+    .toHaveAttribute('href', 'https://github.com/progit/progit2')
+
   // Navigate to the first section
   await page.getByRole('link', { name: 'Getting Started' }).click()
   await expect(page).toHaveURL(/Getting-Started-About-Version-Control/)
+
+  // the repository URL is still correct
+  await expect(page.getByRole('link', { name: 'hosted on GitHub' }))
+    .toHaveAttribute('href', 'https://github.com/progit/progit2')
 
   // Verify that the drop-down is shown when clicked
   const chaptersDropdown = page.locator('#chapters-dropdown')
@@ -220,6 +228,10 @@ test('book', async ({ page }) => {
   await expect(page).toHaveURL(/book\/fr/)
   await expect(page.getByRole('link', { name: 'Démarrage rapide' })).toBeVisible()
 
+  // the repository URL now points to the French translation
+  await expect(page.getByRole('link', { name: 'hosted on GitHub' }))
+    .toHaveAttribute('href', 'https://github.com/progit/progit2-fr')
+
   // Navigate to a page whose URL contains a question mark
   await page.goto(`${url}book/az/v2/Başlanğıc-Git-Nədir?`)
   if (isRailsApp) {
@@ -229,4 +241,8 @@ test('book', async ({ page }) => {
     await expect(page).toHaveURL(/Ba%C5%9Flan%C4%9F%C4%B1c-Git-N%C9%99dir%3F/)
   }
   await expect(page.getByRole('document')).toHaveText(/Snapshot’lar, Fərqlər Yox/)
+
+  // the repository URL now points to the Azerbaijani translation
+  await expect(page.getByRole('link', { name: 'hosted on GitHub' }))
+    .toHaveAttribute('href', 'https://github.com/progit2-aze/progit2')
 })
