@@ -230,7 +230,8 @@ test('book', async ({ page }) => {
   // Navigate to the French translation
   await page.getByRole('link', { name: 'Français' }).click()
   await expect(page).toHaveURL(/book\/fr/)
-  await expect(page.getByRole('link', { name: 'Démarrage rapide' })).toBeVisible()
+  await expect(page.locator('.inner h1')).toHaveText(/Démarrage rapide/)
+  await expect(page.getByRole('link', { name: 'Démarrage rapide' })).not.toBeVisible()
 
   // the repository URL now points to the French translation
   await expect(page.getByRole('link', { name: 'hosted on GitHub' }))
