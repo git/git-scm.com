@@ -25,7 +25,14 @@ const mimeTypes = {
 
 const handler = (request, response) => {
     const pathname = decodeURIComponent(url.parse(request.url).pathname);
-    let filename = path.join(basePath, pathname === "/" ? "index.html" : pathname);
+    let filename = path.join(
+        basePath,
+        pathname === "/"
+        ? "index.html"
+        : pathname.endsWith("/")
+          ? `${pathname}index.html`
+          : pathname
+    );
 
     let stats = fs.statSync(filename, { throwIfNoEntry: false });
     if (!stats?.isFile() && !filename.match(/\.[A-Za-z0-9]{1,11}$/)) {

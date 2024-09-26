@@ -199,7 +199,11 @@ test('manual pages', async ({ page }) => {
 })
 
 test('book', async ({ page }) => {
+  await page.goto(`${url}book/`)
+  await expect(page).toHaveURL(`${url}book/en/v2`)
+
   await page.goto(`${url}book`)
+  await expect(page).toHaveURL(`${url}book/en/v2`)
 
   // Navigate to the first section
   await page.getByRole('link', { name: 'Getting Started' }).click()
