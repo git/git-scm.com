@@ -130,7 +130,11 @@ class Book
     front_matter = self.front_matter
     front_matter["page_title"] = "Git - Book"
     front_matter["url"] = "/book/#{@language_code}/v#{@edition}.html"
-    front_matter["aliases"] = [ "/book/#{@language_code}/v#{@edition}/index.html" ]
+    front_matter["aliases"] = [
+      "/book/#{@language_code}/v#{@edition}/index.html",
+      "/book/#{@language_code}/index.html"
+    ]
+    front_matter["aliases"].push("/book/index.html") if @language_code == "en"
     front_matter["book"]["front_page"] = true
     front_matter["book"]["repository_url"] = "https://github.com/#{@@all_books[@language_code]}"
     front_matter["book"]["sha"] = self.sha
