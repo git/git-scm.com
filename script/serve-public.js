@@ -36,8 +36,8 @@ const handler = (request, response) => {
 
     let stats = fs.statSync(filename, { throwIfNoEntry: false });
     if (!stats?.isFile() && !filename.match(/\.[A-Za-z0-9]{1,11}$/)) {
-	    filename += ".html";
-	    stats = fs.statSync(filename, { throwIfNoEntry: false });
+            filename += ".html";
+            stats = fs.statSync(filename, { throwIfNoEntry: false });
     }
     try{
         if (!stats?.isFile()) throw new Error(`Not a file: ${filename}`);

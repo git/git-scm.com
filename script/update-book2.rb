@@ -196,7 +196,7 @@ def genbook(language_code, &get_content)
       end
 
       images.each do |path|
-        content = get_content.call(path)
+        content = get_content.call(path, :gently => true)
         csection.saveImage(path, content)
       rescue Errno::ENOENT
         begin
@@ -289,11 +289,11 @@ end
 # Generate book html directly from local git repo"
 def local_genbook2(language_code, worktree_path)
   if language_code && worktree_path
-    book = genbook(language_code) do |filename|
+    book = genbook(language_code) do |filename, options={}|
       File.open(File.join(worktree_path, filename), "r") { |infile| File.read(infile) }
-    rescue
-      puts "::error::#{filename} is missing!"
-      "**ERROR**: _#{filename} is missing_"
+    rescue => e
+      puts "::error::#{filename} is missing!" unless options[:gently]
+      raise e
     end
     book.sha = `git -C "#{worktree_path}" rev-parse HEAD`.chomp
     if language_code == 'en'
