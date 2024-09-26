@@ -291,9 +291,9 @@ def local_genbook2(language_code, worktree_path)
   if language_code && worktree_path
     book = genbook(language_code) do |filename|
       File.open(File.join(worktree_path, filename), "r") { |infile| File.read(infile) }
-    rescue
+    rescue => e
       puts "::error::#{filename} is missing!"
-      "**ERROR**: _#{filename} is missing_"
+      raise e
     end
     book.sha = `git -C "#{worktree_path}" rev-parse HEAD`.chomp
     if language_code == 'en'
