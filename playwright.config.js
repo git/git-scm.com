@@ -22,7 +22,11 @@ module.exports = defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   /* Uses 'github' for GitHub Actions CI to generate annotations, otherwise 'html' */
-  reporter: process.env.CI && process.env.PLAYWRIGHT_TEST_URL === 'http://localhost:5000/' ? 'github' : 'html',
+  reporter: [
+    [ 'html' ],
+    ...(process.env.CI && process.env.PLAYWRIGHT_TEST_URL === 'http://localhost:5000/'
+      ? [ [ 'github' ] ] : [])
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
