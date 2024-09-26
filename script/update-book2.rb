@@ -74,6 +74,9 @@ def genbook(language_code, &get_content)
   content = expand(initial_content, "progit.asc") { |filename| get_content.call(filename) }
   # revert internal links decorations for ebooks
   content.gsub!(/<<.*?\#(.*?)>>/, "<<\\1>>")
+  # work around AsciiDoctor v2.0.19 and later mis-interpreting multiple `+` as
+  # indicating the start or the end of literal monospace.
+  content.gsub!(/`\+`/, "`{plus}`")
 
   asciidoc = Asciidoctor::Document.new(content, attributes: { "lang" => language_code })
   html = asciidoc.render
