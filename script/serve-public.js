@@ -48,9 +48,8 @@ const handler = (request, response) => {
         fileStream.pipe(response);
     } catch(e) {
         console.log(`Could not read ${filename}`);
-        response.writeHead(404, {'Content-Type': 'text/plain'});
-        response.write('404 Not Found\n');
-        response.end();
+        response.writeHead(404, {'Content-Type': 'text/html'});
+        fs.createReadStream(path.join(basePath, '404.html')).pipe(response);
         return;
     }
 };

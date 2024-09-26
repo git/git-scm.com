@@ -234,3 +234,18 @@ test('book', async ({ page }) => {
   }
   await expect(page.getByRole('document')).toHaveText(/Snapshot’lar, Fərqlər Yox/)
 })
+
+test('404', async ({ page }) => {
+  await page.goto(`${url}does-not.exist`)
+
+  await expect(page.locator('.inner h1')).toHaveText(`That page doesn't exist.`)
+
+  // the 404 page should be styled
+  await expect(page.locator('link[rel="stylesheet"]')).toHaveAttribute('href', /application(\.min)?\.css$/)
+
+  // the search box is shown
+  await expect(page.locator('#search-text')).toBeVisible()
+
+  // the usual navbar is shown
+  await expect(page.getByRole('link', { name: 'Community' })).toBeVisible()
+})
