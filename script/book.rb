@@ -118,6 +118,7 @@ class Book
     end
     data = {
       "language_code" => @language_code,
+      "repository_url" => "https://github.com/#{@@all_books[@language_code]}",
       "chapters" => chapters
     }
     path = File.join(File.dirname(__FILE__), "..", "external", "book", "data", "book", "#{@language_code}.yml")
