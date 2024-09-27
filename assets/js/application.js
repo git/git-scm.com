@@ -475,7 +475,7 @@ var Downloads = {
       if (window.history && window.history.pushState) {
         var url = os === ''
           ? `${baseURLPrefix}downloads/guis`
-          : `${baseURLPrefix}download/guis?os=${os}`;
+          : `${baseURLPrefix}downloads/guis?os=${os}`;
         try {
           history.pushState(null, $(this).html(), url);
         } catch (e) {
