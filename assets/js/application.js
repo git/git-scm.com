@@ -34,6 +34,7 @@ $(document).ready(function() {
   Forms.init();
   Downloads.init();
   DownloadBox.init();
+  BarCharts.init();
 });
 
 function onPopState(fn) {
@@ -539,6 +540,54 @@ var Downloads = {
     Downloads.adjustFor32BitWindows();
     $('#relative-release-date').html(Downloads.postProcessReleaseDate);
   },
+}
+var BarCharts = {
+  init: function() {
+    BarCharts.render();
+  },
+
+  render: function() {
+    $('barchart').each(function() {
+      const label = $(this).attr('x-data-title');
+      const pairs = $(this).attr('x-data').split(',');
+      const data = pairs.reduce((data, pair) => {
+        const [label, amount] = pair.split(':');
+        data[label] = parseFloat(amount);
+        return data;
+      }, {});
+      const backgroundColor = pairs.map(pair => pair.startsWith('git') ? '#E09FA0' : '#E05F49');
+
+      const canvas = document.createElement('canvas');
+      new Chart(canvas, {
+        type: 'bar',
+        data: {
+          datasets: [{
+            data,
+            backgroundColor,
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              display: false,
+              beginAtZero: true,
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            title: {
+              display: true,
+              text: label,
+            }
+          }
+        }
+      });
+      $(this).append(canvas);
+    });
+  }
 }
 
 // Scroll to Top
