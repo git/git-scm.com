@@ -265,3 +265,19 @@ test('404', async ({ page }) => {
   // the usual navbar is shown
   await expect(page.getByRole('link', { name: 'Community' })).toBeVisible()
 })
+
+test('sidebar', async ({ page }) => {
+  await page.goto(`${url}community`);
+
+  test.skip(!await page.evaluate(() => matchMedia('(max-width: 940px)').matches),
+    'not a small screen');
+
+  const sidebarButton = page.locator('.sidebar-btn');
+  await expect(sidebarButton).toBeVisible();
+  await sidebarButton.click();
+
+  const about = page.getByRole('link', { name: 'About', exact: true });
+  await expect(about).toBeVisible();
+  await about.click();
+  await expect(page.getByRole('heading', { name: 'About - Branching and Merging' })).toBeVisible();
+});
