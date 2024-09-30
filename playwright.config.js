@@ -57,6 +57,13 @@ module.exports = defineConfig({
       name: 'chrome',
       use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
+    {
+      name: 'iPhone',
+      use: {
+        ...devices['iPhone 11'],
+      },
+    },
+
 
     /* Test against mobile viewports. */
     // {
