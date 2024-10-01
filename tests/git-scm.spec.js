@@ -228,6 +228,12 @@ test('book', async ({ page }) => {
   await expect(chaptersDropdown.locator('.active')).toHaveCount(1)
 
   // Navigate to the French translation
+  if (await page.evaluate(() => matchMedia('(max-width: 940px)').matches)) {
+    // On small screens, the links to the translated versions of the ProGit book
+    // are hidden by default, and have to be "un-hidden" by clicking on the
+    // sidebar button first.
+    await page.locator('.sidebar-btn').click();
+  }
   await page.getByRole('link', { name: 'Français' }).click()
   await expect(page).toHaveURL(/book\/fr/)
   await expect(page.getByRole('link', { name: 'Démarrage rapide' })).toBeVisible()
