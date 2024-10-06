@@ -29,6 +29,7 @@ const baseURLPrefix = (() => {
 
 $(document).ready(function() {
   BrowserFallbacks.init();
+  DarkMode.init();
   Search.init();
   Dropdowns.init();
   Forms.init();
@@ -538,6 +539,44 @@ var Downloads = {
   postProcessDownloadPage: function() {
     Downloads.adjustFor32BitWindows();
     $('#relative-release-date').html(Downloads.postProcessReleaseDate);
+  },
+}
+
+var DarkMode = {
+  init: function() {
+    const button = $('#dark-mode-button');
+    if (!button.length) return;
+
+    // Check for dark mode preference at the OS level
+    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    // Get the user's theme preference from local storage, if it's available
+    const currentTheme = localStorage.getItem("theme");
+
+    const body = $("body");
+    if (prefersDarkScheme) {
+      if (currentTheme === "light") {
+       body.addClass("light-mode");
+     } else {
+      button.text("🌞");
+     }
+    } else if (currentTheme === "dark") {
+      body.addClass("dark-mode");
+      button.text("🌞");
+    }
+
+    button.click(() => {
+      let theme
+      if (prefersDarkScheme) {
+        body.toggleClass("light-mode");
+        theme = body.hasClass("light-mode") ? "light" : "dark";
+      } else {
+        body.toggleClass("dark-mode");
+        theme = body.hasClass("dark-mode") ? "dark" : "light";
+      }
+      localStorage.setItem("theme", theme);
+      button.text(theme === "dark" ? "🌞" : "🌙");
+    });
   },
 }
 
