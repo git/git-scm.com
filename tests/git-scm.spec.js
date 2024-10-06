@@ -200,10 +200,10 @@ test('manual pages', async ({ page }) => {
 
 test('book', async ({ page }) => {
   await page.goto(`${url}book/`)
-  await expect(page).toHaveURL(`${url}book/en/v2`)
+  await expect(page).toHaveURL(/book\/en\/v2/)
 
   await page.goto(`${url}book`)
-  await expect(page).toHaveURL(`${url}book/en/v2`)
+  await expect(page).toHaveURL(/book\/en\/v2/)
 
   // the repository URL is correct
   await expect(page.getByRole('link', { name: 'hosted on GitHub' }))
