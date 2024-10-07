@@ -6,8 +6,8 @@ section: documentation
 subsection: manual
 title: Git - multi-pack-index Documentation
 docname: multi-pack-index
-version: 2.36.0
-latest-changes: 2.36.0
+version: 2.47.0
+latest-changes: 2.47.0
 aliases:
 - "/docs/multi-pack-index/index.html"
 ---
@@ -113,6 +113,137 @@ without any loss of information.</p>
 commit-graph file) that allows optional data to be added.</p>
 </li>
 </ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_incremental_multi_pack_indexes"><a class="anchor" href="#_incremental_multi_pack_indexes"></a>Incremental multi-pack indexes</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>As repositories grow in size, it becomes more expensive to write a
+multi-pack index (MIDX) that includes all packfiles. To accommodate
+this, the "incremental multi-pack indexes" feature allows for combining
+a "chain" of multi-pack indexes.</p>
+</div>
+<div class="paragraph">
+<p>Each individual component of the chain need only contain a small number
+of packfiles. Appending to the chain does not invalidate earlier parts
+of the chain, so repositories can control how much time is spent
+updating the MIDX chain by determining the number of packs in each layer
+of the MIDX chain.</p>
+</div>
+<div class="sect2">
+<h3 id="_design_state"><a class="anchor" href="#_design_state"></a>Design state</h3>
+<div class="paragraph">
+<p>At present, the incremental multi-pack indexes feature is missing two
+important components:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The ability to rewrite earlier portions of the MIDX chain (i.e., to
+"compact" some collection of adjacent MIDX layers into a single
+MIDX). At present the only supported way of shrinking a MIDX chain
+is to rewrite the entire chain from scratch without the <code>--split</code>
+flag.</p>
+<div class="paragraph">
+<p>There are no fundamental limitations that stand in the way of being able
+to implement this feature. It is omitted from the initial implementation
+in order to reduce the complexity, but will be added later.</p>
+</div>
+</li>
+<li>
+<p>Support for reachability bitmaps. The classic single MIDX
+implementation does support reachability bitmaps (see the section
+titled "multi-pack-index reverse indexes" in
+<a href='{{< relurl "docs/gitformat-pack" >}}'>gitformat-pack[5]</a> for more details).</p>
+<div class="paragraph">
+<p>As above, there are no fundamental limitations that stand in the way of
+extending the incremental MIDX format to support reachability bitmaps.
+The design below specifically takes this into account, and support for
+reachability bitmaps will be added in a future patch series. It is
+omitted from the current implementation for the same reason as above.</p>
+</div>
+<div class="paragraph">
+<p>In brief, to support reachability bitmaps with the incremental MIDX
+feature, the concept of the pseudo-pack order is extended across each
+layer of the incremental MIDX chain to form a concatenated pseudo-pack
+order. This concatenation takes place in the same order as the chain
+itself (in other words, the concatenated pseudo-pack order for a chain
+<code>{$H1, $H2, $H3}</code> would be the pseudo-pack order for <code>$H1</code>, followed by
+the pseudo-pack order for <code>$H2</code>, followed by the pseudo-pack order for
+<code>$H3</code>).</p>
+</div>
+<div class="paragraph">
+<p>The layout will then be extended so that each layer of the incremental
+MIDX chain can write a <code>*.bitmap</code>. The objects in each layer&#8217;s bitmap
+are offset by the number of objects in the previous layers of the chain.</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_file_layout"><a class="anchor" href="#_file_layout"></a>File layout</h3>
+<div class="paragraph">
+<p>Instead of storing a single <code>multi-pack-index</code> file (with an optional
+<code>.rev</code> and <code>.bitmap</code> extension) in <code>$GIT_DIR/objects/pack</code>, incremental
+MIDXs are stored in the following layout:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$GIT_DIR/objects/pack/multi-pack-index.d/
+$GIT_DIR/objects/pack/multi-pack-index.d/multi-pack-index-chain
+$GIT_DIR/objects/pack/multi-pack-index.d/multi-pack-index-$H1.midx
+$GIT_DIR/objects/pack/multi-pack-index.d/multi-pack-index-$H2.midx
+$GIT_DIR/objects/pack/multi-pack-index.d/multi-pack-index-$H3.midx</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>multi-pack-index-chain</code> file contains a list of the incremental
+MIDX files in the chain, in order. The above example shows a chain whose
+<code>multi-pack-index-chain</code> file would contain the following lines:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$H1
+$H2
+$H3</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>multi-pack-index-$H1.midx</code> file contains the first layer of the
+multi-pack-index chain. The <code>multi-pack-index-$H2.midx</code> file contains
+the second layer of the chain, and so on.</p>
+</div>
+<div class="paragraph">
+<p>When both an incremental- and non-incremental MIDX are present, the
+non-incremental MIDX is always read first.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_object_positions_for_incremental_midxs"><a class="anchor" href="#_object_positions_for_incremental_midxs"></a>Object positions for incremental MIDXs</h3>
+<div class="paragraph">
+<p>In the original multi-pack-index design, we refer to objects via their
+lexicographic position (by object IDs) within the repository&#8217;s singular
+multi-pack-index. In the incremental multi-pack-index design, we refer
+to objects via their index into a concatenated lexicographic ordering
+among each component in the MIDX chain.</p>
+</div>
+<div class="paragraph">
+<p>If <code>objects_nr()</code> is a function that returns the number of objects in a
+given MIDX layer, then the index of an object at lexicographic position
+<code>i</code> within, say, $H3 is defined as:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>objects_nr($H2) + objects_nr($H1) + i</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>(in the C implementation, this is often computed as <code>i +
+m-&gt;num_objects_in_base</code>).</p>
+</div>
 </div>
 </div>
 </div>
