@@ -106,13 +106,18 @@ runs:
           -H "Content-Type: application/json" \
           -d '{ "purge_everything": true }'
 
-    - name: construct `--remap` option for lychee
+    - name: construct `--remap` options for lychee
       id: remap
       shell: bash
       run: |
         base_url='${{ steps.pages.outputs.base_url }}'
         echo "result=$(echo "$base_url" |
           sed 's|^\(.*\)\(/git-scm\.com\)$|(\1)?\2(.*)|') file://$PWD/public\$2" \
+          >>$GITHUB_OUTPUT
+        # When running in forks, do detect when links try to break out of the
+        # `/git-scm.com/` subdirectory
+        echo "remap-dotdot=$(echo "$base_url" |
+          sed 's|^\(.*\)\(/git-scm\.com\)$|--remap '\''(\1.*) file://../$1'\''|')" \
           >>$GITHUB_OUTPUT
 
     - name: check for broken links
@@ -125,6 +130,7 @@ runs:
           --fallback-extensions html
           --base '${{ steps.pages.outputs.base_url }}'
           --remap '${{ steps.remap.outputs.result }}'
+          ${{ steps.remap.outputs.remap-dotdot }}
           --exclude file:///path/to/repo.git/
           --exclude file:///caminho/para/o/reposit%C3%B3rio.git/
           --exclude file:///ruta/a/repositorio.git/
@@ -150,8 +156,8 @@ runs:
             return s.replace(/^([^]{0,65000}\n)[^]*\n(.+)\n?$/, '$1\n[...]\n\n$2')
           })(await fs.promises.readFile('lychee.md', 'utf8'))
 
+          const req = { owner: context.repo.owner, repo: context.repo.repo }
           const issues = await (async () => {
-            const req = { owner: context.repo.owner, repo: context.repo.repo }
             const q = `"Link+Checker+Report"+in:title+is:issue+label:linkchecker+is:open+repo:${req.owner}/${req.repo}`
             try {
               return await github.rest.search.issuesAndPullRequests({ ...req, q, sort: 'created', per_page: 1 })
