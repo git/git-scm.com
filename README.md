@@ -16,6 +16,15 @@ $ scalar clone https://github.com/git/git-scm.com
 $ cd git-scm.com/src
 $ git sparse-checkout set layouts content static assets hugo.yml data script
 
+If your Git installation comes without `scalar`, you can create a sparse, partial clone manually, like this:
+
+```ShellSession
+$ git clone --filter=blob:none --no-checkout https://github.com/git/git-scm.com
+$ cd git-scm.com
+$ git sparse-checkout set layouts content static assets hugo.yml data script
+$ git reset --hard
+```
+
 Here is a detailed list of the relevant directories:
 
 - If you want to test any page rendering using Hugo:
