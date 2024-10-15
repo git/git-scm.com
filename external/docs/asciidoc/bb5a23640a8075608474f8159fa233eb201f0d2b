@@ -1,0 +1,144 @@
+git-repack(1)
+=============
+
+NOM
+---
+git-repack - Empaquète les objets non empaquetés dans le dépôt
+
+
+SYNOPSIS
+--------
+[verse]
+'git repack' [-a] [-A] [-d] [-f] [-F] [-l] [-n] [-q] [-b] [-m] [--window=<n>] [--depth=<n>] [--threads=<n>] [--keep-pack=<nom-de-pack>] [--write-midx]
+
+DESCRIPTION
+-----------
+
+Cette commande est utilisée pour combiner tous les objets qui ne résident pas actuellement dans un "pack", dans un pack. Elle peut également être utilisée pour réorganiser les packs existants en un seul pack plus efficace.
+
+Un paquet est une collection d'objets, compressés individuellement, avec une compression de delta appliquée, stockés dans un seul fichier avec un fichier d'index associé.
+
+Les paquets sont utilisés pour réduire la charge sur les systèmes de miroir, les moteurs de sauvegarde, le stockage de disque, etc.
+
+OPTIONS
+-------
+
+-a::
+	Au lieu empaqueter progressivement les objets non empaquetés, empaqueter tout ce qui est référencé dans un seul paquet. Particulièrement utile lors de l'empaquetage d'un dépôt utilisé pour un développement privé. À utilliser avec `-d`. Cela nettoie les objets que `git prune` a laissé, mais que `git fsck --full --dangling` montre comme en suspens.
++
+Notez que les utilisateurs qui récupèrent via des protocoles idiots devront récupérer le nouveau pack complet pour obtenir tout objet contenu, peu importe le nombre d'autres objets dans ce pack qu'ils ont déjà localement.
++
+Les fichiers de paquet prometteurs sont réemballés séparément : s'il y a des fichiers paquets qui ont un fichier associé ".promisor", ces paquets seront réemballés dans un autre paquet séparé, et un fichier ".promisor" vide correspondant au nouveau paquet séparé sera écrit.
+
+-A::
+	Même que `-a`, sauf si `-d` est utilisé. Ensuite, tous les objets inaccessibles dans un paquet précédent deviennent des objets libres, non empaquetés, au lieu d'être laissés dans l'ancien paquet. Les objets inaccessibles ne sont jamais intentionnellement ajoutés à un paquet, même en rempaquetant. Cette option empêche les objets inaccessibles d'être immédiatement supprimés parce qu'ils sont laissés dans l'ancien paquet et ensuite enlevés. Au lieu de cela, les objets non joignables libres seront élagués selon les règles d'expiration normales avec la prochaine invocation de 'git gc'. Voir linkgit:git-gc[1].
+
+-d::
+	Après l'empaquetage, si les paquets nouvellement créés rendent quelques paquets existants redondants, retirer les paquets redondants. Lancer également 'git prune-packed' pour supprimer les fichiers d'objets libres redondants.
+
+--cruft::
+	Identique à `-a`, sauf si `-d` est utilisé. Ensuite, tous les objets inaccessibles sont empaquetés dans un paquet déchet séparé. Les objets inaccessibles peuvent être élagués selon les règles d'expiration normales avec l'invocation suivante de `git gc` (voir linkgit:git-gc[1]). Incompatible avec `-k`.
+
+--cruft-expiration=<approxi-date>::
+	Expirer les objets inaccessibles plus âgés que `<date-approx>` immédiatement au lieu d'attendre la prochaine invocation `git gc`. Seulement utile avec `--cruft -d`.
+
+--max-cruft-size=<n>::
+	Rempaqueter les objets en paquets d'au plus _<n>_ octets avant de créer de nouveaux paquets. Tant qu'il y a assez de paquets déchets plus petits que _<n>_, le rempaquetage créera un nouveau paquet déchet contenant les objets de tous les paquets déchets combinés, en plus de tous les nouveaux objets inaccessibles. Les paquets déchets plus grands que _<n>_ ne seront pas modifiés. Lorsqu'un nouveau paquet déchet est plus grand que les _<n>_octets, il est divisé en plusieurs paquets, qui sont tous garantis d'avoir une taille d'au plus _<n>_ octets. Seulement utile avec `--cruft -d`.
+
+--expire-to=<rép.>::
+	Écrire un paquet déchet contenant des objets élagués (le cas échéant) dans le répertoire _<rép>_. Cette option est utile pour conserver une copie de tous les objets élagués dans un répertoire séparé comme sauvegarde. Seulement utile avec `--cruft -d`.
+
+-l::
+	Passer l'option `--local` à 'git pack-objects'. Voir linkgit:git-pack-objects[1].
+
+-f::
+	Passer l'option `--no-reuse-delta` à `git-pack-objects`. Voir linkgit:git-pack-objects[1].
+
+-F::
+	Passer l'option `--no-reuse-object` à `git-pack-objects`. Voir linkgit:git-pack-objects[1].
+
+-q::
+--quiet::
+	N’afficher aucune progression sur le flux d’erreur standard et passer l'option `-q` à 'git pack-objects'. Voir linkgit:git-pack-objects[1].
+
+-n::
+	Ne pas mettre à jour les informations du serveur avec 'git update-server-info'. Cette option ignore la mise à jour des fichiers de catalogue locaux nécessaires pour publier ce dépôt (ou une copie directe de celui-ci) sur HTTP ou FTP. Voir linkgit:git-update-server-info[1].
+
+--window=<n>::
+--depth=<n>::
+	Ces deux options affectent la façon dont les objets contenus dans le paquet sont stockés à l'aide de la compression delta. Les objets sont d'abord triés en interne par type, taille et optionnellement par noms et comparés aux autres objets dans `--window` pour voir si l'utilisation de compression de delta permet d'économiser de l'espace. `--depth` limite la profondeur maximale du delta ; la rendre trop profonde affecte la performance du côté du dépaqueteur, parce que les données de delta doivent être appliquées autant de fois pour arriver à l'objet nécessaire.
++
+La valeur par défaut pour --window est 10 et --depth est 50. La profondeur maximale est de 4095.
+
+--threads=<n>::
+	Cette option est passée à `git pack-objects`.
+
+--window-memory=<n>::
+	Cette option fournit une limite supplémentaire par dessus `--window` ; la taille de la fenêtre s'étendra dynamiquement vers le bas afin de ne pas prendre plus que '<n>' octets en mémoire. Ceci est utile dans les dépôts avec un mélange de grands et petits objets afin de ne pas manquer de mémoire avec une grande fenêtre, mais encore être en mesure de profiter de la grande fenêtre pour les petits objets. La taille peut être suffixée par "k", "m", ou "g". `--window-memory=0` rend l'utilisation de la mémoire illimitée. La valeur par défaut est tirée de la variable de configuration `pack.windowMemory`. Notez que l'utilisation réelle de la mémoire sera la limite multipliée par le nombre de threads utilisés par linkgit:git-pack-objects[1].
+
+--max-pack-size=<n>::
+	La taille maximum de chaque fichier paquet. La taille peut être suffixée avec "k", "m", ou "g". La taille minimale autorisée est limitée à 1 MiB. Si spécifiée, plusieurs fichiers paquets seront créés, ce qui empêche la création d'un index de bitmap. La valeur par défaut est illimitée, sauf si la variable config `pack.packSizeLimit` est définie. Notez que cette option peut entraîner un dépôt plus gros et plus lent ; voir la discussion dans `pack.packSizeLimit`.
+
+--filter=<spéc. du filtre>::
+	Retirer les objets correspondant à la spécification du filtre du fichier paquet résultant et les mettre dans un fichier paquet séparé. Notez que les objets utilisés dans le répertoire de travail ne sont pas filtrés. Donc, pour que la séparation fonctionne pleinement, il est préférable de l'exécuter dans un dépôt nu et d'utiliser les options `-a` et `-d` avec cette option. `--no-write-bitmap-index` (ou l'option de config `repack.writebitmaps` à `false`) devrait aussi être utilisés, sinon l'écriture de l'index de bitmap échouera, vu que cela supposerait l'écriture d'un seul fichier paquet contenant tous les objets. Voir linkgit:git-rev-list[1] pour les forme valides de _<spéc-de-filtre>_.
+
+--filter-to=<rép.>::
+	Écrire le paquet contenant des objets filtrés vers le répertoire _<répertoire>_. Seulement utile avec `--filter`. Ceci peut être utilisé pour mettre le paquet dans un répertoire d'objets séparé qui est accessible par le mécanisme alternatif de Git. **ATTENTION :** Si le fichier paquet contenant les objets filtrés n'est pas accessible, le dépôt peut se corrompre car il pourrait ne pas être possible d'accéder aux objets dans ce fichier. Voir les sections `objects` et `objects/info/alternates` de linkgit:gitrepository-layout[5].
+
+-b::
+--write-bitmap-index::
+	Écrire un index de bitmap accessible dans le cadre du rempaquetage. Cela n'a de sens que lorsqu'utilisé avec `-a`, `-A` ou `-m`, car les bitmaps doivent pouvoir se référer à tous les objets accessibles. Cette option annule le réglage de `repack.writeBitmaps`. Cette option n'a aucun effet si plusieurs paquets sont créés, à moins d'écrire un MIDX (auquel cas un bitmap multi-pack est créé).
+
+--pack-kept-objects::
+	Inclure des objets dans les fichiers `.keep` lors du rempaquetage. Notez que nous ne supprimons toujours pas les paquets `.keep` après la fin de `pack-objects` . Cela signifie que nous pouvons dupliquer des objets, mais cela rend l'option sûre lorsqu'il y a des poussées ou des récupérations simultanées. Cette option n'est généralement utile que si vous écrivez des bitmaps avec `-b` ou `repack.writeBitmaps`, car elle garantit que le paquet géré par le bitmap a les objets nécessaires.
+
+--keep-pack=<nom-de-paquet>::
+	Exclure le paquet donné du réempaquetage. C'est équivalent à avoir un fichier `.keep` sur le paquet.`<nom-de-paquet>` est le nom du fichier paquet sans répertoire (par exemple `pack-123.pack`). L'option peut être spécifiée plusieurs fois pour garder plusieurs paquets.
+
+--unpack-unreachable=<quand>::
+	Lors de la libération des objets inaccessibles, ne pas s'ennuyer à relâcher des objets plus anciens que _<quand>_. Cela peut être utilisé pour optimiser l'écriture de tous les objets qui seraient immédiatement élagués par un `git prune`subséquent.
+
+-k::
+--keep-unreachable::
+	Lorsqu'utilisé avec `-ad`, tous les objets inaccessibles des paquets existants seront annexés à la fin du paquet au lieu d'être enlevés. De plus, tous les objets inaccessibles seront empaquetés (et leurs homologues libres enlevés).
+
+-i::
+--delta-islands::
+	Passer l'option `--delta-islands` à `git-pack-objects`, voir linkgit:git-pack-objects[1].
+
+-g<facteur>::
+--geometric=<facteur>::
+	Arranger la structure de paquets résultant de sorte que chaque paquet successif contient au moins _<facteur>_ fois le nombre d'objets que le plus grand paquet existant .
++
+`git repack` assure cela en déterminant une "limite" de paquets qui doivent être rempaquetés en un paquet afin d'assurer une progression géométrique. Il choisit le plus petit ensemble de fichiers paquets tels que le plus grand nombre de paquets plus grands (en comptant des objets contenus dans ce paquet) peuvent être laissés intacts.
++
+Contrairement à d'autres modes de rempaquetage, l'ensemble des objets à empaqueter est déterminé de façon unique par l'ensemble de paquets "enroulés" ; en d'autres termes, les paquets identifiés à être combinés pour restaurer une progression géométrique.
++
+Les objets libres sont implicitement inclus dans cet "enroulage", indépendamment de leur accessibilité. Ceci est sujet à changement dans l'avenir.
++
+Lors de l'écriture d'un bitmap multi-paquet, `git repack` choisit le plus grand paquet résultant comme le paquet préféré pour la sélection d'objets par le MIDX (voir linkgit:git-multi-pack-index[1]).
+
+-m::
+--write-midx::
+	Écrire un index multi-paquet (voir linkgit:git-multi-pack-index[1]) contenant les paquets non redondants.
+
+CONFIGURATION
+-------------
+
+Diverses variables de configuration affectent l'empaquetage, voir linkgit:git-config[1] (recherchez "paquet" et "delta").
+
+Par défaut, la commande passe l'option `--delta-base-offset` à 'git pack-objects' ; cela entraîne généralement des paquets légèrement plus petits, mais les paquets générés sont incompatibles avec les versions de Git plus anciennes que la version 1.4.4. Si vous avez besoin de partager votre dépôt avec ces anciennes versions Git, soit directement ou via le protocole http idiot, vous devez définir la variable de configuration `repack.UseDeltaBaseOffset` à `false` et rempaqueter. L'accès depuis des anciennes versions de Git avec le protocole natif n'est pas affecté par cette option puisque la conversion est effectuée à la volée en cas de besoin.
+
+La compression de delta n'est pas utilisée sur des objets plus grands que la variable de configuration `core.bigFileThreshold` et sur des fichiers dont l'attribut `delta ` est réglé à `false`.
+
+VOIR AUSSI
+----------
+linkgit:git-pack-objects[1] linkgit:git-prune-packed[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .
