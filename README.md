@@ -24,6 +24,8 @@ $ cd git-scm.com
 $ git sparse-checkout set layouts content static assets hugo.yml data script
 $ git reset --hard
 ```
+> [!NOTE]
+> If you _already_ have a full clone and wish to accelerate development by focusing only on a small subset of the pages, you may want to run the `git sparse-checkout set [...]` command mentioned above.
 
 Here is a detailed list of the relevant directories:
 
