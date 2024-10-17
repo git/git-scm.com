@@ -1,4 +1,4 @@
-const { test, expect, selectors } = require('@playwright/test')
+const { test, expect, selectors, devices } = require('@playwright/test')
 
 const url = process.env.PLAYWRIGHT_TEST_URL
   ? process.env.PLAYWRIGHT_TEST_URL.replace(/[^/]$/, '$&/')
@@ -287,4 +287,16 @@ test('sidebar', async ({ page }) => {
   await expect(about).toBeVisible();
   await about.click();
   await expect(page.getByRole('heading', { name: 'About - Branching and Merging' })).toBeVisible();
+});
+
+test('small-and-fast', async ({ page }) => {
+  await page.setViewportSize(devices['iPhone X'].viewport);
+
+  await page.goto(`${url}about/small-and-fast`);
+
+  // Scroll to text right below the graphs
+  await page.getByText('For testing, large AWS instances').scrollIntoViewIfNeeded();
+
+  const lastGraph = page.locator('.bar-chart').last();
+  await expect(lastGraph).toBeInViewport();
 });
