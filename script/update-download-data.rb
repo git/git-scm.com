@@ -35,8 +35,10 @@ class DownloadData
         bitness  = match[3]
 
         # Git for windows sometimes creates extra releases all based off of the same upstream Git version
-        # so we want to crop versions like 2.16.1.4 to just 2.16.1
+        # so we first want to crop versions like 2.16.1.4 to just 2.16.1
         version = match[2].slice(/^\d+\.\d+\.\d+/)
+        # Now, as per Git for Windows' custom, append the fourth part in parens, e.g. 2.16.1(4)
+        version += "(#{match[2].slice(version.length + 1)})" if match[2][version.length] == "."
 
         if version
           config["windows_installer"] = {} if config["windows_installer"].nil?
@@ -119,8 +121,8 @@ class DownloadData
     end
 
     def version_compare(a, b)
-      a = a.nil? ? [] : a.gsub(/^v/, "").split(/\./)
-      b = b.nil? ? [] : b.gsub(/^v/, "").split(/\./)
+      a = a.nil? ? [] : a.gsub(/^v/, "").split(/[.()]/)
+      b = b.nil? ? [] : b.gsub(/^v/, "").split(/[.()]/)
       while true
         a0 = a.shift
         b0 = b.shift
