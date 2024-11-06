@@ -156,14 +156,10 @@ class Book
     end
 
     front_matter = { "redirect_to" => "book/#{@language_code}/v#{@edition}" }
-    File.open(self.absolute_path("../_index.html"), 'w') do |file|
-      file.write(self.wrap_front_matter(front_matter))
-    end
+    File.write(self.absolute_path("../_index.html"), self.wrap_front_matter(front_matter))
 
     if @language_code == "en"
-      File.open(self.absolute_path("../../_index.html"), 'w') do |file|
-        file.write(self.wrap_front_matter(front_matter))
-      end
+      File.write(self.absolute_path("../../_index.html"), self.wrap_front_matter(front_matter))
     end
 
     FileUtils.mkdir_p(self.absolute_path("ch00"))
