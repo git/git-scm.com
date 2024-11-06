@@ -133,9 +133,13 @@ class Book
     front_matter["url"] = "/book/#{@language_code}/v#{@edition}.html"
     front_matter["aliases"] = [
       "/book/#{@language_code}/v#{@edition}/index.html",
+      "/book/#{@language_code}/v1/index.html",
       "/book/#{@language_code}/index.html"
     ]
-    front_matter["aliases"].push("/book/index.html") if @language_code == "en"
+    if @language_code == "en"
+      front_matter["aliases"].push("/book/index.html")
+      front_matter["aliases"].push("/book/v1/index.html")
+    end
     front_matter["book"]["front_page"] = true
     front_matter["book"]["repository_url"] = "https://github.com/#{@@all_books[@language_code]}"
     front_matter["book"]["sha"] = self.sha
@@ -157,9 +161,13 @@ class Book
 
     front_matter = { "redirect_to" => "book/#{@language_code}/v#{@edition}" }
     File.write(self.absolute_path("../_index.html"), self.wrap_front_matter(front_matter))
+    FileUtils.mkdir_p(self.absolute_path("../v1"))
+    File.write(self.absolute_path("../v1/_index.html"), self.wrap_front_matter(front_matter))
 
     if @language_code == "en"
       File.write(self.absolute_path("../../_index.html"), self.wrap_front_matter(front_matter))
+      FileUtils.mkdir_p(self.absolute_path("../../v1"))
+      File.write(self.absolute_path("../../v1/_index.html"), self.wrap_front_matter(front_matter))
     end
 
     FileUtils.mkdir_p(self.absolute_path("ch00"))
@@ -194,6 +202,19 @@ class Book
         file.write(self.wrap_front_matter(front_matter))
       end
     end
+  end
+
+  def book_v1_aliases(cs_number)
+    if @book_v1_aliases.nil?
+      path = File.absolute_path(File.join(File.dirname(__FILE__), "..", "data", "book_v1.yml"))
+      if File.exists?(path)
+        @book_v1_aliases = YAML.load_file(path)&.[](@language_code)
+      end
+      @book_v1_aliases = {} if @book_v1_aliases.nil?
+    end
+    return @book_v1_aliases[cs_number]&.flat_map { |title|
+      ["/book/#{@language_code}/#{title}.html", "/book/#{@language_code}/v1/#{title}.html"]
+    }
   end
 end
 
@@ -254,6 +275,10 @@ class Chapter
   def save
     # TODO
   end
+
+  def book_v1_aliases(cs_number)
+    return @book.book_v1_aliases(cs_number)
+  end
 end
 
 class Section
@@ -294,6 +319,11 @@ class Section
 	  "/#{relative_url.gsub(/%3F.*/, '')}.html"
 	]
       end
+    end
+    v1_aliases = @chapter.book_v1_aliases(self.cs_number)
+    unless v1_aliases.nil?
+      front_matter["aliases"] = [] if front_matter["aliases"].nil?
+      front_matter["aliases"] += v1_aliases
     end
     return front_matter
   end
