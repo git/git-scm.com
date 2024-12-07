@@ -7,7 +7,65 @@ section: "site"
     <img src="{{< relurl "images/404@2x.png" >}}" alt="404" width="456" height="149" />
   </p>
   <h1>That page doesn't exist.</h1>
-  <p>
+  <p id='explanation'>
     We recently redesigned the site and older URLs may now lead to missing pages. We apologize for the inconvenience.
   </p>
+  <script>
+    /* Be more helpful for outdated manual versions */
+    let match = window.location.pathname.match(/^(.*\/docs\/([^/]*))\/([0-9.]*)$/)
+    if (match) {
+      const [, path, command, version] = match
+
+      const el = document.querySelector('#explanation')
+      el.innerHTML = `Version ${version} of <a href="${
+        path}${window.location.search}${window.location.hash
+      }">the <code>${command}</code> manual page</a> is no longer available.`
+
+      const url = window.location.href.substring(0, window.location.href.length - version.length - 1);
+      (async () => {
+        // fetch the newest version to obtain the list of versions
+        const result = await fetch(url)
+        if (result.status < 200 || result.status >= 300) {
+          el.innerHTML = `The page <code>${command}</code> does not exist in <a href="${
+            path.substring(0, path.length - command.length - 1)
+          }">the documentation</a>.`
+          return
+        }
+
+        const div = document.createElement('div')
+        div.innerHTML = await result.text()
+        const versions = Array.from(
+          div
+          .querySelector('#previous-versions-dropdown')
+          .querySelectorAll('.version')
+        ).map(e => e.innerHTML)
+
+        const versionCompare = (a, b) => {
+          b = String(b).split('.')
+          for (const p of String(a).split('.')) {
+            const q = b.shift()
+            if (isNaN(q)) return +1
+            if (p != q) return p - q
+          }
+          return b.length > 0 ? -1 : 0
+        }
+
+        let i = -1
+        while (i + 1 < versions.length && versionCompare(version, versions[i + 1]) < 0) i++
+        if (versions[i]) el.innerHTML += `<br />The most closely-matching page describes version <a href="${
+          path}/${versions[i]}${window.location.search}${window.location.hash
+        }">${versions[i]}</a>.`
+      })().catch(console.error)
+    }
+
+    match = window.location.pathname.match(/^(.*\/book\/([^/]*))(\/.*)$/)
+    if (match) {
+      const [, path, rest] = match
+
+      const el = document.querySelector('#explanation')
+      el.innerHTML = `This book page was not found. <a href="${
+        path}${window.location.search}${window.location.hash
+      }">The book's front page is here</a>.`
+    }
+  </script>
 </div>
