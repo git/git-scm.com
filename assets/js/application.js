@@ -29,6 +29,7 @@ const baseURLPrefix = (() => {
 
 $(document).ready(function() {
   BrowserFallbacks.init();
+  DarkMode.init();
   Search.init();
   Dropdowns.init();
   Forms.init();
@@ -538,6 +539,38 @@ var Downloads = {
   postProcessDownloadPage: function() {
     Downloads.adjustFor32BitWindows();
     $('#relative-release-date').html(Downloads.postProcessReleaseDate);
+  },
+}
+
+var DarkMode = {
+  init: function() {
+    const button = $('#dark-mode-button');
+    if (!button.length) return;
+    button.show(3000);
+
+    // Check for dark mode preference at the OS level
+    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    // Get the user's theme preference from local storage, if it's available
+    const currentTheme = localStorage.getItem("theme");
+
+    if ((prefersDarkScheme && currentTheme !== "light")
+        || (!prefersDarkScheme && currentTheme === "dark")) {
+      button.text("🌞");
+    }
+
+    button.click(function(e) {
+      e.preventDefault();
+      let theme
+      if (prefersDarkScheme) {
+        theme = document.documentElement.dataset.theme === "light" ? "dark" : "light"
+      } else {
+        theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark"
+      }
+      document.documentElement.dataset.theme = theme
+      localStorage.setItem("theme", theme);
+      button.text(theme === "dark" ? "🌞" : "🌙");
+    });
   },
 }
 
