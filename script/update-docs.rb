@@ -9,6 +9,7 @@ require 'fileutils'
 require 'yaml'
 require 'diffy'
 require_relative "version"
+require_relative 'asciidoctor-extensions'
 
 SITE_ROOT = File.join(File.expand_path(File.dirname(__FILE__)), '../')
 DOCS_INDEX_FILE = "#{SITE_ROOT}external/docs/content/docs/_index.html"
