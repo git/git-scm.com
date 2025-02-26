@@ -47,6 +47,7 @@ runs:
         set -x &&
         echo "HUGO_VERSION=$(sed -n 's/^ *hugo_version: *//p' <hugo.yml)" >>$GITHUB_ENV
         echo "PAGEFIND_VERSION=$(sed -n 's/^ *pagefind_version: *//p' <hugo.yml)" >>$GITHUB_ENV
+        echo "BASE_URL=${{ steps.pages.outputs.base_url }}" >>$GITHUB_ENV
 
     - name: install Hugo ${{ env.HUGO_VERSION }}
       shell: bash
@@ -59,7 +60,7 @@ runs:
       env:
         HUGO_RELATIVEURLS: false
       shell: bash
-      run: hugo config && hugo --baseURL "${{ steps.pages.outputs.base_url }}/"
+      run: hugo config && hugo --baseURL "$BASE_URL/"
 
     - name: run Pagefind ${{ env.PAGEFIND_VERSION }} to build the search index
       shell: bash
@@ -110,13 +111,12 @@ runs:
       id: remap
       shell: bash
       run: |
-        base_url='${{ steps.pages.outputs.base_url }}'
-        echo "result=$(echo "$base_url" |
+        echo "result=$(echo "$BASE_URL" |
           sed 's|^\(.*\)\(/git-scm\.com\)$|(\1)?\2(.*)|') file://$PWD/public\$2" \
           >>$GITHUB_OUTPUT
         # When running in forks, do detect when links try to break out of the
         # `/git-scm.com/` subdirectory
-        echo "remap-dotdot=$(echo "$base_url" |
+        echo "remap-dotdot=$(echo "$BASE_URL" |
           sed -n 's|^\(https\?:\/\/.*\)\(/git-scm\.com\)$|--remap '\''(\1.*) file://../$1'\''|p')" \
           >>$GITHUB_OUTPUT
 
@@ -127,7 +127,7 @@ runs:
         args: >-
           --offline
           --fallback-extensions html
-          --base '${{ steps.pages.outputs.base_url }}'
+          --base '$BASE_URL'
           --remap '${{ steps.remap.outputs.result }}'
           ${{ steps.remap.outputs.remap-dotdot }}
           --exclude file:///path/to/repo.git/
@@ -199,9 +199,8 @@ runs:
     - name: Run Playwright tests
       shell: bash
       id: playwright
-      env:
-        PLAYWRIGHT_TEST_URL: ${{ steps.pages.outputs.base_url }}
       run: |
+        PLAYWRIGHT_TEST_URL="$BASE_URL"
         # avoid test failures when HTTPS is enforced half-way through
         case "$PLAYWRIGHT_TEST_URL" in
         https://*|http://git-scm.com) ;; # okay, leave as-is
