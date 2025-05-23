@@ -56,19 +56,15 @@ git reset --hard
 > **Note:**  
 > If you already have a full clone and wish to focus on a subset of the repository, you may use the `git sparse-checkout set [...]` command as shown above.
 
-Here is a detailed list of the relevant directories:
+### Directory Structure
 
-- If you want to test any page rendering using Hugo:
-  - layouts/
-  - content/
-  - static/
-  - assets/
+- **layouts/**, **content/**, **static/**, **assets/**: For testing page rendering with Hugo.
+- **data/**: For adding new GUI client data.
+- **script/**: For pre-rendering pages sourced from other repositories (e.g., ProGit book).
+- **.github/**: Contains GitHub workflow configurations.
+- **external/book/**, **external/docs/**: Pre-rendered pages (do not edit directly).
 
-- To add new GUIs:
-  - data/
-
-- To work on pre-rendering pages that originate from other repositories (such as the ProGit book):
-  - script/
+---
 
 - To work on the GitHub workflows that perform the automated, scheduled pre-rendering:
   - .github/
