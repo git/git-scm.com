@@ -243,23 +243,26 @@ We warmly welcome contributions! Please [fork the repository on GitHub](https://
 
 After making your changes, commit and push to a named branch in your fork, then open a pull request. For significant features, consider [opening an issue](https://github.com/git/git-scm.com/issues/new) first to discuss your proposal.
 
-After making the changes, commit and push to a named branch in your fork, then open a pull request. If it is a big feature, you might want to [start an issue](https://github.com/git/git-scm.com/issues/new) first to make sure it's something that will be accepted.
+---
 
-## Adding a new GUI
+## Adding a New GUI Client
 
-The [list of GUI clients](https://git-scm.com/downloads/guis) has been constructed by the community for a long time. If you want to add another tool you'll need to follow a few steps:
+To add a new GUI client to the [list of GUI clients](https://git-scm.com/downloads/guis):
 
-1. Add a new `.md` file with the GUI client details: data/guis
-    1. The fields need to be enclosed within `---` lines
-    2. The fields `name`, `project_url`, `price`, `license` should be very straightforward to fill.
-    3. The field `image_tag` corresponds to the path of the image of the tool (should start with `images/guis/`).
-    4. `platforms` is a list of at least 1 platform in which the tool is supported. The possibilities are: `Windows`, `Mac`, `Linux`, `Android`, and `iOS`
-    5. `order` can be filled with the biggest number already existing, plus 1 (this number determines the order in which the GUIs are rendered). This is the only field whose value should _not_ be enclosed in double-quote characters.
-    6. `trend_name` is an optional field that can be used for helping sorting the clients.
+1. Create a new `.md` file in `data/guis` with the following fields (enclosed within `---`):
 
-2. Add the image to `static/images/guis/<GUI_CLIENT_NAME>@2x.png` and `static/images/guis/<GUI_CLIENT_NAME>.png` making sure the aspect ratio matches a 588:332 image.
+    - `name`
+    - `project_url`
+    - `price`
+    - `license`
+    - `image_tag` (path starting with `images/guis/`)
+    - `platforms` (list: `Windows`, `Mac`, `Linux`, `Android`, `iOS`)
+    - `order` (next available integer, not in quotes)
+    - `trend_name` (optional)
 
-## Useful links
+2. Add images to `static/images/guis/<GUI_CLIENT_NAME>@2x.png` and `static/images/guis/<GUI_CLIENT_NAME>.png` (aspect ratio: 588:332).
+
+---
 
 ### Hugo (static site generator)
 
