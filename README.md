@@ -172,27 +172,32 @@ You can also run specific tests matching a pattern using `-g <regex>` for more f
     bundler install
     ```
 
-Similarly, you can also populate the localized man pages. From a local clone of https://github.com/jnavila/git-html-l10n :
+2. Build manual pages from a local Git clone:
 
-```console
-$ ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n  # all versions
-$ REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n  # specific version
-```
+    ```console
+    ruby ./script/update-docs.rb /path/to/git/.git en
+    ```
 
-Or you can do it from GitHub (much slower) like this:
+   To build for a specific version:
 
-```console
-$ export GITHUB_API_TOKEN=github_personal_auth_token
-$ REBUILD_DOC=$version ruby ./script/update-docs.rb remote l10n  # specific version
-```
+    ```console
+    version=v2.23.0
+    REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git/.git en
+    ```
 
-## Update the `Downloads` pages
+   To build from GitHub (slower):
 
-Now you need to get the latest downloads for the downloads pages:
+    ```console
+    export GITHUB_API_TOKEN=github_personal_auth_token
+    REBUILD_DOC=$version ruby ./script/update-docs.rb remote en
+    ```
 
-```console
-$ ruby ./script/update-download-data.rb
-```
+   For localized man pages, use a local clone of [git-html-l10n](https://github.com/jnavila/git-html-l10n):
+
+    ```console
+    ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n
+    REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n
+    ```
 
 ## Update the ProGit book
 
