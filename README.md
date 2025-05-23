@@ -66,30 +66,30 @@ git reset --hard
 
 ---
 
-- To work on the GitHub workflows that perform the automated, scheduled pre-rendering:
-  - .github/
+## Local Development
 
-- The pre-rendered pages (ProGit book, its translated versions, the manual pages, their translated versions):
-  - external/book/
-  - external/docs/
-  You will want to avoid editing these directly, as they contain pages that are pre-rendered via GitHub workflows, sourcing content from other repositories.
+### Prerequisites
 
-To render the site locally, you'll need [Hugo](https://gohugo.io/)'s **extended** version v0.128.0 or later. On Windows, we recommend using the Windows Subsystem for Linux (WSL) because some file names contain colons which prevent them from being checked out on Windows file systems.
+- [Hugo](https://gohugo.io/), **extended** version v0.128.0 or later.
+- [Node.js](https://nodejs.org/).
+- On Windows, it is recommended to use Windows Subsystem for Linux (WSL) due to file naming constraints.
 
-You can verify the Hugo version like this:
+Verify your Hugo installation:
 
 ```console
 $ hugo version
 hugo v0.128.0+extended linux/amd64 BuildDate=unknown
 ```
 
-You can serve the site locally via:
+### Serving the Site Locally
+
+To serve the site using the provided script:
 
 ```console
-$ node script/serve-public.js
+node script/serve-public.js
 ```
 
-The site should be running on http://127.0.0.1:5000.
+The site will be available at [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 If you want to serve the site via Hugo's built-in mechanism, you will need to turn off ["ugly URLs"](https://gohugo.io/content-management/urls/#appearance), by running this command, which will serve the site via http://127.0.0.1:1313:
 
