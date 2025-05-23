@@ -199,22 +199,21 @@ You can also run specific tests matching a pattern using `-g <regex>` for more f
     REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git-html-l10n/.git l10n
     ```
 
-## Update the ProGit book
+### Downloads Data
 
-First, you will have to get the necessary prerequisites:
-
-```console
-$ bundler install
-```
-
-Now you'll probably want some book data.
-
-You'll have to get the book content from a repository on your computer by specifying the path:
+Update the downloads data for the site:
 
 ```console
-$ git clone https://github.com/progit/progit2-fr ../progit2-fr
-$ ruby ./script/update-book2.rb fr ../progit2-fr
+ruby ./script/update-download-data.rb
 ```
+
+### ProGit Book
+
+1. Install prerequisites:
+
+    ```console
+    bundler install
+    ```
 
 That will generate the book content from the Asciidoc files and write the files to the local tree, ready to be committed and served via Hugo.
 
