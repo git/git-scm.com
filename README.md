@@ -239,9 +239,9 @@ ruby ./script/update-download-data.rb
 
 ## Contributing
 
-If you wish to contribute to this website, please [fork it on GitHub](https://github.com/git/git-scm.com).
+We warmly welcome contributions! Please [fork the repository on GitHub](https://github.com/git/git-scm.com), clone it using [`scalar`](https://git-scm.com/docs/scalar), and use [`git sparse-checkout`](https://git-scm.com/docs/git-sparse-checkout) to focus on relevant files.
 
-Then, clone it using [`scalar`](https://git-scm.com/docs/scalar) (this avoids long clone times) and then use [`git sparse-checkout add <directory>`](https://git-scm.com/docs/git-sparse-checkout) to check out the files relevant to your work.
+After making your changes, commit and push to a named branch in your fork, then open a pull request. For significant features, consider [opening an issue](https://github.com/git/git-scm.com/issues/new) first to discuss your proposal.
 
 After making the changes, commit and push to a named branch in your fork, then open a pull request. If it is a big feature, you might want to [start an issue](https://github.com/git/git-scm.com/issues/new) first to make sure it's something that will be accepted.
 
