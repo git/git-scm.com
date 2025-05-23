@@ -42,13 +42,15 @@ cd git-scm.com/src
 git sparse-checkout set layouts content static assets hugo.yml data script
 ```
 
-If your Git installation comes without `scalar`, you can create a sparse, partial clone manually, like this:
+#### 2. Alternative: Manual Sparse Clone
+
+If `scalar` is not available, you can perform a sparse, partial clone manually:
 
 ```console
-$ git clone --filter=blob:none --no-checkout https://github.com/git/git-scm.com
-$ cd git-scm.com
-$ git sparse-checkout set layouts content static assets hugo.yml data script
-$ git reset --hard
+git clone --filter=blob:none --no-checkout https://github.com/git/git-scm.com
+cd git-scm.com
+git sparse-checkout set layouts content static assets hugo.yml data script
+git reset --hard
 ```
 
 > [!NOTE]
