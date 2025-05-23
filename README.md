@@ -162,19 +162,15 @@ You can also run specific tests matching a pattern using `-g <regex>` for more f
 
 ---
 
-This will populate the manual pages for all Git versions. You can also populate them only for a specific Git version (faster):
+## Content Updates
 
-```console
-$ version=v2.23.0
-$ REBUILD_DOC=$version ruby ./script/update-docs.rb /path/to/git/.git en
-```
+### Manual Pages
 
-Or you can populate the man pages from GitHub (much slower) like this:
+1. Install Ruby prerequisites:
 
-```console
-$ export GITHUB_API_TOKEN=github_personal_auth_token
-$ REBUILD_DOC=$version ruby ./script/update-docs.rb remote en  # specific version
-```
+    ```console
+    bundler install
+    ```
 
 Similarly, you can also populate the localized man pages. From a local clone of https://github.com/jnavila/git-html-l10n :
 
