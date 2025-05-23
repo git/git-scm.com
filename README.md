@@ -37,9 +37,9 @@ Welcome to the repository for [git-scm.com](https://git-scm.com), the official w
 We recommend using [`scalar`](https://git-scm.com/docs/scalar) for an efficient and focused clone. This allows you to work only on the parts of the repository relevant to your interests.
 
 ```console
-$ scalar clone https://github.com/git/git-scm.com
-$ cd git-scm.com/src
-$ git sparse-checkout set layouts content static assets hugo.yml data script
+scalar clone https://github.com/git/git-scm.com
+cd git-scm.com/src
+git sparse-checkout set layouts content static assets hugo.yml data script
 ```
 
 If your Git installation comes without `scalar`, you can create a sparse, partial clone manually, like this:
