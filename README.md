@@ -122,19 +122,17 @@ npx -y pagefind --site public --serve
 
 ---
 
-Believe it or not, https://git-scm.com/ has its own test suite. It uses [Playwright](https://playwright.dev/) to perform a couple of tests that verify that the site "looks right". These tests live in `tests/` and are configured via `playwright.config.js`.
+## Testing
 
-To run these tests in your local setup, you need a working node.js installation. After that, you need to install Playwright:
+The site includes a test suite using [Playwright](https://playwright.dev/) to verify UI correctness. Tests are located in the `tests/` directory and configured via `playwright.config.js`.
 
-```console
-$ npm install @playwright/test
-```
+### Running Tests
 
-Since Playwright uses headless versions of popular web browsers, you most likely need to install at least one of them, e.g. via:
+1. Install Playwright:
 
-```console
-$ npx playwright install firefox
-```
+    ```console
+    npm install @playwright/test
+    ```
 
 Supported browsers include `firefox`, `chromium`, `webkit`, `chrome`. You can also simply download all of them using `npx playwright install` but please first note that they all weigh >100MB, so you might want to refrain from doing that. Side note: In GitHub Actions' hosted runners, Chrome comes pre-installed, and you might be able to use your own Chrome installation, too, if you have one.
 
