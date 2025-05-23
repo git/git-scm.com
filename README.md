@@ -91,13 +91,14 @@ node script/serve-public.js
 
 The site will be available at [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
-If you want to serve the site via Hugo's built-in mechanism, you will need to turn off ["ugly URLs"](https://gohugo.io/content-management/urls/#appearance), by running this command, which will serve the site via http://127.0.0.1:1313:
+Alternatively, to use Hugo's built-in server (served at [http://127.0.0.1:1313](http://127.0.0.1:1313)), disable "ugly URLs":
 
 ```console
-$ HUGO_UGLYURLS=false hugo serve -w
+HUGO_UGLYURLS=false hugo serve -w
 ```
 
-Side note: What _are_ "ugly URLs"? Hugo, by default, generates "pretty" URLs like https://git-scm.com/about/ (note the trailing slash) instead of what it calls "ugly" URLs like https://git-scm.com/about.html. However, since GitHub Pages auto-resolves "even prettier" URLs like https://git-scm.com/about by appending `.html` first, we _want_ the "ugly" URLs to be used here. The `serve-public.js` script emulates GitHub Pages' behavior, while `hugo serve` does not.
+> **Note:**  
+> "Ugly URLs" refer to URLs ending with `.html` (e.g., `/about.html`). GitHub Pages prefers these for compatibility. The `serve-public.js` script emulates this behavior.
 
 Pro-Tip: Do this in a sparse checkout that excludes large parts of `content/`, to speed up the rendering time.
 
