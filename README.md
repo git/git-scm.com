@@ -28,6 +28,14 @@ Welcome to the repository for [git-scm.com](https://git-scm.com), the official w
 
 ---
 
+## Getting Started
+
+### Cloning the Repository
+
+#### 1. Recommended Approach: Using Scalar
+
+We recommend using [`scalar`](https://git-scm.com/docs/scalar) for an efficient and focused clone. This allows you to work only on the parts of the repository relevant to your interests.
+
 ```console
 $ scalar clone https://github.com/git/git-scm.com
 $ cd git-scm.com/src
