@@ -100,14 +100,14 @@ HUGO_UGLYURLS=false hugo serve -w
 > **Note:**  
 > "Ugly URLs" refer to URLs ending with `.html` (e.g., `/about.html`). GitHub Pages prefers these for compatibility. The `serve-public.js` script emulates this behavior.
 
-Pro-Tip: Do this in a sparse checkout that excludes large parts of `content/`, to speed up the rendering time.
+### Enabling Search Locally
 
-To test the site locally _with_ the search enabled, run this instead:
+To test the site with search enabled:
 
 ```console
-$ hugo
-$ npx -y pagefind --site public
-$ node script/serve-public.js
+hugo
+npx -y pagefind --site public
+node script/serve-public.js
 ```
 
 You can also use Pagefind's built-in server (which will be running on http://127.0.0.1:1414), but again, you have to turn off "ugly URLs":
