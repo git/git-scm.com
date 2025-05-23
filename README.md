@@ -134,29 +134,33 @@ The site includes a test suite using [Playwright](https://playwright.dev/) to ve
     npm install @playwright/test
     ```
 
-Supported browsers include `firefox`, `chromium`, `webkit`, `chrome`. You can also simply download all of them using `npx playwright install` but please first note that they all weigh >100MB, so you might want to refrain from doing that. Side note: In GitHub Actions' hosted runners, Chrome comes pre-installed, and you might be able to use your own Chrome installation, too, if you have one.
+---
 
-By default, the Playwright tests target https://git-scm.com/, which is unlikely what you want: You probably want to run the tests to validate your local changes. To do so, the configuration has a special provision to start a tiny local web server to serve the files written to `public/` by Hugo and Pagefind:
+### 2. Install a browser for Playwright tests (e.g., Firefox)
 
-```console
-$ PLAYWRIGHT_TEST_URL='http://localhost:5000/' npx playwright test --project=firefox
-```
-
-For more fine-grained testing, you can pass `-g <regex>` to run only the matching test cases.
-
-## Update manual pages
-
-First, install the Ruby prerequisites:
+Playwright supports several browsers including `firefox`, `chromium`, `webkit`, and `chrome`. You can install a specific browser like Firefox using:
 
 ```console
-$ bundler install
+npx playwright install firefox
 ```
 
-Then, you can build the manual pages using a local Git source clone like this:
+> **Note:**  
+> You can install all supported browsers with `npx playwright install`, but be aware that each browser download is over 100MB. To save space and time, install only the browsers you need.  
+> In GitHub Actions hosted runners, Chrome is pre-installed, and you might also be able to use your local Chrome installation.
+
+---
+
+### 3. Run tests against your local site
+
+By default, Playwright tests run against [https://git-scm.com/](https://git-scm.com/). To test your local changes, run a local server (e.g., on `http://localhost:5000/`) and then run the tests targeting it:
 
 ```console
-$ ruby ./script/update-docs.rb /path/to/git/.git en
+PLAYWRIGHT_TEST_URL='http://localhost:5000/' npx playwright test --project=firefox
 ```
+
+You can also run specific tests matching a pattern using `-g <regex>` for more fine-grained testing.
+
+---
 
 This will populate the manual pages for all Git versions. You can also populate them only for a specific Git version (faster):
 
