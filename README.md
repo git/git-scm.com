@@ -264,25 +264,27 @@ To add a new GUI client to the [list of GUI clients](https://git-scm.com/downloa
 
 ---
 
-### Hugo (static site generator)
+## Useful Links
 
-* https://gohugo.io/
-* https://gohugo.io/content-management/shortcodes/
-* https://github.com/google/re2/wiki/Syntax/ (for Hugo's regular expression syntax)
+### Hugo (Static Site Generator)
 
-### Pagefind (client-side search)
+- [Hugo Documentation](https://gohugo.io/)
+- [Shortcodes](https://gohugo.io/content-management/shortcodes/)
+- [Regular Expression Syntax](https://github.com/google/re2/wiki/Syntax/)
 
-* https://pagefind.app/
+### Pagefind (Client-Side Search)
 
-### Lychee (link checker)
+- [Pagefind Documentation](https://pagefind.app/)
 
-* https://lychee.cli.rs/
+### Lychee (Link Checker)
 
-### Playwright (website UI test framework)
+- [Lychee Documentation](https://lychee.cli.rs/)
 
-* https://playwright.dev/
+### Playwright (UI Test Framework)
 
-## License
+- [Playwright Documentation](https://playwright.dev/)
+
+---
 
 The source code for the site is licensed under the MIT license, which you can find in
 the MIT-LICENSE.txt file.
