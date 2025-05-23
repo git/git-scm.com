@@ -110,16 +110,17 @@ npx -y pagefind --site public
 node script/serve-public.js
 ```
 
-You can also use Pagefind's built-in server (which will be running on http://127.0.0.1:1414), but again, you have to turn off "ugly URLs":
+Alternatively, to use Pagefind's built-in server (at [http://127.0.0.1:1414](http://127.0.0.1:1414)):
 
 ```console
-$ HUGO_UGLYURLS=false hugo
-$ npx -y pagefind --site public --serve
+HUGO_UGLYURLS=false hugo
+npx -y pagefind --site public --serve
 ```
 
-Note that running Pagefind will make the process about 7 times slower, and the site will not be re-rendered and live-reloaded in the browser when you change files in `content/` (unlike with `hugo serve -w`).
+> **Note:**  
+> Running Pagefind may slow down the process and disables live reloading.
 
-## Running the test suite
+---
 
 Believe it or not, https://git-scm.com/ has its own test suite. It uses [Playwright](https://playwright.dev/) to perform a couple of tests that verify that the site "looks right". These tests live in `tests/` and are configured via `playwright.config.js`.
 
