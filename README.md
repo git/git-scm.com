@@ -1,10 +1,9 @@
-# Git Homepage [![CI](https://github.com/git/git-scm.com/actions/workflows/ci.yml/badge.svg)](https://github.com/git/git-scm.com/actions/workflows/ci.yml) [![Help Contribute to Open Source](https://www.codetriage.com/git/git-scm.com/badges/users.svg)](https://www.codetriage.com/git/git-scm.com)
+# Git Homepage
 
-This is the repository for the [git-scm.com](https://git-scm.com) site.  It is meant to be the
-first place a person new to Git will land and download or learn about the
-Git SCM system.
+[![CI](https://github.com/git/git-scm.com/actions/workflows/ci.yml/badge.svg)](https://github.com/git/git-scm.com/actions/workflows/ci.yml)
+[![Help Contribute to Open Source](https://www.codetriage.com/git/git-scm.com/badges/users.svg)](https://www.codetriage.com/git/git-scm.com)
 
-This site is built with [Hugo](https://gohugo.io/) and served via GitHub Pages.
+Welcome to the repository for [git-scm.com](https://git-scm.com), the official website for Git. This site is designed to be the starting point for anyone interested in downloading, learning about, or contributing to the Git SCM system. The site is built with [Hugo](https://gohugo.io/) and served via GitHub Pages.
 
 ## Local development setup
 
