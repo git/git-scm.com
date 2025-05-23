@@ -5,10 +5,28 @@
 
 Welcome to the repository for [git-scm.com](https://git-scm.com), the official website for Git. This site is designed to be the starting point for anyone interested in downloading, learning about, or contributing to the Git SCM system. The site is built with [Hugo](https://gohugo.io/) and served via GitHub Pages.
 
-## Local development setup
+---
 
-> [!NOTE]
-> It is highly recommended to clone this repository using [`scalar`](https://git-scm.com/docs/scalar); This allows to work only on the parts of the repository relevant to your interests. You can select which directories are checked out using the [`git sparse-checkout add <directory>...`](https://git-scm.com/docs/git-sparse-checkout) command. Typically, you will want to start like this:
+## Table of Contents
+
+- [Getting Started](#getting-started)
+  - [Cloning the Repository](#cloning-the-repository)
+  - [Directory Structure](#directory-structure)
+- [Local Development](#local-development)
+  - [Prerequisites](#prerequisites)
+  - [Serving the Site Locally](#serving-the-site-locally)
+  - [Enabling Search Locally](#enabling-search-locally)
+- [Testing](#testing)
+- [Content Updates](#content-updates)
+  - [Manual Pages](#manual-pages)
+  - [Downloads Data](#downloads-data)
+  - [ProGit Book](#progit-book)
+- [Contributing](#contributing)
+- [Adding a New GUI Client](#adding-a-new-gui-client)
+- [Useful Links](#useful-links)
+- [License](#license)
+
+---
 
 ```console
 $ scalar clone https://github.com/git/git-scm.com
