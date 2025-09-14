@@ -808,17 +808,4 @@ var Graphviz = {
   }
 }
 
-// Scroll to Top
-$('#scrollToTop').removeClass('no-js');
-$(window).on('scroll', function() {
-  $(this).scrollTop() > 150
-    ? $('#scrollToTop').fadeIn()
-    : $('#scrollToTop').fadeOut();
-});
-$('#scrollToTop').on('click', function(e) {
-  e.preventDefault();
-  $("html, body").animate({
-      scrollTop: 0
-  }, "slow");
-  return false;
-});
+
