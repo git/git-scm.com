@@ -111,7 +111,7 @@ def extract_headings(html)
   headings
 end
 
-def extract_glossary_from_html(content, lang = 'en')
+def extract_glossary_from_html(content, check_paths, lang = 'en')
   # skip front matter
   content = content.split(/^---$/)[2] || content
 
@@ -139,7 +139,7 @@ def extract_glossary_from_html(content, lang = 'en')
     current_element = dt.next_element
     raise 'Expected dd' unless current_element&.name == 'dd'
 
-    # Fix up the links because they'regoing to be on a different page
+    # Fix up the links because they're going to be on a different page
     if lang == 'en'
       glossary_url = '/docs/gitglossary'
     else
@@ -156,6 +156,24 @@ def extract_glossary_from_html(content, lang = 'en')
     end
     definition = definition_fragment.to_html
 
+    # Hugo constructs "public/js/glossary/#{lang}.json" by those files:
+    # - external/docs/content/js/glossary/#{lang}.html
+    # - external/docs/data/glossary/#{lang}.json
+    # - layouts/js/glossary/single.json.json
+    definition.gsub!(/linkgit:+(\S+?)\[(\d+)\]/) do
+      if $1 == "curl"
+        "<a href='https://curl.se/docs/manpage.html'>curl</a>"
+      else
+        cmd_raw = $1
+        section = $2
+        cmd = cmd_raw.gsub(/&#x2d;/, '-')
+        relurl = lang == 'en' ? "docs/#{cmd}" : "docs/#{cmd}/#{lang}"
+        check_paths.add(relurl)
+        # Fix up the links because they're going to be on a different page
+        "<a href='/#{relurl}'>#{cmd_raw}[#{section}]</a>"
+      end
+    end
+
     term_names.each do |term|
       glossary[term] = definition
     end
@@ -167,7 +185,7 @@ end
 def save_glossary_files(glossary_data_by_lang)
   return if glossary_data_by_lang.empty?
 
-  glossary_dir = "#{SITE_ROOT}static/js/glossary"
+  glossary_dir = "#{SITE_ROOT}external/docs/data/glossary"
   FileUtils.mkdir_p(glossary_dir)
 
   glossary_data_by_lang.each do |lang, glossary_data|
@@ -282,7 +300,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       html = asciidoc.render
 
       if path == 'gitglossary'
-        glossary_data_by_lang[lang] = extract_glossary_from_html(html, lang)
+        glossary_data_by_lang[lang] = extract_glossary_from_html(html, check_paths, lang)
         puts "   extracted #{glossary_data_by_lang[lang].size} glossary terms for #{lang}"
       end
 
@@ -604,7 +622,7 @@ def index_doc(filter_tags, doc_list, get_content)
         html = asciidoc.render
 
         if docname == 'gitglossary'
-          glossary_data_by_lang['en'] = extract_glossary_from_html(html, 'en')
+          glossary_data_by_lang['en'] = extract_glossary_from_html(html, check_paths, 'en')
           puts "   extracted #{glossary_data_by_lang['en'].size} glossary terms for 'en'"
         end
 
