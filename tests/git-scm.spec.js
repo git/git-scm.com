@@ -184,8 +184,51 @@ test('anchor links in manual pages', async ({ page }) => {
   await page.goto(`${url}docs/git-clone${anchor}`)
 
   // Find the anchored element that should be scrolled into view
-  const anchoredElement = await page.getByText(/^--recurse-submodules.*pathspec/)
+  const anchoredElement = page.getByText(/^--recurse-submodules.*pathspec/)
   await expect(anchoredElement).toBeVisible()
+})
+
+test('tooltips in manual pages contain absolute links', async ({ page }) => {
+  const cases = [
+    {
+      // Test that the "#def_foo" links ("<<def_foo,bar>>" from
+      // glossary-content.adoc) have been resolved
+      pageUrl: `${url}docs/git-push/fr`,
+      triggerText: '<dépôt>',  // repository
+      tooltipElementText: 'refs',
+      tooltipElementHref: `/docs/gitglossary/fr#def_ref`,
+    },
+    {
+      // Test that the "git-foo[1]" links have been resolved
+      pageUrl: `${url}docs/git-push`,
+      triggerText: '<refspec>',
+      tooltipElementText: 'git-fetch[1]',
+      tooltipElementHref: `/docs/git-fetch`,
+    },
+  ]
+
+  for (const {
+    pageUrl,
+    triggerText,
+    tooltipElementText,
+    tooltipElementHref,
+  } of cases) {
+    await page.goto(pageUrl)
+
+    const trigger = page.getByText(triggerText, { exact: true }).first()
+    await expect(trigger).toBeVisible()
+
+    await trigger.hover()
+
+    const tooltip = page.locator('.tooltip.show')
+    await expect(tooltip).toBeVisible()
+
+    const tooltipLink = tooltip.getByRole('link', { name: tooltipElementText, exact: true })
+    await expect(tooltipLink).toBeVisible()
+    await expect(tooltipLink).toHaveAttribute('href', tooltipElementHref)
+
+    await page.mouse.move(0, 0)
+  }
 })
 
 test('book', async ({ page }) => {
