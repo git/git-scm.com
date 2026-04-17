@@ -1,0 +1,209 @@
+git-range-diff(1)
+=================
+
+NAMN
+----
+git-range-diff - Jämför två incheckningsintervall (dvs. två versioner av en gren)
+
+SYNOPSIS
+--------
+[verse]
+'git range-diff' [--color=[<när>]] [--no-color] [<diff-flaggor>]
+	[--no-dual-color] [--creation-factor=<faktor>]
+	[--left-only | --right-only] [--diff-merges=<format>]
+	[--remerge-diff]
+	( <range1> <range2> | <rev1>...<rev2> | <base> <rev1> <rev2> )
+	[[--] <sökväg>...]
+
+BESKRIVNING
+-----------
+
+Det här kommandot visar skillnaderna mellan två versioner av en patchserieer, eller mer generellt, två inchecknings-intervall (ignorerar sammanslagnings-incheckningar).
+
+Om `<sökväg>`-argument finns begränsas dessa inchecknings-intervall i enlighet därmed.
+
+För detta ändamål, hittar den först par av incheckningar från båda inchecknings-intervallen som motsvarar varandra. Två incheckningar sägs överensstämma när skillnaden mellan deras patchar (dvs. författarinformationen, inchecknings-meddelandet och inchecknings-differensen) är rimligt liten jämfört med patcharnas storlek. Se ``Algoritm`` nedan för detaljer.
+
+Slutligen, visas listan över matchande incheckningar i ordningen för det andra inchecknings-intervallet, där omatchade incheckningar infogas precis efter att alla deras föregångare har visats.
+
+Det finns tre sätt att ange inchecknings-intervallen:
+
+- `<intervall1> <intervall2>`: Endera inchecknings-intervallet kan ha formen `<bas>..<rev>`, `<rev>^!` eller `<rev>^-<n>`. Se `SPECIFIERING AV INTERVALL` i linkgit:gitrevisions[7] för mer information.
+
+- `<rev1>...<rev2>`. Detta motsvarar `<rev2>..<rev1> <rev1>..<rev2>`.
+
+- `<bas> <rev1> <rev2>`: Detta motsvarar `<bas>..<rev1> <bas>..<rev2>`.
+
+ALTERNATIV
+----------
+--no-dual-color::
+	När inchecknings-differenserna skiljer sig åt återskapar `git range-diff` de ursprungliga differnas färg och lägger till yttre -/+ diff-markörer med *bakgrunden* röd/grön för att göra det lättare att se t.ex. när det skedde en ändring i exakt vilka rader som lades till.
++
+Dessutom, visas inchecknings diff-raderna som bara finns i det första inchecknings-intervallet "nedtonade" (detta kan åsidosättas med konfigurationsinställningen `color.diff.<fack>` där `<fack>` är en av `contextDimmed`, `oldDimmed` och `newDimmed`), och inchecknings diff-raderna som bara finns i det andra inchecknings-intervallet visas i fetstil (vilket kan åsidosättas med konfigurationsinställningarna `color.diff.<fack>` där `<fack>` är en av `contextBold`, `oldBold` eller `newBold`).
++
+Detta kallas `range-diff` för "dubbel färgning". Använd `--no-dual-color` för att återgå till att färga alla linjer enligt de yttre diff-markörerna (och helt ignorera den inre diff-markören när det gäller färg).
+
+--creation-factor=<procent>::
+	Sätt kostnadsfudgefaktorn för skapande/borttagning till `<procent>`. Standardvärdet är 60. Försök med ett större värde om `git range-diff` felaktigt betraktar en stor ändring som en total omskrivning (borttagning av en incheckning och tillägg av en annan), och ett mindre värde i det omvända fallet. Se avsnittet ``Algoritm`` nedan för en förklaring av varför detta behövs.
+
+--left-only::
+	Undertryck incheckningar som saknas i det första angivna området (eller det "vänstra området" när formatet `<rev1>...<rev2>` används).
+
+--right-only::
+	Undertryck incheckningar som saknas i det andra angivna intervallet (eller "höger intervall" när formatet `<rev1>...<rev2>` används).
+
+--diff-merges=<format>::
+	Istället för att ignorera sammanslagnings-incheckningar, generera diffs för dem med hjälp av motsvarande `--diff-merges=<format>`-alternativ i linkgit:git-log[1], och inkludera dem i jämförelsen.
++
+Obs: I vanliga fall är `remerge`-läget det mest naturliga att använda, eftersom det bara visar skillnaden utöver vad Gits sammanslagnings-maskineri skulle ha producerat. Med andra ord, om en sammanslagnings-incheckning är resultatet av en icke-konfliktfylld `git merge`, kommer `remerge`-läget att representera det med en tom skillnad.
+
+--remerge-diff::
+	Bekvämlighetsalternativ, motsvarande `--diff-merges=remerge`.
+
+--notes[=<ref>]::
+--no-notes::
+	Denna flagga skickas till `git log`-programmet (se linkgit:git-log[1]) som genererar patcharna.
+
+<intervall1> <intervall2>::
+	Jämför de incheckningar som anges av de två intervallen, där `<intervall1>` anses vara en äldre version av `<intervall2>`.
+
+<rev1>...<rev2>::
+	Motsvarar att skicka `<rev2>..<rev1>` och `<rev1>..<rev2>`.
+
+<bas> <rev1> <rev2>::
+	Motsvarar att skicka `<bas>..<rev1>` och `<bas>..<rev2>`. Observera att `<bas>` inte behöver vara den exakta förgreningspunkten för grenarna. Exempel: efter att ha ombaserat en gren `mitt-ämne`, skulle `git range-diff mitt-ämne@{u} mitt-ämne@{1} mitt-ämne` visa skillnaderna som introduceras av ombaseringen.
+
+`git range-diff` accepterar även de vanliga diff-alternativen (se linkgit:git-diff[1]), framför allt alternativen `--color=[<när>]` och `--no-color`. Dessa alternativ används när man genererar "differensen mellan patchar", dvs. för att jämföra författaren, inchecknings-meddelandet och diff-värdet för motsvarande gamla/nya incheckningar. Det finns för närvarande inget sätt att justera de flesta av diff-alternativen som skickas till `git log` när man genererar dessa patchar.
+
+UTMATNINGSSTABILITET
+--------------------
+
+Utdata från kommandot `range-diff` kan komma att ändras. Det är avsett att vara människoläsbart porslinsutdata, inte något som kan användas i olika versioner av Git för att få en textmässigt stabil `range-diff` (i motsats till något som `--stable`-alternativet till linkgit:git-patch-id[1]). Det finns inte heller någon motsvarighet till linkgit:git-apply[1] för `range-diff`, utdata är inte avsett att vara maskinläsbart.
+
+Detta gäller särskilt när man skickar in diff-alternativ. För närvarande kan vissa alternativ som `--stat`, som en framväxande effekt, producera utdata som är ganska värdelösa i samband med `range-diff`. Framtida versioner av `range-diff` kan lära sig att tolka sådana alternativ på ett sätt som är specifikt för `range-diff` (t.ex. för `--stat` som producerar människoläsbart utdata som sammanfattar hur diffstaten ändradats).
+
+KONFIGURATION
+-------------
+Det här kommandot använder inställningarna `diff.color.*` och `pager.range-diff` (den senare är aktiverad som standard). Se linkgit:git-config[1].
+
+
+EXEMPEL
+-------
+
+När en ombasering kräver att sammanslagningskonflikter löses, jämför ändringarna som introducerats av ombaseringen direkt efteråt med hjälp av:
+
+------------
+$ git range-diff @{u} @{1} @
+------------
+
+
+En typisk utdata från `git range-diff` skulle se ut så här:
+
+------------
+-:  ------- > 1:  0ddba11 Förbered dig på det oundvikliga!
+1:  c0debee = 2:  cab005e Lägg till ett användbart meddelande i början
+2:  f00dbal ! 3:  decafe1 Beskriv en bugg
+    @@ -1,3 +1,3 @@
+     Author: A U Thor <author@example.com>
+
+    -TODO: Beskriv en bugg
+    +Beskriv en bugg
+    @@ -324,5 +324,6
+      Detta är förväntat.
+
+    -+Det oväntade är att den också kommer att krascha.
+    ++Oväntat kraschar den också. Detta är en bugg, och juryn är'
+    ++fortfarande ute efter hur man bäst åtgärdar den. Se ärende #314 för mer information.
+
+      Contact
+3:  bedead < -:  ------- TO-UNDO
+------------
+
+I det här exemplet, finns det 3 gamla och 3 nya incheckningar, där utvecklaren tog bort den tredje, lade till en ny före de två första och modifierade inchecknings-meddelandet för den andra incheckningen såväl som dess diff.
+
+När utdata skickas till en terminal, är den färgkodad som standard, precis som vanlig `git diff` utdata. Dessutom är den första raden (som lägger till en incheckning) grön, den sista raden (som tar bort en incheckning) är röd, den andra raden (med perfekt matchning) är gul som inchecknings-huvudet i `git show` utdata, och den tredje raden färgar den gamla incheckningen röd, den nya grön och resten som `git show`s inchecknings-huvuder.
+
+En naiv färgkodad diff av diffs är faktiskt lite svår att läsa, eftersom den färgar hela raderna röda eller gröna. Raden som lade till "Vad är oväntat" i den gamla incheckningen är till exempel helt röd, även om avsikten med den gamla cincheckningen var att lägga till något.
+
+För att underlätta detta använder `range` läget `--dual-color` som standard. I det här läget behåller diff-värdena de ursprungliga färgerna och prefixerar raderna med -/+ markörer som har sin *bakgrund* röd eller grön, för att göra det tydligare att de beskriver hur själva diffen ändrades.
+
+
+Algoritm
+--------
+
+Den allmänna idén är denna: vi genererar en kostnadsmatris mellan incheckningar i båda inchecknings-intervallen, och löser sedan den lägsta kostnadstilldelningen.
+
+Kostnadsmatrisen fylls i så här: för varje par av incheckningar genereras båda differna och "diffen av differ" genereras, med 3 kontextrader, sedan används antalet rader i den diffen som kostnad.
+
+För att undvika falska positiva resultat (t.ex. när en patch har tagits bort och en orelaterad patch har lagts till mellan två iterationer av samma patchserie), utökas kostnadsmatrisen för att möjliggöra detta, genom att lägga till fasta kostnadsposter för grossistborttagningar/tillägg.
+
+Exempel: Låt incheckningar `1--2` vara den första iterationen i en patchserie och `A--C` den andra iterationen. Låt oss anta att `A` är ett urval av `2` och `C` är ett urval av `1` men med en liten modifiering (t.ex. ett rättat stavfel). Visualisera incheckningar som en tvådelad graf:
+
+------------
+    1            A
+
+    2            B
+
+		 C
+------------
+
+Vi letar efter en "bästa" förklaring av den nya serien i termer av den gamla. Vi kan representera en "förklaring" som en kant i grafen:
+
+
+------------
+    1            A
+	       /
+    2 --------'  B
+
+		 C
+------------
+
+Denna förklaring kommer "gratis" eftersom det inte skedde någon förändring. På liknande sätt skulle `C` kunna förklaras med `1`, men det har en viss kostnad c>0 på grund av modifieringen:
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+	  |
+	  `----- C
+	  c>0
+------------
+
+Matematiskt sett letar vi efter någon form av tvådelad matchning med minimal kostnad; `1` matchas mot `C` till en viss kostnad, etc. Den underliggande grafen är i själva verket en komplett tvådelad graf; kostnaden vi associerar med varje kant är storleken på skillnaden mellan de två incheckningarnas patchar. För att även förklara nya incheckningar introducerar vi attrapp-noder på båda sidor:
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+	  |
+    o     `----- C
+	  c>0
+    o            o
+
+    o            o
+------------
+
+Kostnaden för en kant `o--C` är storleken på `C`s diff, modifierad med en fudgefaktor som bör vara mindre än 100%. Kostnaden för en kant `o--o` är gratis. Fudgefaktorn är nödvändig eftersom även om `1` och `C` inte har något gemensamt, kan de fortfarande dela några tomma rader och liknande, vilket möjligen gör tilldelningen `1--C`, `o--o` något billigare än `1--o`, `o--C` även om `1` och `C` inte har något gemensamt. Med fudgefaktorn kräver vi en mycket större gemensam del för att betrakta patchar som motsvarande.
+
+Den totala tiden som behövs för att beräkna denna algoritm är den tid som behövs för att beräkna n+m inchecknings-differenser och sedan n*m differenser av patchar, plus den tid som behövs för att beräkna den lägsta kostnadstilldelningen mellan n och m differenser. Git använder en implementering av Jonker-Volgenant-algoritmen för att lösa tilldelningsproblemet, som har kubisk runtime-komplexitet. Matchningen som hittas i detta fall kommer att se ut så här:
+
+------------
+    1 ----.      A
+	  |    /
+    2 ----+---'  B
+       .--+-----'
+    o -'  `----- C
+	  c>0
+    o ---------- o
+
+    o ---------- o
+------------
+
+
+SE ÄVEN
+-------
+linkgit:git-log[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

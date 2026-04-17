@@ -1,0 +1,161 @@
+git-archive(1)
+==============
+
+NAMN
+----
+git-archive - Skapa ett arkiv över filer från ett namngivet träd
+
+
+SYNOPSIS
+--------
+[verse]
+'git archive' [--format=<fmt>] [--list] [--prefix=<prefix>/] [<extra>]
+	      [-o <file> | --output=<fil>] [--worktree-attributes]
+	      [--remote=<repository> [--exec=<git-upload-archive>]] <trädlikt>
+	      [<sökväg>...]
+
+BESKRIVNING
+-----------
+Skapar ett arkiv i det angivna formatet som innehåller trädstrukturen för det namngivna trädet och skriver ut det till standardutdata. Om <prefix> anges läggs det till i filnamnen i arkivet.
+
+'git archive' beter sig olika beroende på om det får ett träd-ID eller ett inchecknings-ID/tagg-ID. När ett träd-ID anges används aktuell tid som ändringstid för varje fil i arkivet. När ett inchecknings-ID eller tagg-ID anges används i stället incheckningstiden som är lagrad i det refererade incheckningsobjektet. Dessutom lagras inchecknings-ID:t i en global utökad pax-header om tar-formatet används; det kan extraheras med 'git get-tar-commit-id'. I ZIP-filer lagras det som en filkommentar.
+
+ALTERNATIV
+----------
+
+--format=<fmt>::
+	Format för det resulterande arkivet. Möjliga värden är `tar`, `zip`, `tar.gz`, `tgz` och valfritt format som definieras med konfigurationsalternativet `tar.<format>.command`. Om `--format` inte anges och utdatafilen anges, härleds formatet från filnamnet om möjligt (t.ex. om man skriver till `foo.zip` blir utdata i `zip`-format). Annars är utdataformatet `tar`.
+
+-l::
+--list::
+	Visa alla tillgängliga format.
+
+-v::
+--verbose::
+	Rapportera förloppet till stderr.
+
+--prefix=<prefix>/::
+	Lägg till <prefix>/ framför sökvägarna i arkivet. Kan upprepas; dess värde längst till höger används för alla spårade filer. Se nedan vilket värde som används av `--add-file`.
+
+-o <fil>::
+--output=<fil>::
+	Skriv arkivet till <fil> i stället för stdout.
+
+--add-file=<fil>::
+	Lägg till en icke-spårad fil i arkivet. Kan upprepas för att lägga till flera filer. Sökvägen till filen i arkivet skapas genom att sammanfoga värdet för det sista `--prefix`-alternativet (om det finns något) före denna `--add-file` och basnamnet för <fil>.
+
+--add-virtual-file=<sökväg>:<innehåll>::
+	Lägg till det angivna innehållet i arkivet. Kan upprepas för att lägga till flera filer.
++
+Argumentet `<sökväg>` kan börja och sluta med ett dubbelt citattecken; det inneslutna filnamnet tolkas som en C-liknande sträng, d.v.s. bakåtsnedstrecket tolkas som ett escapetecken. Sökvägen måste anges inom citattecken om den innehåller kolon, för att undvika att kolon misstolkas som avgränsaren mellan sökvägen och innehållet, eller om sökvägen börjar eller slutar med ett dubbelt citattecken.
++
+Filläget är begränsat till en vanlig fil, och alternativet kan vara beroende av plattformsberoende kommandoradsbegränsningar. För icke-triviala fall, skriv en ospårad fil och använd `--add-file` i stället.
++
+Observera att till skillnad från `--add-file` påverkas inte sökvägen som skapas i arkivet av alternativet `--prefix`, eftersom en fullständig `<sökväg>` kan anges som värde för alternativet.
+
+--worktree-attributes::
+	Sök även efter attribut i .gitattributes-filer i arbetsträdet (se <<ATTRIBUTES>>).
+
+--mtime=<tid>::
+	Ställ in ändringstid för arkivposter. Utan detta alternativ används incheckare-tiden om `<trädlikt>` är en incheckning eller tagg, och aktuell tid om det är ett träd.
+
+<extra>::
+	Det här kan vara vilka alternativ som helst som arkiveringsbakänden förstår. Se nästa avsnitt.
+
+--remote=<repository>::
+	I stället för att skapa ett tar-arkiv från det lokala kodförrådet, hämta ett tar-arkiv från ett fjärrkodförråd. Observera att fjärrkodförrådet kan begränsa vilka sha1-uttryck som får tillåtas i `<trädlikt>`. Se linkgit:git-upload-archive[1] för mer information.
+
+--exec=<git-upload-archive>::
+	Används med --remote för att ange sökvägen till 'git-upload-archive' på fjärrsidan.
+
+<trädlikt>::
+	Trädet eller incheckning för att skapa ett arkiv för.
+
+<sökväg>::
+	Utan en valfri sökvägsparameter inkluderas alla filer och underkataloger i den aktuella arbetskatalogen i arkivet. Om en eller flera sökvägar anges inkluderas endast dessa.
+
+EXTRA ALTERNATIV FÖR BAKÄNDA
+----------------------------
+
+zip
+~~~
+-<siffra>::
+	Ange komprimeringsnivå. Större värden gör att kommandot kan använda mer tid på att komprimera till mindre storlek. Värden som stöds är från `-0` (endast lagring) till `-9` (bästa förhållande). Standardvärdet är `-6` om inget anges.
+
+tar
+~~~
+-<nummer>::
+	Ange komprimeringsnivå. Värdet skickas till komprimeringskommandot som konfigurerats i `tar.<format>.command`. Se manualsidan för det konfigurerade kommandot för en lista över nivåer som stöds och standardnivån om detta alternativ inte anges.
+
+KONFIGURATION
+-------------
+
+tar.umask::
+	Denna variabel kan användas för att begränsa behörighetsbitarna för tar-arkivposter. Standardvärdet är 0002, vilket stänger av world write-biten. Specialvärdet "user" indikerar att den arkiverande användarens umask kommer att användas i stället. Se umask(2) för mer information. Om `--remote` används träder endast konfigurationen av fjärrkodförrådet i kraft.
+
+tar.<format>.command::
+	Denna variabel anger ett shell-kommando genom vilket tar-utdatan som genereras av `git archive` ska skickas. Kommandot körs med hjälp av shell-kommandot med den genererade tar-filen på standardindata och ska producera den slutliga utdatan på standardutdata. Eventuella komprimeringsnivå-alternativ kommer att skickas till kommandot (t.ex. `-9`).
++
+Formaten `tar.gz` och `tgz` definieras automatiskt och använder som standard det magiska kommandot `git archive gzip`, vilket anropar en intern implementering av gzip.
+
+tar.<format>.remote::
+	Om sant, aktivera formatet för användning av fjärrklienter via linkgit:git-upload-archive[1]. Standardvärdet är falskt för användar-definierade format, men sant för formaten `tar.gz` och `tgz`.
+
+[[ATTRIBUTES]]
+ATTRIBUT
+--------
+
+export-ignore::
+	Filer och kataloger med attributet export-ignore kommer inte att läggas till i arkivfiler. Se linkgit:gitattributes[5] för mer information.
+
+export-subst::
+	Om attributet export-subst är satt för en fil kommer Git att expandera flera platshållare när filen läggs till i ett arkiv. Se linkgit:gitattributes[5] för mer information.
+
+Observera att attribut som standard hämtas från `.gitattributes`-filerna i trädet som arkiveras. Om du vill justera hur utdata genereras i efterhand (t.ex. om du har genomfört en incheckning utan att lägga till en lämplig export-ignore i dess `.gitattributes`), justera den utcheckade `.gitattributes`-filen efter behov och använd alternativet `--worktree-attributes`. Alternativt kan du behålla nödvändiga attribut som ska gälla när du arkiverar ett träd i din `$GIT_DIR/info/attributes`-fil.
+
+EXEMPEL
+-------
+`git archive --format=tar --prefix=junk/ HEAD | (cd /var/tmp/ && tar xf -)`::
+
+	Skapa ett tar-arkiv som innehåller innehållet i den senaste incheckning på den aktuella grenen, och extrahera det i katalogen `/var/tmp/junk`.
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0 | gzip >git-1.4.0.tar.gz`::
+
+	Skapa en komprimerad tarball för v1.4.0-utgåvan.
+
+`git archive --format=tar.gz --prefix=git-1.4.0/ v1.4.0 >git-1.4.0.tar.gz`::
+
+	Samma som ovan, men med den inbyggda tar.gz-hanteringen.
+
+`git archive --prefix=git-1.4.0/ -o git-1.4.0.tar.gz v1.4.0`::
+
+	Samma som ovan, men formatet härleds från utdatafilen.
+
+`git archive --format=tar --prefix=git-1.4.0/ v1.4.0^{tree} | gzip >git-1.4.0.tar.gz`::
+
+	Skapa en komprimerad tarball för v1.4.0-utgåvan, men utan en global utökat pax-huvud.
+
+`git archive --format=zip --prefix=git-docs/ HEAD:Dokumentation/ > git-1.4.0-docs.zip`::
+
+	Lägg allt i den aktuella huvudets Dokumentation/-katalog i 'git-1.4.0-docs.zip', med prefixet 'git-docs/'.
+
+`git archive -o latest.zip HEAD`::
+
+	Skapa ett zip-arkiv som innehåller innehållet i den senaste incheckningen på den aktuella grenen. Observera att utdataformatet härleds från utdatafilens filändelse.
+
+`git archive -o latest.tar --prefix=build/ --add-file=configure --prefix= HEAD`::
+
+	Skapar ett tar-arkiv som innehåller innehållet i den senaste incheckningen på den aktuella grenen utan prefix och den ospårade filen 'configure' med prefixet 'build/'.
+
+`git config tar.tar.xz.command "xz -c"`::
+
+	Konfigurera ett "tar.xz"-format för att skapa LZMA-komprimerade tar-filer. Du kan använda det genom att ange `--format=tar.xz`, eller genom att skapa en utdatafil som `-o foo.tar.xz`.
+
+
+SE ÄVEN
+-------
+linkgit:gitattributes[5]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

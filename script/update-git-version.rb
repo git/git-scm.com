@@ -20,7 +20,7 @@ date = tag.tagger.date
 config = YAML.load_file("hugo.yml")
 config["params"] = {} if config["params"].nil?
 config["params"]["latest_version"] = version
-config["params"]["latest_relnote_url"] = "https://raw.github.com/git/git/master/Documentation/RelNotes/#{version}.adoc"
+config["params"]["latest_relnote_url"] = "https://gitlab.com/git-scm/git/-/blob/HEAD/Documentation/RelNotes/#{version}.adoc"
 config["params"]["latest_release_date"] = date.strftime("%Y-%m-%d")
 yaml = YAML.dump(config).gsub(/ *$/, "")
 File.write("hugo.yml", yaml)

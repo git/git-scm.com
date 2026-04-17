@@ -1,0 +1,367 @@
+git-filter-branch(1)
+====================
+
+NAMN
+----
+git-filter-branch - Skriv om grenar
+
+SYNOPSIS
+--------
+[verse]
+'git filter-branch' [--setup <kommando>] [--subdirectory-filter <katalog>]
+	[--env-filter <kommando>] [--tree-filter <kommando>]
+	[--index-filter <kommando>] [--parent-filter <kommando>]
+	[--msg-filter <kommando>] [--commit-filter <kommando>]
+	[--tag-name-filter <kommando>] [--prune-empty]
+	[--original <namnrymd>] [-d <katalog>] [-f | --force]
+	[--state-branch <gren>] [--] [<rev-list-alternativ>...]
+
+VARNING
+-------
+'git filter-branch' har en mängd fallgropar som kan orsaka icke-uppenbara felaktigheter i den avsedda historikomskrivningen (och kan ge dig begränsad tid att undersöka sådana problem eftersom den har så dålig prestanda). Dessa säkerhets- och prestandaproblem kan inte åtgärdas bakåtkompatibelt och därför rekommenderas inte dess användning. Använd ett alternativt historikfiltreringsverktyg som https://github.com/newren/git-filter-repo/[git filter-repo]. Om du fortfarande behöver använda 'git filter-branch', läs noggrant <<SÄKERHET>> (och <<PRESTANDA>>) för att lära dig om filter-branchs landminor, och undvik sedan noggrant så många av de faror som listas där som rimligen är möjligt.
+
+BESKRIVNING
+-----------
+Låter dig skriva om Gits revisionshistorik genom att skriva om grenarna som nämns i <rev-list-alternativ>, och tillämpa anpassade filter på varje revision. Dessa filter kan modifiera varje träd (t.ex. ta bort en fil eller köra en perl-omskrivning på alla filer) eller information om varje commit. Annars kommer all information (inklusive ursprungliga inchecknings-tider eller sammanslagings-information) att bevaras.
+
+Kommandot kommer bara att skriva om de _positiva_ referenser som nämns i kommandoraden (t.ex. om du skickar 'a..b' kommer endast 'b' att skrivas om). Om du inte anger några filter kommer incheckningar att åter-inchecknings utan några ändringar, vilket normalt inte skulle ha någon effekt. Detta kan dock vara användbart i framtiden för att kompensera för vissa Git-buggar eller liknande, därför är sådan användning tillåten.
+
+*OBS*: Detta kommando respekterar `.git/info/grafts`-filen och referenser i namnrymden `refs/replace/`. Om du har några grafts eller ersättningsreferenser definierade, kommer att köra detta kommando att göra dem permanenta.
+
+*VARNING*! Den omskrivna historiken kommer att ha olika objektnamn för alla objekt och kommer inte att konvergera med den ursprungliga grenen. Du kommer inte enkelt att kunna push:a och distribuera den omskrivna grenen ovanpå den ursprungliga grenen. Använd inte det här kommandot om du inte känner till de fullständiga konsekvenserna, och undvik att använda det ändå, om en enkel incheckning skulle räcka för att lösa problemet. (Se avsnittet "ÅTERSTÄLLA FRÅN UPSTRÖMS-OMBASERING" i linkgit:git-rebase[1] för mer information om att skriva om publicerad historik.)
+
+Kontrollera alltid att den omskrivna versionen är korrekt: De ursprungliga referenserna, om de skiljer sig från de omskrivna, kommer att lagras i namnrymden 'refs/original/'.
+
+Observera att eftersom den här operationen är mycket I/O-intensiv, kan det vara en bra idé att omdirigera den temporära katalogen utanför-disken med alternativet `-d`, t.ex. på tmpfs. Hastighetsökningen ska enligt uppgift vara mycket märkbar.
+
+
+Filter
+~~~~~~
+
+Filtren tillämpas i den ordning som anges nedan. Argumentet <kommando> utvärderas alltid i shell-kontexten med hjälp av kommandot 'eval' (med det anmärkningsvärda undantaget för inchecknings-filtret, av tekniska skäl). Innan dess kommer miljövariabeln `$GIT_COMMIT` att ställas in för att innehålla ID:t för den incheckning som skrivs om. Dessutom tas GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_AUTHOR_DATE, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL och GIT_COMMITTER_DATE från den aktuella incheckningen och exporteras till miljön för att påverka författar- och incheckare-identiteterna för den ersättningsincheckning som skapats av linkgit:git-commit-tree[1] efter att filtren har körts.
+
+Om någon utvärdering av <kommando> returnerar en avslutningsstatus som inte är noll, kommer hela operationen att avbrytas.
+
+En 'map'-funktion är tillgänglig som tar argumentet "original sha1 id" och matar ut ett "rewritten sha1 id" om incheckningen redan har skrivits om, och annars "original sha1 id". 'map'-funktionen kan returnera flera id:n på separata rader om ditt inchecknings-filter genererade flera incheckningar.
+
+
+ALTERNATIV
+----------
+
+--setup <kommando>::
+	Detta är inte ett riktigt filter som körs för varje incheckning utan en engångsinställning precis före loopen. Därför är inga inchecknings-specifika variabler definierade ännu. Funktioner eller variabler som definieras här kan användas eller modifieras i följande filtersteg förutom inchecknings-filtret, av tekniska skäl.
+
+--subdirectory-filter <katalog>::
+	Only look at the history which touches the given subdirectory. The result will contain that directory (and only that) as its project root. Implies <<Remap_to_ancestor>>.
+
+--env-filter <kommando>::
+	Det här filtret kan användas om du bara behöver ändra miljön där inchecknings-processen ska utföras. Mer specifikt kanske du vill skriva om miljövariablerna för författare/incheckare-namn/e-postadress/tid (se linkgit:git-commit-tree[1] för mer information).
+
+--tree-filter <kommando>::
+	Detta är filtret för att skriva om trädet och dess innehåll. Argumentet utvärderas i skal med arbetskatalogen satt till roten av det utcheckade trädet. Det nya trädet används sedan som det är (nya filer läggs till automatiskt, försvunna filer tas bort automatiskt - varken .gitignore-filer eller några andra ignoreringsregler *HAR NÅGON EFFEKT*!).
+
+--index-filter <kommando>::
+	Detta är filtret för att skriva om indexet. Det liknar trädfiltret men kontrollerar inte trädet, vilket gör det mycket snabbare. Används ofta med `git rm --cached --ignore-unmatch ...`, se EXEMPEL nedan. För svåra fall, se linkgit:git-update-index[1].
+
+--parent-filter <kommando>::
+	Detta är filtret för att skriva om incheckningens föräldralista. Den kommer att ta emot föräldrasträngen på stdin och ska mata ut den nya föräldrasträngen på stdout. Föräldrasträngen har formatet som beskrivs i linkgit:git-commit-tree[1]: tom för den initiala incheckningen, "-p parent" för en normal incheckning och "-p parent1 -p parent2 -p parent3 ..." för en sammanslagnings-incheckning.
+
+--msg-filter <kommando>::
+	Detta är filtret för att skriva om inchecknings-meddelandena. Argumentet utvärderas i skalet med det ursprungliga inchecknings-meddelandet som standardindata; dess standardutdata används som det nya inchecknings-meddelandet.
+
+--commit-filter <kommando>::
+	This is the filter for performing the commit. If this filter is specified, it will be called instead of the 'git commit-tree' command, with arguments of the form "<TREE_ID> [(-p <PARENT_COMMIT_ID>)...]" and the log message on stdin. The commit id is expected on stdout.
++
+Som ett speciellt tillägg, kan inchecknings-filtret generera flera inchecknings-id:n; i så fall kommer de omskrivna under-ID:na till den ursprungliga incheckningen att ha alla dessa som föräldrar.
++
+Du kan använda bekvämlighetsfunktionen 'map' i det här filtret, och även andra bekvämlighetsfunktioner. Om du till exempel anropar 'skip_commit "$@"' kommer den aktuella incheckningen att utelämnas (men inte dess ändringar! Om du vill ha det, använd 'git rebase' istället).
++
+Du kan också använda `git_commit_non_empty_tree "$@"` istället för `git commit-tree "$@"` om du inte vill behålla incheckningar hos en enda förälder och det inte gör någon ändring av trädet.
+
+--tag-name-filter <kommando>::
+	Detta är filtret för att skriva om taggnamn. När det skickas kommer det att anropas för varje taggreferens som pekar på ett omskrivet objekt (eller på ett taggobjekt som pekar på ett omskrivet objekt). Det ursprungliga taggnamnet skickas via standardindata, och det nya taggnamnet förväntas på standardutdata.
++
+De ursprungliga taggarna tas inte bort, men kan skrivas över; använd "--tag-name-filter cat" för att helt enkelt uppdatera taggarna. Var i det här fallet mycket försiktig och se till att du har säkerhetskopierat de gamla taggarna ifall konverteringen skulle misslyckas.
++
+Nästan korrekt omskrivning av taggobjekt stöds. Om taggen har ett bifogat meddelande skapas ett nytt taggobjekt med samma meddelande, författare och tidsstämpel. Om taggen har en signatur bifogad, tas signaturen bort. Det är per definition omöjligt att bevara signaturer. Anledningen till att detta är "nästan" korrekt, är att om taggen helst inte ändras (pekar på samma objekt, har samma namn, etc.) borde den behålla eventuella signaturer. Så är inte fallet, signaturer kommer alltid att tas bort, användning på egen risk. Det finns inte heller stöd för att ändra författare eller tidsstämpel (eller taggmeddelandet för den delen). Taggar som pekar på andra taggar kommer att skrivas om för att peka på den underliggande incheckning.
+
+--prune-empty::
+	Vissa filter genererar tomma incheckningar som lämnar trädet orört. Den här instruktionen instruerar git-filter-branch att ta bort sådana incheckningar om de har exakt en eller noll icke-beskärda föräldrar; sammanslagnings-incheckningar kommer därför att förbli intakta. Den här inställningen kan inte användas tillsammans med `--commit-filter`, även om samma effekt kan uppnås genom att använda den angivna funktionen `git_commit_non_empty_tree` i ett inchecknings-filter.
+
+--original <namn-utrymme>::
+	Använd det här alternativet för att ange namnrymden där de ursprungliga incheckningar ska lagras. Standardvärdet är 'refs/original'.
+
+-d <katalog>::
+	Använd det här alternativet för att ange sökvägen till den temporära katalogen som används för omskrivning. När ett trädfilter tillämpas måste kommandot tillfälligt checka ut trädet till någon katalog, vilket kan ta upp avsevärt utrymme vid stora projekt. Som standard görs detta i katalogen `.git-rewrite/`, men du kan åsidosätta det valet med den här parametern.
+
+-f::
+--force::
+	'git filter-branch' vägrar att starta med en befintlig temporär katalog eller när det redan finns referenser som börjar med 'refs/original/', om inte tvingad.
+
+--state-branch <gren>::
+	Det här alternativet gör att mappningen från gamla till nya objekt laddas från den namngivna grenen vid start och sparas som en ny incheckning till den grenen vid avslutning, vilket möjliggör stegvis administration av stora träd. Om '<gren>' inte finns kommer den att skapas.
+
+<rev-list alternativ>...::
+	Arguments for 'git rev-list'. All positive refs included by these options are rewritten. You may also specify options such as `--all`, but you must use `--` to separate them from the 'git filter-branch' options. Implies <<Remap_to_ancestor>>.
+
+
+[[Remap_to_ancestor]]
+Ommappa till förfader
+~~~~~~~~~~~~~~~~~~~~~
+
+Genom att använda argument i linkgit:git-rev-list[1], t.ex. sökvägsbegränsare, kan du begränsa mängden revisioner som skrivs om. Positiva referenser på kommandoraden särskiljs dock: vi låter dem inte exkluderas av sådana begränsare. För detta ändamål skrivs de istället om för att peka på den närmaste förfadern som inte exkluderades.
+
+
+UTGÅNGSSTATUS
+-------------
+
+Vid lyckat resultat, är avslutningsstatusen `0`. Om filtret inte hittar några incheckningar att skriva om är avslutningsstatusen `2`. Vid alla andra fel kan avslutningsstatusen vara vilket annat värde som helst som inte är noll.
+
+
+EXEMPEL
+-------
+
+Anta att du vill ta bort en fil (som innehåller konfidentiell information eller upphovsrättsintrång) från alla incheckningar:
+
+-------------------------------------------------------
+git filter-branch --tree-filter 'rm filename' HEAD
+-------------------------------------------------------
+
+Däremot, om filen saknas i trädet för någon incheckning, kommer ett enkelt `rm filename` att misslyckas för det trädet och incheckningen. Därför kan du istället vilja använda `rm -f filename` som skript.
+
+Att använda `--index-filter` med 'git rm' ger en betydligt snabbare version. Precis som med `rm filename` kommer `git rm --cached filename` att misslyckas om filen saknas i trädet för en incheckning. Om du vill "glömma bort" en fil helt spelar det ingen roll när den gick in i historiken, så vi lägger också till `--ignore-unmatch`:
+
+--------------------------------------------------------------------------
+git filter-branch --index-filter 'git rm --cached --ignore-unmatch filename' HEAD
+--------------------------------------------------------------------------
+
+Nu, får du den omskrivna historiken sparad i HEAD.
+
+För att skriva om förvaret så att det ser ut som om `foodir/` hade varit dess projektrot och ta bort all annan historik:
+
+-------------------------------------------------------
+git filter-branch --subdirectory-filter foodir -- --all
+-------------------------------------------------------
+
+Således kan du t.ex. göra om en biblioteksunderkatalog till ett eget förvar. Observera `--` som separerar 'filter-branch'-alternativ från revisionsalternativ, och `--all` för att skriva om alla grenar och taggar.
+
+För att ställa in en incheckning (som vanligtvis ligger i början av en annan historik) som förälder till den aktuella initiala incheckningen, för att klistra in den andra historiken bakom den aktuella historiken:
+
+-------------------------------------------------------------------
+git filter-branch --parent-filter 'sed "s/^\$/-p <graft-id>/"' HEAD
+-------------------------------------------------------------------
+
+(om föräldersträngen är tom – vilket händer när vi har att göra med den initiala incheckningen – lägg till graftincheckning som förälder). Observera att detta förutsätter historik med en enda rot (det vill säga att ingen sammanslagning utan gemensamma förfäder har skett). Om så inte är fallet, använd:
+
+--------------------------------------------------------------------------
+git filter-branch --parent-filter \
+	'test $GIT_COMMIT = <commit-id> && echo "-p <graft-id>" || cat' HEAD
+--------------------------------------------------------------------------
+
+eller ännu enklare:
+
+-----------------------------------------------
+git replace --graft $commit-id $graft-id
+git filter-branch $graft-id..HEAD
+-----------------------------------------------
+
+För att ta bort incheckningar skrivna av "Darl McBride" från historiken:
+
+------------------------------------------------------------------------------
+git filter-branch --commit-filter '
+	if [ "$GIT_AUTHOR_NAME" = "Darl McBribe" ];
+	then
+		skip_commit "$@";
+	else
+		git commit-tree "$@";
+	fi' HEAD
+------------------------------------------------------------------------------
+
+Funktionen 'skip_commit' definieras enligt följande:
+
+--------------------------
+skip_commit()
+{
+	shift;
+	while [ -n "$1" ];
+	do
+		shift;
+		map "$1";
+		shift;
+	done;
+}
+--------------------------
+
+Shift-magin kastar först bort träd-idn och sedan -p parametrarna. Observera att detta hanterar sammanslagningar korrekt! Om Darl genomförde en sammanslagning mellan P1 och P2 kommer den att propageras korrekt och alla barn av sammanslagningen blir sammanslagnings-incheckninger med P1,P2 som sina föräldrar istället för sammanslagnings-incheckningen:en.
+
+*OBS* ändringarna som introduceras av incheckningar, och som inte återställs av efterföljande incheckningar, kommer fortfarande att finnas i den omskrivna grenen. Om du vill slänga _förändringar_ tillsammans med incheckningar, bör du använda det interaktiva läget 'git rebase'.
+
+Du kan skriva om inchecknings-loggmeddelandena med hjälp av `--msg-filter`. Till exempel kan 'git svn-id'-strängar i ett förvar skapat av 'git svn' tas bort på följande sätt:
+
+-------------------------------------------------------
+git filter-branch --msg-filter '
+	sed -e "/^git-svn-id:/d"
+'
+-------------------------------------------------------
+
+Om du behöver lägga till 'Acked-by'-rader till, säg, de sista 10 incheckningar (av vilka ingen är en sammanslaging), använd det här kommandot:
+
+--------------------------------------------------------
+git filter-branch --msg-filter '
+	cat &&
+	echo "Acked-by: Bugs Bunny <bunny@bugzilla.org>"
+' HEAD~10..HEAD
+--------------------------------------------------------
+
+Alternativet `--env-filter` kan användas för att ändra incheckare- och/eller författaridentitet. Om du till exempel upptäcker att dina incheckningar har fel identitet på grund av en felkonfigurerad user.email, kan du göra en korrigering innan du publicerar projektet, så här:
+
+--------------------------------------------------------
+git filter-branch --env-filter '
+	if test "$GIT_AUTHOR_EMAIL" = "root@localhost"
+	then
+		GIT_AUTHOR_EMAIL=john@example.com
+	fi
+	if test "$GIT_COMMITTER_EMAIL" = "root@localhost"
+	then
+		GIT_COMMITTER_EMAIL=john@example.com
+	fi
+' -- --all
+--------------------------------------------------------
+
+För att begränsa omskrivningen till endast en del av historiken, ange ett revisionsintervall utöver det nya grennamnet. Det nya grennamnet kommer att peka på den översta revisionen som en 'git rev-list' för detta intervall kommer att skriva ut.
+
+Beakta på denna historia:
+
+------------------
+     D--E--F--G--H
+    /     /
+A--B-----C
+------------------
+
+För att bara skriva om incheckningar D, E, F, G, H, men lämna A, B och C oberörda, använd:
+
+--------------------------------
+git filter-branch ... C..H
+--------------------------------
+
+För att skriva om incheckningar E, F, G, H, använd en av dessa:
+
+----------------------------------------
+git filter-branch ... C..H --not D
+git filter-branch ... D..H --not C
+----------------------------------------
+
+För att flytta hela trädet till en underkatalog, eller ta bort det därifrån:
+
+---------------------------------------------------------------
+git filter-branch --index-filter \
+	'git ls-files -s | sed "s-\t\"*-&newsubdir/-" |
+		GIT_INDEX_FILE=$GIT_INDEX_FILE.new \
+			git update-index --index-info &&
+	 mv "$GIT_INDEX_FILE.new" "$GIT_INDEX_FILE"' HEAD
+---------------------------------------------------------------
+
+
+
+CHECKLISTA FÖR ATT KRYMPA ETT FÖRVAR
+------------------------------------
+
+git-filter-branch kan användas för att bli av med en delmängd av filer, vanligtvis med någon kombination av `--index-filter` och `--subdirectory-filter`. Folk förväntar sig att det resulterande förvaret ska vara mindre än originalet, men du behöver några fler steg för att faktiskt göra det mindre, eftersom Git försöker hårt att inte förlora dina objekt förrän du säger åt det att göra det. Se först till att:
+
+* Du tog verkligen bort alla varianter av ett filnamn om en blob flyttades under sin livstid. `git log --name-only --follow --all -- filename` kan hjälpa dig att hitta namnbyten.
+
+* Du filtrerade verkligen alla referenser: använd `--tag-name-filter cat -- --all` när du anropar git-filter-branch.
+
+Sedan finns det två sätt att få ett mindre förvar. Ett säkrare sätt är att klona, vilket behåller originalet intakt.
+
+* Klona den med `git clone file:///sökväg/till/förvar`. Klonen kommer inte att ha de borttagna objekten. Se linkgit:git-clone[1]. (Observera att kloning med en vanlig sökväg bara hårdlänkar allt!)
+
+Om du verkligen inte vill klona den, oavsett anledning, kontrollera följande punkter istället (i denna ordning). Detta är en mycket destruktiv metod, så *gör en säkerhetskopia* eller återgå till att klona den. Du har blivit varnad.
+
+* Ta bort de ursprungliga referenserna som säkerhetskopieras av git-filter-branch: säg `git for-each-ref --format="%(refname)" refs/original/ | xargs -n 1 git update-ref -d`.
+
+* Låt alla refloggar upphöra med `git reflog expire --expire=now --all`.
+
+* Skräpsamla alla orefererade objekt med `git gc --prune=now` (eller om din git-gc inte är tillräckligt ny för att stödja argument till `--prune`, använd `git repack -ad; git prune` istället).
+
+[[PERFORMANCE]]
+PRESTANDA
+---------
+
+Prestandan för git-filter-branch är glacialt långsam; dess design gör det omöjligt för en bakåtkompatibel implementering att någonsin vara snabb:
+
+* Vid redigering av filer kontrollerar git-filter-branch avsiktligt varje incheckningt som den fanns i det ursprungliga förvaret. Om ditt repo har `10^5` filer och `10^5` incheckningar, men varje incheckning bara modifierar fem filer, kommer git-filter-branch att få dig att göra `10^10` modifieringar, trots att det bara finns (högst) `5*10^5` unika blobbar.
+
+* Om du försöker fuska och försöker få git-filter-branch att bara fungera på filer som modifierats i en incheckning, så händer två saker
+
+  ** du stöter på problem med borttagningar när användaren helt enkelt försöker byta namn på filer (eftersom det verkar vara ett icke-operation att försöka ta bort filer som inte finns; det krävs en del trick för att mappa om borttagningar över filnamn när omdöpningarna sker via godtyckliga användardefinierade skal)
+
+  ** även om du lyckas med map-deletes-for-renames-chikanen, bryter du fortfarande tekniskt sett mot bakåtkompatibilitet eftersom användare tillåts filtrera filer på sätt som beror på incheckningarnas topologi istället för att filtrera enbart baserat på filinnehåll eller namn (även om detta inte har observerats i verkligheten).
+
+* Även om du inte behöver redigera filer utan bara vill t.ex. byta namn på eller ta bort några och därmed kan undvika att checka ut varje fil (dvs. du kan använda --index-filter), skickar du fortfarande skal-kodsnipplar för dina filter. Det betyder att för varje incheckning måste du ha ett förberett git-förvar där dessa filter kan köras. Det är en viktig konfiguration.
+
+* Dessutom, skapas eller uppdateras flera ytterligare filer per incheckning av git-filter-branch. Några av dessa är till för att stödja de bekvämlighetsfunktioner som tillhandahålls av git-filter-branch (som map()), medan andra är till för att hålla reda på internt tillstånd (men kunde också ha nåts av användarfilter; ett av git-filter-branchs regressionstester gör det). Detta innebär i huvudsak att man använder filsystemet som en IPC-mekanism mellan git-filter-branch och de användardefinierade filtren. Diskar tenderar att vara en långsam IPC-mekanism, och att skriva dessa filer representerar också effektivt en påtvingad synkroniseringspunkt mellan separata processer som vi träffar vid varje incheckning.
+
+* De användardefinierade skal-kommandona kommer sannolikt att involvera en pipeline av kommandon, vilket resulterar i att många processer per incheckning skapas. Att skapa och köra en annan process tar en mycket varierande tid mellan operativsystem, men på alla plattformar är det mycket långsamt i förhållande till att anropa en funktion.
+
+* Själva git-filter-branch är skrivet i skal (sh), vilket är ganska långsamt. Detta är det enda prestandaproblemet som skulle kunna åtgärdas bakåtkompatibelt, men jämfört med ovanstående problem som är inneboende i designen av git-filter-branch, är själva verktygets språk ett relativt litet problem.
+
+  ** Sidoanteckning: Tyvärr tenderar folk att fixera sig vid det som är skrivet i skalet och frågar regelbundet om git-filter-branch kan skrivas om till ett annat språk för att åtgärda prestandaproblemen. Det ignorerar inte bara de större inneboende problemen med designen, det skulle också hjälpa mindre än man skulle kunna förvänta sig: om git-filter-branch i sig inte vore skal, skulle bekvämlighetsfunktionerna (map(), skip_commit(), etc.) och argumentet `--setup` inte längre kunna köras en gång i början av programmet utan skulle istället behöva läggas till i varje användarfilter (och därmed köras om med varje incheckning).
+
+Verktyget https://github.com/newren/git-filter-repo/[git filter-repo] är ett alternativ till git-filter-branch som inte lider av dessa prestandaproblem eller säkerhetsproblem (nämns nedan). För de med befintliga verktyg som förlitar sig på git-filter-branch, erbjuder 'git filter-repo' också https://github.com/newren/git-filter-repo/blob/master/contrib/filter-repo-demos/filter-lamely[filter-lamely], en drop-in-ersättning för git-filter-branch (med några få förbehåll). Medan filter-lamely lider av samma säkerhetsproblem som git-filter-branch, förbättrar det åtminstone prestandaproblemen något.
+
+[[SAFETY]]
+SAFETY
+------
+
+git-filter-branch är full av missöden, vilket resulterar i olika sätt att enkelt korrumpera förvar eller sluta med en röra som är värre än vad du började med:
+
+* Någon kan ha en uppsättning "fungerande och testade filter" som de dokumenterar eller tillhandahåller till en kollega, som sedan kör dem på ett annat operativsystem där samma kommandon inte fungerar/testas (några exempel på git-filter-branch manualsidan påverkas också av detta). Skillnader mellan BSD och GNU-användarland kan verkligen bita. Med tur dyker felmeddelanden upp. Men lika troligt är det att kommandona antingen inte utför den filtrering som begärs, eller så korrumperar de tyst genom att göra någon oönskad ändring. Den oönskade ändringen kan bara påverka ett fåtal incheckningar, så det är inte nödvändigtvis uppenbart heller. (Det faktum att problem inte nödvändigtvis är uppenbara innebär att de sannolikt kommer att gå obemärkta förbi förrän den omskrivna historiken har använts ett bra tag, och då är det verkligen svårt att rättfärdiga ytterligare en flaggdag för ytterligare en omskrivning.)
+
+* Filnamn med mellanslag hanteras ofta fel av shell-kodavsnitt eftersom de orsakar problem för shell-pipelines. Inte alla är bekanta med find -print0, xargs -0, git-ls-files -z, etc. Även personer som är bekanta med dessa kan anta att sådana flaggor inte är relevanta eftersom någon annan döpte om sådana filer i sitt repo innan personen som utförde filtreringen gick med i projektet. Och ofta kanske inte ens de som är bekanta med att hantera argument med mellanslag gör det bara för att de inte är i tankesättet att tänka på allt som kan gå fel.
+
+* Filnamn som inte är ascii kan tas bort i tysthet trots att de finns i en önskad katalog. Att bara behålla önskade sökvägar görs ofta med hjälp av pipelines som `git ls-files | grep -v ^WANTED_DIR/ | xargs git rm`. ls-files citerar bara filnamn om det behövs, så folk kanske inte märker att en av filerna inte matchade regex (åtminstone inte förrän det är alldeles för sent). Ja, någon som känner till core.quotePath kan undvika detta (såvida de inte har andra specialtecken som \t, \n eller "), och personer som använder ls-files -z med något annat än grep kan undvika detta, men det betyder inte att de kommer att göra det.
+
+* På liknande sätt, när man flyttar filer, kan man upptäcka att filnamn med tecken som icke-ascii eller specialtecken hamnar i en annan katalog, en som innehåller ett dubbelt citattecken. (Detta är tekniskt sett samma problem som ovan med citattecken, men kanske ett intressant annorlunda sätt som det kan och har manifesterats som ett problem.)
+
+* Det är alldeles för lätt att av misstag blanda ihop gammal och ny historik. Det är fortfarande möjligt med vilket verktyg som helst, men git-filter-branch inbjuder nästan till det. Om man har tur är den enda nackdelen att användarna blir frustrerade över att de inte vet hur de ska krympa sitt förvar och ta bort det gamla. Om de har otur slår de ihop gammal och ny historik och får flera "kopior" av varje incheckning, av vilka vissa innehåller oönskade eller känsliga filer och andra inte. Detta sker på flera olika sätt:
+
+  ** standardinställningen är att bara göra en partiell omskrivning av historiken ('--all' är inte standardinställningen och få exempel visar det)
+
+  ** det faktum att det inte finns någon automatisk rengöring efter körning
+
+  ** det faktum att --tag-name-filter (när det används för att byta namn på taggar) inte tar bort de gamla taggarna utan bara lägger till nya med det nya namnet
+
+  ** det faktum att det ges lite utbildningsinformation för att informera användare om konsekvenserna av en omskrivning och hur man undviker att blanda gammal och ny historik. Till exempel diskuterar den här manualsidan hur användare behöver förstå att de behöver ombasera sina ändringar för alla sina grenar ovanpå den nya historiken (eller ta bort och klona om), men det är bara en av flera saker att tänka på. Se avsnittet "DISKUSSION" på manualsidan för git filter-repo för mer information.
+
+* Annoterade taggar kan av misstag konverteras till lättviktstaggar på grund av ett av två problem:
+
+  ** Någon kan skriva om historiken, inse att de har gjort fel, återställa från säkerhetskopiorna i refs/original/ och sedan göra om sitt git-filter-branch-kommando. (Säkerhetskopieringen i refs/original/ är inte en riktig säkerhetskopia; den avreferenserar taggar först.)
+
+  ** Kör git-filter-branch med antingen --tags eller --all i din <rev-list-alternativ>. För att behålla kommenterade taggar som kommenterade måste du använda --tag-name-filter (och får inte ha återställt från refs/original/ i en tidigare misslyckad omskrivning).
+
+* Alla inchecknings-meddelanden som anger en kodning kommer att bli korrupta av omskrivningen; git-filter-branch ignorerar kodningen, tar de ursprungliga bytena och matar den till commit-tree utan att ange rätt kodning. (Detta händer oavsett om --msg-filter används eller inte.)
+
+* Inchecknings-meddelanden (även om de alla är i UTF-8) blir som standard korrupta på grund av att de inte uppdateras -- alla referenser till andra inchecknings-hashar i inchecknings-meddelanden kommer nu att referera till incheckningar som inte längre finns.
+
+* Det finns inga funktioner som hjälper användare att hitta vilket oönskat skräp de ska ta bort, vilket innebär att de är mycket mer benägna att ha ofullständiga eller partiella rensningar som ibland leder till förvirring och att folk slösar tid på att försöka förstå. (Till exempel tenderar folk att bara leta efter stora filer att ta bort istället för stora kataloger eller tillägg, och när de väl gör det, kommer personer som använder det nya förvaret och går igenom historiken någon gång senare att märka en katalog för bygg-artefakter som innehåller vissa filer men inte andra, eller en cache av beroenden (node_modules eller liknande) som aldrig kunde ha fungerat eftersom den saknar vissa filer.)
+
+* Om --prune-empty inte anges kan filtreringsprocessen skapa massor av förvirrande tomma incheckningar
+
+* Om --prune-empty anges, så beskärs även avsiktligt placerade tomma incheckningar från tiden före filtreringsåtgärden, istället för att bara beskära incheckningar som blev tomma på grund av filtreringsregler.
+
+* Om --prune-empty anges, missas ibland tomma incheckningar och lämnas kvar ändå (en något ovanlig bugg, men det händer...)
+
+* Ett mindre problem, men användare som har som mål att uppdatera alla namn och e-postadresser i ett förar kan ledas till --env-filter som bara uppdaterar författare och incheckare, och saknar taggare.
+
+* Om användaren anger ett --tag-name-filter som mappar flera taggar till samma namn, visas ingen varning eller fel; git-filter-branch skriver helt enkelt över varje tagg i någon odokumenterad fördefinierad ordning vilket resulterar i endast en tagg i slutet. (Ett regressionstest av git-filter-branch kräver detta överraskande beteende.)
+
+Dessutom, leder den dåliga prestandan hos git-filter-branch ofta till säkerhetsproblem:
+
+* Att komma på rätt shell-kodsavsnitt för att utföra den filtrering man vill ha är ibland svårt om man inte bara gör en trivial modifiering, som att ta bort ett par filer. Tyvärr lär sig folk ofta om kodavsnittet är rätt eller fel genom att prova sig fram, men om det är rätt eller fel kan variera beroende på speciella omständigheter (mellanslag i filnamn, non-ascii filnamn, roliga författarnamn eller e-postadresser, ogiltiga tidszoner, förekomst av grafts eller ersättningsobjekt, etc.), vilket innebär att de kan behöva vänta länge, stöta på ett fel och sedan starta om. Prestandan för git-filter-branch är så dålig att denna cykel är smärtsam, vilket minskar tiden som finns tillgänglig för att noggrant kontrollera om (för att inte tala om vad det gör med tålamodet hos den person som gör omskrivningen även om de tekniskt sett har mer tid tillgänglig). Detta problem förvärras ytterligare eftersom fel från trasiga filter kanske inte visas på länge och/eller går vilse i ett hav av utdata. Ännu värre är att trasiga filter ofta bara resulterar i tysta felaktiga omskrivningar.
+
+* Som grädde på moset, även när användare äntligen hittar fungerande kommandon, vill de naturligtvis dela med sig av dem. Men de kanske inte är medvetna om att deras förvar inte hade vissa specialfall som någon annans har. Så när någon annan med ett annat förvar kör samma kommandon, drabbas de av problemen ovan. Eller så kör användaren bara kommandon som egentligen granskades för specialfall, men de kör dem på ett annat operativsystem där det inte fungerar, som nämnts ovan.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

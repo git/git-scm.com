@@ -1,0 +1,126 @@
+git-cherry(1)
+=============
+
+NAMN
+----
+git-cherry - Hitta incheckningar som ännu inte har tillämpats på uppströms
+
+SYNOPSIS
+--------
+[verse]
+'git cherry' [-v] [<uppström> [<huvud> [<gräns>]]]
+
+BESKRIVNING
+-----------
+Avgör om det finns incheckningar i `<huvud>..<uppström>` som är likvärdiga med de i intervallet `<gräns>..<huvud>`.
+
+Ekvivalenstestet baseras på diff-koden, efter att blanktecken och radnummer har tagits bort. git-cherry detekterar därför när incheckningar har "kopierats" med hjälp av linkgit:git-cherry-pick[1], linkgit:git-am[1] eller linkgit:git-rebase[1].
+
+Matar ut SHA1 för varje incheckning i `<gräns>..<huvud>`, prefixet med `-` för incheckningar som har en motsvarighet i <uppström>, och `+` för incheckningar som inte har det.
+
+ALTERNATIV
+----------
+-v::
+	Visa inchecknings-ämnen bredvid SHA1:erna.
+
+<uppströms>::
+	Upstream branch to search for equivalent commits. Defaults to the upstream branch of HEAD.
+
+<huvud>::
+	Arbetande gren; standardinställningen är HEAD.
+
+<gräns>::
+	Rapportera inte incheckningar upp till (och inklusive) gränsen.
+
+EXEMPEL
+-------
+
+Patch-arbetsflöden
+~~~~~~~~~~~~~~~~~~
+
+git-cherry is frequently used in patch-based workflows (see linkgit:gitworkflows[7]) to determine if a series of patches has been applied by the upstream maintainer. In such a workflow you might create and send a topic branch like this:
+
+------------
+$ git checkout -b ämne origin/master
+# arbeta och skapa några incheckningar
+$ git format-patch origin/master
+$ git send-email ... 00*
+------------
+
+Senare, kan du se om dina ändringar har tillämpats genom att säga (fortfarande på `ämne`):
+
+------------
+$ git fetch  # uppdatera din uppfattning om origin/master
+$ git cherry -v
+------------
+
+Konkret exempel
+~~~~~~~~~~~~~~~
+
+I en situation där ämnet bestod av tre incheckningar, och underhålls-ansvarige tillämpade två av dem, kan situationen se ut så här:
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...ämne
+* 7654321 (origin/master) uppströms top incheckning
+[... klipp ut några andra incheckninger ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... klipp ut mycket mer som har hänt ...]
+| * cccc000 (ämne) incheckning C
+| * bbbb000 incheckning B
+| * aaaa000 incheckning A
+|/
+o 1234567 förgreningspunkt
+------------
+
+I sådana fall, visar git-cherry en kortfattad sammanfattning av vad som ännu inte har tillämpats:
+
+------------
+$ git cherry origin/master ämne
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+Här ser vi att incheckning A och C (markerade med `-`) kan tas bort från din `ämnes`-gren när du ombaserar den ovanpå `origin/master`, medan incheckning B (markerad med `+`) fortfarande behöver behållas så att den skickas för att tillämpas på `origin/master`.
+
+
+Använda en gräns
+~~~~~~~~~~~~~~~~
+
+Det valfria alternativet <gräns> är användbart i de fall där ditt ämne är baserat på annat arbete som inte finns i uppströms. Om vi utvidgar föregående exempel, kan detta se ut så här:
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...ämne
+* 7654321 (origin/master) uppströms top incheckning
+[... klipp ut några andra incheckningar ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... klipp ut mycket mer som har hänt ...]
+| * cccc000 (ämne) incheckning C
+| * bbbb000 incheckning B
+| * aaaa000 incheckning A
+| * 0000fff (base) opublicerade saker F
+[... snip ...]
+| * 0000aaa opublicerade saker A
+|/
+o 1234567 sammanslagningsbas mellan uppströms och ämne
+------------
+
+Genom att ange `bas` som gräns kan du undvika att lista incheckningar mellan `bas` och `ämne`:
+
+------------
+$ git cherry origin/master ämne bas
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+
+SE ÄVEN
+-------
+linkgit:git-patch-id[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

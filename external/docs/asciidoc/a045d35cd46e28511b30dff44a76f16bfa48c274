@@ -1,0 +1,151 @@
+git-repack(1)
+=============
+
+NAMN
+----
+git-repack - Packa opackade objekt i ett förvar
+
+
+SYNOPSIS
+--------
+[verse]
+'git repack' [-a] [-A] [-d] [-f] [-F] [-l] [-n] [-q] [-b] [-m]
+	[--window=<n>] [--depth=<n>] [--threads=<n>] [--keep-pack=<paket-namn>]
+	[--write-midx] [--name-hash-version=<n>] [--path-walk]
+
+BESKRIVNING
+-----------
+
+Det här kommandot används för att kombinera alla objekt som för närvarande inte finns i ett "paket" till ett paket. Det kan också användas för att omorganisera befintliga paket till ett enda, mer effektivt paket.
+
+Ett paket är en samling objekt, individuellt komprimerade, med deltakomprimering tillämpad, lagrade i en enda fil, med en tillhörande indexfil.
+
+Paket används för att minska belastningen på spegelsystem, backupmotorer, disklagring etc.
+
+ALTERNATIV
+----------
+
+-a::
+	Istället för att packa de opackade objekten stegvis, packa allt som refereras till i ett enda paket. Särskilt användbart när man packar ett kodförråd som används för privat utveckling. Använd med `-d`. Detta rensar upp objekten som `git prune` lämnar efter sig, men `git fsck --full --dangling` visas som dinglande.
++
+Observera att användare som hämtar över dumma protokoll måste hämta hela det nya paketet för att hämta ett objekt där i, oavsett hur många andra objekt i det paketet de redan har lokalt.
++
+Löftesgivare-paketfiler packas om separat: om det finns paketfiler som har en associerad ".promisor"-fil, kommer dessa paketfiler att packas om till ett annat separat paket, och en tom ".promisor"-fil som motsvarar det nya separata paketet kommer att skrivas.
+
+-A::
+	Samma som `-a`, om inte `-d` används. Då blir alla onåbara objekt i ett tidigare paket lösa, ouppackade objekt, istället för att lämnas kvar i det gamla paketet. Oåtkomliga objekt läggs aldrig avsiktligt till i ett paket, inte ens vid ompackning. Detta alternativ förhindrar att onåbara objekt från att omedelbart raderas genom att lämnas kvar i det gamla paketet och sedan tas bort. Istället kommer de lösa onåbara objekten att beskäras enligt normala utgångsregler med nästa 'git gc'-anrop. Se linkgit:git-gc[1].
+
+-d::
+	Efter packningen, om de nyskapade paketen gör vissa befintliga paket överflödiga, ta bort de redundanta paketen. Kör även 'git prune-packed' för att ta bort redundanta lösa objektfiler.
+
+--cruft::
+	Samma som `-a`, såvida inte `-d` används. Då packas alla oåtkomliga objekt i ett separat cruft-paket. Oåtkomliga objekt kan beskäras med hjälp av de vanliga utgångsreglerna med nästa `git gc`-anrop (se linkgit:git-gc[1]). Inkompatibel med `-k`.
+
+--cruft-expiration=<approxidatum>::
+	Gör att oåtkomliga objekt äldre än `<approximate>` omedelbart upphör istället för att vänta på nästa `git gc`-anrop. Endast användbart med `--cruft -d`.
+
+--max-cruft-size=<n>::
+	Åsidosätt `--max-pack-size` för cruft-paket. Ärver värdet för `--max-pack-size` (om det finns något) som standard. Se dokumentationen för `--max-pack-size` för mer information.
+
+--combine-cruft-below-size=<n>::
+	När du genererar cruft-paket utan beskärning, packa endast om befintliga cruft-paket vars storlek är strikt mindre än `<n>` byte, vilket valfritt kan suffixas med "k", "m" eller "g". Cruft-paket vars storlek är större än eller lika med `<n>` lämnas som de är och packas inte om. Användbart när du vill undvika att packa om stora cruft-paket i förvar som har många och/eller stora oåtkomliga objekt.
+
+--expire-to=<kat>::
+	Skriv ett cruft-paket som innehåller beskurna objekt (om några) till katalogen `<kat>`. Det här alternativet är användbart för att spara en kopia av beskurna objekt i en separat katalog som säkerhetskopia. Endast användbart med `--cruft -d`.
+
+-l::
+	Skicka `--local`-alternativet till 'git pack-objects'. Se linkgit:git-pack-objects[1].
+
+-f::
+	Skicka `--no-reuse-delta`-alternativet till `git-pack-objects`, se linkgit:git-pack-objects[1].
+
+-F::
+	Skicka `--no-reuse-object`-alternativet till `git-pack-objects`, se linkgit:git-pack-objects[1].
+
+-q::
+--quiet::
+	Visa inga förloppsindikationer över standardfelströmmen och skicka `-q`-alternativet till 'git pack-objects'. Se linkgit:git-pack-objects[1].
+
+-n::
+	Uppdatera inte serverinformationen med 'git update-server-info'. Det här alternativet hoppar över uppdatering av lokala katalogfiler som behövs för att publicera detta förvar (eller en direkt kopia av det) via HTTP eller FTP. Se linkgit:git-update-server-info[1].
+
+--window=<n>::
+--depth=<n>::
+	Dessa två alternativ påverkar hur objekten i paketet lagras med deltakomprimering. Objekten sorteras först internt efter typ, storlek och eventuellt namn och jämförs med de andra objekten i `--window` för att se om deltakomprimering sparar utrymme. `--depth` begränsar det maximala deltadjupet; att göra det för djupt påverkar prestandan på uppackningssidan, eftersom deltadata måste tillämpas så många gånger för att komma till det nödvändiga objektet.
++
+Standardvärdet för --window är 10 och --depth är 50. Det maximala djupet är 4095.
+
+--threads=<n>::
+	Den här alternativet skickas vidare till `git pack-objects`.
+
+--window-memory=<n>::
+	Det här alternativet ger en ytterligare gräns utöver `--window`; fönsterstorleken kommer dynamiskt att skalas ned så att den inte tar upp mer än '<n>' byte i minnet. Detta är användbart i förvar med en blandning av stora och små objekt för att inte få slut på minne med ett stort fönster, men ändå kunna dra nytta av det stora fönstret för de mindre objekten. Storleken kan läggas till suffixet "k", "m" eller "g". `--window-memory=0` gör minnesanvändningen obegränsad. Standardvärdet tas från konfigurationsvariabeln `pack.windowMemory`. Observera att den faktiska minnesanvändningen kommer att vara gränsen multiplicerad med antalet trådar som används av linkgit:git-pack-objects[1].
+
+--max-pack-size=<n>::
+	Maximal storlek för varje utdatapaketfil. Storleken kan anges med suffixet "k", "m" eller "g". Den minsta tillåtna storleken är begränsad till 1 MiB. Om angiven, kan flera paketfiler skapas, vilket också förhindrar skapandet av ett bitmappsindex. Standardinställningen är obegränsad, såvida inte konfigurationsvariabeln `pack.packSizeLimit` är angiven. Observera att det här alternativet kan resultera i ett större och långsammare förvar; se diskussionen i `pack.packSizeLimit`.
+
+--filter=<filter-spec>::
+	Ta bort objekt som matchar filterspecifikationen från den resulterande packfilen och lägg dem i en separat packfil. Observera att objekt som används i arbetskatalogen inte filtreras bort. Så för att delningen ska fungera fullt ut, är det bäst att utföra den i ett rent repo och att använda alternativen `-a` och `-d` tillsammans med detta alternativ. Även `--no-write-bitmap-index` (eller konfigurationsalternativet `repack.writebitmaps` satt till `false`) bör användas, annars kommer skrivning av bitmapindex att misslyckas, eftersom det förutsätter en enda packfil som innehåller alla objekt. Se linkgit:git-rev-list[1] för giltiga `<filter-spec>`-former.
+
+--filter-to=<kat>::
+	Skriv paketet som innehåller bortfiltrerade objekt till katalogen `<kat>`. Endast användbart med `--filter`. Detta kan användas för att placera paketet i en separat objektkatalog som nås via Git alternativ-mekanismen. **VARNING:** Om paketfilen som innehåller de bortfiltrerade objekten inte är tillgänglig kan förvaret bli korrupt eftersom det kanske inte är möjligt att komma åt objekten i den paketfilen. Se avsnitten `objects` och `objects/info/alternates` i linkgit:gitrepository-layout[5].
+
+-b::
+--write-bitmap-index::
+	Skriv ett nåbarhetes-bitmappindex som en del av ompackningen. Detta är bara meningsfullt när det används med `-a`, `-A` eller `-m`, eftersom bitmapparna måste kunna referera till alla nåbara objekt. Det här alternativet åsidosätter inställningen för `repack.writeBitmaps`. Det här alternativet har ingen effekt om flera packfiler skapas, såvida inte en MIDX skrivs (i vilket fall en bitmapp för fler-pack skapas).
+
+--pack-kept-objects::
+	Inkludera objekt i `.keep`-filer vid ompackning. Observera att vi fortfarande inte tar bort `.keep`-paket efter att `pack-objects` är klar. Det betyder att vi kan duplicera objekt, men det gör alternativet säkert att använda när det sker samtidiga push- eller hämtningar. Det här alternativet är generellt sett bara användbart om du skriver bitmappar med `-b` eller `repack.writeBitmaps`, eftersom det säkerställer att den bitmappade packfilen har de nödvändiga objekten.
+
+--keep-pack=<pack-namn>::
+	Exkludera det givna paketet från ompackning. Detta motsvarar att ha `.keep`-filen på paketet. `<paketnamn>` är paketets filnamn utan inledande katalog (t.ex. `pack-123.pack`). Alternativet kan anges flera gånger för att behålla flera paket.
+
+--unpack-unreachable=<när>::
+	När du lossar oåtkomliga objekt, bry dig inte om att lossa några objekt som är äldre än `<när>`. Detta kan användas för att optimera bort skrivningen av alla objekt som omedelbart skulle rensas av en uppföljande `git prune`.
+
+-k::
+--keep-unreachable::
+	När `-ad` används, kommer alla oåtkomliga objekt från befintliga paket att läggas till i slutet av paketfilen istället för att tas bort. Dessutom kommer alla oåtkomliga lösa objekt att packas (och deras lösa motsvarigheter tas bort).
+
+-i::
+--delta-islands::
+	Skicka `--delta-islands`-alternativet till `git-pack-objects`, se linkgit:git-pack-objects[1].
+
+-g<faktor>::
+--geometric=<faktor>::
+	Ordna den resulterande paketstrukturen så att varje efterföljande paket innehåller minst `<faktor>` gånger antalet objekt som det näst största paketet.
++
+`git repack` säkerställer detta genom att bestämma en "uppsättning" av packfiler som behöver packas om till en för att säkerställa en geometrisk progression. Den väljer den minsta uppsättningen packfiler så att så många som möjligt av de större packfilerna (genom antalet objekt som finns i det paketet) kan lämnas intakta.
++
+Till skillnad från andra ompackningslägen bestäms uppsättningen objekt som ska packas unikt av uppsättningen paket som "rullas ihop"; med andra ord, de paket som bedöms behöva kombineras för att återställa en geometrisk progression.
++
+Lösa objekt ingår implicit i denna "uppsamling", oavsett deras tillgänglighet. Detta kan komma att ändras i framtiden.
++
+När man skriver en fler-pakets bitmapp väljer `git repack` det största resulterande paketet som det föredragna paketet för objektval av MIDX (se linkgit:git-multi-pack-index[1]).
+
+-m::
+--write-midx::
+	Skriv ett multipackindex (se linkgit:git-multi-pack-index[1]) som innehåller de icke-redundanta paketen.
+
+--name-hash-version=<n>::
+	Ange detta argument till den underliggande `git pack-objects`-processen. Se linkgit:git-pack-objects[1] för fullständig information.
+
+--path-walk::
+	Skicka `--path-walk`-alternativet till den underliggande `git pack-objects`-processen. Se linkgit:git-pack-objects[1] för fullständig information.
+
+KONFIGURATION
+-------------
+
+Olika konfigurationsvariabler påverkar packning, se linkgit:git-config[1] (sök efter "pack" och "delta").
+
+Som standard, skickar kommandot alternativet `--delta-base-offset` till 'git pack-objects'; detta resulterar vanligtvis i något mindre paket, men de genererade paketen är inkompatibla med versioner av Git som är äldre än version 1.4.4. Om du behöver dela ditt arkiv med sådana gamla Git-versioner, antingen direkt eller via det dumma http-protokollet, måste du ställa in konfigurationsvariabeln `repack.UseDeltaBaseOffset` till "false" och packa om. Åtkomst från gamla Git-versioner över det ursprungliga protokollet påverkas inte av det här alternativet eftersom konverteringen utförs direkt efter behov i så fall.
+
+Deltakomprimering används inte på objekt som är större än konfigurationsvariabeln `core.bigFileThreshold` och på filer med attributet `delta` inställt på falskt.
+
+SE ÄVEN
+-------
+linkgit:git-pack-objects[1] linkgit:git-prune-packed[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

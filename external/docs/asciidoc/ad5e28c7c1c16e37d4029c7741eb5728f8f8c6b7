@@ -1,0 +1,126 @@
+git-cherry(1)
+=============
+
+НАЗВА
+-----
+git-cherry - Знайти коміти, які ще не застосовані до основної розробки
+
+СИНОПСИС
+--------
+[verse]
+'git cherry' [-v] [<upstream> [<head> [<limit>]]]
+
+ОПИС
+----
+Визначити, чи є коміти в `<head>..<upstream>`, еквівалентні тим, що в діапазоні `<limit>..<head>`.
+
+Тест еквівалентності базується на різниці (diff) після видалення пробілів та номерів рядків. Таким чином, git-cherry виявляє, коли коміти були "скопійовані" за допомогою linkgit:git-cherry-pick[1], linkgit:git-am[1] або linkgit:git-rebase[1].
+
+Виводить SHA1 кожного коміту в `<limit>..<head>`, з префіксом `-` для комітів, що мають еквівалент в <upstream>, та `+` для комітів, що його не мають.
+
+ОПЦІЇ
+-----
+-v::
+	Показати теми комітів поруч із SHA1.
+
+<upstream>::
+	Гілка вище за течією для пошуку еквівалентних комітів. За замовчуванням використовується гілка HEAD вище за течією.
+
+<head>::
+	Робоча гілка; за замовчуванням HEAD.
+
+<limit>::
+	Не повідомляти про коміти до ліміту (включно).
+
+ПРИКЛАДИ
+--------
+
+Робочі процеси виправлення
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+git-cherry часто використовується в робочих процесах на основі патчів (див. linkgit:gitworkflows[7]), щоб визначити, чи було застосовано серію патчів розробником основної версії. У такому робочому процесі ви можете створити та надіслати тематичну гілку ось так:
+
+------------
+$ git checkout -b topic origin/master
+# попрацюйте та створіть кілька комітів
+$ git format-patch origin/master
+$ git send-email ... 00*
+------------
+
+Пізніше ви можете перевірити, чи ваші зміни були застосовані, сказавши (все ще за темою):
+
+------------
+$ git fetch  # оновіть своє уявлення про походження/господаря
+$ git cherry -v
+------------
+
+Конкретний приклад
+~~~~~~~~~~~~~~~~~~
+
+У ситуації, коли тема складається з трьох комітів, а розробник застосував два з них, ситуація може виглядати так:
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...topic
+* 7654321 (origin/master) upstream tip commit
+[... snip some other commits ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... snip a lot more that has happened ...]
+| * cccc000 (topic) commit C
+| * bbbb000 commit B
+| * aaaa000 commit A
+|/
+o 1234567 branch point
+------------
+
+У таких випадках git-cherry показує стислий виклад того, що ще потрібно застосувати:
+
+------------
+$ git cherry origin/master topic
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+Тут ми бачимо, що коміти A та C (позначені `-`) можна видалити з вашої гілки `topic`, коли ви перебазуєте її поверх `origin/master`, тоді як коміт B (позначений `+`) все ще потрібно зберегти, щоб його було надіслано для застосування до `origin/master`.
+
+
+Використання ліміту
+~~~~~~~~~~~~~~~~~~~
+
+Необов'язковий тег <limit> корисний у випадках, коли ваша тема базується на іншій роботі, яка не є частиною основної розробки. Розвиваючи попередній приклад, це може виглядати так:
+
+------------
+$ git log --graph --oneline --decorate --boundary origin/master...topic
+* 7654321 (origin/master) upstream tip commit
+[... snip some other commits ...]
+* cccc111 cherry-pick of C
+* aaaa111 cherry-pick of A
+[... snip a lot more that has happened ...]
+| * cccc000 (topic) commit C
+| * bbbb000 commit B
+| * aaaa000 commit A
+| * 0000fff (base) unpublished stuff F
+[... snip ...]
+| * 0000aaa unpublished stuff A
+|/
+o 1234567 merge-base between upstream and topic
+------------
+
+Вказавши `base` як обмеження, ви можете уникнути перерахування комітів між `base` та `topic`:
+
+------------
+$ git cherry origin/master topic base
+- cccc000... commit C
++ bbbb000... commit B
+- aaaa000... commit A
+------------
+
+
+ДИВ. ТАКОЖ
+----------
+linkgit:git-patch-id[1]
+
+GIT
+---
+Частина набору linkgit:git[1]

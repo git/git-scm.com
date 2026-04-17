@@ -1,0 +1,128 @@
+git-commit-tree(1)
+==================
+
+NAMN
+----
+git-commit-tree - Skapa ett nytt inchecknings-objekt
+
+
+SYNOPSIS
+--------
+[verse]
+'git commit-tree' <träd> [(-p <förälder>)...]
+'git commit-tree' [(-p <parent>)...] [-S[<keyid>]] [(-m <meddelande>)...]
+		  [(-F <fil>)...] <träd>
+
+
+BESKRIVNING
+-----------
+Detta är vanligtvis inte vad en slutanvändare vill köra direkt. Se linkgit:git-commit[1] istället.
+
+Skapar ett nytt inchecknings-objekt baserat på det angivna trädobjektet och genererar det nya inchecknings-objekt-id:t vid stdout. Loggmeddelandet läses från standardindata, såvida inte alternativen `-m` eller `-F` anges.
+
+Alternativen `-m` och `-F` kan anges hur många gånger som helst, i valfri ordning. Meddelandet i inchecknings-loggen kommer att skrivas i den ordning alternativen anges.
+
+Ett inchecknings-objekt kan ha ett valfritt antal föräldrar. Med exakt en förälder är det en vanlig incheckning. Att ha mer än en förälder gör incheckningen till en sammanslagning mellan flera historik-linjer. Initiala (root) commits har inga föräldrar.
+
+Medan ett träd representerar ett visst katalogtillstånd i en arbetskatalog, representerar en incheckning det tillståndet i "tid" och förklarar hur man kommer dit.
+
+Normalt sett skulle en incheckning identifiera ett nytt "HEAD"-tillstånd, och även om Git inte bryr sig om var du sparar anteckningen om det tillståndet, tenderar vi i praktiken att bara skriva resultatet till filen som `.git/HEAD` pekar på, så att vi alltid kan se vad det senaste incheckade tillståndet var.
+
+ALTERNATIV
+----------
+<träd>::
+	Ett befintligt trädobjekt.
+
+-p <förälder>::
+	Varje `-p` anger id:t för ett överordnat inchecknings-objekt.
+
+-m <meddelande>::
+	Ett stycke i incheckning-loggmeddelandet. Detta kan ges mer än en gång och varje <meddelande> blir ett eget stycke.
+
+-F <fil>::
+	Läs inchecknings-loggmeddelandet från den givna filen. Använd `-` för att läsa från standardindata. Detta kan anges mer än en gång och innehållet i varje fil blir ett eget stycke.
+
+-S[<nyckeld>]::
+--gpg-sign[=<nyckelid>]::
+--no-gpg-sign::
+	GPG-signera incheckningar. Argumentet `keyid` är valfritt och används som standard för committer-identiteten; om det anges måste det fästas vid alternativet utan mellanslag. `--no-gpg-sign` är användbart för att ångra ett `--gpg-sign`-alternativ som angetts tidigare på kommandoraden.
+
+Inchecknings-information
+------------------------
+
+En incheckning inkapslar:
+
+- alla överordnade objekt-id:n
+- författarnamn, e-postadress och datum
+- namn och e-postadress för incheckaren och inchecknings-tid.
+
+En inchecknings-kommentar läses från stdin. Om en ändringsloggpost inte anges via omdirigering med "<", kommer 'git commit-tree' bara att vänta på att en ska anges och avslutas med ^D.
+
+DATUMFORMAT
+-----------
+
+Miljövariablerna `GIT_AUTHOR_DATE` och `GIT_COMMITTER_DATE` stöder följande datumformat:
+
+Git internt format::
+	Det är `<unix-timestamp> <time-zone-offset>`, där `<unix-timestamp>` är antalet sekunder sedan UNIX-epoken. `<time-zone-offset>` är en positiv eller negativ förskjutning från UTC. Till exempel är CET (som är 1 timme före UTC) `+0100`.
+
+RFC 2822::
+	Standarddatumformatet som beskrivs av RFC 2822, till exempel `Tor, 07 Apr 2005 22:13:13 +0200`.
+
+ISO 8601::
+	Tid och datum som anges av ISO 8601-standarden, till exempel `2005-04-07T22:13:13`. Parsern accepterar även ett mellanslag istället för tecknet `T`. Bråkdelar av en sekund kommer att ignoreras, till exempel `2005-04-07T22:13:13.019` kommer att behandlas som `2005-04-07T22:13:13`.
++
+NOTE: Dessutom accepteras datumdelen i följande format: `ÅÅÅÅ.MM.DD`, `MM/DD/ÅÅÅÅ` och `DD.MM.ÅÅÅÅ`.
+
+ifdef::git-commit[]
+Förutom att känna igen alla datumformat ovan, kommer alternativet `--date` också att försöka förstå andra, mer människocentrerade datumformat, såsom relativa datum som "yesterday" (igår) eller "yesterday" (förra fredagen vid middagstid).
+endif::git-commit[]
+[]
+
+Diskussion
+----------
+
+Git är till viss del teckenkodningsagnostisk.
+
+ - Innehållet i blob-objekten är otolkade sekvenser av byte. Det finns ingen kodningsöversättning på kärnnivå.
+
+ - Sökvägsnamn är kodade i UTF-8-normaliseringsform C. Detta gäller trädobjekt, indexfilen, referensnamn, såväl som sökvägsnamn i kommandoradsargument, miljövariabler och konfigurationsfiler (`.git/config` (se linkgit:git-config[1]), linkgit:gitignore[5], linkgit:gitattributes[5] och linkgit:gitmodules[5]).
++
+Observera att Git på kärnnivå behandlar sökvägsnamn helt enkelt som sekvenser av icke-NUL-byte, det finns inga konverteringar av sökvägskodning (förutom på Mac och Windows). Därför fungerar användning av sökvägsnamn som inte är ASCII-namn oftast även på plattformar och filsystem som använder äldre utökade ASCII-kodningar. Förvar som skapas på sådana system kommer dock inte att fungera korrekt på UTF-8-baserade system (t.ex. Linux, Mac, Windows) och vice versa. Dessutom antar många Git-baserade verktyg helt enkelt att sökvägsnamn är UTF-8 och kommer inte att kunna visa andra kodningar korrekt.
+
+ - Meddelanden i commitloggar kodas vanligtvis i UTF-8, men andra utökade ASCII-kodningar stöds också. Detta inkluderar ISO-8859-x, CP125x och många andra, men _inte_ UTF-16/32, EBCDIC och CJK multibyte-kodningar (GBK, Shift-JIS, Big5, EUC-x, CP9xx etc.).
+
+Även om vi uppmuntrar att incheckningsloggmeddelanden kodas i UTF-8, är både kärnan och användarkommandona (porcelain) i Git utformade för att inte tvinga fram UTF-8 i projekt. Om alla deltagare i ett visst projekt tycker att det är bekvämare att använda äldre kodningar, förbjuder inte Git det. Det finns dock några saker att tänka på.
+
+. `git commit` och `git commit-tree` utfärdar en varning om incheckningsloggmeddelandet som ges till det inte ser ut som en giltig UTF-8-sträng, såvida du inte uttryckligen anger att ditt projekt använder en äldre kodning. Sättet att säga detta är att ha `i18n.commitEncoding` i `.git/config`-filen, så här:
++
+------------
+[i18n]
+	commitEncoding = ISO-8859-1
+------------
++
+Incheckningsobjekt som skapats med ovanstående inställning registrerar värdet för `i18n.commitEncoding` i sin `encoding`-header. Detta är för att hjälpa andra som tittar på dem senare. Avsaknaden av denna header innebär att incheckningsloggmeddelandet är kodat i UTF-8.
+
+. `git log`, `git show`, `git blame` och vänner tittar på `encoding`-headern för ett incheckningsobjekt och försöker koda om loggmeddelandet till UTF-8 om inget annat anges. Du kan ange önskad utdatakodning med `i18n.logOutputEncoding` i `.git/config`-filen, så här:
++
+------------
+[i18n]
+	logOutputEncoding = ISO-8859-1
+------------
++
+Om du inte har den här konfigurationsvariabeln används värdet för `i18n.commitEncoding` i stället.
+
+Observera att vi medvetet valde att inte koda om incheckningsloggmeddelandet när en incheckning görs för att tvinga fram UTF-8 på incheckningsobjektnivå, eftersom omkodning till UTF-8 inte nödvändigtvis är en reversibel operation.
+[]
+
+FILER
+-----
+/etc/mailname
+
+SE ÄVEN
+-------
+linkgit:git-write-tree[1] linkgit:git-commit[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

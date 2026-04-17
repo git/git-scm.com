@@ -1,0 +1,702 @@
+git-push(1)
+===========
+
+NAMN
+----
+git-push - Uppdatera fjärr-referenser och tillhörande objekt
+
+
+SYNOPSIS
+--------
+[synopsis]
+git push [--all | --branches | --mirror | --tags] [--follow-tags] [--atomic] [-n | --dry-run] [--receive-pack=<git-receive-pack>]
+	 [--repo=<repository>] [-f | --force] [-d | --delete] [--prune] [-q | --quiet] [-v | --verbose]
+	 [-u | --set-upstream] [-o <string> | --push-option=<string>]
+	 [--[no-]signed | --signed=(true|false|if-asked)]
+	 [--force-with-lease[=<refname>[:<expect>]] [--force-if-includes]]
+	 [--no-verify] [<repository> [<refspec>...]]
+
+BESKRIVNING
+-----------
+
+Uppdaterar en eller flera grenar, taggar eller andra referenser i ett fjärrkodförråd från ditt lokala kodförråd och skickar all nödvändig data som inte redan finns i fjärrkodförrådet.
+
+Det enklaste sättet att skicka är `git push <fjärr> <gren>`. `git push origin main` skickar den lokala grenen `main` till grenen `main` på fjärrkodförrådet med namnet `origin`.
+
+Argumentet `<repository>` är som standard uppström för den aktuella grenen, eller `origin` om det inte finns någon konfigurerad uppström.
+
+För att avgöra vilka grenar, taggar eller andra referenser som ska skickas använder Git (i prioritetsordning):
+
+1. Argumentet/argumenten `<refspec>` (till exempel `main` i `git push origin main`) eller alternativen `--all`, `--mirror` eller `--tags`
+2. Konfigurationen `remote.<namn>.push` för kodförrådet som skickas till
+3. Konfigurationen `push.default`. Standardinställningen är `push.default=simple`, vilket skickar till en gren med samma namn som den aktuella grenen. Se avsnittet <<CONFIGURATION,KONFIGURATION>> nedan för mer information om `push.default`.
+
+`git push` kan misslyckas om du inte har ställt in en uppström för den aktuella grenen, beroende på vad `push.default` är inställt på. Se avsnittet <<UPSTREAM-BRANCHES,UPPSTRÖMS GRENAR>> nedan för mer information om hur man ställer in och använder uppström.
+
+Du kan få intressanta saker att hända i ett kodförråd varje gång du skickar till det genom att sätta upp 'hooks' där. Se dokumentationen för linkgit:git-receive-pack[1].
+
+[[OPTIONS]]
+ALTERNATIV
+----------
+_<repository>_::
+	Det "fjärrkodförråd" som är destination att skicka till. Parametern kan antingen vara en URL (se avsnittet <<URLS,GIT URLS>> nedan) eller namnet på en fjärr (se avsnittet <<REMOTES,FJÄRRAR>> nedan).
+
+`<refspec>...`::
+	Ange vilken destinationsreferens som ska uppdateras med vilket källobjekt.
++
+Formatet för en referensspecifikation är `[+]<src>[:<mål>]`, till exempel `main`, `main:other` eller `HEAD^:refs/heads/main`.
++
+_<src>_ är ofta namnet på den lokala grenen som ska skickas, men det kan vara vilket godtyckligt "SHA-1-uttryck" som helst (se linkgit:gitrevisions[7]).
++
+_<mål>_ avgör vilken referens som ska uppdateras på fjärrsidan. Det måste vara namnet på en gren, tagg eller annan referens, inte ett godtyckligt uttryck.
++
+`+` är valfritt och gör samma sak som `--force`.
++
+Du kan skriva en referensspecifikation med hjälp av den helt expanderade formen (till exempel `refs/heads/main:refs/heads/main`) som anger exakt källa och destination, eller med en kortare form (till exempel `main` eller `main:other`). Här är reglerna för hur referensspecifikationer expanderas, såväl som olika andra speciella referensspecifikations-former:
++
+ *  _<src>_ utan `:<mål>` innebär att uppdatera samma referens som _<src>_, såvida inte konfigurationen `remote.<repository>.push` anger en annan _<mål>_. Till exempel, om `main` är en gren, expanderas referensspecifikationen `main` till `main:refs/heads/main`.
+ *  Om _<mål>_ otvetydigt refererar till en referens på fjärr <repository>, expandera den till den referensen. Om till exempel `v1.0` är en tagg på fjärren, expanderas `HEAD:v1.0` till `HEAD:refs/tags/v1.0`.
+ *  Om _<src>_ leder till en referens som börjar med `refs/heads/` eller `refs/tags/`, lägg då till det före <mål>. Om till exempel `main` är en gren, expanderas `main:other` till `main:refs/heads/other`
+ *  Den speciella referensspecifikationen `:` (eller `+:` för att tillåta uppdateringar som inte spolas framåt) instruerar Git att skicka "matchande" grenar: för varje gren som finns på den lokala sidan uppdateras fjärrsidan om en gren med samma namn redan finns på fjärrsidan.
+ *  _<src>_ kan innehålla ett `*` för att indikera en enkel mönstermatchning. Detta fungerar som en glob som matchar alla referenser som matchar mönstret. Det får bara finnas ett `*` i både `<src>` och `<mål>`. Den kommer att mappa referenser till målet genom att ersätta * med innehållet som matchas från källan. Till exempel kommer `refs/heads/*:refs/heads/*` att skicka alla grenar.
+ *  En referensspecifikation som börjar med `^` är en negativ referensspecifikation. Detta anger referenser som ska exkluderas. En referens kommer att anses matcha om den matchar minst en positiv referensspecifikation och inte matchar någon negativ referensspecifikation. Negativa referensspecifikationer kan vara mönsterrefspecar. De får bara innehålla ett _<src>_. Fullständigt stavade hexadecimala objektnamn stöds inte heller. Till exempel kommer `git push origin 'refs/heads/*' '^refs/heads/dev-*'` att skicka alla grenar förutom de som börjar med `dev-`
+ *  Om _<src>_ är tomt, raderas _<mål>_-referensen från fjärrkodförråd. Till exempel, `git push origin :dev` kommer att radera `dev`-grenen.
+ *  `tag <tagg>` expanderar till `refs/tags/<tagg>:refs/tags/<tagg>`.
+	Detta är tekniskt sett en speciell syntax för `git push` och inte en referensspecifikation, eftersom argumenten `tag` och `v1.0` är separata i `git push origin tag v1.0`.
+ *  Om referensspecifikationen inte kan expanderas entydigt, skicka ett felmeddelande som anger vad som försöktes, och beroende på konfigurationen av `advice.pushUnqualifiedRefname` (se linkgit:git-config[1]) föreslå vilken refs/namnrymd du kanske ville skicka till.
+
+Inte alla uppdateringar är tillåtna: se SÄND-REGLER nedan för mer information.
+
+`--all`::
+`--branches`::
+	Skicka alla grenar (d.v.s. referenser under `refs/heads/`); kan inte användas med andra <refspecar>.
+
+`--prune`::
+	Ta bort fjärrgrenar som inte har en lokal motsvarighet. Till exempel kommer en fjärrgren `tmp` att tas bort om en lokal gren med samma namn inte längre finns. Detta respekterar även referensspecifikationer, t.ex. `git push --prune remote refs/heads/*:refs/tmp/*` skulle se till att fjärrgrenen `refs/tmp/foo` kommer att tas bort om `refs/heads/foo` inte finns.
+
+`--mirror`::
+	I stället för att namnge varje referens som ska skickas anger detta att alla referenser under `refs/` (vilket inkluderar men inte är begränsat till `refs/heads/`, `refs/remotes/` och `refs/tags/`) ska speglas till fjärrkodförrådet. Nyskapade lokala referenser kommer att skickas till fjärrändan, lokalt uppdaterade referenser kommer att tvångsuppdateras på fjärrändan och borttagna referenser kommer att tas bort från fjärrändan. Detta är standardinställningen om konfigurationsalternativet `remote.<fjärr>.mirror` är inställt.
+
+`-n`::
+`--dry-run`::
+	Gör allt utom att faktiskt skicka uppdateringarna.
+
+`--porcelain`::
+	Skapa maskinläsbar utdata. Statusraden för varje referens blir tab-separerad och skickas till stdout i stället för stderr. Referensernas fullständiga symboliska namn anges.
+
+`-d`::
+`--delete`::
+	Alla listade referenser raderas från fjärrkodförråd. Detta är samma sak som att lägga till ett kolon före alla referenser.
+
+`--tags`::
+	Alla referenser under `refs/tags` skickas, utöver referensspecifikationer som uttryckligen listas på kommandoraden.
+
+`--follow-tags`::
+	Skicka alla referenser som skulle skickas utan det här alternativet, och skicka även kommenterade taggar i `refs/tags` som saknas i fjärrkodförrådet men pekar på incheckningsliknande objekt som är nåbara från de referenser som skickas. Detta kan också anges med konfigurationsvariabeln `push.followTags`. För mer information, se `push.followTags` i linkgit:git-config[1].
+
+`--signed`::
+`--no-signed`::
+`--signed=(true|false|if-asked)`::
+	GPG-signera begäran om att uppdatera referenser på mottagarsidan, så att den kan kontrolleras av krokar och/eller loggas. Möjliga värden är:
+`false`;;
+`--no-signed`;;
+inget försök till signering kommer att göras.
+`true`;;
+`--signed`;;
+Push-funktionen kommer att misslyckas om servern inte stöder signerade push-meddelanden.
+`if-asked`;;
+signera om och endast om servern stöder signerade push-kommandon. Push-kommandot kommer också att misslyckas om det faktiska anropet till `gpg --sign` misslyckas. Se linkgit:git-receive-pack[1] för detaljer om mottagarsidan.
+
+`--atomic`::
+`--no-atomic`::
+	Använd en atomär transaktion på fjärrsidan om sådan finns. Antingen uppdateras alla referenser, eller vid fel uppdateras inga referenser. Om servern inte stöder atomära push-transaktioner kommer push-transaktionen att misslyckas.
+
+`-o <alternativ>`::
+`--push-option=<alternativ>`::
+	Skicka den givna strängen till servern, som skickar den vidare till både pre-receive- och post-receive-kroken. Den givna strängen får inte innehålla tecknet _NUL_ eller _LF_. När flera `--push-option=<alternativ>` anges skickas de alla till den andra sidan i den ordning som anges på kommandoraden. När ingen `--push-option=<alternativ>` anges från kommandoraden används värdena för konfigurationsvariabeln `push.pushOption` i stället.
+
+`--receive-pack=<git-receive-pack>`::
+`--exec=<git-receive-pack>`::
+	Sökväg till programmet 'git-receive-pack' på fjärrsidan. Ibland användbart när man skickar till ett fjärrkodförråd via ssh, och du inte har programmet i en katalog på standard-`$PATH`.
+
+`--force-with-lease`::
+`--no-force-with-lease`::
+`--force-with-lease=<refnamn>`::
+`--force-with-lease=<refnamn>:<förväntat>`::
+	Vanligtvis vägrar `git push` att uppdatera en fjärrreferens som inte är en förfader till den lokala referensen som används för att skriva över den.
++
+Det här alternativet åsidosätter denna begränsning om det aktuella värdet för fjärrreferensen är det förväntade värdet. `git push` misslyckas annars.
++
+Tänk dig att du måste ombasera det du redan har publicerat. Du måste kringgå regeln om snabbspolning för att ersätta den historik du ursprungligen publicerade med den ombaserade historiken. Om någon annan byggde ovanpå din ursprungliga historik medan du ombaserade, kan grentoppen på fjärren ha flyttat sig vidare, och att blint skicka med `--force` kommer att förlora den personens arbete.
++
+Det här alternativet låter dig ange att du förväntar dig att historiken du uppdaterar är den du ombaserade och vill ersätta. Om fjärrreferensen fortfarande pekar på den incheckning du angav, kan du vara säker på att inga andra personer gjorde något med referensen. Det är som att ta ett "leaseavtal" på referensen utan att explicit låsa den, och fjärrreferensen uppdateras bara om "leaseavtalet" fortfarande är giltigt.
++
+Enbart `--force-with-lease`, utan att specificera detaljerna, skyddar alla fjärrreferenser som ska uppdateras genom att kräva att deras nuvarande värde är detsamma som den fjärrspårade grenen vi har för dem.
++
+`--force-with-lease=<refname>`, utan att ange det förväntade värdet, skyddar _<refname>_ (ensamt), om den ska uppdateras, genom att kräva att dess nuvarande värde är detsamma som den fjärrspårade grenen vi har för den.
++
+`--force-with-lease=<refnamn>:<förväntat>` skyddar _<refnamn>_ (ensamt), om den ska uppdateras, genom att kräva att dess nuvarande värde är detsamma som det angivna värdet _<förväntat>_ (vilket får skilja sig från den fjärrspårade grenen vi har för referensnamnet, annars behöver vi inte ens ha en sådan fjärrspårad gren när denna form används). Om _<förväntat>_ är den tomma strängen får den namngivna referensen inte redan existera.
++
+Observera att alla former förutom `--force-with-lease=<refnamn>:<förväntat>` som explicit anger det förväntade aktuella värdet för referensen fortfarande är experimentella och deras semantik kan komma att ändras allt eftersom vi får erfarenhet av den här funktionen.
++
+`--no-force-with-lease` kommer att upphäva alla tidigare `--force-with-lease` på kommandoraden.
++
+En allmän anmärkning om säkerhet: att ange detta alternativ utan ett förväntat värde, d.v.s. som `--force-with-lease` eller `--force-with-lease=<refnamn>`, interagerar mycket dåligt med allt som implicit kör `git fetch` på fjärren för att skickas till i bakgrunden, t.ex. `git fetch origin` på ditt kodförråd i ett cronjob.
++
+Skyddet den erbjuder jämfört med `--force` säkerställer att efterföljande ändringar som ditt arbete inte baserades på inte förstörs, men detta är trivialt om någon bakgrundsprocess uppdaterar referenser i bakgrunden. Vi har inget annat än fjärrspårningsinformation att använda som en heuristik för referenser som du förväntas ha sett och är villig att förstöra.
++
+Om din redigerare eller något annat system kör `git fetch` i bakgrunden är ett sätt att mildra detta att helt enkelt konfigurera en annan fjärr:
++
+----
+git remote add origin-push $(git config remote.origin.url)
+git fetch origin-push
+----
++
+När bakgrundsprocessen kör `git fetch origin` kommer referenserna på `origin-push` inte att uppdateras, och därmed kommandon som:
++
+----
+git push --force-with-lease origin-push
+----
++
+Kommer att misslyckas om du inte kör `git fetch origin-push` manuellt. Den här metoden är naturligtvis helt omintetgjord av något som kör `git fetch --all`, i så fall skulle du behöva antingen inaktivera den eller göra något mer mödosamt som:
++
+----
+git fetch              # uppdatera 'master' från fjärr
+git tag base master    # markera vår baspunktt
+git rebase -i master   # skriv om några incheckningar
+git push --force-with-lease=master:base master:master
+----
++
+D.v.s. skapa en `base`-tagg för versioner av uppströmskoden som du har sett och är villig att skriva över, skriv sedan om historiken, och tvinga slutligen fram att skicka ändringar till `master` om fjärrversionen fortfarande är på `base`, oavsett vad din lokala `remotes/origin/master` har uppdaterats till i bakgrunden.
++
+Alternativt kan du ange `--force-if-includes` som ett tilläggsalternativ tillsammans med `--force-with-lease[=<refnamn>]` (d.v.s. utan att ange exakt vilken incheckning referensen på fjärrsidan måste peka på, eller vilka referenser på fjärrsidan som skyddas) när man skickar, för att verifiera att uppdateringar från fjärrspårningsreferenser som kan ha uppdaterats implicit i bakgrunden har integrerats lokalt innan en tvångsuppdatering tillåts.
+
+`-f`::
+`--force`::
+	Vanligtvis vägrar `git push` att uppdatera en gren som inte är en förfader till den incheckning som skickas.
++
+Den här flaggan inaktiverar den kontrollen, de andra säkerhetskontrollerna i PUSHREGLER nedan och kontrollerna i `--force-with-lease`. Den kan göra att fjärrkodförrådet förlorar incheckningar; använd den med försiktighet.
++
+Observera att `--force` gäller för alla referenser som skickas. Därför kan användning med `push.default` satt till `matching`, eller med flera push-destinationer konfigurerade med `remote.<namn>.push`, skriva över andra referenser än den aktuella grenen (inklusive lokala referenser som ligger efter sin fjärrmotsvarighet). För att tvinga fram att skicka till endast en gren, använd ett `+` framför referensspecifikationen (t.ex. `git push origin +master` för att tvinga fram att skicka till grenen `master`). Se avsnittet `<refspec>...` ovan för mer information.
+
+`--force-if-includes`::
+`--no-force-if-includes`::
+	Tvinga fram en uppdatering endast om toppen på fjärrspårningsreferensen har integrerats lokalt.
++
+Det här alternativet aktiverar en kontroll som verifierar om toppen för fjärrspårningsreferensen är nåbar från en av "reflog"-posterna för den lokala grenen som är baserad i den för en omskrivning. Kontrollen säkerställer att eventuella uppdateringar från fjärren har införlivats lokalt genom att avvisa den påtvingade uppdateringen om så inte är fallet.
++
+Om alternativet anges utan `--force-with-lease`, eller tillsammans med `--force-with-lease=<refnamn>:<förväntat>`, är det utan verkan.
++
+Om du anger `--no-force-if-includes` inaktiveras detta beteende.
+
+`--repo=<repository>`::
+	Det här alternativet motsvarar argumentet _<repository>_. Om båda anges har kommandoradsargumentet företräde.
+
+`-u`::
+`--set-upstream`::
+	För varje gren som är uppdaterad eller har skickats utan fel, lägg till en uppströmsreferens (spårningsreferens) som används av linkgit:git-pull[1] utan argument och andra kommandon. För mer information, se `branch.<name>.merge` i linkgit:git-config[1].
+
+`--thin`::
+`--no-thin`::
+	Dessa alternativ skickas till linkgit:git-send-pack[1]. En tunn överföring minskar mängden skickad data avsevärt när sändare och mottagare delar många av samma objekt gemensamt. Standardvärdet är `--thin`.
+
+`-q`::
+`--quiet`::
+	Undertryck all utdata, inklusive listan över uppdaterade referenser, såvida inte ett fel uppstår. Förlopp rapporteras inte till standardfelströmmen.
+
+`-v`::
+`--verbose`::
+	Kör utförligt.
+
+`--progress`::
+	Förloppsstatus rapporteras som standard i standardfelströmmen när den är kopplad till en terminal, såvida inte `-q` anges. Denna flagga tvingar fram förloppsstatus även om standardfelströmmen inte dirigeras till en terminal.
+
+`--no-recurse-submodules`::
+`--recurse-submodules=(check|on-demand|only|no)`::
+	Kan användas för att säkerställa att alla undermodul-incheckningar som används av de revisioner som ska skickas är tillgängliga på en fjärrspårad gren. Möjliga värden är:
+`check`;;
+Git verifierar att alla undermodulincheckningar som ändrats i de revisioner som ska skickas är tillgängliga på minst en fjärr för undermodulen. Om några incheckningar saknas avbryts operationen och avslutas med status som inte är noll.
+`on-demand`;;
+	alla undermoduler som ändrats i de revisioner som ska skickas kommer att skickas. Om `on-demand` inte kunde skicka alla nödvändiga revisioner kommer den också att avbrytas och avslutas med status som inte är noll.
+`only`;;
+	Alla undermoduler kommer att skickas medan superprojektet lämnas oskickat.
+`no`;;
+	åsidosätta konfigurationsvariabeln `push.recurseSubmodules` när ingen rekursion av en undermodul krävs. Liknar det att använda `--no-recurse-submodules`.
+
++
+När `on-demand` eller `only` används, om en undermodul har en `push.recurseSubmodules=(on-demand|only)` eller `submodule.recurse` konfiguration, kommer ytterligare rekursion att ske. I det här fallet behandlas `only` som `on-demand`.
+
+`--verify`::
+`--no-verify`::
+	Växla pre-push-kroken (se linkgit:githooks[5]). Standard är `--verify`, vilket ger kroken möjlighet att avbryta. Med `--no-verify` kringgås kroken helt.
+
+`-4`::
+`--ipv4`::
+	Använd endast IPv4-adresser och ignorera IPv6-adresser.
+
+`-6`::
+`--ipv6`::
+	Använd endast IPv6-adresser och ignorera IPv4-adresser.
+
+GIT URLS[[URLS]]
+----------------
+
+I allmänhet innehåller URL:er information om transportprotokollet, adressen till fjärrservern och sökvägen till kodförråd. Beroende på transportprotokollet kan en del av denna information saknas.
+
+Git stöder ssh-, git-, http- och https-protokollen (dessutom kan ftp och ftps användas för hämtning, men detta är ineffektivt och föråldrat; använd dem inte).
+
+Den inbyggda transporten (dvs. `git://` URL) utför ingen autentisering och bör användas med försiktighet på osäkra nätverk.
+
+Följande syntaxer kan användas med dem:
+
+- `ssh://[<användare>@]<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `git://<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `http[s]://<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `ftp[s]://<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+
+En alternativ scp-liknande syntax kan också användas med ssh-protokollet:
+
+- `[<användare>@]<värd>:/<sökväg-till-git-kodförråd>`
+
+Denna syntax känns bara igen om det inte finns några snedstreck före det första kolonet. Detta hjälper till att skilja en lokal sökväg som innehåller ett kolon. Till exempel kan den lokala sökvägen `foo:bar` anges som en absolut sökväg eller `./foo:bar` för att undvika att misstolkas som en ssh-url.
+
+Protokollen ssh och git stöder dessutom `~<username>`-expansionen:
+
+- `ssh://[<användare>@]<värd>[:<port>]/~<användare>/<sökväg-till-git-kodförråd>`
+- `git://[<användare>@]<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `[<användare>@]<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+
+För lokala kodförråd, som också stöds nativt av Git, kan följande syntaxer användas:
+
+- `/sokvag/till/kodförråd.git/`
+- `file:///sokvag/till/kodförråd.git/`
+
+ifndef::git-clone[]
+Dessa två syntaxer är mestadels likvärdiga, förutom vid kloning, då den förra innebär alternativet `--local`. Se linkgit:git-clone[1] för detaljer.
+endif::git-clone[]
+
+ifdef::git-clone[]
+Dessa två syntaxer är mestadels likvärdiga, förutom att den förra innebär alternativet `--local`.
+endif::git-clone[]
+
+`git clone`, `git fetch` och `git pull`, men inte `git push`, accepterar också en lämplig bundle-fil. Se linkgit:git-bundle[1].
+
+När Git inte vet hur ett visst transportprotokoll ska hanteras, försöker det använda fjärr-hjälpprogram `remote-<transport>`, om en sådan finns. För att explicit begära en fjärr-hjälpprogram kan följande syntax användas:
+
+- `<transport>::<adress>`
+
+där _<adress>_ kan vara en sökväg, en server och sökväg, eller en godtycklig URL-liknande sträng som känns igen av den specifika fjärrhjälparen som anropas. Se linkgit:gitremote-helpers[7] för mer information.
+
+Om det finns ett stort antal fjärrdatabaser med liknande namn och du vill använda ett annat format för dem (så att de URL:er du använder skrivs om till URL:er som fungerar), kan du skapa en konfigurationssektion i formatet:
+
+[verse]
+--
+	[url "__<faktisk-url-bas>__"]
+		insteadOf = _<annan-url-bas>_
+--
+
+Till exempel med detta:
+
+------------
+	[url "git://git.host.xz/"]
+		insteadOf = host.xz:/sokvag/till/
+		insteadOf = arbete:
+------------
+
+En URL som "arbete:kodförråd.git" eller "host.xz:/sokvag/till/kodförråd.git" kommer att skrivas om i alla sammanhang som antar att URL:en är "git://git.host.xz/kodförråd.git".
+
+Om du vill skriva om URL:er enbart för sändning (push), kan du skapa en konfigurationssektion i formen:
+
+[verse]
+--
+	[url "__<faktisk-url-bas>__"]
+		pushInsteadOf = _<annan-url-bas>_
+--
+
+Till exempel med detta:
+
+------------
+	[url "ssh://example.org/"]
+		pushInsteadOf = git://example.org/
+------------
+
+En URL som "git://example.org/path/to/repo.git" kommer att skrivas om till "ssh://example.org/path/to/repo.git" för sändning ("pushas"), men pulls kommer fortfarande att använda den ursprungliga URL:en.
+[]
+
+FJÄRR[[REMOTES]]
+----------------
+
+Namnet på en av följande kan användas istället för en URL som _<kodförråd>_ argument:
+
+* en fjärr i Git-konfigurationsfilen: `$GIT_DIR/config`,
+* en fil i katalogen `$GIT_DIR/remotes`, eller
+* en fil i katalogen `$GIT_DIR/branches`.
+
+Alla dessa låter dig också utelämna referensspecifikationen från kommandoraden eftersom de var och en innehåller en referensspecifikation som git kommer att använda som standard.
+
+Namngiven fjärr i konfigurationsfilen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Du kan välja att ange namnet på en fjärren som du tidigare konfigurerat med hjälp av linkgit:git-remote[1], linkgit:git-config[1] eller till och med genom en manuell redigering av filen `$GIT_DIR/config`. URL:en för denna fjärr kommer att användas för att komma åt kodförrådet. Referensspecifikationen för denna fjärr kommer att användas som standard när du inte anger en referensspecifikation på kommandoraden. Posten i konfigurationsfilen skulle se ut så här:
+
+------------
+	[remote "<name>"]
+		url = <URL>
+		pushurl = <pushurl>
+		push = <refspec>
+		fetch = <refspec>
+------------
+
+_<pushurl>_ används endast för sänding ("pusha"). Det är valfritt och standardvärdet är _<URL>_. Att säda till en fjärr påverkar alla definierade push-adresser eller alla definierade webbadresser om inga sänd-adresser (push) är definierade. Fetch hämtar dock bara från den först definierade webbadressen om flera webbadresser är definierade.
+
+Namngiven fil i `$GIT_DIR/remotes`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Du kan välja att ange namnet på en fil i `$GIT_DIR/remotes`. URL:en i den här filen kommer att användas för att komma åt kodförrådet. Referensspecifikationen i den här filen kommer att användas som standard när du inte anger en referensspecifikation på kommandoraden. Den här filen ska ha följande format:
+
+------------
+	URL: ett av ovanstående URL-format
+	Push: <refspec>
+	Pull: <refspec>
+
+------------
+
+`Push:`-rader används av `git push` och `Pull:`-rader används av `git pull` och `git fetch`. Flera `Push:`- och `Pull:`-rader kan anges för ytterligare grenmappningar.
+
+Namngiven fil i `$GIT_DIR/branches`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Du kan välja att ange namnet på en fil i `$GIT_DIR/branches`. URL:en i den här filen kommer att användas för att komma åt kodförrådet. Filen ska ha följande format:
+
+
+------------
+	<URL>#<huvud>
+------------
+
+_<URL>_ krävs; `#<huvud>` är valfritt.
+
+Beroende på operationen, kommer git att använda en av följande referensspecifikationer, om du inte anger någon på kommandoraden. _<gren>_ är namnet på den här filen i `$GIT_DIR/branches` och _<huvud>_ har som standard `master`.
+
+git fetch använder:
+
+------------
+	refs/heads/<huvud>:refs/heads/<gren>
+------------
+
+git push använder:
+
+------------
+	HEAD:refs/heads/<huvud>
+------------
+
+
+[[UPSTREAM-BRANCHES]]
+UPPSTRÖMS-GRENAR
+----------------
+
+Grenar i Git kan valfritt ha en uppströms fjärrgren. Git använder som standard uppströmsgrenen för fjärroperationer, till exempel:
+
+* Det är standardvärdet för `git pull` eller `git fetch` utan argument.
+* Det är standardinställningen för `git push` utan argument, med vissa undantag. Du kan till exempel använda alternativet `branch.<name>.pushRemote` för att pusha till en annan fjärr än den du hämtar från, och som standard med `push.default=simple` måste den uppströmsgren du konfigurerar ha samma namn.
+* Olika kommandon, inklusive `git checkout` och `git status`, visar hur många incheckningar som har lagts till i din nuvarande grenen och upstream sedan du avgrenade från den, till exempel "Din branch och 'origin/main' har divergerat och har 2 respektive 3 olika incheckningar".
+
+Uppströmmen lagras i `.git/config`, i fälten "`remote`" och "`merge`". Till exempel, om `main`s uppstrom är `origin/main`:
+
+------------
+[branch "main"]
+   remote = origin
+   merge = refs/heads/main
+------------
+
+Du kan explicit ställa in en uppströmsgren med `git push --set-upstream <fjärr> <gren>` men Git kommer ofta automatiskt att ställa in uppströmsen åt dig, till exempel:
+
+* När du klonar ett kodförråd kommer Git automatiskt att ställa in uppströmmen för standardgrenen.
+* Om du har konfigurationsalternativet `push.autoSetupRemote` aktiverat, kommer `git push` automatiskt att ställa in uppströmsen första gången du pushar en branch.
+* Att checka ut en fjärrspårningsgren med `git checkout <gren>` skapar automatiskt en lokal gren med det namnet och ställer in uppströmmen på den fjärranslutna grenen.
+
+[NOTE]
+Uppströms grenar kallas ibland för "spårningsinformation", som i "ange grenens spårningsinformation".
+[]
+
+UTMATNING
+---------
+
+Utdata från "git push" beror på vilken transportmetod som används; det här avsnittet beskriver utdata vid pushing av Git-protokollet (antingen lokalt eller via ssh).
+
+Statusen för vad som skickas visas i tabellform, där varje rad representerar statusen för en enskild referens. Varje rad har följande form:
+
+-------------------------------
+ <flagga> <sammanfattning> <från> -> <till> (<orsak>)
+-------------------------------
+
+Om `--porcelain` används, så är varje rad i utdata av formen:
+
+-------------------------------
+ <flagga> \t <från>:<till> \t <sammanfattning> (<orsak>)
+-------------------------------
+
+Status för uppdaterade referenser visas endast om alternativet `--porcelain` eller `--verbose` används.
+
+_<flagga>_::
+	Ett enda tecken som anger referensens status:
+(mellanslag);; för en framgångsrikt sänt snabbspolning;
+`+`;; för en lyckad påtvingad uppdatering;
+`-`;; för en framgångsrikt borttagen ref;
+`*`;; för en framgångsrikt sänt ny ref;
+`!`;; för en ref som avvisades eller misslyckades med att sändas; och
+`=`;; för en ref som var aktuell och inte behövde sändas.
+
+_<sammanfattning>_::
+	För en lyckat sänt referens visar sammanfattningen de gamla och nya värdena för referensen i en form som är lämplig att använda som ett argument till `git log` (detta är `<gamla>..<nya>` i de flesta fall, och `<gamla>...<nya>` för tvingade uppdateringar som inte snabbspolas framåt).
++
+För en misslyckad uppdatering ges mer information:
++
+--
+rejected::
+	Git försökte inte skicka referensen alls, vanligtvis för att det inte är en snabbspolning och du inte tvingade fram uppdateringen.
+
+fjärren avvisad::
+	Fjärrsidan vägrade uppdateringen. Vanligtvis orsakat av en krok på fjärrsidan, eller att fjärrkodförrådet har ett av följande säkerhetsalternativ aktiverat: `receive.denyCurrentBranch` (för att skicka till den utcheckade grenen), `receive.denyNonFastForwards` (för tvingade uppdateringar som inte snabbspolas framåt), `receive.denyDeletes` eller `receive.denyDeleteCurrent`. Se linkgit:git-config[1].
+
+fjärrfel::
+	Fjärrsidan rapporterade inte att uppdateringen av referensen lyckades, kanske på grund av ett tillfälligt fel på fjärrsidan, ett avbrott i nätverksanslutningen eller annat övergående fel.
+--
+
+från::
+	Namnet på den lokala referens som skickas, minus dess prefix `refs/<typ>/`. Vid borttagning utelämnas namnet på den lokala referensen.
+
+till::
+	Namnet på den fjärrreferens som uppdateras, minus dess prefix `refs/<typ>/`.
+
+skäl::
+	En människoläsbar förklaring. Vid framgångsrikt skickad ref behövs ingen förklaring. För en misslyckad ref beskrivs orsaken till misslyckandet.
+
+PUSHREGLER
+----------
+
+Som en säkerhetsfunktion tillåter kommandot `git push` endast vissa typer av uppdateringar för att förhindra att du av misstag förlorar data i fjärrkodförrådet.
+
+Eftersom grenar och taggar är avsedda att användas på olika sätt skiljer sig säkerhetsreglerna för att skicka till en gren från reglerna för att skicka till en tagg. I följande regler betyder "uppdatering" alla modifieringar utom borttagning och skapande. Borttagning och skapande är alltid tillåtna, utom när det förbjuds av konfiguration eller krokar.
+
+1. Om destinationen är en **gren** (`refs/heads/*`) är endast snabbspolningsuppdateringar tillåtna, vilket innebär att destinationen måste vara en förfader till källincheckningen. Källan måste vara ett incheckningsobjekt.
+2. Om destinationen är en **tagg** (`refs/tags/*`) avvisas alla uppdateringar. Källan kan vara vilket objekt som helst.
+3. Om destinationen inte är en gren eller tagg gäller följande:
+   * Om källan är ett träd- eller blobobjekt kommer alla uppdateringar att avvisas
+   * Om källan är ett tagg- eller incheckningsobjekt är alla snabbspolningsuppdateringar tillåtna, även i fall där det som snabbspolas framåt inte är en incheckning utan ett taggobjekt som råkar peka på en ny incheckning som är en snabbspolning jämfört med incheckningen som den sista taggen (eller incheckningen) den ersätter. Att ersätta en tagg med en helt annan tagg är också tillåtet om den pekar på samma incheckning, liksom att skicka en avskalad tagg, d.v.s. att skicka den incheckning som ett befintligt taggobjekt pekar på, eller ett nytt taggobjekt som ett befintligt incheckningsobjekt pekar på.
+
+Du kan åsidosätta dessa regler genom att skicka `--force` eller genom att lägga till det valfria inledande `+` i en referensspecifikation. De enda undantagen är att ingen mängd tvång får en gren att acceptera ett objekt som inte är en incheckning, och att tvång inte får fjärrkodförrådet att acceptera något som skickas och som det är konfigurerat att neka.
+
+Krokar och konfiguration kan också åsidosätta eller ändra dessa regler, se t.ex. `receive.denyNonFastForwards` och `receive.denyDeletes` i linkgit:git-config[1] och `pre-receive` och `update` i linkgit:githooks[5].
+
+NOTERING OM SNABBSPOLNING FRAMÅT
+--------------------------------
+
+När en uppdatering ändrar en gren (eller mer generellt, en referens) som brukade peka på incheckning A till att peka på en annan incheckning B, kallas det en snabbuppdatering om och endast om B är en ättling incheckning A.
+
+I en snabbspolning från A till B är uppsättningen incheckningar som den ursprungliga incheckning A byggde ovanpå en delmängd av de incheckningar som den nya incheckning B bygger ovanpå. Därför förlorar den ingen historik.
+
+Däremot, kommer en uppdatering som inte spolas framåt att förlora historik. Anta till exempel, att du och någon annan började vid samma incheckning X, och ni byggde en historik som ledde till incheckning B medan den andra personen byggde en historik som ledde till incheckning A. Historiken ser ut så här:
+
+----------------
+
+      B
+     /
+ ---X---A
+
+----------------
+
+Anta vidare att den andra personen redan skickade ändringar som leder till A tillbaka till det ursprungliga kodförrådet från vilket ni två hämtade den ursprungliga incheckningen X.
+
+Det den andra personen skickade uppdaterade grenen som tidigare pekade på incheckning X till att peka på incheckning A. Det är en snabbspolning.
+
+Men om du försöker skicka kommer du att försöka uppdatera grenen (som nu pekar på A) med incheckning B. Detta är _inte_ en snabbspolning. Om du gjorde det skulle ändringarna som introducerades av incheckning A gå förlorade, eftersom alla då skulle börja bygga ovanpå B.
+
+Kommandot tillåter som standard inte en uppdatering som inte är en snabbspolning för att förhindra sådan historikförlust.
+
+Om du inte vill förlora ditt arbete (historik från X till B) eller arbetet av den andra personen (historik från X till A), måste du först uppdatera historiken från kodförrådet, skapa en historik som innehåller ändringar gjorda av båda parter och sedan spara resultatet.
+
+Du kan utföra "git pull", lösa potentiella konflikter och "git push" resultatet. En "git pull" skapar en sammanslagningsincheckning C mellan incheckningar A och B.
+
+----------------
+
+      B---C
+     /   /
+ ---X---A
+
+----------------
+
+Att uppdatera A med den resulterande sammanslagningsincheckningen blir en snabbspolning och det du skickar accepteras.
+
+Alternativt kan du ombasera din ändring mellan X och B ovanpå A med `git pull --rebase` och skicka tillbaka resultatet. Ombaseringen skapar en ny incheckning D som bygger ändringen mellan X och B ovanpå A.
+
+----------------
+
+      B   D
+     /   /
+ ---X---A
+
+----------------
+
+Återigen: om du uppdaterar A med denna incheckning blir det en snabbspolning och det du skickar accepteras.
+
+Det finns en annan vanlig situation där du kan få avslag för att det inte är en snabbspolning när du försöker skicka, och den kan uppstå även om du skickar till ett kodförråd som ingen annan skickar till. Efter att du själv har skickat incheckning A (i den första bilden i detta avsnitt) ersätter du den med `git commit --amend` så att incheckning B skapas, och försöker sedan skicka ut den eftersom du har glömt att du redan skickat A. I ett sådant fall, och endast om du är säker på att ingen under tiden har uppdaterat din tidigare incheckning A (och börjat bygga ovanpå den), kan du köra `git push --force` för att skriva över den. Med andra ord är `git push --force` en metod reserverad för fall där du faktiskt avser att förlora historik.
+
+
+EXEMPEL
+-------
+
+`git push`::
+	Fungerar som `git push <fjärr>`, där <fjärr> är den aktuella grenens fjärr (eller `origin` om ingen fjärr är konfigurerad för den aktuella grenen).
+
+`git push origin`::
+	Utan ytterligare konfiguration skickas den aktuella grenen till den konfigurerade uppströmsgrenen (konfigurationsvariabeln `branch.<namn>.merge`) om den har samma namn som den aktuella grenen; annars avslutas kommandot med fel utan att något skickas.
++
+Standardbeteendet för det här kommandot när ingen _<refspec>_ anges kan konfigureras genom att ställa in alternativet `push` på fjärren eller konfigurationsvariabeln `push.default`.
++
+Till exempel, för att som standard bara skicka den aktuella grenen till `origin`, använd `git config remote.origin.push HEAD`. Vilken giltig _<refspec>_ som helst (som de i exemplen nedan) kan konfigureras som standard för `git push origin`.
+
+`git push origin :`::
+	Skjut "matchande" grenar till `origin`. Se _<refspec>_ i avsnittet <<OPTIONS,FLAGGOR>> ovan för en beskrivning av "matchande" grenar.
+
+`git push origin master`::
+	Hitta en referens som matchar `master` i källkodförrådet (troligast `refs/heads/master`) och uppdatera samma referens (t.ex. `refs/heads/master`) i kodförrådet `origin` med den. Om `master` inte fanns på fjärren skulle den skapas.
+
+`git push origin HEAD`::
+	Ett praktiskt sätt att skicka den aktuella grenen till samma namn i fjärrkodförrådet.
+
+`git push moderskepp master:satellit/master dev:satellit/dev`::
+	Använd källreferensen som matchar `master` (t.ex. `refs/heads/master`) för att uppdatera referensen som matchar `satellit/master` (troligtvis `refs/remotes/satellit/master`) i `moderskepp`-kodförrådet; gör detsamma för `dev` och `satellite/dev`.
++
+Se avsnittet som beskriver `<refspec>...` ovan för en diskussion om matchande semantik.
++
+Syftet är att emulera `git fetch` som körs på `moderskeppet` genom att använda `git push` i motsatt riktning för att integrera arbete som gjorts på `satellit`. Detta behövs ofta när anslutning bara kan etableras i en riktning (d.v.s. satelliten kan ssh:a in till moderskeppet, men moderskeppet kan inte initiera anslutning till satelliten eftersom den senare ligger bakom en brandvägg eller inte kör sshd).
++
+Efter att du har kört denna `git push` på `satellit`-maskinen kan du ssh:a in till `moderskeppet` och köra `git merge` där för att slutföra emuleringen av `git pull` som kördes på `moderskeppet` för att hämta ändringar som gjorts på `satellit`.
+
+`git push origin HEAD:master`::
+	Skicka den aktuella grenen till fjärrreferensen som matchar `master` i `origin`-kodförrådet. Den här formen är bekväm för att skicka den aktuella grenen utan att behöva tänka på dess lokala namn.
+
+`git push origin master:refs/heads/experimentell`::
+	Skapa grenen `experimentell` i `origin`-kodförrådet genom att kopiera den aktuella `master`-grenen. Detta formulär behövs bara för att skapa en ny gren eller tagg i fjärr-kodförrådet när det lokala namnet och fjärrnamnet är olika; annars fungerar referensnamnet på egen hand.
+
+`git push origin :experimentell`::
+	Hitta en referens som matchar `experimentell` i `origin`-kodförrådet (t.ex. `refs/heads/experimentell`) och radera den.
+
+`git push origin +dev:master`::
+	Uppdatera ursprungskodförrådet (origin's) master-gren med dev-grenen, vilket möjliggör uppdateringar som inte spolas framåt. *Detta kan lämna orefererade incheckningar diglande i ursprungskodförrådet.* Tänk dig följande situation, där en spolning framåt inte är möjlig:
++
+----
+	    o---o---o---A---B  origin/master
+		     \
+		      X---Y---Z  dev
+----
++
+Ovanstående kommando skulle ändra ursprungs-kodförrådet till
++
+----
+		      A---B  (namnlös gren)
+		     /
+	    o---o---o---X---Y---Z  master
+----
++
+Incheckning A och B skulle inte längre tillhöra en gren med ett symboliskt namn, och skulle därför vara oåtkomliga. Som sådan skulle dessa incheckningar tas bort med ett `git gc`-kommando i ursprungs-förrådet (origin).
+
+SÄKERHET
+--------
+Protokollen för hämtning (fetch) och sänd ("skicka") är inte utformade för att förhindra att en sida stjäl data från det andra kodförrådet som inte var avsedda att delas. Om du har privata data som du behöver skydda från en skadlig motpart är det bästa alternativet att lagra dem i ett annat kodförråd. Detta gäller både klienter och servrar. Namnrymder på en server är särskilt inte effektiva för läsåtkomstkontroll; du bör bara bevilja läsåtkomst till ett namnrymd till klienter som du skulle anförtro läsåtkomst till hela kodförrådet.
+
+De kända attackvektorerna är följande:
+
+. Offret skickar "har"-rader som annonserar ID:n för objekt som det har som inte uttryckligen är avsedda att delas men som kan användas för att optimera överföringen om motparten också har dem. Angriparen väljer ett objekt-ID X att stjäla och skickar en referens till X, men är inte skyldig att skicka innehållet i X eftersom offret redan har det. Nu tror offret att angriparen har X, och skickar tillbaka innehållet i X till angriparen senare. (Denna attack är enklast för en klient att utföra på en server, genom att skapa en referens till X i namnrymden som klienten har tillgång till och sedan hämta den. Det mest troliga sättet för en server att utföra den på en klient är att "sammanfoga" X till en offentlig gren och hoppas att användaren gör ytterligare arbete på denna gren och skickar tillbaka den till servern utan att märka sammanslagningen.)
+
+. Precis som i punkt 1 väljer angriparen ett objekt-ID X att stjäla. Offret skickar ett objekt Y som angriparen redan har, och angriparen påstår falskeligen att ha X och inte Y, så offret skickar Y som ett delta mot X. Deltat avslöjar regioner av X som liknar Y för angriparen.
+[]
+
+[[CONFIGURATION]]
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+`push.autoSetupRemote`::
+	Om satt till `true` antas `--set-upstream` vara standard push när ingen uppströmsspårning finns för den aktuella grenen; detta alternativ träder i kraft med `push.default`-alternativen `simple`, `upstream` och `current`. Det är användbart om du som standard vill att nya grenar ska pushas till standardfjärren (som beteendet hos `push.default=current`) och du också vill att uppströmsspårningen ska vara inställd. Arbetsflöden som sannolikt kommer att dra nytta av detta alternativ är `enkla` centrala arbetsflöden där alla grenar förväntas ha samma namn på fjärren.
+
+`push.default`::
+	Definierar åtgärden `git push` ska utföra om ingen refspec anges (vare sig från kommandoraden, konfigurationen eller någon annanstans). Olika värden är väl lämpade för specifika arbetsflöden; till exempel, i ett rent centralt arbetsflöde (dvs. hämtningskällan är lika med push-destinationen) är `upstream` förmodligen vad du vill ha. Möjliga värden är:
++
+--
+`nothing`;;
+do not push anything (error out) unless a refspec is given. This is primarily meant for people who want to avoid mistakes by always being explicit.
+
+`current`;;
+skicka (push) den aktuella grenen för att uppdatera en gren med samma namn i mottagaränden. Fungerar i både centrala och icke-centrala arbetsflöden.
+
+`upstream`;;
+skicka (push) den aktuella grenen tillbaka till den gren vars ändringar vanligtvis är integrerade i den aktuella grenen (som kallas `@{upstream}`). Det här läget är bara meningsfullt om du skickar till samma arkiv som du normalt skulle hämta från (dvs. centralt arbetsflöde).
+
+`tracking`;;
+this is a deprecated synonym for `upstream`.
+
+`simple`;;
+push the current branch with the same name on the remote.
++
+Om du arbetar med ett centraliserat arbetsflöde (push:ar till samma förvar som du hämtar från, vilket vanligtvis är `origin`), måste du konfigurera en uppströmsgren med samma namn.
++
+Det här läget är standardläget sedan Git 2.0 och är det säkraste alternativet som passar nybörjare.
+
+`matching`;;
+skicka (push) alla grenar med samma namn i båda ändar. Detta gör att arkivet du skickar kommer ihåg uppsättningen grenar som kommer att skickas ut (t.ex. om du alltid skickar `maint` och `master` där och inga andra grenar, kommer arkivet du skickar till att ha dessa två grenar, och dina lokala `maint` och `master` kommer att skickas dit).
++
+För att använda det här läget effektivt måste du se till att _alla_ grenar du vill skicka ut är redo att skickas ut innan du kör `git push`, eftersom hela poängen med det här läget är att låta dig skicka alla grenar på en gång. Om du vanligtvis bara avslutar arbetet på en gren och skickar ut resultatet, medan andra grenar är oavslutade, är det här läget inte för dig. Det här läget är inte heller lämpligt för att skicka till ett delat centralt arkiv, eftersom andra personer kan lägga till nya grenar där, eller uppdatera toppen på befintliga grenar utanför din kontroll.
++
+Detta brukade vara standardinställningen, men inte sedan Git 2.0 (`simple` är den nya standardinställningen).
+
+--
+
+`push.followTags`::
+	Om den är satt till sant, aktivera alternativet `--follow-tags` som standard. Du kan åsidosätta denna konfiguration vid skicka-tillfället (push) genom att ange `--no-follow-tags`.
+
+`push.gpgSign`::
+	Kan sättas till ett booleskt värde, eller strängen `if-asked`. Ett sant värde gör att alla sändningar (push) GPG-signeras, som om `--signed` skickas till linkgit:git-push[1]. Strängen `if-asked` gör att push-filer signeras om servern stöder det, som om `--signed=if-asked` skickas till `git push`. Ett falskt värde kan åsidosätta ett värde från en konfigurationsfil med lägre prioritet. En explicit kommandoradsflagga åsidosätter alltid detta konfigurationsalternativ.
+
+`push.pushOption`::
+	När inget `--push-option=<alternativ>`-argument anges från kommandoraden, beter sig `git push` som om varje _<alternativ>_ i denna variabel anges som `--push-option=<alternativ>`.
++
+Detta är en variabel med flera värden, och ett tomt värde kan användas i en konfigurationsfil med högre prioritet (t.ex. `.git/config` i ett förvar) för att rensa värden som ärvts från konfigurationsfiler med lägre prioritet (t.ex. `$HOME/.gitconfig`).
++
+----
+
+Exempel:
+
+/etc/gitconfig
+  push.pushoption = a
+  push.pushoption = b
+
+~/.gitconfig
+  push.pushoption = c
+
+repo/.git/config
+  push.pushoption =
+  push.pushoption = b
+
+Detta kommer att resultera i att endast b (a och c är nollställda).
+
+----
+
+`push.recurseSubmodules`::
+	Kan vara `check`, `on-demand`, `only` eller `no`, med samma beteende som `push --recurse-submodules`. Om inte angivet används `no` som standard, såvida inte `submodule.recurse` är angivet (i vilket fall ett `true`-värde betyder `on-demand`).
+
+`push.useForceIfIncludes`::
+	Om den är satt till `true` motsvarar det att ange `--force-if-includes` som ett alternativ till linkgit:git-push[1] i kommandoraden. Att lägga till `--no-force-if-includes` vid tidpunkten för push åsidosätter denna konfigurations-inställning.
+
+`push.negotiate`::
+	Om värdet är satt till `true`, försök att minska storleken på packfilen som skickas genom förhandlingsrundor där klienten och servern försöker hitta gemensamma incheckningar. Om `false` kommer Git att förlita sig enbart på serverns referensannonsering för att hitta gemensamma incheckningar.
+
+`push.useBitmaps`::
+	Om satt till `false`, inaktiveras användningen av bitmappar för `git push` även om `pack.useBitmaps` är `true`, utan att förhindra att andra git-operationer använder bitmappar. Standardvärdet är `true`.
+[]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

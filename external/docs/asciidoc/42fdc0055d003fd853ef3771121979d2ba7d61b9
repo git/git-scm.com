@@ -1,0 +1,87 @@
+git-check-ref-format(1)
+=======================
+
+NAMN
+----
+git-check-ref-format - Säkerställer att ett referensnamn är korrekt formaterat
+
+SYNOPSIS
+--------
+[verse]
+'git check-ref-format' [--normalize]
+       [--[no-]allow-onelevel] [--referensspecifikation-pattern]
+       <refnamn>
+'git check-ref-format' --branch <kortfattat-grennamn>
+
+BESKRIVNING
+-----------
+Kontrollerar om ett givet 'refnamn' är acceptabelt och avslutas med en status som inte är noll om det inte är det.
+
+En referens används i Git för att ange grenar och taggar. En grenhuvud lagras i hierarkin `refs/heads`, medan en tagg lagras i hierarkin `refs/tags` i namnrymden ref (vanligtvis i katalogerna `$GIT_DIR/refs/heads` och `$GIT_DIR/refs/tags` eller, som poster i filen `$GIT_DIR/packed-refs` om referenserna packas av `git gc`).
+
+Git tillämpar följande regler för hur referenser namnges:
+
+. De kan inkludera snedstreck `/` för hierarkisk (katalog) gruppering, men ingen snedstreckseparerad komponent kan börja med en punkt `.` eller sluta med sekvensen `.lock`.
+
+. De måste innehålla minst ett `/`. Detta framtvingar närvaron av en kategori som `heads/`, `tags/` etc. men de faktiska namnen är inte begränsade. Om alternativet `--allow-onelevel` används, upphävs denna regel.
+
+. De kan inte ha två konsekutiva punkter `..` någonstans.
+
+. De kan inte innehålla ASCII-kontrolltecken (dvs. byte vars värden är lägre än \040 eller \177 `DEL`), mellanslag, tilde `~`, cirkumflätstecken `^` eller kolon `:` någonstans.
+
+. De får inte ha frågetecknet `?`, asterisk `*` eller öppen parentes `[` någonstans. Se alternativet `--refspec-pattern` nedan för ett undantag från denna regel.
+
+. De får inte börja eller sluta med ett snedstreck `/` eller innehålla flera snedstreck i följd (se alternativet `--normalize` nedan för ett undantag från denna regel).
+
+. De kan inte sluta med en punkt `.`.
+
+. De kan inte innehålla en sekvens `@{`.
+
+. De kan inte vara det enstaka tecknet `@`.
+
+. De kan inte innehålla ett `\`.
+
+Dessa regler gör det enkelt för shell-skriptbaserade verktyg att analysera referensnamn, sökvägs expandera av shell-systemet när ett referensnamn används utan citattecken (av misstag), och även undvika tvetydigheter i vissa referensnamnsuttryck (se linkgit:gitrevisions[7]):
+
+. En dubbelpunkt `..` används ofta som i `ref1..ref2`, och i vissa sammanhang betyder denna notation `^ref1 ref2` (dvs. inte i `ref1` och i `ref2`).
+
+. En tilde `~` och en cirkumfläta `^` används för att introducera postfixet 'nth parent' och 'skala löken' operationerna.
+
+. Ett kolon `:` används liksom i `srcref:dstref` för att betyda "använd srcrefs värde och lagra det i dstref" i hämtnings- och push-operationer. Det kan också användas för att välja ett specifikt objekt, till exempel med 'git cat-file': "git cat-file blob v1.3.3:refs.c".
+
+. at-open-brace `@{` används som en notation för att komma åt en reflog-post.
+
+Med alternativet `--branch` tar kommandot ett namn och kontrollerar om det kan användas som ett giltigt grennamn (t.ex. när man skapar en ny gren). Men var försiktig när du använder den tidigare utcheckningssyntaxen som kan referera till ett frånkopplat HEAD-tillstånd. Regeln `git check-ref-format --branch $name` implementerar kan vara striktare än vad `git check-ref-format refs/heads/$name` säger (t.ex. ett bindestreck kan visas i början av en ref-komponent, men det är uttryckligen förbjudet i början av ett grennamn). När den körs med alternativet `--branch` i ett kodförråd expanderas indata först för ``föregående utcheckningssyntax'' `@{-n}`. Till exempel är `@{-1}` ett sätt att referera till det sista som checkades ut med hjälp av operationen "git switch" eller "git checkout". Detta alternativ bör användas av porslinsanvändare för att acceptera denna syntax var som helst där ett grennamn förväntas, så att de kan agera som om du skrev in grennamnet. Som ett undantag kan den "föregående utcheckningsåtgärden" resultera i ett incheckning-objektnamn när den N:te senast utcheckade inte var en gren.
+
+ALTERNATIV
+----------
+--allow-onelevel::
+--no-allow-onelevel::
+	Styr om referensnamn på en nivå accepteras (dvs. referensnamn som inte innehåller flera `/`-separerade komponenter). Standardvärdet är `--no-allow-onelevel`.
+
+--referensspecifikation-pattern::
+	Tolka <refnamn> som ett referensnamnmönster för en referensspecifikation (som används med fjärrkodförråd). Om det här alternativet är aktiverat får <refnamn> innehålla ett enda `*` i referensspecifikationen (t.ex. `foo/bar*/baz` eller `foo/bar*baz/` men inte `foo/bar*/baz*`).
+
+--normalize::
+	Normalisera 'refnamn' genom att ta bort alla inledande snedstreck (`/`) och komprimera serier av intilliggande snedstreck mellan namnkomponenter till ett enda snedstreck. Om det normaliserade refnamnet är giltigt, skriv ut det till standardutdata och avsluta med statusen 0, annars avslutas med en status som inte är noll. (`--print` är ett föråldrat sätt att stava `--normalize`.)
+
+
+EXEMPEL
+-------
+
+* Print the name of the previous thing checked out:
++
+------------
+$ git check-ref-format --branch @{-1}
+------------
+
+* Bestäm referensnamnet som ska användas för en ny gren:
++
+------------
+$ ref=$(git check-ref-format --normalize "refs/heads/$newbranch")||
+{ echo "Vi gillar inte '$newbranch' som grennamn." >&2 ; exit 1 ; }
+------------
+
+GIT
+---
+En del av linkgit:git[1]-sviten

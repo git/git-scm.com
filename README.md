@@ -189,9 +189,6 @@ $ PLAYWRIGHT_TEST_URL='http://localhost:5000/' npx playwright test --project=fir
 
 For more fine-grained testing, you can pass `-g <regex>` to run only the matching test cases.
 
-> [!NOTE]
-> When running the test suite on platforms other than Linux, the first run will "fail" in the `dark mode` test case. That is expected! This test case relies on previously-generated screenshots that are stored in `tests/git-scm.spec.js-snapshots/`, and for bandwidth reasons only the Linux ones are committed in the Git repository (because they are required to run the PR/CI builds). The first run will store those screenshots so that subsequent runs of this test case will succeed, though.
-
 ## Update manual pages
 
 First, install the Ruby prerequisites:

@@ -36,7 +36,9 @@ $(document).ready(function() {
   Forms.init();
   Downloads.init();
   DownloadBox.init();
+  InstallPageLink.init();
   PostelizeAnchor.init();
+  Print.init();
 });
 
 function onPopState(fn) {
@@ -58,28 +60,15 @@ var DownloadBox = {
     $('#gui-os-filter').addClass('visible');
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
-      $(".monitor").addClass("mac");
-      $("#download-link").text("Download for Mac").attr("href", `${baseURLPrefix}downloads/mac`);
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Mac GUIs").attr("href", `${baseURLPrefix}downloads/guis?os=mac`);
+      $("#download-link").text("Install for Mac").attr("href", `${baseURLPrefix}install/mac`);
       $("#gui-os-filter").attr('data-os', 'mac');
       $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
-      $(".monitor").addClass("windows");
-      $("#download-link").text("Download for Windows").attr("href", `${baseURLPrefix}downloads/win`);
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Windows GUIs").attr("href", `${baseURLPrefix}downloads/guis?os=windows`);
-      $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", `${baseURLPrefix}downloads/mac`);
+      $("#download-link").text("Install for Windows").attr("href", `${baseURLPrefix}install/windows`);
       $("#gui-os-filter").attr('data-os', 'windows');
       $("#gui-os-filter").text("Only show GUIs for my OS (Windows)")
     } else if (os == "Linux") {
-      $(".monitor").addClass("linux");
-      $("#download-link").text("Download for Linux").attr("href", `${baseURLPrefix}downloads/linux`);
-      $("#gui-link").removeClass('mac').addClass('gui');
-      $("#gui-link").text("Linux GUIs").attr("href", `${baseURLPrefix}downloads/guis?os=linux`);
-      $("#alt-link").removeClass("windows").addClass("mac");
-      $("#alt-link").text("Mac Build").attr("href", `${baseURLPrefix}downloads/mac`);
+      $("#download-link").text("Install for Linux").attr("href", `${baseURLPrefix}install/linux`);
       $("#gui-os-filter").attr('data-os', 'linux');
       $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
     } else {
@@ -243,7 +232,7 @@ var Search = {
       if(term != Search.currentSearch) {
         Search.currentSearch = term;
         const language = document.querySelector("html")?.getAttribute("lang");
-        const allResultsURL = `${baseURLPrefix}search/results?search=${term}${language && `&language=${language}`}`;
+        const allResultsURL = `${baseURLPrefix}search/results?search=${encodeURIComponent(term)}${language && `&language=${encodeURIComponent(language)}`}`;
         $("#search-results").html(`
           <header> Search Results </header>
           <table>
@@ -253,7 +242,7 @@ var Search = {
                 <td class="matches">
                   <ul>
                     <li>
-                      <a class="highlight" id="show-results-label" href="${allResultsURL}">
+                      <a class="highlight" id="show-results-label">
                         Searching for <span id="search-term">&nbsp;</span>...
                       </a>
                     </li>
@@ -284,6 +273,9 @@ var Search = {
           </table>
         `);
         $("#search-term").text(term);
+        // Set the link target safely (no HTML parsing).
+        $("#show-results-label").attr("href", allResultsURL);
+
         this.initializeSearchIndex(async () => {
           const results = await Search.pagefind.debouncedSearch(term);
           if (results === null || results.results.length === 0) {
@@ -336,7 +328,11 @@ var Search = {
                 if (!i || typeof results.results[i - 1].data === 'object') categorizeResult(i);
                 result.data.meta.title = result.data.meta.title.replace(/^Git - (.*) Documentation$/, "$1")
                 result.data.url = result.data.url.replace(/\.html$/, '')
-                result.li.html(`<a href = "${result.data.url}">${result.data.meta.title}</a>`);
+                // Build result item safely (no HTML parsing).
+                const a = $("<a>");
+                a.attr("href", result.data.url);
+                a.text(result.data.meta.title);
+                result.li.empty().append(a);
               })(displayCount).catch((err) => {
                 console.log(err);
                 result.li.html(`<i>Error loading result</i>`);
@@ -373,7 +369,7 @@ var Search = {
       const term = $('#search-text').val();
       if (!term) return;
       const language = document.querySelector("html")?.getAttribute("lang");
-      url = `${baseURLPrefix}search/results?search=${term}${language && `&language=${language}`}`;
+      url = `${baseURLPrefix}search/results?search=${encodeURIComponent(term)}${language && `&language=${encodeURIComponent(language)}`}`;
     }
     window.location.href = url;
     selectedIndex = 0;
@@ -650,7 +646,7 @@ var DarkMode = {
         || (!prefersDarkScheme && currentTheme === "dark")) {
       button.attr("src", `${baseURLPrefix}images/light-mode.svg`);
     }
-    button.css("display", "block");
+    button.addClass('active');
 
     button.on('click', function(e) {
       e.preventDefault();
@@ -808,17 +804,39 @@ var Graphviz = {
   }
 }
 
-// Scroll to Top
-$('#scrollToTop').removeClass('no-js');
-$(window).on('scroll', function() {
-  $(this).scrollTop() > 150
-    ? $('#scrollToTop').fadeIn()
-    : $('#scrollToTop').fadeOut();
-});
-$('#scrollToTop').on('click', function(e) {
-  e.preventDefault();
-  $("html, body").animate({
-      scrollTop: 0
-  }, "slow");
-  return false;
-});
+var InstallPageLink = {
+  init: function() {
+    const installLink = document.querySelector('.install-link');
+    if (!installLink) return;
+
+    const os = window.session?.browser?.os;
+    if (os === "Mac") {
+      installLink.href = installLink.href.replace('/install', '/install/mac');
+    } else if (os === "Windows") {
+      installLink.href = installLink.href.replace('/install', '/install/windows');
+    } else if (os === "Linux") {
+      installLink.href = installLink.href.replace('/install', '/install/linux');
+    }
+  }
+}
+
+var Print = {
+  init: function() {
+    Print.tagline = $("#tagline");
+    Print.scrollToTop = $("#scrollToTop");
+    window.matchMedia("print").addListener((mediaQueryList) => {
+      Print.toggle(mediaQueryList.matches);
+    });
+  },
+  toggle: function(enable) {
+    if (enable) {
+      Print.taglineBackup = Print.tagline.html();
+      Print.tagline.html("--print-out");
+      Print.scrollToTopDisplay = Print.scrollToTop.attr("display");
+      Print.scrollToTop.attr("display", "none");
+    } else {
+      Print.tagline.html(Print.taglineBackup || "--as-git-as-it-gets");
+      Print.scrollToTop.attr("display", Print.scrollToTopDisplay);
+    }
+  }
+}

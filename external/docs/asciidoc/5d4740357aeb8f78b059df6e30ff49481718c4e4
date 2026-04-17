@@ -1,0 +1,129 @@
+git-rm(1)
+=========
+
+NAMN
+----
+git-rm - Ta bort filer från arbetskatalogen och från indexet
+
+SYNOPSIS
+--------
+[synopsis]
+git rm [-f | --force] [-n] [-r] [--cached] [--ignore-unmatch]
+       [--quiet] [--pathspec-from-file=<fil> [--pathspec-file-nul]]
+       [--] [<sökvägsmönster>...]
+
+BESKRIVNING
+-----------
+Ta bort filer som matchar arbetskatalogfrån indexet, eller från arbetskatalogen och indexet. `git rm` tar inte bort en fil bara från din arbetskatalog. (Det finns inget alternativ att bara ta bort en fil från arbetskatalogen och ändå behålla den i indexet; använd `/bin/rm` om du vill göra det.) Filerna som tas bort måste vara identiska med grenens topp, och inga uppdateringar av deras innehåll kan köas i indexet, även om det standardbeteendet kan åsidosättas med alternativet `-f`. När `--cached` anges måste det köade innehållet matcha antingen grenens spets eller filen på disken, vilket gör att filen kan tas bort bara från indexet. När sparse-checkouts används (se linkgit:git-sparse-checkout[1]), kommer `git rm` bara att ta bort sökvägar inom sparse-checkout-mönstren.
+
+
+ALTERNATIV
+----------
+`<sökvägsmönster>...`::
+	Filer att ta bort. Ett inledande katalognamn (t.ex. `kat` för att ta bort `kat/fil1` och `kat/fil2`) kan anges för att ta bort alla filer i katalogen, och rekursivt alla underkataloger, men detta kräver att alternativet `-r` anges explicit.
++
+Kommandot tar bara bort de sökvägar som är kända för Git.
++
+Filglobbing matchar över kataloggränser. Givet två kataloger `d` och `d2` är det alltså skillnad mellan att använda `git rm 'd*'` och `git rm 'd/*'`, eftersom den förra också tar bort hela katalogen `d2`.
++
+För mer information, se _<sökvägsmönster>_-posten i linkgit:gitglossary[7].
+
+`-f`::
+`--force`::
+	Åsidosätt den àjour-kontrollen.
+
+`-n`::
+`--dry-run`::
+	Ta inte bort några filer. Istället, visa bara om de finns i indexet och annars skulle tas bort av kommandot.
+
+`-r`::
+        Tillåt rekursiv borttagning när ett inledande katalognamn anges.
+
+`--`::
+	Det här alternativet kan användas för att separera kommandoradsalternativ från fillistan (användbart när filnamn kan misstas för kommandoradsalternativ).
+
+`--cached`::
+	Använd det här alternativet för att avköa och endast ta bort sökvägar från indexet. Arbetskatalogs-filer, oavsett om de är ändrade eller inte, kommer att lämnas orörda.
+
+`--ignore-unmatch`::
+	Avsluta med nollstatus även om inga filer matchades.
+
+`--sparse`::
+	Allow updating index entries outside of the sparse-checkout cone. Normally, `git rm` refuses to update index entries whose paths do not fit within the sparse-checkout cone. See linkgit:git-sparse-checkout[1] for more.
+
+`-q`::
+`--quiet`::
+	`git rm` matar normalt ut en rad (i form av ett `rm`-kommando) för varje fil som tas bort. Det här alternativet undertrycker den utmatningen.
+
+`--pathspec-from-file=<fil>`::
+	Pathspec skickas i _<fil>_ istället för args. Om _<fil>_ är exakt `-` används standardindata. sökvägsmönster-poster separeras med _LF_ eller _CR_/_LF_. sökvägsmönster-poster kan citeras enligt beskrivningen för konfigurationsvariabeln `core.quotePath` (se linkgit:git-config[1]). Se även `--pathspec-file-nul` och global `--literal-pathspecs`.
+
+`--pathspec-file-nul`::
+	Endast meningsfullt med `--pathspec-from-file`. Sökvägsmönsterposter separeras med tecknet _NUL_ och alla andra tecken tolkas bokstavligt (inklusive radbrytningar och citattecken).
+
+
+TA BORT FILER SOM HAR FÖRSVUNNIT FRÅN FILSYSTEMET
+-------------------------------------------------
+Det finns inget alternativ för `git rm` att ta bort från indexet endast de sökvägar som har försvunnit från filsystemet. Beroende på användningsfallet finns det dock flera sätt att göra detta.
+
+Använda ``git commit -a''
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Om du avser att din nästa commit ska registrera alla ändringar av spårade filer i arbetskatalogen och registrera alla borttagningar av filer som har tagits bort från arbetskatalogen med `rm` (i motsats till `git rm`), använd `git commit -a`, eftersom det automatiskt kommer att märka och registrera alla borttagningar. Du kan också få en liknande effekt utan att committa genom att använda `git add -u`.
+
+Använder ``git add -A''
+~~~~~~~~~~~~~~~~~~~~~~~
+When accepting a new code drop for a vendor branch, you probably want to record both the removal of paths and additions of new paths as well as modifications of existing paths.
+
+Vanligtvis tar du först bort alla spårade filer från arbetskatalogen med hjälp av det här kommandot:
+
+----------------
+git ls-files -z | xargs -0 rm -f
+----------------
+
+och sedan untar:ar den nya koden i arbetskatalogen. Alternativt kan du 'rsync' ändringarna i arbetskatalogen.
+
+Efter det är det enklaste sättet att registrera alla borttagningar, tillägg och ändringar i arbetskatalogen:
+
+----------------
+git add -A
+----------------
+
+Se linkgit:git-add[1].
+
+Andra sätt
+~~~~~~~~~~
+Om allt du egentligen vill göra är att ta bort filer från indexet som inte längre finns i arbetskatalogen (kanske för att ditt arbetskatalog är smutsig så att du inte kan använda `git commit -a`), använd följande kommando:
+
+----------------
+git diff --name-only --diff-filter=D -z | xargs -0 git rm --cached
+----------------
+
+UNDERMODULER
+------------
+Endast undermoduler som använder en gitfile (vilket innebär att de klonades med en Git-version 1.7.8 eller senare) kommer att tas bort från arbetsträdet, eftersom deras arkiv finns i superprojektets `.git`-katalog. Om en undermodul (eller en av de som är kapslade i den) fortfarande använder en `.git`-katalog, flyttar `git rm` undermodulernas git-katalog till superprojektens git-katalog för att skydda undermodulens historik. Om den existerar kommer även avsnittet `submodule.<namn>` i filen linkgit:gitmodules[5] att tas bort och den filen kommer att köas (såvida inte `--cached` eller `-n` används).
+
+En undermodul anses vara aktuell när `HEAD` är densamma som registrerats i indexet, inga spårade filer är modifierade och inga ospårade filer som inte ignoreras finns i undermodulens arbetsträd. Ignorerade filer anses vara förbrukningsbara och hindrar inte en undermoduls arbetsträd från att tas bort.
+
+Om du bara vill ta bort den lokala utcheckningen för en undermodul från ditt arbetsträd utan att bekräfta borttagningen, använd linkgit:git-submodule[1] `deinit` istället. Se även linkgit:gitsubmodules[7] för detaljer om borttagning av undermoduler.
+
+EXEMPEL
+-------
+`git rm Dokumentation/\*.txt`::
+	Tar bort alla `*.txt`-filer från indexet som finns under katalogen `Dokumentation` och alla dess underkataloger.
++
+Observera att asterisken `*` citeras från skalet i det här exemplet; detta låter Git, och inte skalet, expandera sökvägarna till filer och underkataloger under katalogen `Dokumentation/`.
+
+`git rm -f git-*.sh`::
+	Eftersom det här exemplet låter skalet expandera asterisken (dvs. du listar filerna explicit), tar det inte bort `subdir/git-foo.sh`.
+
+BUGGAR
+------
+Varje gång en superprojektuppdatering tar bort en ifylld undermodul (t.ex. när man växlar mellan incheckningar före och efter borttagningen) kommer en inaktuell undermodulutcheckning att finnas kvar på den gamla platsen. Att ta bort den gamla katalogen är bara säkert när den använder en gitfile, eftersom annars även undermodulens historik kommer att raderas. Detta steg kommer att vara föråldrat när rekursiv undermoduluppdatering har implementerats.
+
+SE ÄVEN
+-------
+linkgit:git-add[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

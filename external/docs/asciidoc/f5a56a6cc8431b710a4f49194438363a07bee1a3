@@ -1,0 +1,158 @@
+git-cvsimport(1)
+================
+
+NAMN
+----
+git-cvsimport - Rädda dina data ut ur en annan SCM folk älskar att hata
+
+
+SYNOPSIS
+--------
+[verse]
+'git cvsimport' [-o <branch-for-HEAD>] [-h] [-v] [-d <CVSROOT>]
+	      [-A <författar-konv-fil>] [-p <flaggor-för-cvsps>] [-P <fil>]
+	      [-C <git-kodförråd>] [-z <fuzz>] [-i] [-k] [-u] [-s <subst>]
+	      [-a] [-m] [-M <regex>] [-S <regex>] [-L <inchecknings-gräns>]
+	      [-r <fjärr>] [-R] [<CVS-modul>]
+
+
+BESKRIVNING
+-----------
+*VARNING:* `git cvsimport` använder cvsps version 2, vilket anses vara föråldrat; det fungerar inte med cvsps version 3 och senare. Om du importerar ett CVS-arkiv i ett enda steg, överväg att använda http://cvs2svn.tigris.org/cvs2git.html[cvs2git] eller https://gitlab.com/esr/cvs-fast-export[cvs-fast-export].
+
+Importerar ett CVS-kodförrådtill Git. Antingen skapar det ett nytt kodförråd eller importerar det stegvis till ett befintligt.
+
+Dela upp CVS-loggen i patchuppsättningar görs med 'cvsps'. Minst version 2.1 krävs.
+
+*VARNING:* I vissa situationer leder importen till felaktiga resultat. Se avsnittet <<issues,PROBLEM>> för ytterligare referens.
+
+Du bör *aldrig* göra något eget arbete på grenarna som skapas av 'git cvsimport'. Som standard skapar och fyller den initiala importen en "master"-gren från CVS-arkivets huvudgren som du fritt kan arbeta med; därefter måste du själv 'git merge' stegvisa importer, eller andra CVS-grenar. Det är lämpligt att ange en namngiven fjärr via -r för att separera och skydda de inkommande grenarna.
+
+Om du tänker skapa ett delat offentligt kodförråd som alla utvecklare kan läsa/skriva till, eller om du vill använda linkgit:git-cvsserver[1], då vill du förmodligen skapa en ren klon av det importerade kodförrådet, och använda klonen som det delade kodförrådet. Se linkgit:gitcvs-migration[7].
+
+
+ALTERNATIV
+----------
+-v::
+	Utförlighet: låt 'cvsimport' rapportera vad den gör.
+
+-d <CVSROOT>::
+	Roten till CVS-arkivet. Kan vara lokal (en enkel sökväg) eller fjärr; för närvarande stöds endast åtkomstmetoderna :local:, :ext: och :pserver:. Om inget anges kommer 'git cvsimport' att försöka läsa den från `CVS/Root`. Om ingen sådan fil finns söker den efter miljövariabeln `CVSROOT`.
+
+<CVS-modul>::
+	CVS-modulen du vill importera. Relativ till <CVSROOT>. Om den inte anges försöker 'git cvsimport' läsa den från `CVS/Repository`.
+
+-C <mål-kat>::
+Git-kodförrådet att importera till. Om katalogen inte finns kommer den att skapas. Standard är den aktuella katalogen.
+
+-r <fjärr>::
+	Git-fjärr att importera detta CVS-arkiv till. Flyttar alla CVS-grenar till remotes/<fjärr>/<gren> på samma sätt som 'git clone' använder 'origin' som standard.
+
+-o <gren-för-HEAD>::
+	När ingen fjärr anges (via -r) importeras grenen `HEAD` från CVS till grenen 'origin' i Git-kodförrådet, eftersom `HEAD` redan har en speciell betydelse för Git. När en fjärr anges heter grenen `HEAD` remotes/<fjärr>/master som speglar 'git clone'-beteendet. Använd det här alternativet om du vill importera till en annan gren.
++
+Använd '-o master' för att fortsätta en import som ursprungligen gjordes av det gamla cvs2git-verktyget.
+
+-i::
+	Endast import: gör ingen utcheckning efter import. Det här alternativet säkerställer att arbetskatalogen och indexet förblir orörda och skapar dem inte om de inte finns.
+
+-k::
+	Avsluta nyckelord: extraherar filer med '-kk' från CVS-arkivet för att undvika brusiga ändringsset. Rekommenderas starkt, men är avstängd som standard för att bevara kompatibilitet med tidigt importerade träd.
+
+-u::
+	Konvertera understreck i tagg- och grennamn till punkter.
+
+-s <subst>::
+	Ersätt tecknet "/" i grennamn med <subst>
+
+-p <flaggor-för-cvsps>::
+	Ytterligare alternativ för cvsps. Alternativen `-u` och '-A' är implicita och bör inte användas här.
++
+Om du behöver ange flera alternativ, separera dem med ett kommatecken.
+
+-z <fuzz>::
+	Skicka tidsstämpelns fuzzfaktor till cvsps, i sekunder. Om den inte är inställd är standardvärdet för cvsps 300s.
+
+-P <cvsps-utdata-fil>::
+	Istället för att anropa cvsps, läs den tillhandahållna-utdata filen. Användbart för felsökning eller när cvsps hanteras utanför cvsimport.
+
+-m::
+	Försök att upptäcka sammanslagningar baserat på inchecknings-meddelandet. Det här alternativet aktiverar standardregex som försöker hämta källgrennamnet från inchecknings-meddelandet.
+
+-M <regex>::
+	Försök att upptäcka sammanslagningar baserat på inchecknings-meddelandet med en anpassad regex. Den kan även användas med `-m` för att aktivera standardregexen. Du måste escape:a framåt-snedstreck.
++
+Regexen måste fånga källans grenen-namn i $1.
++
+Det här alternativet kan användas flera gånger för att tillhandahålla flera upptäckts-regexpar.
+
+-S <regex>::
+	Hoppa över sökvägar som matchar regex.
+
+-a::
+	Importera alla incheckningar, inklusive de senaste. cvsimport hoppar som standard över incheckningar som har en tidsstämpel från mindre än 10 minuter sedan.
+
+-L <gräns>::
+	Begränsa antalet importerade incheckningar. Lösning för fall där cvsimport läcker minne.
+
+-A <författare-konv-fil>::
+	CVS använder som standard Unix-användarnamnet när det skriver sina inchecknings-loggar. Genom att använda det här alternativet och en författare-konv-fil mappas namnet som är registrerat i CVS till författarnamn, e-postadress och valfri tidszon:
++
+---------
+	exon=Andreas Ericsson <ae@op5.se>
+	spawn=Simon Pawn <spawn@frog-pond.org> America/Chicago
+
+---------
++
+'git cvsimport' kommer att få det att se ut som att dessa författare hade sina GIT_AUTHOR_NAME och GIT_AUTHOR_EMAIL korrekt inställda hela tiden. Om en tidszon anges kommer GIT_AUTHOR_DATE att få motsvarande offset tillämpad.
++
+För enkelhetens skull, sparas dessa data till `$GIT_DIR/cvs-authors` varje gång alternativet '-A' anges och läses från samma fil varje gång 'git cvsimport' körs.
++
+Det rekommenderas inte att använda den här funktionen om du avser att exportera ändringar tillbaka till CVS senare med 'git cvsexportcommit'.
+
+-R::
+	Generera en `$GIT_DIR/cvs-revisions`-fil som innehåller en mappning från CVS-revisionsnummer till nyskapade Git-commit-ID:n. Den genererade filen kommer att innehålla en rad för varje importerat (filnamn, revisions-)par; varje rad kommer att se ut så här
++
+---------
+src/widget.c 1.1 1d862f173cdc7325b6fa6d2ae1cfd61fd1b512b7
+---------
++
+Revisionsdata läggs till i filen om den redan finns, för användning vid stegvis import.
++
+Det här alternativet kan vara användbart om du har CVS-revisionsnummer lagrade i inchecknings-meddelanden, felrapporteringssystem, e-postarkiv och liknande.
+
+-h::
+	Skriv ut ett kort användningsmeddelande och avsluta.
+
+UTMATNING
+---------
+Om `-v` anges, rapporterar skriptet vad det gör.
+
+Annars, indikeras framgång på Unix-sättet, dvs. genom att helt enkelt avsluta med noll avslutningsstatus.
+
+[[issues]]
+PROBLEM
+-------
+Problem relaterade till tidsstämplar:
+
+ * Om tidsstämplar för incheckningar i CVS-kodförrådet inte är tillräckligt stabila för att användas för att ordna incheckningar kan ändringar visas i fel ordning.
+ * Om några filer någonsin har "cvs-importerats" mer än en gång (t.ex. import av mer än en leverantörsversion) innehåller HEAD-filen fel innehåll.
+ * Om tidsstämpelordningen för olika filer korsar revisionsordningen inom tidsfönstret för inchecknings-matchning kan ordningen på incheckningar vara fel.
+
+Problem relaterade till grenar:
+
+ * Grenar där inga incheckningar har gjorts importeras inte.
+ * Alla filer från förgreningspunkten läggs till i en gren även om de aldrig blev tillagda till i CVS.
+ * Detta gäller filer som läggs till i källgrenen *efter* att en dottergren skapades: om ingen incheckning gjordes på dottergrenen tidigare kommer de felaktigt att läggas till i dottergrenen i git.
+
+Problem relaterade till taggar:
+
+* Flera taggar på samma revision importeras inte.
+
+Om du misstänker att något av dessa problem kan gälla för det kodförråd du vill importera, överväg att använda cvs2git:
+
+* cvs2git (en del av cvs2svn), `https://subversion.apache.org/`
+
+GIT
+---
+En del av linkgit:git[1]-sviten

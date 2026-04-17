@@ -1,0 +1,142 @@
+git-update-ref(1)
+=================
+
+NAMN
+----
+git-update-ref - Uppdatera objektnamnet som lagras i en ref på ett säkert sätt
+
+SYNOPSIS
+--------
+[synopsis]
+git update-ref [-m <anledning>] [--no-deref] -d <ref> [<gammal-oid>]
+git update-ref [-m <anledning>] [--no-deref] [--create-reflog] <ref> <ny-oid> [<gammal-oid>]
+git update-ref [-m <anledning>] [--no-deref] --stdin [-z] [--batch-updates]
+
+BESKRIVNING
+-----------
+Givet två argument, lagrar <ny-oid> i <ref>, eventuellt avrefererande de symboliska referenserna. T.ex. `git update-ref HEAD <ny-oid>` uppdaterar den aktuella gren-huvudet till det nya objektet.
+
+Givet tre argument, lagrar <ny-oid> i <ref>, eventuellt avtrefererande de symboliska refs, efter att ha verifierat att det aktuella värdet för <ref> matchar <gammalt-oid>. T.ex. `git update-ref refs/heads/master <ny-oid> <gammalt-oid>` uppdaterar master-grenen head till <ny-oid> endast om dess aktuella värde är <gammalt-oid>. Du kan ange 40 "0" eller en tom sträng som <gammalt-oid> för att säkerställa att refen du skapar inte existerar.
+
+De sista argumenten är objektnamn; detta kommando utan några alternativ stöder inte uppdatering av en symbolisk referens för att peka på en annan referens (se linkgit:git-symbolic-ref[1]). Men `git update-ref --stdin` har `symref-*`-kommandona så att vanliga referenser och symboliska referenser kan checkas-in i samma transaktion.
+
+Om --no-deref anges, <ref> sigsjälv skrivs över, snarare än resultatet av att följa de symboliska pekarna.
+
+Med `-d` raderas den namngivna <ref> efter att ha verifierat att den fortfarande innehåller <gammal-oid>.
+
+Med `--stdin` läser update-ref instruktioner från standardindata och utför alla modifieringar tillsammans. Ange kommandon av formen:
+
+	update SP <ref> SP <ny-oid> [SP <-oid>] LF
+	create SP <ref> SP <ny-oid> LF
+	delete SP <ref> [SP <gammal-oid>] LF
+	verify SP <ref> [SP <gammal-oid>] LF
+	symref-update SP <ref> SP <ny-target> [SP (ref SP <gammalt-mål> | oid SP <gammal-oid>)] LF
+	symref-create SP <ref> SP <ny-target> LF
+	symref-delete SP <ref> [SP <gammal-target>] LF
+	symref-verify SP <ref> [SP <gammal-target>] LF
+	option SP <opt> LF
+	start LF
+	prepare LF
+	commit LF
+	abort LF
+
+Med `--create-reflog` skapar update-ref en reflog för varje ref även om en normalt inte skulle skapas.
+
+Med `--batch-updates`, kör update-ref uppdateringarna i en batch men tillåter att enskilda uppdateringar misslyckas på grund av ogiltig eller felaktig användarinmatning, och tillämpar endast de lyckade uppdateringarna. Dock, systemrelaterade fel – såsom I/O-fel eller minnesproblem – kommer att resultera i ett fullständigt misslyckande av alla batchuppdateringar. Alla misslyckade uppdateringar rapporteras i följande format:
+
+	rejected SP (<gammal-oid> | <gammalt-mål>) SP (<ny-oid> | <ny-mål>) SP <avslagsorsak> LF
+
+Citat-fält som innehåller blanksteg som om de vore strängar i C-källkod; d.v.s. omgivna av dubbla citattecken och med bakåtsnedstreck. Använd 40 "0"-tecken eller den tomma strängen för att ange ett nollvärde. För att ange ett saknat värde, utelämna värdet och dess föregående SP helt och hållet.
+
+Alternativt, kan du använda `-z` för att ange i NUL-avslutat format, utan att citera:
+
+	update SP <ref> NUL <ny-oid> NUL [<gammal-oid>] NUL
+	create SP <ref> NUL <ny-oid> NUL
+	delete SP <ref> NUL [<gammal-oid>] NUL
+	verify SP <ref> NUL [<gammal-oid>] NUL
+	symref-update SP <ref> NUL <ny-target> [NUL (ref NUL <gammalt-mål> | oid NUL <gammal-oid>)] NUL
+	symref-create SP <ref> NUL <ny-target> NUL
+	symref-delete SP <ref> [NUL <gammalt-mål>] NUL
+	symref-verify SP <ref> [NUL <gammalt-mål>] NUL
+	option SP <opt> NUL
+	start NUL
+	prepare NUL
+	commit NUL
+	abort NUL
+
+I det här formatet, använder du 40 "0" för att ange ett nollvärde och den tomma strängen för att ange ett saknat värde.
+
+I båda formaten, kan värden anges i vilken form som helst som Git känner igen som ett objektnamn. Kommandon i något annat format eller en upprepad <ref> producerar ett fel. Kommandons betydelser är:
+
+update::
+	Sätt <ref> till <ny-oid> efter att du verifierat <gammal-oid>, om angivet. Ange ett nollvärde för <ny-oid> för att säkerställa att referensen inte finns efter uppdateringen och/eller ett nollvärde för <gammal-oid> för att säkerställa att referensen inte finns före uppdateringen.
+
+create::
+	Skapa <ref> med <ny-oid> efter att ha verifierat att det inte existerar. Den angivna <ny-oid> får inte vara noll.
+
+delete::
+	Ta bort <ref> efter att ha verifierat att den existerar med <gammal-oid>, om angivet. Om angivet, kanske <gammal-oid> inte är noll.
+
+symref-update::
+	Sätt <ref> till <ny-mål> efter att ha verifierat <gammalt-mål> eller <gammal-oid>, om angivet. Ange ett nollvärde för <gammal-oid> för att säkerställa att referensen inte finns före uppdateringen.
+
+verify::
+	Verifiera <ref> mot <gammal-oid> men ändra den inte. Om <gammal-oid> är noll eller saknas, får referensen inte existera.
+
+symref-create:
+	Skapa symbolisk ref <ref> med <ny-mål> efter att ha verifierat att
+	den inte existerar.
+
+symref-delete::
+	Ta bort <ref> efter att ha verifierat att den finns med <gammalt-mål>, om angivet.
+
+symref-verify::
+	Verifiera symboliska <ref> mot <gammalt-mål> men ändra den inte. Om <gammalt-mål> saknas får referensen inte finnas. Kan endast användas i `no-deref`-läge.
+
+option::
+	Ändra beteendet för nästa kommando som namnger en <ref>. Det enda giltiga alternativet är `no-deref` för att undvika att avreferensera en symbolisk referens.
+
+start::
+	Starta en transaktion. Till skillnad från en icke-transaktionell session avbryts en transaktion automatiskt om sessionen avslutas utan en explicit incheckning. Detta kommando kan skapa en ny tom transaktion när den nuvarande redan har checkats-in eller avbrutits.
+
+prepare::
+	Förbered inchecknings transaktionen. Detta skapar låsfiler för alla köade referensuppdateringar. Om en referens inte kunde låsas, avbryts transaktionen.
+
+incheckning::
+	Checka-in alla referens-uppdateringar som är i kö för transaktionen, vilket avslutar transaktionen.
+
+abort::
+	Avbryt transaktionen, och släpp alla lås om transaktionen är i förberett tillstånd.
+
+Om alla <ref> kan låsas med matchande <gammal-oid> samtidigt, utförs alla modifieringar. Annars utförs inga modifieringar. Observera att även om varje enskild <ref> uppdateras eller raderas atomärt, kan en samtidig läsare fortfarande se en delmängd av modifieringarna.
+
+LOGGNINGS-UPPDATERINGAR
+-----------------------
+Om konfigurationsparametern "core.logAllRefUpdates" är sann och referensen finns under "refs/heads/", "refs/remotes/", "refs/notes/", eller en pseudoref som HEAD eller ORIG_HEAD; eller om filen "$GIT_DIR/logs/<ref>" finns så kommer `git update-ref` att lägga till en rad i loggfilen "$GIT_DIR/logs/<ref>" (och avreferera alla symboliska referenser innan loggnamnet skapas) som beskriver ändringen i referensvärdet. Loggrader formateras enligt:
+
+    gammaltsha1 SP nysha1 SP incheckare LF
+
+Där "gammaltsha1" är det hexadecimala värdet på 40 tecken som tidigare lagrats i <ref>, "nysha1" är det hexadecimala värdet på 40 tecken för <ny-oid> och "incheckare" är incheckarens namn, e-postadress och datum i standardformatet för Git incheckare-ident format.
+
+Valfritt med -m:
+
+    gammaltsha1 SP nysha1 SP incheckare TAB meddelande LF
+
+Där alla fält är som beskrivits ovan och "meddelande" är värdet som anges till alternativet -m.
+
+En uppdatering kommer att misslyckas (utan att ändra <ref>) om den aktuella användaren inte kan skapa en ny loggfil, lägga till en i den befintliga loggfilen eller inte har tillgänglig incheckare-information tillgänglig.
+
+NOTERINGAR
+----------
+
+Symboliska referenser implementerades ursprungligen med hjälp av symboliska länkar. Detta är nu föråldrat eftersom inte alla filsystem stöder symboliska länkar.
+
+Det här kommandot följer *riktiga* symboliska länkar endast om de börjar med "refs/": annars kommer det bara att försöka läsa dem och uppdatera dem som en vanlig fil (dvs. det kommer att tillåta filsystemet att följa dem, men kommer att skriva över en sådan symbolisk länk till någon annanstans med ett vanligt filnamn).
+
+SE ÄVEN
+-------
+linkgit:git-symbolic-ref[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

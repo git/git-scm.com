@@ -1,0 +1,126 @@
+git-annotate(1)
+===============
+
+NAMN
+----
+git-annotate - Annotera filrader med inchecknings-information
+
+SYNOPSIS
+--------
+[verse]
+git annotate [<flaggor>] [<rev-flaggor>] [<rev>] [--] <fil>
+
+BESKRIVNING
+-----------
+Annoterar varje rad i den givna filen med information från den incheckning som introducerade raden. Annoterar valfritt från en given revision.
+
+Den enda skillnaden mellan detta kommando och linkgit:git-blame[1] är att de använder något olika utdataformat, och detta kommando finns endast för bakåtkompatibilitet för att stödja befintliga skript och ge ett mer välbekant kommandonamn för personer som kommer från andra SCM-system.
+
+ALTERNATIV
+----------
+-b::
+	Visa tom SHA-1 för gräns-incheckningar. Detta kan också styras via konfigurationsalternativet `blame.blankBoundary`.
+
+--root::
+	Behandla inte root-incheckningar som gränser. Detta kan också styras via konfigurationsalternativet `blame.showRoot`.
+
+--show-stats::
+	Inkludera ytterligare statistik i slutet av skyldiga utdata.
+
+-L <start>,<slut>::
+-L :<funktionsnamn>::
+	Kommentera endast radintervallet som anges av '<start>,<slut>' eller av funktionsnamnets regex '<funktionsnamn>'. Kan anges flera gånger. Överlappande intervall är tillåtna.
++
+'<start>' och '<slut>' är valfria. `-L <start>` eller `-L <start>,` sträcker sig från '<start>' till slutet av filen. `-L ,<slut>` sträcker sig från början av filen till '<slut>'.
++
+_<start>_ och _<slut>_ kan anta en av dessa former:
+
+- _<nummer>_
++
+Om _<start>_ eller _<slut>_ är ett tal, anger det ett absolut radnummer (raderna räknas från 1).
++
+
+- `/<regex>/`
++
+Det här formen använder den första raden som matchar det givna POSIX-värdet _<regex>_. Om _<start>_ är ett regex, söker den från slutet av föregående `-L`-intervall, om något, annars från början av filen. Om _<start>_ är `^/<regex>/`, söker den från början av filen. Om _<slut>_ är ett regex, börjar sökandet på raden som anges av _<start>_.
++
+
+- `+<offset>` or `-<offset>`
++
+Detta gäller endast för _<slut>_ och anger ett antal rader före eller efter raden som anges av _<start>_.
+
++
+Om `:<funktionsnamn>` anges istället för _<start>_ och _<slut>_, är det ett reguljärt uttryck som anger intervallet från den första funktionsnamn-raden som matchar _<funktionsnamn>_, upp till nästa funcname-rad. `:<funktionsnamn>` söker från slutet av föregående `-L`-intervall, om något, annars från början av filen. `^:<funktionsnamn>` söker från början av filen. Funktionsnamnen bestäms på samma sätt som `git diff` beräknar patch-styckes-huvuden (se 'Definiera en anpassad styckes-huvuden' i linkgit:gitattributes[5]).
+[]
+
+-l::
+	Visa lång rev (Standard: av).
+
+-t::
+	Visa rå tidsstämpel (Standard: av).
+
+-S <revs-fil>::
+	Använd revisioner från revs-filen istället för att anropa linkgit:git-rev-list[1].
+
+--reverse <rev>..<rev>::
+	Gå framåt istället för bakåt i historiken. Istället för att visa den version där en rad förekom, visar detta den senaste versionen där en rad har funnits. Detta kräver ett versionsintervall som START..SLUT där sökvägen att skylla finns i START. `git blame --reverse START` tas som `git blame --reverse START..HEAD` för enkelhetens skull.
+
+--first-parent::
+	Följ endast den första överordnade incheckning när en merge commit visas. Det här alternativet kan användas för att avgöra när en rad introducerades i en viss integrationsgren, snarare än när den introducerades i historiken överlag.
+
+-p::
+--porcelain::
+	Visa i ett format utformat för maskinkonsumtion.
+
+--line-porcelain::
+	Visa porslins-formatet, men mata ut incheckning-information för varje rad, inte bara första gången en incheckning refereras. Innebär --porcelain.
+
+--incremental::
+	Visa resultatet stegvis i ett format som är utformat för maskin-konsumtion.
+
+--encoding=<kodning>::
+	Anger kodningen som används för att mata ut författarnamn och inchecknings-sammanfattningar. Om den ställs in på `none` matas blame-data ut som okonverterad. För mer information, se diskussionen om kodning på manualsidan för linkgit:git-log[1].
+
+--contents <fil>::
+	Kommentera med innehållet från den namngivna filen, med början från <rev> om det anges, och HEAD annars. Du kan ange '-' för att få kommandot att läsas från standard in för filinnehållet.
+
+--date <format>::
+	Anger formatet som används för att mata ut datum. Om --date inte anges används värdet för konfigurationsvariabeln blame.date. Om konfigurationsvariabeln blame.date inte heller är inställd används iso-formatet. För värden som stöds, se diskussionen om alternativet --date på linkgit:git-log[1].
+
+--progress::
+--no-progress::
+	Förloppsstatus rapporteras som standard i standardfelströmmen när den är ansluten till en terminal. Denna flagga aktiverar förloppsrapportering även om den inte är ansluten till en terminal. Det går inte att använda `--progress` tillsammans med `--porcelain` eller `--incremental`.
+
+-M[<num>]::
+	Identifiera flyttade eller kopierade rader i en fil. När en incheckning flyttar eller kopierar ett radblock (t.ex. originalfilen har A och sedan B, och incheckning ändrar det till B och sedan A), märker den traditionella "skuld"-algoritmen bara hälften av rörelsen och skyller vanligtvis de rader som flyttades upp (dvs. B) på föräldern och tilldelar skulden till de rader som flyttades ner (dvs. A) till barn-inchecking. Med det här alternativet skylls båda grupperna av rader på föräldern genom att köra extra inspektionsomgångar.
++
+<num> är valfritt men det är den nedre gränsen för antalet alfanumeriska tecken som Git måste upptäcka som flytt/kopiering inom en fil för att dessa rader ska associeras med den överordnade incheckning. Standardvärdet är 20.
+
+-C[<num>]::
+	Utöver `-M`, upptäcker rader som flyttats eller kopierats från andra filer som har ändrats i samma incheckning. Detta är användbart när du omorganiserar ditt program och flyttar kod mellan filer. När det här alternativet anges två gånger letar kommandot dessutom efter kopior från andra filer i den incheckning som skapar filen. När det här alternativet anges tre gånger letar kommandot dessutom efter kopior från andra filer i valfri incheckning.
++
+<num> är valfritt men det är den nedre gränsen för antalet alfanumeriska tecken som Git måste upptäcka vid flyttning/kopiering mellan filer för att dessa rader ska associeras med den överordnade incheckningen. Och standardvärdet är 40. Om det finns fler än ett `-C`-alternativ angivet, kommer <num>-argumentet för det sista `-C` att gälla.
+
+--ignore-rev <rev>::
+	Ignorera ändringar gjorda av revisionen när du tilldelar skuld, som om ändringen aldrig inträffade. Rader som ändrades eller lades till av en ignorerad incheckning kommer att skyllas på den föregående incheckning som ändrade den raden eller närliggande rader. Det här alternativet kan anges flera gånger för att ignorera mer än en revision. Om konfigurationsalternativet `blame.markIgnoredLines` är aktiverat, kommer rader som ändrades av en ignorerad incheckning och tillskrivits en annan incheckning att markeras med ett `?` i skuldutdata. Om konfigurationsalternativet `blame.markUnblamableLines` är aktiverat, markeras de rader som berörts av en ignorerad incheckning som vi inte kunde tillskriva en annan revision med ett '*'. I porslinslägena skriver vi 'ignored' respektive 'unblamable' på en nyrad.
+
+--ignore-revs-file <fil>::
+	Ignorera revisioner som listas i `fil`, vilka måste ha samma format som en `fsck.skipList`. Detta alternativ kan upprepas, och dessa filer kommer att bearbetas efter alla filer som angetts med konfigurationsalternativet `blame.ignoreRevsFile`. Ett tomt filnamn, `""`, rensar listan över revideringar från tidigare bearbetade filer.
+
+--color-lines::
+	Färglägg radannoteringar i standardformatet annorlunda om de kommer från samma incheckning som föregående rad. Detta gör det enklare att skilja kodblock som introduceras av olika incheckningar. Standardfärgen är cyan och kan justeras med konfigurationsalternativet `color.blame.repeatedLines`.
+
+--color-by-age::
+	Färglägg linjeannoteringar beroende på linjens ålder i standardformatet. Konfigurationsalternativet `color.blame.highlightRecent` styr vilken färg som används för varje åldersintervall.
+
+-h::
+	Visa hjälpmeddelande.
+[]
+
+SE ÄVEN
+-------
+linkgit:git-blame[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

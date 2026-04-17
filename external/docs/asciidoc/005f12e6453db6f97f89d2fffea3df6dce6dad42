@@ -1,0 +1,113 @@
+git-ls-tree(1)
+==============
+
+NAMN
+----
+git-ls-tree - Lista innehållet i ett trädobjekt
+
+
+SYNOPSIS
+--------
+[verse]
+'git ls-tree' [-d] [-r] [-t] [-l] [-z]
+	    [--name-only] [--name-status] [--object-only] [--full-name] [--full-tree] [--abbrev[=<n>]] [--format=<format>]
+	    <trädlikt> [<sökväg>...]
+
+BESKRIVNING
+-----------
+Listar innehållet i ett givet trädobjekt, ungefär som vad "/bin/ls -a" gör i den aktuella arbetskatalogen. Observera att:
+
+ - Beteendet skiljer sig något från "/bin/ls" genom att '<sökväg>' bara anger en lista med mönster som ska matchas, t.ex. så att ange katalognamn (utan `-r`) kommer att bete sig annorlunda, och ordningen på argumenten spelar ingen roll.
+
+ - Beteendet liknar det för "/bin/ls" i det att '<sökväg>' tas som relativ till den aktuella arbetskatalogen. T.ex. när du är i en katalog 'sub' som har en katalog 'dir' kan du köra 'git ls-tree -r HEAD dir' för att lista innehållet i trädet (det vill säga `sub/dir` i `HEAD`). Du vill inte ange ett träd som inte är på rotnivå (t.ex. `git ls-tree -r HEAD:sub dir`) i det här fallet, eftersom det skulle resultera i att fråga efter `sub/sub/dir` i `HEAD`-incheckningen. Den aktuella arbetskatalogen kan dock ignoreras genom att skicka alternativet --full-tree.
+
+ALTERNATIV
+----------
+<trädlikt>::
+	ID för ett trädlikt objekt.
+
+-d::
+	Visa endast själva den namngivna trädposten, inte dess barn.
+
+-r::
+	Rekursera ner i underträd.
+
+-t::
+	Visar trädposter även när man ska använda rekursiv funktion. Har ingen effekt om `-r` inte skickades. `-d` innebär `-t`.
+
+-l::
+--long::
+	Visa objektstorlek för blob-poster (filposter).
+
+-z::
+	\0 radavslutning vid utdata och citera inte filnamn. Se UTMATNINGSFORMAT nedan för mer information.
+
+--name-only::
+--name-status::
+	Lista endast filnamn (i stället för den "långa" utdatan), ett per rad. Kan inte kombineras med `--object-only`.
+
+--object-only::
+	Lista endast namnen på objekten, ett per rad. Kan inte kombineras med `--name-only` eller `--name-status`. Detta motsvarar att ange `--format='%(objektnamn)'`, men för både detta alternativ och exakt det formatet använder kommandot en handoptimerad kodväg i stället för att gå via den generiska formateringsmekanismen.
+
+--abbrev[=<n>]::
+	I stället för att visa hela 40-byte hexadecimala objektraderna, visa det kortaste prefixet som är minst '<n>' hexdigits långt och som unikt refererar till objektet. Antal siffror som inte är standard kan anges med --abbrev=<n>.
+
+--full-name::
+	I stället för att visa sökvägarna i förhållande till den aktuella arbetskatalogen, visa de fullständiga sökvägarna.
+
+--full-tree::
+	Begränsa inte listan till den aktuella arbetskatalogen. Innebär --full-name.
+
+--format=<format>::
+	En sträng som interpolerar `%(fältnamn)` från resultatet som visas. Den interpolerar också `%%` till `%`, och `%xNN` där `NN` är hexagonala siffror interpolerar till tecken med hexagonalkod `NN`; till exempel interpolerar `%x00` till `\0` (NUL), `%x09` till `\t` (TAB) och `%x0a` till `\n` (LF). När `--format` anges kan den inte kombineras med andra formatändringsalternativ, inklusive `--long`, `--name-only` och `--object-only`.
+
+[<sökväg>...]::
+	När sökvägar anges, visa dem (observera att detta inte är råa sökvägsnamn, utan snarare en lista med mönster som ska matcha). Annars används implicit trädets rotnivå som enda sökvägsargument.
+
+
+Utdataformat
+------------
+
+Utdataformatet för `ls-tree` bestäms antingen av alternativet `--format` eller andra format-ändringsalternativ som `--name-only` etc. (se `--format` ovan).
+
+Användningen av vissa `--format`-direktiv motsvarar att använda dessa alternativ, men att anropa hela formateringsmaskineriet kan vara långsammare än att använda ett lämpligt formateringsalternativ.
+
+I de fall där `--format` exakt skulle mappas till ett befintligt alternativ kommer `ls-tree` att använda lämplig snabbare sökväg. Standardformatet är alltså likvärdigt med:
+
+	%(objectmode) %(objecttype) %(objectname)%x09%(path)
+
+Det här utdataformat är kompatibelt med vad `--index-info --stdin` i 'git update-index' förväntar sig.
+
+När alternativet `-l` används ändras formatet till
+
+	%(objectmode) %(objecttype) %(objectname) %(objectsize:padded)%x09%(path)
+
+Objektstorleken som identifieras av <objektnamn> anges i byte och är högerjusterad med en minsta bredd på 7 tecken. Objektstorleken anges endast för blob-poster (filposter); för andra poster används `-`-tecknet i stället för storlek.
+
+Utan `-z`-alternativet citeras sökvägar med "ovanliga" tecken enligt beskrivningen för konfigurationsvariabeln `core.quotePath` (se linkgit:git-config[1]). Med `-z` matas filnamnet ut ordagrant och raden avslutas med en NUL-byte.
+
+Anpassat format:
+
+Det är möjligt att skriva ut i ett anpassat format genom att använda alternativet `--format`, vilket kan interpolera olika fält med hjälp av notationen `%(fältnamn)`. Om du till exempel bara bryr dig om fälten "objektnamn" och "sökväg" kan du köra med ett specifikt "--format" som
+
+	git ls-tree --format='%(objectname) %(path)' <trädlikt>
+
+FÄLTNAMN
+--------
+
+Olika värden från strukturerade fält kan användas för att interpolera in i den resulterande utdata. För varje utmatningsrad kan följande namn användas:
+
+objectmode::
+	Objektets läge.
+objecttype::
+	Objektets typ (`commit`, `blob` eller `tree`).
+objectname::
+	Objektets namn.
+objectsize[:padded]::
+	Storleken på ett `blob`-objekt ("-" om det är ett `commit` eller `tree`). Det stöder också ett utfyllt format med storleken "%(objectsize:padded)".
+sökväg::
+	Objektets sökväg.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

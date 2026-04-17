@@ -13,16 +13,10 @@ class DownloadData
   # [OvD] note that Google uses Atom & Sourceforge uses RSS
   # however this isn't relevant when parsing the feeds for
   # name, version, url & date with Feedzirra
-  SOURCEFORGE_URL = "https://sourceforge.net/projects/git-osx-installer/rss?limit=20"
-
   GIT_FOR_WINDOWS_REGEX           = /^(Portable|)Git-(\d+\.\d+\.\d+(?:\.\d+)?)-(?:.+-)*(64-bit|arm64)(?:\..*)?\.exe/
   GIT_FOR_WINDOWS_NAME_WITH_OWNER = "git-for-windows/git"
 
   class << self
-    def sourceforge_project_download_url(project, filename)
-      "https://sourceforge.net/projects/#{project}/files/#{filename}/download?use_mirror=autoselect"
-    end
-
     def update_download_windows_versions(config)
       files_from_github(GIT_FOR_WINDOWS_NAME_WITH_OWNER).each do |name, date, url|
         # Git for Windows uses the following naming system
@@ -61,32 +55,6 @@ class DownloadData
       end
     end
 
-    def update_download_mac_versions(config)
-      files_from_sourceforge(SOURCEFORGE_URL).each do |url, date|
-        filename  = url.split("/")[-2]
-        match = /git-(.*?)-/.match(filename)
-
-        next unless match
-
-        url  = sourceforge_project_download_url("git-osx-installer", filename)
-        name = match[1]
-
-        version = name
-
-        if version
-          config["macos_installer"] = {} if config["macos_installer"].nil?
-          mac_config = config["macos_installer"]
-          return if version_compare(version, mac_config["version"]) < 0
-          mac_config["filename"] = filename
-          mac_config["release_date"] = Time.parse(date.iso8601).strftime("%Y-%m-%d")
-          mac_config["version"] = version
-          mac_config["url"] = url
-        else
-          $logger.info("Could not find version #{name}")
-        end
-      end
-    end
-
     private
 
     def files_from_github(repository)
@@ -104,18 +72,6 @@ class DownloadData
             asset.browser_download_url
           ]
         end
-      end
-
-      downloads
-    end
-
-    def files_from_sourceforge(repository)
-      downloads = []
-      rss       = URI.parse(repository).open.read
-      feed      = RSS::Parser.parse(rss)
-
-      feed.items.each do |item|
-        downloads << [item.link, item.pubDate]
       end
 
       downloads
@@ -139,6 +95,5 @@ end
 config = YAML.load_file("hugo.yml")
 config["params"] = {} if config["params"].nil?
 DownloadData.update_download_windows_versions(config["params"])
-DownloadData.update_download_mac_versions(config["params"])
 yaml = YAML.dump(config).gsub(/ *$/, "")
 File.write("hugo.yml", yaml)

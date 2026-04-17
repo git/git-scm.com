@@ -1,0 +1,129 @@
+git-rm(1)
+=========
+
+NOMBRE
+------
+git-rm - Borra ficheros del árbol de trabajo y del índice
+
+SINOPSIS
+--------
+[synopsis]
+git rm [-f | --force] [-n] [-r] [--cached] [--ignore-unmatch]
+        [--quiet] [--pathspec-from-file=<fichero> [--pathspec-file-nul]]
+        [--] [<ruta>...]
+
+DESCRIPCIÓN
+-----------
+Elimina ficheros que coincidan con la especificación de ruta, del índice o del árbol de trabajo y el índice. `git rm` no eliminará un fichero únicamente de tu directorio de trabajo. (No hay opción para eliminar un fichero sólo del árbol de trabajo y aún mantenerlo en el índice; si quieres hacer eso usa `/bin/rm`.) Los ficheros eliminados tienen que ser idénticos a la punta de la rama, y no se pueden presentar en el índice cambios a su contenido, aunque el comportamiento predeterminado puede ser anulado con la opción `-f`. Cuando se da `--cached`, el contenido presentado tiene que coincidir ya sea con la punta de la rama o con el fichero en disco, permitiendo que el fichero sea removido solamente del índice. Cuando se usan checkouts escasos (ver linkgit:git-sparse-checkout[1]), `git rm` solo eliminará las rutas dentro de los patrones del checkout escaso.
+
+
+OPCIONES
+--------
+`<especificación-de-ruta>...`::
+	Ficheros a remover. Se puede dar un nombre inicial de directorio (p. ej. `dir` para eliminar `dir/fichero1` y `dir/fichero2`) para remover todos los ficheros en un directorio y recursivamente todos sus subdirectorios, pero esto requiere que se de explícitamente la opción `-r`.
++
+El comando remueve solo las rutas conocidas por Git.
++
+Con expresiones glob se buscan ficheros coincidentes dentro de los límites de directorio. De este modo, dados dos directorios `d` y `d2`, hay una diferencia entre usar `git rm 'd*'` y `git rm 'd/*'`, ya que el primero también removerá todo lo del directorio `d2`.
++
+Para mas detalles, ver _<especificación-de-ruta>_ en linkgit:gitglossary[7].
+
+`-f`::
+`--force`::
+	Anular la comprobación de estado actualizado.
+
+`-n`::
+`--dry-run`::
+	Realmente no elimina fichero alguno. Sólo muestra si existen en el índice y que de otra manera debieran ser eliminados por el comando.
+
+`-r`::
+        Permite remoción recursiva cuando se da un nombre inicial de directorio.
+
+`--`::
+	Este opción puede ser usada para separar las opciones de línea de comandos de la lista de ficheros; útil cuando los nombres de ficheros se pueden confundir por opciones de línea de comandos.
+
+`--cached`::
+	Use this option to unstage and remove paths only from the index. Working tree files, whether modified or not, will be left alone.
+
+`--ignore-unmatch`::
+	Salir con estado cero incluso si ningún fichero coincide.
+
+`--sparse`::
+	Allow updating index entries outside of the sparse-checkout cone. Normally, `git rm` refuses to update index entries whose paths do not fit within the sparse-checkout cone. See linkgit:git-sparse-checkout[1] for more.
+
+`-q`::
+`--quiet`::
+	`git rm` normalmente da salida a una línea (coma la de un comando `rm`) por cada fichero eliminado. Esta opción suprime esa salida.
+
+`--pathspec-from-file=<fichero>`::
+	La especificación de ruta se pasa en _<fichero>_ y no como argumento. Si _<fichero>_ es exactamente `-` entonces se usa la entrada estándar. Los elementos de la especificación de ruta se separan por _LF_ o _CR_/_LF_. Los elementos de la especificación de ruta pueden ser entrecomillados como se explica para la variable de configuración `core.quotePath` (ver linkgit:git-config[1]). Ver también `--pathspec-file-nul` y `--literal-pathspecs` global.
+
+`--pathspec-file-nul`::
+	Sólo significativo con `--pathspec-from-file`. Los elementos de la especificación de ruta se separan con el caracter _NUL_ y todos los otros caracteres se toman literalmente (incluyendo saltos de línea y entrecomillados).
+
+
+ELIMINANDO FICHEROS QUE HAN DESAPARECIDO DEL SISTEMA DE ARCHIVOS
+----------------------------------------------------------------
+No hay opción de `git rm` para eliminar del índice solo las rutas que han desaparecido del sistema de archivos. No obstante, dependiendo del caso de uso, hay varias formas de conseguirlo.
+
+Usando ``git commit -a``
+~~~~~~~~~~~~~~~~~~~~~~~~
+Si intentas que tu confirmación siguiente registre todas las modificaciones de los ficheros rastreados en el árbol de trabajo y registre todas las eliminaciones de archivos del árbol de trabajo con `rm` (lo contrario de `git rm`), usa `git commit -a`, que automáticamente notará y registrará todas las eliminaciones. También puedes obtener un efecto similar sin confirmar con `git add -u`.
+
+Usando ``git add -A``
+~~~~~~~~~~~~~~~~~~~~~
+Cuando se acepta un nuevo código para la rama de un proveedor, probablemente querrás registrar tanto las rutas eliminadas como las nuevas, así como las modificaciones a rutas existentes.
+
+Típicamente, eliminarías primero todos los ficheros rastreados del árbol de trabajo usando este comando:
+
+----------------
+git ls-files -z | xargs -0 rm -f
+----------------
+
+y luego descomprimir el código nuevo en el árbol de trabajo. Alternativamente podrías usar un `rsync` que modifique el contenido del árbol de trabajo.
+
+Después de eso, la forma más fácil de registrar todas las eliminaciones, adiciones y modificaciones en el árbol de trabajo es:
+
+----------------
+git add -A
+----------------
+
+Ver linkgit:git-add[1].
+
+Otras maneras
+~~~~~~~~~~~~~
+Si lo que realmente quieres es eliminar del índice los ficheros que ya no están presentes en el árbol de trabajo (quizás porque tu árbol de trabajo esta sucio y ya no puedes usar `git commit -a`) usa el comando siguiente:
+
+----------------
+git diff --name-only --diff-filter=D -z | xargs -0 git rm --cached
+----------------
+
+SUBMÓDULOS
+----------
+Sólo los submódulos que usan un gitfile (lo que significa que fueron clonados con Git versión 1.7.8 o superior) serán eliminados del árbol de trabajo, ya que su repositorio vive dentro del directorio `.git` del superproyecto. Si un submódulo (o uno de ellos anidado dentro de él) aún usa un directorio `.git`, `git rm` moverá el directorio git de submódulos al directorio git del superproyecto para proteger el historial del submódulo. Si ya existe la sección `submodule.<nombre>` en el fichero linkgit:gitmodules[5] también será eliminada y ese fichero será presentado (a menos que se use `--cached` o `-n`).
+
+Un submódulo es considerado actualizado cuando la `HEAD` es la misma que la registrada en el índice, no hay ficheros rastreados modificados y no hay ficheros sin rastreo que no estén ignorados y estén presentes en el árbol de trabajo del submódulo. Los ficheros ignorados son considerados desechables y no impedirán su eliminación del árbol de trabajo de un submódulo.
+
+Si solo quieres eliminar el checkout local de un submódulo de tu árbol de trabajo sin confirmar la eliminación, usa linkgit:git-submodule[1] `deinit` en su lugar. También ver linkgit:gitsubmodules[7] para detalles sobre la eliminación de submódulos.
+
+EJEMPLOS
+--------
+`git rm Documentacion/\*.txt`::
+	Elimina del índice a todos los ficheros `*.txt` que estén en el directorio `Documentación` y cualquiera de sus subdirectorios.
++
+Nótese que el asterisco `*` esta entrecomillado en el shell de este ejemplo; esto le permite a Git, y no al shell, expandir los nombres de rutas de ficheros y subdirectorios bajo el directorio `Documentación/`.
+
+`git rm -f git-*.sh`::
+	Debido a que este ejemplo deja a la shell que expanda el asterisco (ej. estás listando los ficheros explícitamente), no elimina `subdir/git-foo.sh`.
+
+DEFECTOS
+--------
+Each time a superproject update removes a populated submodule (e.g. when switching between commits before and after the removal) a stale submodule checkout will remain in the old location. Removing the old directory is only safe when it uses a gitfile, as otherwise the history of the submodule will be deleted too. This step will be obsolete when recursive submodule update has been implemented.
+
+VER TAMBIÉN
+-----------
+linkgit:git-add[1]
+
+GIT
+---
+Parte de la suite de linkgit:git[1]

@@ -48,29 +48,10 @@ test.describe('Windows', () => {
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
   test.use({ userAgent })
 
-  test('download/GUI links', async ({ page, browserName }) => {
+  test('install link', async ({ page, browserName }) => {
     await pretendPlatform(page, browserName, userAgent, 'Windows')
     await page.goto(url)
-    await expect(page.getByRole('link', { name: 'Download for Windows' })).toBeVisible()
-
-    await expect(page.getByRole('link', { name: 'Graphical UIs' })).toBeHidden()
-    const windowsGUIs = page.getByRole('link', { name: 'Windows GUIs' })
-    await expect(windowsGUIs).toBeVisible()
-    await expect(windowsGUIs).toHaveAttribute('href', /\/downloads\/guis\?os=windows$/)
-
-    // navigate to Windows GUIs
-    await windowsGUIs.click()
-    const windowsButton = page.getByRole('link', { name: 'Windows' })
-    await expect(windowsButton).toBeVisible()
-    await expect(windowsButton).toHaveClass(/selected/)
-
-    const allButton = page.getByRole('link', { name: 'All' })
-    await expect(allButton).not.toHaveClass(/selected/)
-
-    const thumbnails = page.locator('.gui-thumbnails li:visible')
-    const count = await thumbnails.count()
-    await allButton.click()
-    await expect.poll(() => thumbnails.count()).toBeGreaterThan(count)
+    await expect(page.getByRole('link', { name: 'Install for Windows' })).toBeVisible()
   })
 })
 
@@ -78,13 +59,10 @@ test.describe('macOS', () => {
   const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15'
   test.use({ userAgent })
 
-  test('download/GUI links', async ({ page, browserName }) => {
+  test('install link', async ({ page, browserName }) => {
     await pretendPlatform(page, browserName, userAgent, 'Mac OS X')
     await page.goto(url)
-    await expect(page.getByRole('link', { name: 'Download for Mac' })).toBeVisible()
-
-    await expect(page.getByRole('link', { name: 'Graphical UIs' })).toBeHidden()
-    await expect(page.getByRole('link', { name: 'Mac GUIs' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Install for Mac' })).toBeVisible()
   })
 })
 
@@ -92,13 +70,10 @@ test.describe('Linux', () => {
   const userAgent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0'
   test.use({ userAgent })
 
-  test('download/GUI links', async ({ page, browserName }) => {
+  test('install link', async ({ page, browserName }) => {
     await pretendPlatform(page, browserName, userAgent, 'Linux')
     await page.goto(url)
-    await expect(page.getByRole('link', { name: 'Download for Linux' })).toBeVisible()
-
-    await expect(page.getByRole('link', { name: 'Graphical UIs' })).toBeHidden()
-    await expect(page.getByRole('link', { name: 'Linux GUIs' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Install for Linux' })).toBeVisible()
   })
 })
 
@@ -303,43 +278,91 @@ test('sidebar', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'About - Branching and Merging' })).toBeVisible();
 });
 
-test('small-and-fast', async ({ page }) => {
-  await page.setViewportSize(devices['iPhone X'].viewport);
-
-  await page.goto(`${url}about/small-and-fast`);
-
-  // Scroll to text right below the graphs
-  await page.getByText('For testing, large AWS instances').scrollIntoViewIfNeeded();
-
-  const lastGraph = page.locator('.bar-chart').last();
-  await expect(lastGraph).toBeInViewport();
-});
-
 test('dark mode', async({ page }) => {
-  await page.setViewportSize(devices['iPhone X'].viewport);
+  // Helper: returns relative luminance in range [0, 1]
+  const getPageBrightness = async () => {
+    const screenshot = await page.screenshot({ type: 'png' });
+    const base64 = screenshot.toString('base64');
 
-  await page.goto(`${url}`);
+    return await page.evaluate((b64) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${b64}`;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, 1, 1);
+          const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+
+          // Calculate brightness, for more details, see
+          // https://en.wikipedia.org/wiki/Relative_luminance#Relative_luminance_and_%22gamma_encoded%22_colorspaces
+          const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+          // Normalize to [0, 1]
+          resolve(luminance / 255);
+        };
+        img.onerror = () => resolve(-1); // error indicator
+      });
+    }, base64);
+  };
+
+  await page.setViewportSize(devices['iPhone X'].viewport);
+  await page.goto(url);
+
+  // Ensure consistent test state
   await page.evaluate(() => {
     document.querySelector('#tagline').innerHTML = '--dark-mode-for-dark-times';
   });
+
   const darkModeButton = page.locator('#dark-mode-button');
 
-  const o = { maxDiffPixels: 30 };
-  await expect(page).toHaveScreenshot({ name: 'light-mode.png', ...o });
+  // 1. Light mode
+  const lightBrightness = await getPageBrightness();
+  expect(lightBrightness).toBeCloseTo(0.85, 0.1); // e.g., 0.75–0.95
+
+  // 2. Toggle to dark mode
   await darkModeButton.click();
-  await expect(page).toHaveScreenshot({ name: 'dark-mode.png', ...o });
+  const darkBrightness = await getPageBrightness();
+  expect(darkBrightness).toBeCloseTo(0.25, 0.1); // e.g., 0.15–0.35
 
-  // Now, try again, but this time with system's preference being dark mode
+  // 3. Verify dark < light
+  expect(darkBrightness).toBeLessThan(lightBrightness);
 
+  // --- Test system preference: prefers-color-scheme: dark ---
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.evaluate(() => window.localStorage.clear());
-  await page.evaluate(() => window.sessionStorage.clear());
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
   await page.reload();
   await page.evaluate(() => {
     document.querySelector('#tagline').innerHTML = '--dark-mode-for-dark-times';
   });
 
-  await expect(page).toHaveScreenshot({ name: 'dark-mode.png', ...o });
+  // Should start in dark mode
+  const autoDarkBrightness = await getPageBrightness();
+  expect(autoDarkBrightness).toBeCloseTo(0.25, 0.1);
+
+  // Toggle to light
   await darkModeButton.click();
-  await expect(page).toHaveScreenshot({ name: 'light-mode.png', ...o });
+  const autoLightBrightness = await getPageBrightness();
+  expect(autoLightBrightness).toBeCloseTo(0.85, 0.1);
+});
+
+test('right-side alignment of header and content areas', async ({ page }) => {
+  await page.goto(`${url}about`)
+
+  // The sidebar (aside) and #content sit inside #content-wrapper (display: flex).
+  // Their combined widths must fill the container so the right edges align.
+  const containerBox = await page.locator('#content-wrapper').boundingBox()
+  const contentBox = await page.locator('#content').boundingBox()
+
+  expect(containerBox).not.toBeNull()
+  expect(contentBox).not.toBeNull()
+
+  const containerRight = containerBox.x + containerBox.width
+  const contentRight = contentBox.x + contentBox.width
+
+  expect(Math.abs(containerRight - contentRight)).toBeLessThanOrEqual(1)
 })

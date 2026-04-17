@@ -1,0 +1,133 @@
+git-checkout-index(1)
+=====================
+
+NAMN
+----
+git-checkout-index - Kopiera filer från indexet till arbetskatalog
+
+
+SYNOPSIS
+--------
+[verse]
+'git checkout-index' [-u] [-q] [-a] [-f] [-n] [--prefix=<sträng>]
+		   [--stage=<number>|all]
+		   [--temp]
+		   [--ignore-skip-worktree-bits]
+		   [-z] [--stdin]
+		   [--] [<fil>...]
+
+BESKRIVNING
+-----------
+Kopierar alla listade filer från indexet till arbetskatalogen (skriver inte över befintliga filer).
+
+ALTERNATIV
+----------
+-u::
+--index::
+	uppdatera statistikinformation för de utcheckade posterna i indexfilen.
+
+-q::
+--quiet::
+	var tyst om filer finns eller inte finns i indexet
+
+-f::
+--force::
+	tvinga överskrivning av befintliga filer
+
+-a::
+--all::
+	kontrollerar alla filer i indexet förutom de med skip-worktree-biten satt (se `--ignore-skip-worktree-bits`). Kan inte användas tillsammans med explicita filnamn.
+
+-n::
+--no-create::
+	Checka inte ut nya filer, uppdatera bara filer som redan är utcheckade.
+
+--prefix=<sträng>::
+	När du skapar filer, lägg till <sträng> före (vanligtvis en katalog med en avslutande /)
+
+--stage=<nummer>|all::
+	Istället för att checka ut ej sammanslagna poster, kopiera ut filerna från det namngivna steget. <nummer> måste vara mellan 1 och 3. Obs: --stage=all innebär automatiskt --temp.
+
+--temp::
+	Istället för att kopiera filerna till arbetskatalogen, skriv innehållet till temporära filer. De temporära namnassociationerna kommer att skrivas till stdout.
+
+--ignore-skip-worktree-bits::
+	Kolla ut alla filer, inklusive de med skip-worktree-biten uppsatt.
+
+--stdin::
+	Istället för att hämta en lista med sökvägar från kommandoraden, läs listan med sökvägar från standardinmatningen. Sökvägar separeras som standard med LF (dvs. en sökväg per rad).
+
+-z::
+	Endast meningsfullt med `--stdin`; sökvägar separeras med NUL-tecknet istället för LF.
+
+\--::
+	Tolka inte fler argument som alternativ.
+
+Flaggornas ordning brukade spela roll, men inte längre.
+
+Att bara göra `git checkout-index` gör ingenting. Du menade förmodligen `git checkout-index -a`. Och om du vill tvinga fram det, vill du ha `git checkout-index -f -a`.
+
+Intuitivitet är inte målet här. Repeterbarhet är. Anledningen till beteendet "inga argument betyder inget arbete" är att man från skript ska kunna göra:
+
+----------------
+$ find . -name '*.h' -print0 | xargs -0 git checkout-index -f --
+----------------
+
+vilket tvingar alla befintliga `*.h`-filer att ersättas med deras cachade kopior. Om en tom kommandorad antydde "all", skulle detta tvinga fram en uppdatering av allt i indexet, vilket inte var poängen. Men eftersom 'git checkout-index' accepterar --stdin skulle det vara snabbare att använda:
+
+----------------
+$ find . -name '*.h' -print0 | git checkout-index -f -z --stdin
+----------------
+
+`--` är en bra idé när du vet att resten kommer att vara filnamn; det kommer att förhindra problem med ett filnamn på till exempel `-a`. Att använda `--` är förmodligen en bra policy i skript.
+
+
+Använda --temp eller --stage=all
+--------------------------------
+När `--temp` används (eller antyds av `--stage=all`) skapar 'git checkout-index' en temporär fil för varje indexpost som checkas ut. Indexet uppdateras inte med statistikinformation. Dessa alternativ kan vara användbara om anroparen behöver alla steg i alla icke-sammanslagna poster så att de icke-sammanslagna filerna kan bearbetas av ett externt sammanslagningsverktyg.
+
+En lista kommer att skrivas till stdout och tillhandahålla associationen av temporära filnamn till spårade sökvägar. Listformatet har två varianter:
+
+    . tillfälligt namn TAB-sökväg RS
++
+Det första formatet används när `--stage` utelämnas eller inte är `--stage=all`. Fältet tempname är det temporära filnamnet som innehåller filinnehållet och path är det spårade sökvägsnamnet i indexet. Endast de begärda posterna matas ut.
+
+    . steg1temp SP steg2temp SP steg3temp TAB-sökväg RS
++
+Det andra formatet används när `--stage=all`. De tre fälten för temporära steg (steg1temp, steg2temp, steg3temp) listar namnet på den temporära filen om det finns en stegpost i indexet eller `.` om det inte finns någon stegpost. Sökvägar som bara har en steg 0-post kommer alltid att utelämnas från utdata.
+
+I båda formaten är RS (postavgränsaren) som standard nyrad men kommer att vara nullbyte om -z skickades på kommandoraden. De temporära filnamnen är alltid säkra strängar; de kommer aldrig att innehålla katalogavgränsare eller blanksteg. Sökvägsfältet är alltid relativt till den aktuella katalogen och de temporära filnamnen är alltid relativa till den översta katalogen.
+
+Om objektet som kopieras till en temporär fil är en symbolisk länk kommer länkens innehåll att skrivas till en vanlig fil. Det är upp till slutanvändaren eller Porslin att använda denna information.
+
+
+EXEMPEL
+-------
+För att uppdatera och uppdatera endast de filer som redan är utcheckade::
++
+----------------
+$ git checkout-index -n -f -a && git update-index --ignore-missing --refresh
+----------------
+
+Använda 'git checkout-index' för att "exportera ett helt träd"::
+	Prefixfunktionen gör det i princip enkelt att använda 'git checkout-index' som en "export as tree"-funktion. Läs bara in önskat träd i indexet och gör:
++
+----------------
+$ git checkout-index --prefix=git-export-dir/ -a
+----------------
++
+`git checkout-index` kommer att "exportera" indexet till den angivna katalogen.
++
+Den sista "/"-strängen är viktig. Det exporterade namnet har bokstavligen bara den angivna strängen som prefix. Jämför detta med följande exempel.
+
+Exportera filer med ett prefix::
++
+----------------
+$ git checkout-index --prefix=.merged- Makefile
+----------------
++
+Detta kommer att checka ut den för närvarande cachade kopian av `Makefile` i filen `.merged-Makefile`.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

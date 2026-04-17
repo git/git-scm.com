@@ -1,0 +1,714 @@
+git-svn(1)
+==========
+
+NAMN
+----
+git-svn - Dubbelriktad operation mellan ett Subversion-kodförråd och Git
+
+SYNOPSIS
+--------
+[verse]
+'git svn' <kommando> [<flaggor>] [<argument>]
+
+BESKRIVNING
+-----------
+'git svn' är en enkel kanal för ändringsuppsättningar mellan Subversion och Git. Den tillhandahåller ett dubbelriktat flöde av ändringar mellan ett Subversion- och ett Git-förvar.
+
+'git svn' kan spåra ett vanligt Subversion-förvar, genom att följa den vanliga layouten "trunk/branches/tags", med alternativet --stdlayout. Den kan också följa grenar och taggar i vilken layout som helst med alternativen -T/-t/-b (se alternativ för 'init' nedan, och även kommandot 'clone').
+
+När ett Subversion-förvar har spårats (med någon av ovanstående metoder) kan Git-förvaret uppdateras från Subversion med kommandot 'fetch' och Subversion uppdateras från Git med kommandot 'dcommit'.
+
+KOMMANDON
+---------
+
+'init'::
+	Initierar ett tomt Git-förvar med ytterligare metadatakataloger för 'git svn'. Subversion-URL:en kan anges som ett kommandoradsargument eller som fullständiga URL-argument till -T/-t/-b. Valfritt kan målkatalogen som ska användas anges som ett andra argument. Normalt initierar detta kommando den aktuella katalogen.
+
+-T<stam-underkatalog>;;
+--trunk=<stam-underkatalog>;;
+-t<taggar-underkatalog>;;
+--tags=<taggar-underkatalog>;;
+-b<grenar-underkatalog>;;
+--branches=<grenar-underkatalog>;;
+-s;;
+--stdlayout;;
+	Dessa är valfria kommandoradsalternativ för init. Var och en av dessa flaggor kan peka på en relativ sökväg till förvaret (--tags=project/tags) eller en fullständig url (--tags=https://foo.org/project/tags). Du kan ange mer än ett --tags- och/eller --branches-alternativ, ifall ditt Subversion-förvar placerar taggar eller grenar under flera sökvägar. Alternativet --stdlayout är ett förkortat sätt att ställa in trunk,tags,branches som relativa sökvägar, vilket är Subversions standardvärde. Om något av de andra alternativen också anges har de företräde.
+--no-metadata;;
+	Ställ in alternativet 'noMetadata' i konfigurationsfilen [svn-remote]. Det här alternativet rekommenderas inte, läs avsnittet 'svn.noMetadata' på den här manualsidan innan du använder det.
+--use-svm-props;;
+	Ställ in 'useSvmProps' alternativet i [svn-remote] konfigurationsfilen.
+--use-svnsync-props;;
+	Ställ in 'useSvnsyncProps' alternativet i [svn-remote] konfigurationsfilen.
+--rewrite-root=<URL>;;
+	Ställ in 'rewriteRoot' alternativet i [svn-remote] konfigurationsfilen.
+--rewrite-uuid=<UUID>;;
+	Ställ in 'rewriteUUID' alternativet i [svn-remote] konfigurationsfilen.
+--username=<anvädare>;;
+	För transporter som SVN hanterar autentisering för (http, https och vanlig svn), ange användarnamnet. För andra transporter (t.ex. `svn+ssh://`) måste du inkludera användarnamnet i URL:en, t.ex. `svn+ssh://foo@svn.bar.com/project`
+--prefix=<prefix>;;
+	Detta gör det möjligt att ange ett prefix som läggs till före namnen på fjärrer om trunk/branches/tags anges. Prefixet inkluderar inte automatiskt ett avslutande snedstreck, så se till att inkludera ett i argumentet om det är vad du vill. Om --branches/-b anges måste prefixet inkludera ett avslutande snedstreck. Att ange ett prefix (med ett avslutande snedstreck) rekommenderas starkt i vilket fall som helst, eftersom dina SVN-spårningsreferenser då kommer att finnas på "refs/remotes/$prefix/*", vilket är kompatibelt med Gits egen layout för fjärrspårningsreferenser (refs/remotes/$remote/*). Att ange ett prefix är också användbart om du vill spåra flera projekt som delar ett gemensamt arkiv. Som standard är prefixet satt till 'origin/'.
++
+NOTE: Före Git v2.0 var standardprefixet "" (inget prefix). Detta innebar att SVN-spårningsreferenser placerades vid "refs/remotes/*", vilket är inkompatibelt med hur Gits egna fjärrspårningsreferenser är organiserade. Om du fortfarande vill ha den gamla standardprefixen kan du få den genom att skicka `--prefix ""` på kommandoraden (`--prefix=""` kanske inte fungerar om din Perls Getopt::Long är < v2.37).
+
+--ignore-refs=<regex>;;
+	När det skickas till 'init' eller 'clone' kommer detta reguljära uttryck att bevaras som en konfigurationsnyckel. Se 'fetch' för en beskrivning av `--ignore-refs`.
+--ignore-paths=<regex>;;
+	När det skickas till 'init' eller 'clone' kommer detta reguljära uttryck att bevaras som en konfigurationsnyckel. Se 'fetch' för en beskrivning av `--ignore-paths`.
+--include-paths=<regex>;;
+	När det skickas till 'init' eller 'clone' kommer detta reguljära uttryck att bevaras som en konfigurationsnyckel. Se 'fetch' för en beskrivning av `--include-paths`.
+--no-minimize-url;;
+	När man spårar flera kataloger (med hjälp av alternativen --stdlayout, --branches eller --tags) kommer git svn att försöka ansluta till roten (eller den högsta tillåtna nivån) av Subversion-förvaret. Denna standardinställning möjliggör bättre spårning av historik om hela projekt flyttas inom ett förvar, men kan orsaka problem på förvar där läsåtkomstrestriktioner finns. Att skicka `--no-minimize-url` tillåter git svn att acceptera URL:er som de är utan att försöka ansluta till en katalog på högre nivå. Detta alternativ är avstängt som standard när endast en URL/gren spåras (det skulle inte göra någon större nytta).
+
+'fetch'::
+	Hämta ohämtad revisioner från den Subversion-fjärr vi spårar. Namnet på avsnittet [svn-remote "..."] i filen $GIT_DIR/config kan anges som ett valfritt kommandoradsargument.
++
+Detta uppdaterar automatiskt rev_map om det behövs (se '$GIT_DIR/svn/\**/.rev_map.*' i avsnittet FILER nedan för mer information).
+
+--localtime;;
+	Lagra Git-incheckningtider i den lokala tidszonen istället för UTC. Detta gör att 'git log' (även utan --date=local) visar samma tider som 'svn log' skulle göra i den lokala tidszonen.
++
+Detta stör inte samverkan med Subversion-förvaret du klonade från, men om du vill att ditt lokala Git-förvar ska kunna samverka med någon annans lokala Git-förvar, använd antingen inte det här alternativet eller så bör ni båda använda det i samma lokala tidszon.
+
+--parent;;
+	Hämta endast från SVN-föräldern till den aktuella HEAD.
+
+--ignore-refs=<regex>;;
+	Ignorera referenser för grenar eller taggar som matchar det reguljära uttrycket i Perl. En "negativ look-ahead-påstående" som `^refs/remotes/origin/(?!tags/wanted-tag|wanted-branch).*$` kan användas för att endast tillåta vissa referenser.
++
+[verse]
+konfigurationsnyckel: svn-remote.<namn>.ignore-refs
++
+Om konfigurationsnyckeln ignore-refs är angiven och kommandoradsalternativet också anges, kommer båda reguljära uttrycken att användas.
+
+--ignore-paths=<regex>;;
+	Detta gör det möjligt att ange ett reguljärt Perl-uttryck som gör att alla matchande sökvägar hoppas över från utcheckningen från SVN. Alternativet `--ignore-paths` ska matcha för varje 'fetch' (inklusive automatiska hämtningar på grund av 'clone', 'dcommit', 'rebase', etc.) på ett givet förvar.
++
+[verse]
+konfigurationsnyckel: svn-remote.<namn>.ignore-paths
++
+Om konfigurationsnyckeln ignore-paths är inställd och kommandoradsalternativet också anges, kommer båda reguljära uttrycken att användas.
++
+Exempel:
++
+--
+Hoppa över katalogen "doc*" för varje hämtning;;
++
+------------------------------------------------------------------------
+--ignore-paths="^doc"
+------------------------------------------------------------------------
+
+Hoppa över "grenar" och "taggar" i kataloger på första nivån;;
++
+------------------------------------------------------------------------
+--ignore-paths="^[^/]+/(?:branches|tags)"
+------------------------------------------------------------------------
+--
+
+--include-paths=<regex>;;
+	Detta gör det möjligt att ange ett reguljärt Perl-uttryck som gör att endast matchande sökvägar inkluderas vid utcheckning från SVN. Alternativet `--include-paths` ska matcha för varje 'fetch' (inklusive automatiska hämtningar på grund av 'clone', 'dcommit', 'rebase', etc.) på ett givet förvar. `--ignore-paths` har företräde framför `--include-paths`.
++
+[verse]
+konfigurationsnyckel: svn-remote.<namn>.include-paths
+
+--log-window-size=<n>;;
+	Hämta <n> loggposter per begäran vid skanning av Subversionshistorik. Standardvärdet är 100. För mycket stora Subversion-förvar kan större värden behövas för att 'klona'/'hämta' ska slutföras inom rimlig tid. Men alltför stora värden kan leda till högre minnesanvändning och timeouts för begäran.
+
+'clone'::
+	Kör 'init' och 'fetch'. Den skapar automatiskt en katalog baserat på basnamnet på URL:en som skickas till den; eller om ett andra argument skickas; skapar den en katalog och arbetar inom den. Den accepterar alla argument som kommandona 'init' och 'fetch' accepterar; med undantag för `--fetch-all` och `--parent`. Efter att ett arkiv har klonats kommer kommandot 'fetch' att kunna uppdatera revisioner utan att påverka arbetskatalogen; och kommandot 'rebase' kommer att kunna uppdatera arbetskatalogen med de senaste ändringarna.
+
+--preserve-empty-dirs;;
+	Skapa en platshållarfil i det lokala Git-arkivet för varje tom katalog som hämtas från Subversion. Detta inkluderar kataloger som blir tomma genom att ta bort alla poster i Subversion-förvaret (men inte själva katalogen). Platshållarfilerna spåras också och tas bort när de inte längre behövs.
+
+--placeholder-filename=<filnamn>;;
+	Ange namnet på platshållarfiler som skapats av --preserve-empty-dirs. Standard: ".gitignore"
+
+'rebase'::
+	Detta hämtar revisioner från SVN-föräldern till den aktuella HEAD-filen och ombaserar det nuvarande (ej incheckade till SVN) arbetet mot den.
++
+Detta fungerar på liknande sätt som `svn update` eller `git pull` förutom att det bevarar linjär historik med `git rebase` istället för `git merge` för att förenkla dcommitning med `git svn`.
++
+Detta accepterar alla alternativ som 'git svn fetch' och 'git rebase' accepterar. Emellertid hämtar `--fetch-all` bara från den aktuella [svn-remote], och inte alla [svn-remote] definitioner.
++
+Liksom 'git rebase'; detta kräver att arbetskatalogen är ren och inte har några oincheckade ändringar.
++
+Detta uppdaterar automatiskt rev_map om det behövs (se '$GIT_DIR/svn/\**/.rev_map.*' i avsnittet FILER nedan för mer information).
+
+-l;;
+--local;;
+	Hämta inte på distans; kör endast 'git rebase' mot den senast hämtade incheckningen från uppströms SVN.
+
+'dcommit'::
+	Checka-in varje diff från den aktuella grenen direkt till SVN-förvaret och ombasera eller återställ sedan (beroende på om det finns en diff mellan SVN och head). Detta skapar en revision i SVN för varje incheckning i Git.
++
+När ett valfritt Git-grennamn (eller ett Git inchecknings-objektnamn) anges som ett argument, fungerar delkommandot på den angivna grenen, inte på den aktuella grenen.
++
+Användning av 'dcommit' är att föredra framför 'set-tree' (nedan).
++
+--no-rebase;;
+	Efter checkat-in, gör inte ombasering eller återställning.
+--commit-url <URL>;;
+	Incheckning till denna SVN-URL (den fullständiga sökvägen). Detta är avsett att tillåta att befintliga 'git svn'-förvar som skapats med en transportmetod (t.ex. `svn://` eller `http://` för anonym läsning) återanvänds om en användare senare ges åtkomst till en alternativ transportmetod (t.ex. `svn+ssh://` eller `https://`) för incheckning.
++
+[verse]
+konfigurationsnyckel: svn-remote.<namn>.commiturl
+konfigurationsnyckel: svn.commiturl (skriver över alla svn-remote.<namn>.commiturl-alternativ)
++
+Observera att SVN-URL:en för incheckningsurl-konfigurationsnyckeln inkluderar SVN-grenen. Om du hellre vill ange incheckning-URL:en för ett helt SVN-förvar, använd svn-remote.<namn>.pushurl istället.
++
+Att använda detta alternativ för något annat ändamål (fråga inte) avråds starkt.
+
+--mergeinfo=<sammanslagningsinfo>;;
+	Lägg till den givna sammanslagings-informationen under dcommit (t.ex. `--mergeinfo="/branches/foo:1-10"`). Alla svn-serverversioner kan lagra denna information (som en egenskap), och svn-klienter från och med version 1.5 kan använda den. För att ange sammanslagings-information från flera grenar, använd ett enda mellanslag mellan grenarna (`--mergeinfo="/branches/foo:1-10 /branches/bar:3,5-6,8"`)
++
+[verse]
+konfigurationsnyckel: svn.pushmergeinfo
++
+Det här alternativet gör att git-svn försöker automatiskt fylla i egenskapen svn:mergeinfo i SVN-förvaret när det är möjligt. För närvarande kan detta bara göras vid dcommit av icke-snabbspola-sammanslagningar där alla föräldrar utom den första redan har skickats in i SVN.
+
+--interactive;;
+	Be användaren att bekräfta att en patchuppsättning faktiskt ska skickas till SVN. För varje patch kan man svara "ja" (acceptera denna patch), "nej" (kassera denna patch), "alla" (acceptera alla patchar) eller "avsluta".
++
+'git svn dcommit' returnerar omedelbart om svaret är "nej" eller "avsluta", utan att checka-in något till SVN.
+
+'branch'::
+	Skapa en gren i SVN-förvaret.
+
+-m;;
+--message;;
+	Tillåter att ange inchecknings-meddelandet.
+
+-t;;
+--tag;;
+	Skapa en tagg genom att använda tags_subdir istället för branches_subdir som angavs under git svn init.
+
+-d<sökväg>;;
+--destination=<sökväg>;;
+
+	Om fler än ett --branches (eller --tags)-alternativ har angetts för kommandot 'init' eller 'clone' måste du ange platsen för den gren (eller tagg) du vill skapa i SVN-förvaret. <sökväg> anger vilken sökväg som ska användas för att skapa grenen eller taggen och ska matcha mönstret till vänster om en av de konfigurerade grenarnas eller taggarnas refspecs. Du kan se dessa refspecs med kommandona
++
+	git config --get-all svn-remote.<namn>.branches git config --get-all svn-remote.<namn>.tags
++
+där <namn> är namnet på SVN-arkivet som anges av -R-alternativet till 'init' (eller "svn" som standard).
+
+--username;;
+	Ange SVN-användarnamnet som incheckning ska utföras som. Det här alternativet åsidosätter konfigurationsegenskapen 'användarnamn'.
+
+--commit-url;;
+	Använd den angivna URL:en för att ansluta till Subversion-målfövaret. Detta är användbart i fall där käll-SVN-förvaret är skrivskyddat. Det här alternativet åsidosätter konfigurationsegenskapen 'commiturl'.
++
+	git config --get-all svn-remote.<namn>.commiturl
++
+
+--parents;;
+	Skapa överordnade mappar. Den här parametern motsvarar parametern --parents på svn cp-kommandon och är användbar för icke-standardiserade förvars-layouter.
+
+'tag'::
+	Skapa en tagg i SVN-förvaret. Detta är en förkortning för 'branch -t'.
+
+'log'::
+	Detta borde göra det enkelt att slå upp svn-loggmeddelanden när svn-användare hänvisar till -r/--revisionsnummer.
++
+Följande funktioner från `svn log' stöds:
++
+--
+-r <n>[:<n>];;
+--revision=<n>[:<n>];;
+	stöds, icke-numeriska argument stöds inte: HEAD, NEXT, BASE, PREV, etc ...
+-v;;
+--verbose;;
+	Det är inte helt kompatibelt med --verbose-utdata i svn-loggen, men relativt nära.
+--limit=<n>;;
+	är INTE samma sak som --max-count, räknar inte sammanslagna/exkluderade incheckningar
+--incremental;;
+	stöds
+--
++
+Nya funktioner:
++
+--
+--show-commit;;
+	visar även Git incheckning sha1
+--oneline;;
+	vår version av --pretty=oneline
+--
++
+NOTE: SVN lagrar bara tider i UTC och inget annat. Den vanliga svn-klienten konverterar UTC-tiden till lokal tid (eller baserat på TZ=-miljön). Det här kommandot har samma beteende.
++
+Alla andra argument skickas direkt till 'git log'
+
+'blame'::
+	Visa vilken version och författare som senast ändrade varje rad i en fil. Utdata från detta läge är som standard formatkompatibel med utdata från `svn blame'. Precis som med SVN blame-kommandot ignoreras lokala, obekräftade ändringar i arbetskatalogen; versionen av filen i HEAD-versionen antecknas. Okända argument skickas direkt till 'git blame'.
++
+--git-format;;
+	Producera utdata i samma format som 'git blame', men med SVN-revisionsnummer istället för Git inchecknings-hashar. I det här läget visas ändringar som inte har incheckats till SVN (inklusive lokala redigeringar av arbetskopior) som revision 0.
+
+'find-rev'::
+	När ett SVN-revisionsnummer av formen 'rN' ges, returneras motsvarande Git inchecknings-hash (detta kan valfritt följas av ett träd-liknande tecken för att ange vilken gren som ska genomsökas). När ett träd-liknande tecken ges, returneras motsvarande SVN-revisionsnummer.
++
+-B;;
+--before;;
+	Kräv inte en exakt matchning om det ges en SVN-revision, hitta istället den incheckning som motsvarar tillståndet för SVN-repositoriet (på den aktuella grenen) vid den angivna revisionen.
++
+-A;;
+--after;;
+	Kräv inte en exakt matchning om det ges en SVN-revision; om det inte finns en exakt matchning returnera den närmaste matchningen vid sökning framåt i historiken.
+
+'set-tree'::
+	Du bör överväga att använda 'dcommit' istället för det här kommandot. Kommit angivna incheckning- eller trädobjekt till SVN. Detta kräver att dina importerade hämtningsdata är uppdaterade. Detta gör absolut inga försök att göra patchar vid incheckning till SVN, det skriver helt enkelt över filer med de som anges i trädet eller incheckningen. All sammanslagning antas ha skett oberoende av 'git svn'-funktioner.
+
+'create-ignore'::
+	Hittar rekursivt egenskaperna svn:ignore och svn:global-ignores i kataloger och skapar matchande .gitignore-filer. De resulterande filerna köade för att checkas-in, men är inte incheckade. Använd -r/--revision för att referera till en specifik revision.
+
+'show-ignore'::
+	Söker rekursivt efter och listar egenskaperna svn:ignore och svn:global-ignores i kataloger. Utdata är lämpliga för att läggas till i filen $GIT_DIR/info/exclude.
+
+'mkdirs'::
+	Försöker återskapa tomma kataloger som Git inte kan spåra baserat på information i $GIT_DIR/svn/<refnamn>/unhandled.log-filer. Tomma kataloger återskapas automatiskt när "git svn clone" och "git svn rebase" används, så "mkdirs" är avsedd att användas efter kommandon som "git checkout" eller "git reset". (Se konfigurationsfilsalternativet svn-remote.<namn>.automkdirs för mer information.)
+
+'commit-diff'::
+	Bekräftar skillnaden mellan två träd-igta argument från kommandoraden. Detta kommando förlitar sig inte på att finnas inuti ett `git svn init`-redigerat förvar. Detta kommando tar tre argument, (a) det ursprungliga trädet att differa mot, (b) det nya trädresultatet, (c) URL:en till Subversion-målförvaret. Det sista argumentet (URL:en) kan utelämnas om du arbetar från ett 'git svn'-medvetet förvar (som har `initierats` med 'git svn'). Alternativet -r<revision> krävs för detta.
++
+Inchecknings-meddelandet levereras antingen direkt med alternativet `-m` eller `-F`, eller indirekt från taggen eller incheckning när den andra träd-igt betecknar ett sådant objekt, eller så begärs det genom att anropa en editor (se alternativet `--edit` nedan).
+
+-m <medd>;;
+--message=<medd>;;
+	Använd det givna `medd` som inchecknings-meddelande. Det här alternativet inaktiverar alternativet `--edit`.
+
+-F <filnamn>;;
+--file=<filnamn>;;
+	Hämta inchecknings-meddelandet från den givna filen. Det här alternativet inaktiverar alternativet `--edit`.
+
+'info'::
+	Visar information om en fil eller katalog liknande den som `svn info' tillhandahåller. Stöder för närvarande inte argumentet -r/--revision. Använd alternativet --url för att endast mata ut värdet från fältet 'URL:'.
+
+'proplist'::
+	Listar egenskaperna som lagras i Subversion-förvaret för en given fil eller katalog. Använd -r/--revision för att referera till en specifik Subversion-revision.
+
+'propget'::
+	Hämtar Subversion-egenskapen som första argument för en fil. En specifik revision kan anges med -r/--revision.
+
+'propset'::
+	Ställer in Subversion-egenskapen som anges som det första argumentet, till värdet som anges som det andra argumentet för filen som anges som det tredje argumentet.
++
+Exempel:
++
+------------------------------------------------------------------------
+git svn propset svn:keywords "FreeBSD=%H" devel/py-tipper/Makefile
+------------------------------------------------------------------------
++
+Detta kommer att ställa in egenskapen 'svn:keywords' till 'FreeBSD=%H' för filen 'devel/py-tipper/Makefile'.
+
+'show-externals'::
+	Visar Subversions externa element. Använd -r/--revision för att ange en specifik revision.
+
+'gc'::
+	Komprimera $GIT_DIR/svn/<refnamn>/unhandled.log filerna och ta bort $GIT_DIR/svn/<refnamn>/index-filerna.
+
+'reset'::
+	Ångrar effekterna av 'fetch' (hämta) tillbaka till den angivna revisionen. Detta låter dig åter-'fetch' en SVN-revision. Normalt sett bör innehållet i en SVN-revision aldrig ändras och 'återställ' bör inte vara nödvändigt. Men om SVN-behörigheter ändras, eller om du ändrar alternativet --ignore-paths, kan en 'hämtning' misslyckas med "hittades inte i incheckning" (filen var inte synlig tidigare) eller "checksumma missmatchning" (en ändring missades). Om problemfilen inte kan ignoreras för alltid (med --ignore-paths) är det enda sättet att reparera repo att använda 'återställ'.
++
+Endast rev_map och refs/remotes/git-svn ändras (se '$GIT_DIR/svn/\**/.rev_map.*' i avsnittet FILER nedan för detaljer). Följ 'reset' med en 'fetch' och sedan 'git reset' eller 'git rebase' för att flytta lokala grenar till det nya trädet.
+
+-r <n>;;
+--revision=<n>;;
+	Ange den senaste versionen som ska behållas. Alla senare versioner ignoreras.
+-p;;
+--parent;;
+	Släng även den angivna revisionen och behåll istället den närmaste föräldern.
+Exempel:;;
+Anta att du har lokala ändringar i "master", men att du behöver hämta "r2" på nytt.
++
+------------
+    r1---r2---r3 remotes/git-svn
+                \
+                 A---B master
+------------
++
+Åtgärda problemet med ignore-paths eller SVN-behörigheter som orsakade att "r2" var ofullständig från första början. Sedan:
++
+[verse]
+git svn reset -r2 -p
+git svn fetch
++
+------------
+    r1---r2'--r3' remotes/git-svn
+      \
+       r2---r3---A---B master
+------------
++
+Fixa sedan "master" med 'git rebase'. Använd INTE 'git merge', annars kommer din historik inte att vara kompatibel med en framtida 'dcommit'!
++
+[verse]
+git rebase --onto remotes/git-svn A^ master
++
+------------
+    r1---r2'--r3' remotes/git-svn
+                \
+                 A'--B' master
+------------
+
+ALTERNATIV
+----------
+
+--shared[=(false|true|umask|group|all|world|everybody)]::
+--template=<mall-katalog>::
+	Används endast med kommandot 'init'. Dessa skickas direkt till 'git init'.
+
+-r <arg>::
+--revision <arg>::
+	   Används med 'fetch' kommandot.
++
+Detta möjliggör stöd för revisionsintervall för partiell/kauteriserad historik. $NUMBER, $NUMBER1:$NUMBER2 (numeriska intervall), $NUMBER:HEAD och BASE:$NUMBER stöds alla.
++
+Detta kan tillåta dig att skapa partiella speglingar när du kör hämtning; men rekommenderas generellt inte eftersom historiken kommer att hoppas över och förloras.
+
+-::
+--stdin::
+	Används endast med kommandot 'set-tree'.
++
+Läs en lista med incheckningar från stdin och checka-in dem i omvänd ordning. Endast den inledande sha1 läses från varje rad, så utdata från 'git rev-list --pretty=oneline' kan användas.
+
+--rmdir::
+	Används endast med kommandona 'dcommit', 'set-tree' och 'commit-diff'.
++
+Ta bort kataloger från SVN-trädet om det inte finns några filer kvar. SVN kan versionsläsa tomma kataloger, och de tas inte bort som standard om det inte finns några filer kvar i dem. Git kan inte versionsläsa tomma kataloger. Om du aktiverar den här flaggan kommer incheckning till SVN att agera som Git.
++
+[verse]
+konfigurationsnyckel: svn.rmdir
+
+-e::
+--edit::
+	Används endast med kommandona 'dcommit', 'set-tree' och 'commit-diff'.
++
+Redigera inchecknings-meddelandet innan det checkas-in till SVN. Detta är avstängt som standard för objekt som är incheckningar och tvingas aktiverat vid incheckning av trädobjekt.
++
+[verse]
+konfigurationsnyckel: svn.edit
+
+-l<num>::
+--find-copies-harder::
+	Används endast med kommandona 'dcommit', 'set-tree' och 'commit-diff'.
++
+Båda skickas direkt till 'git diff-tree'; se linkgit:git-diff-tree[1] för mer information.
++
+[verse]
+konfigurationsnyckel: svn.l
+konfigurationsnyckel: svn.findcopiesharder
+
+-A<filnamn>::
+--authors-file=<filnamn>::
+	Syntaxen är kompatibel med filen som används av 'git cvsimport' men en tom e-postadress kan anges med '<>':
++
+------------------------------------------------------------------------
+	loginname = Joe User <user@example.com>
+------------------------------------------------------------------------
++
+Om det här alternativet anges och 'git svn' stöter på ett SVN-incheckare-namn som inte finns i authors-filen, kommer 'git svn' att avbryta åtgärden. Användaren måste då lägga till lämplig post. Att köra det föregående 'git svn'-kommandot igen efter att authors-filen har ändrats bör fortsätta åtgärden.
++
+[verse]
+konfigurationsnyckel: svn.authorsfile
+
+--authors-prog=<filnamn>::
+	Om det här alternativet anges, körs filen med incheckare-namnet som första argument för varje SVN-incheckare-namn som inte finns i authors-filen. Programmet förväntas returnera en enda rad av formen "Namn <e-postadress>" eller "Namn <>", vilken kommer att behandlas som om den inkluderades i authors-filen.
++
+Av historiska skäl söks först ett relativt 'filnamn' relativt till den aktuella katalogen för 'init' och 'clone' och relativt till roten av arbetskatalogen för 'fetch'. Om 'filnamn' inte hittas söks det som vilket annat kommando som helst i '$PATH'.
++
+[verse]
+konfigurationsnyckel: svn.authorsProg
+
+-q::
+--quiet::
+	Gör 'git svn' mindre utförlig. Specificera en andra gång för att göra det ännu mindre utförligt.
+
+-m::
+--merge::
+-s<strategi>::
+--strategy=<strategi>::
+-p::
+--rebase-merges::
+	Dessa används endast med kommandona 'dcommit' och 'rebase'.
++
+Skickas direkt till 'git rebase' när 'dcommit' används om en 'git reset' inte kan användas (se 'dcommit').
+
+-n::
+--dry-run::
+	Detta kan användas med kommandona 'dcommit', 'rebase', 'branch' och 'tag'.
++
+För 'dcommit', skriv ut serien med Git-argument som skulle visa vilka diffs som skulle checkats-in till SVN.
++
+För 'rebase', visa den lokala grenen som är associerad med det uppströms svn-förvaret som är associerat med den aktuella grenen och URL:en för det svn-förvar som ska hämtas från.
++
+För 'branch' och 'tag', visa de webbadresser som ska användas för kopiering när grenen eller taggen skapas.
+
+--use-log-author::
+	När du hämtar svn-incheckningar till Git (som en del av operationerna 'fetch', 'rebase' eller 'dcommit'), leta efter den första `From:`-raden eller `Signed-off-by`-trailern i loggmeddelandet och använd den som författarsträng.
++
+[verse]
+konfigurationsnyckel: svn.useLogAuthor
+
+--add-author-from::
+	När du checkar-in till svn från Git (som en del av 'set-tree'- eller 'dcommit'-operationer), och om det befintliga loggmeddelandet inte redan har en `From:`- eller `Signed-off-by`-trailer, lägg till en `From:`-rad baserat på Git-incheckningens författarsträng. Om du använder detta kommer `--use-log-author` att hämta en giltig författarsträng för alla incheckningar.
++
+[verse]
+konfigurationsnyckel: svn.addAuthorFrom
+
+AVANCERADE ALTERNATIV
+---------------------
+
+-i<GIT_SVN_ID>::
+--id <GIT_SVN_ID>::
+	Detta ställer in GIT_SVN_ID (istället för att använda miljön). Detta gör det möjligt för användaren att åsidosätta standardreferensnamnet som hämtas från när en enskild URL spåras. Kommandona 'log' och 'dcommit' kräver inte längre denna växel som argument.
+
+-R<fjärr-namn>::
+--svn-remote <fjärr-namn>::
+	Ange avsnittet [svn-remote "<fjärr-namn>"] som ska användas, detta gör att flera SVN-arkiv kan spåras. Standard: "svn"
+
+--follow-parent::
+	Det här alternativet är endast relevant om vi spårar grenar (med hjälp av ett av layoutflaggor för förvar --trunk, --tags, --branches, --stdlayout). För varje spårad gren, försök att ta reda på var dess version kopierades ifrån och ange en lämplig förälder i den första Git-incheckningen för grenen. Detta är särskilt användbart när vi spårar en katalog som har flyttats runt inom förvaret. Om den här funktionen är inaktiverad kommer grenarna som skapats av 'git svn' alla att vara linjära och inte dela någon historik, vilket innebär att det inte kommer att finnas någon information om var grenar förgrenades eller slogs samman. Att följa långa/komplicerade historiker kan dock ta lång tid, så att inaktivera den här funktionen kan påskynda kloningsprocessen. Den här funktionen är aktiverad som standard, använd --no-follow-parent för att inaktivera den.
++
+[verse]
+konfigurationsnyckel: svn.followparent
+
+CONFIG FILE-ONLY OPTIONS
+------------------------
+
+svn.noMetadata::
+svn-remote.<namn>.noMetadata::
+	Detta tar bort raderna 'git-svn-id:' i slutet av varje incheckning.
++
+Det här alternativet kan bara användas för engångsimporter eftersom 'git svn' inte kommer att kunna hämtas igen utan metadata. Om du dessutom förlorar dina '$GIT_DIR/svn/\**/.rev_map.*'-filer kommer 'git svn' inte att kunna återskapa dem.
++
+Kommandot 'git svn log' fungerar inte heller på förvar som använder detta. Att använda detta konflikt med alternativet 'useSvmProps' av (förhoppningsvis) uppenbara skäl.
++
+Det här alternativet rekommenderas INTE eftersom det gör det svårt att spåra gamla referenser till SVN-revisionsnummer i befintlig dokumentation, felrapporter och arkiv. Om du planerar att så småningom migrera från SVN till Git och är säker på att ta bort SVN-historiken, överväg https://github.com/newren/git-filter-repo[git-filter-repo] istället. filter-repo tillåter också omformatering av metadata för att underlätta läsning och omskrivning av författarskapsinformation för användare som inte har "svn.authorsFile".
+
+svn.useSvmProps::
+svn-remote.<namn>.useSvmProps::
+	Detta gör det möjligt för 'git svn' att ommappa förvarets URL:er och UUID:er från speglar skapade med SVN::Mirror (eller svk) för metadata.
++
+Om en SVN-revision har egenskapen "svm:headrev" är det troligt att revisionen skapades av SVN::Mirror (som även används av SVK). Egenskapen innehåller ett UUID för arkivet och en revision. Vi vill att det ska se ut som att vi speglar den ursprungliga URL:en, så vi introducerar en hjälpfunktion som returnerar den ursprungliga identitets-URL:en och UUID:t, och använder den när vi genererar metadata i inchecknings-meddelanden.
+
+svn.useSvnsyncProps::
+svn-remote.<namn>.useSvnsyncprops::
+	Liknar alternativet useSvmProps; detta är för användare av kommandot svnsync(1) som distribueras med SVN 1.4.x och senare.
+
+svn-remote.<namn>.rewriteRoot::
+	Detta gör det möjligt för användare att skapa förvar från alternativa URL:er. Till exempel kan en administratör köra 'git svn' lokalt på servern (åtkomst via file://) men vilja distribuera förvaret med en offentlig http://- eller svn://-URL i metadata så att användarna ser den offentliga URL:en.
+
+svn-remote.<namn>.rewriteUUID::
+	Liknar alternativet useSvmProps; detta är för användare som behöver mappa om UUID manuellt. Detta kan vara användbart i situationer där det ursprungliga UUID inte är tillgängligt via vare sig useSvmProps eller useSvnsyncProps.
+
+svn-remote.<namn>.pushurl::
+
+	I likhet med Gits `remote.<namn>.pushurl` är denna nyckel utformad för att användas i fall där 'url' pekar till ett SVN-förvar via en skrivskyddad transport, för att tillhandahålla en alternativ läs-/skrivtransport. Det antas att båda nycklarna pekar till samma förvar. Till skillnad från 'commiturl' är 'pushurl' en bassökväg. Om antingen 'commiturl' eller 'pushurl' kan användas, har 'commiturl' företräde.
+
+svn.brokenSymlinkWorkaround::
+	Detta inaktiverar potentiellt dyra kontroller för att kringgå trasiga symboliska länkar som checkats in i SVN av trasiga klienter. Ställ in det här alternativet till "false" om du spårar ett SVN-arkiv med många tomma blobbar som inte är symboliska länkar. Det här alternativet kan ändras medan 'git svn' körs och träda i kraft vid nästa hämtade version. Om det inte är inställt antar 'git svn' att det här alternativet är "sant".
+
+svn.pathnameencoding::
+	Detta instruerar git svn att omkoda sökvägar till en given kodning. Det kan användas av Windows-användare och av de som arbetar i icke-UTF8-språk för att undvika korrupta filnamn med icke-ASCII-tecken. Giltiga kodningar är de som stöds av Perls Encode-modul.
+
+svn-remote.<namn>.automkdirs::
+	Normalt sett försöker kommandona "git svn clone" och "git svn rebase" att återskapa tomma kataloger som finns i Subversion-förvaret. Om det här alternativet är satt till "false" kommer tomma kataloger endast att skapas om kommandot "git svn mkdirs" körs explicit. Om det inte är satt antar 'git svn' att det här alternativet är "sant".
+
+Eftersom alternativen noMetadata, rewriteRoot, rewriteUUID, useSvnsyncProps och useSvmProps alla påverkar metadata som genereras och används av 'git svn', *måste* de ställas in i konfigurationsfilen innan någon historik importeras och dessa inställningar bör aldrig ändras när de väl är inställda.
+
+Dessutom kan endast ett av dessa alternativ användas per svn-remote-sektion eftersom de påverkar metadataraden 'git-svn-id:', förutom rewriteRoot och rewriteUUID som kan användas tillsammans.
+
+
+GRUNDLÄGGANDE EXEMPEL
+---------------------
+
+Spåra och bidra till Spåra och bidra till stam-strukturen (trunk) för ett Subversion-hanterat projekt (ignorera taggar och grenar):
+
+------------------------------------------------------------------------
+# Klona ett repo (som git clone):
+	git svn clone http://svn.example.com/project/trunk
+# Ange den nyligen klonade katalogen:
+	cd trunk
+# Du bör vara på master branch, dubbelkolla med 'git branch'
+	git branch
+# Gör lite arbete och incheckning lokalt till Git:
+	git commit ...
+# Något är incheckat till SVN, ombasera dina lokala ändringar mot de
+# senaste ändringarna i SVN:
+	git svn rebase
+# Checka nu in dina ändringar (som tidigare incheckning med Git) till SVN,
+# samt uppdatera automatiskt din fungerande HEAD:
+	git svn dcommit
+# Lägg till svn:ignore och svn:global-ignores inställningar till standard Git exclude-filen:
+	git svn show-ignore >> .git/info/exclude
+------------------------------------------------------------------------
+
+Spåra och bidra till ett helt Subversion-hanterat projekt (komplett med en trunk, taggar och grenar):
+
+------------------------------------------------------------------------
+# Klona ett förvar med standard SVN-kataloglayout (som git clone):
+	git svn clone http://svn.example.com/project --stdlayout --prefix svn/
+# Eller, om förvaret använder en icke-standardiserad kataloglayout:
+	git svn clone http://svn.example.com/project -T tr -b branch -t tag --prefix svn/
+# Visa alla grenar och taggar du har klonat:
+	git branch -r
+# Skapa en ny gren i SVN
+	git svn branch waldo
+# Återställ din master till trunk (eller någon annan gren, ersätt 'trunk'
+# med lämpligt namn):
+	git reset --hard svn/trunk
+# Du kan bara dcommit till en gren/tagg/trunk åt gången. Användningen
+# av dcommit/rebase/show-ignore bör vara densamma som ovan.
+------------------------------------------------------------------------
+
+Den initiala 'git svn clone' kan vara ganska tidskrävande (särskilt för stora Subversion-förvar). Om flera personer (eller en person med flera maskiner) vill använda 'git svn' för att interagera med samma Subversion-förvar, kan du göra den initiala 'git svn clone' till ett förvar på en server och låta varje person klona det förvar med 'git clone':
+
+------------------------------------------------------------------------
+# Gör den initiala importen på en server
+	ssh server "cd /pub && git svn clone http://svn.example.com/project [options...]"
+# Klona lokalt - se till att refs/remotes/-utrymmet matchar serverns
+	mkdir project
+	cd project
+	git init
+	git remote add origin server:/pub/project
+	git config --replace-all remote.origin.fetch '+refs/remotes/*:refs/remotes/*'
+	git fetch
+# Förhindra fetch/pull från fjärr-Git-servern i framtiden,
+# vi vill bara använda git svn för framtida uppdateringar
+	git config --remove-section remote.origin
+# Skapa en lokal gren från en av de grenar som just hämtats
+	git checkout -b master FETCH_HEAD
+# Initiera 'git svn' lokalt (se till att använda samma URL och
+# --stdlayout/-T/-b/-t/--prefix alternativ som användes på servern)
+	git svn init http://svn.example.com/project [options...]
+# Hämta de senaste ändringarna från Subversion
+	git svn rebase
+------------------------------------------------------------------------
+
+REBASE MOT PULL/MERGE
+---------------------
+Föredra att använda 'git svn rebase' eller 'git rebase', snarare än 'git pull' eller 'git merge' för att synkronisera ointegrerade incheckningar med en 'git svn'-gren. Genom att göra det hålls historiken för ointegrerade incheckningar linjär i förhållande till SVN-förvaret uppströms och tillåts användning av det föredragna underkommandot 'git svn dcommit' för att skicka tillbaka ointegrerade incheckningar till SVN.
+
+Ursprungligen rekommenderade 'git svn' att utvecklare skulle hämta eller sammanslå från grenen 'git svn'. Detta berodde på att författaren föredrog `git svn set-tree B` för att checka-in ett enda huvud snarare än `git svn set-tree A..B`-notationen för att checka-in flera incheckningar. Användning av 'git pull' eller 'git merge' med `git svn set-tree A..B` kommer att göra att icke-linjär historik plattas ut vid incheckning i SVN och detta kan leda till att sammanslagnings-incheckningar oväntat återställer tidigare incheckningar i SVN.
+
+SAMMANSLAGNINGSSPÅRNING
+-----------------------
+Även om 'git svn' kan spåra kopieringshistorik (inklusive grenar och taggar) för kodförråd som använder en standardlayout, kan den ännu inte representera sammanslagningshistorik som skett inuti git tillbaka uppströms till SVN-användare. Därför rekommenderas det att användare håller historiken så linjär som möjligt inuti Git för att underlätta kompatibiliteten med SVN (se avsnittet FÖRBEHÅLL nedan).
+
+HANTERING AV SVN-GRENAR
+-----------------------
+Om 'git svn' är konfigurerad för att hämta grenar (och --follow-branches är aktivt), skapar den ibland flera Git-grenar för en SVN-gren, där de ytterligare grenarna har namn av formen 'branchname@nnn' (med nnn ett SVN-revisionsnummer). Dessa ytterligare grenar skapas om 'git svn' inte kan hitta en överordnad incheckning för den första incheckningen i en SVN-gren, för att koppla grenen till historiken för de andra grenarna.
+
+Normalt sett, består den första incheckningen i en SVN-gren av en kopieringsoperation. 'git svn' läser denna incheckning för att hämta SVN-revisionen som grenen skapades från. Den försöker sedan hitta Git-incheckningen som motsvarar denna SVN-revision och använder den som förälder till grenen. Det är dock möjligt att det inte finns någon lämplig Git-incheckning som kan fungera som förälder. Detta händer bland annat om SVN-grenen är en kopia av en revision som inte hämtades av 'git svn' (t.ex. för att det är en gammal revision som hoppades över med `--revision`), eller om en katalog kopierades i SVN som inte spåras av 'git svn' (t.ex. en gren som inte spåras alls, eller en underkatalog till en spårad gren). I dessa fall kommer 'git svn' fortfarande att skapa en Git-gren, men istället för att använda en befintlig Git-incheckning som förälder till grenen, kommer den att läsa SVN-historiken för katalogen som grenen kopierades från och skapa lämpliga Git-incheckningar. Detta indikeras av meddelandet "Initierar förälder: <grennamn>".
+
+Dessutom skapas en speciell gren med namnet '<branchname>@<SVN-Revision>', där <SVN-Revision> är SVN-revisionsnumret som grenen kopierades från. Denna gren pekar på den nyskapade föräldra-incheckningen för grenen. Om grenen i SVN raderades och senare återskapades från en annan version, kommer det att finnas flera sådana grenar med ett '@'.
+
+Observera att detta kan innebära att flera Git-incheckningar skapas för en enda SVN-revision.
+
+Ett exempel: i ett SVN-förvar med en standardlayout för trunk/tags/branches skapas en katalog trunk/sub i r.100. I r.200 förgrenas trunk/sub genom att kopieras till branches/. 'git svn clone -s' skapar sedan en gren 'sub'. Den skapar också nya Git-incheckningar för r.100 till r.199 och använder dessa som historik för grenen 'sub'. Således kommer det att finnas två Git-incheckningar för varje revision från r.100 till r.199 (en som innehåller trunk/, en som innehåller trunk/sub/). Slutligen skapar den en gren 'sub@200' som pekar på den nya överordnade incheckningen för grenen 'sub' (dvs. incheckningen för r.200 och trunk/sub/).
+
+FÖRBEHÅLL
+---------
+
+För enkelhetens skull och för att interagera med Subversion rekommenderas det att alla 'git svn'-användare klonar, hämtar och dcommitar direkt från SVN-servern, och undviker alla 'git clone'/'pull'/'merge'/'push'-operationer mellan Git-förvar och grenar. Den rekommenderade metoden för att utbyta kod mellan Git-grenar och användare är 'git format-patch' och 'git am', eller bara 'dcommit' till SVN-förvaret.
+
+Att köra 'git merge' eller 'git pull' rekommenderas INTE på en gren du planerar att 'dcommit' från eftersom Subversion-användare inte kan se några sammanslagingar du har gjort. Dessutom, om du sammanslår (merge) eller drar (pull) från en Git-gren som är en spegel av en SVN-gren, kan 'dcommit' checka-in till fel gren.
+
+Om du sammanslår (merge), observera följande regel: 'git svn dcommit' kommer att försöka checka-in ovanpå SVN-incheckningen som namnges i
+
+------------------------------------------------------------------------
+git log --grep=^git-svn-id: --first-parent -1
+------------------------------------------------------------------------
+
+Du 'måste' därför se till att den senaste inchecknings-filen för den gren du vill dcommit:a till är den 'första' föräldern till sammanslagingen. Annars kommer det att bli kaos, särskilt om den första föräldern är en äldre incheckning på samma SVN-gren.
+
+'git clone' klonar inte grenar under hierarkin refs/remotes/ eller någon 'git svn'-metadata eller konfiguration. Så förvar som skapats och hanteras med 'git svn' bör använda 'rsync' för kloning, om kloning ska göras överhuvudtaget.
+
+Eftersom 'dcommit' använder ombasering (reabse) internt, kommer alla Git-grenar som du 'git push' till före 'dcommit' att kräva att den befintliga referensen på fjärrförvaret överskrivs. Detta anses generellt vara dålig praxis, se dokumentationen för linkgit:git-push[1] för mer information.
+
+Använd inte --amend alternativet i linkgit:git-commit[1] på en ändring som du redan har dcommitat. Det anses vara dålig praxis att --amend incheckningar som du redan har pushat till ett fjärrförvar för andra användare, och dcommit med SVN är analogt med det.
+
+När man klonar ett SVN-förvar, om inget av alternativen för att beskriva förvarets layout används (--trunk, --tags, --branches, --stdlayout), kommer 'git svn clone' att skapa ett Git-förvar med helt linjär historik, där grenar och taggar visas som separata kataloger i arbetskopian. Även om detta är det enklaste sättet att få en kopia av ett komplett förvar, kommer det för projekt med många grenar att leda till en arbetskopia som är många gånger större än bara trunk-katalogen. Därför rekommenderas det för projekt som använder standardkatalogstrukturen (trunk/branches/tags) att klona med alternativet `--stdlayout`. Om projektet använder en icke-standardiserad struktur, och/eller om grenar och taggar inte krävs, är det enklast att bara klona en katalog (vanligtvis trunk), utan att ange några alternativ för arkivets layout. Om fullständig historik med grenar och taggar krävs måste alternativen `--trunk` / `--branches` / `--tags` användas.
+
+När man använder flera --branches eller --tags hanterar 'git svn' inte automatiskt namnkollisioner (till exempel om två grenar från olika sökvägar har samma namn, eller om en gren och en tagg har samma namn). I dessa fall, använd 'init' för att konfigurera ditt Git-förvar och redigera sedan, innan din första 'fetch', $GIT_DIR/config-filen så att grenarna och taggarna är associerade med olika namnrymder. Till exempel:
+
+	branches = stable/*:refs/remotes/svn/stable/*
+	branches = debug/*:refs/remotes/svn/debug/*
+
+KONFIGURATION
+-------------
+
+'git svn' lagrar konfigurationsinformation för [svn-remote] i förvars-filen $GIT_DIR/config. Det liknar de centrala Git [remote]-sektionerna förutom att 'fetch'-nycklarna inte accepterar glob-argument; de hanteras istället av nycklarna 'branches' och 'tags'. Eftersom vissa SVN-förvar är ovalningt konfigurerade med flera projekt, är glob-expansioner som de som listas nedan tillåtna:
+
+------------------------------------------------------------------------
+[svn-remote "project-a"]
+	url = http://server.org/svn
+	fetch = trunk/project-a:refs/remotes/project-a/trunk
+	branches = branches/*/project-a:refs/remotes/project-a/branches/*
+	branches = branches/release_*:refs/remotes/project-a/branches/release_*
+	branches = branches/re*se:refs/remotes/project-a/branches/*
+	tags = tags/*/project-a:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+Tänk på att `*` (asterisk) för den lokala referensen (till höger om `:`) *måste* vara den längst till höger belägna sökvägskomponenten; fjärr jokertecknet kan dock finnas var som helst så länge det är en oberoende sökvägskomponent (omgiven av `/` eller EOL). Denna typ av konfiguration skapas inte automatiskt av 'init' och bör anges manuellt med en textredigerare eller med hjälp av 'git config'.
+
+Observera också att endast en asterisk är tillåten per ord. Till exempel:
+
+	branches = branches/re*se:refs/remotes/project-a/branches/*
+
+kommer dock att matcha grenarna 'release', 'rese', 're123se'
+
+	branches = branches/re*s*e:refs/remotes/project-a/branches/*
+
+kommer att producera ett fel.
+
+Det är också möjligt att hämta en delmängd av grenar eller taggar genom att använda en kommaseparerad lista med namn inom klammerparenteser. Till exempel:
+
+------------------------------------------------------------------------
+[svn-remote "huge-project"]
+	url = http://server.org/svn
+	fetch = trunk/src:refs/remotes/trunk
+	branches = branches/{red,green}/src:refs/remotes/project-a/branches/*
+	tags = tags/{1.0,2.0}/src:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+Flera hämtnings-, gren- och tagg-nycklar stöds:
+
+------------------------------------------------------------------------
+[svn-remote "messy-repo"]
+	url = http://server.org/svn
+	fetch = trunk/project-a:refs/remotes/project-a/trunk
+	fetch = branches/demos/june-project-a-demo:refs/remotes/project-a/demos/june-demo
+	branches = branches/server/*:refs/remotes/project-a/branches/*
+	branches = branches/demos/2011/*:refs/remotes/project-a/2011-demos/*
+	tags = tags/server/*:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+Att skapa en gren i en sådan konfiguration kräver att man tydliggör vilken plats som ska användas med hjälp av flaggan -d eller --destination:
+
+------------------------------------------------------------------------
+$ git svn branch -d branches/server release-2-3-0
+------------------------------------------------------------------------
+
+Observera att git-svn håller reda på den högsta versionen där en gren eller tagg har förekommit. Om delmängden av grenar eller taggar ändras efter hämtning, måste $GIT_DIR/svn/.metadata redigeras manuellt för att ta bort (eller återställa) branches-maxRev och/eller tags-maxRev efter behov.
+
+FILER
+-----
+$GIT_DIR/svn/\**/.rev_map.*::
+	Mappning mellan Subversion-revisionsnummer och Git-cincheckningsnamn. I ett repository där alternativet noMetadata inte är angivet kan detta byggas om från git-svn-id:-raderna som finns i slutet av varje incheckning (se avsnittet 'svn.noMetadata' ovan för mer information).
++
+'git svn fetch' och 'git svn rebase' uppdaterar automatiskt rev_map om den saknas eller inte är uppdaterad. 'git svn reset' spolar tillbaka den automatiskt.
+
+BUGGAR
+------
+
+Vi ignorerar alla SVN-egenskaper förutom svn:executable. Alla ohanterade egenskaper loggas till $GIT_DIR/svn/<refnamn>/unhandled.log
+
+Omdöpta och kopierade kataloger upptäcks inte av Git och spåras därför inte vid incheckning till SVN. Jag planerar inte att lägga till stöd för detta eftersom det är ganska svårt och tidskrävande att få det att fungera för alla möjliga gränsfall (Git gör det inte heller). Att checka-in omdöpta och kopierade filer stöds fullt ut om de är tillräckligt lika för att Git ska kunna upptäcka dem.
+
+I SVN är det möjligt (men avråds) att göra ändringar i en tagg (eftersom en tagg bara är en katalogkopia, alltså tekniskt sett samma sak som en gren). När man klonar ett SVN-förvar kan 'git svn' inte veta om en sådan incheckning till en tagg kommer att ske i framtiden. Därför agerar den konservativt och importerar alla SVN-taggar som grenar, med prefixet 'tags/' före taggnamnet.
+
+SE ÄVEN
+-------
+linkgit:git-rebase[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

@@ -1,0 +1,915 @@
+Bekämpa regressioner med git bisect
+===================================
+:Author: Christian Couder
+:Email: chriscool@tuxfamily.org
+:Date: 2009/11/08
+
+Abstrakt
+--------
+
+"git bisect" gör det möjligt för programvaruanvändare och utvecklare att enkelt hitta den incheckning som introducerade en regression. Vi visar varför det är viktigt att ha bra verktyg för att bekämpa regressioner. Vi beskriver hur "git bisect" fungerar utifrån och vilka algoritmer det använder inuti. Sedan förklarar vi hur man kan dra nytta av "git bisect" för att förbättra nuvarande metoder. Och vi diskuterar hur "git bisect" skulle kunna förbättras i framtiden.
+
+
+Introduktion till "git bisect"
+------------------------------
+
+Git är ett distribuerat versionshanteringssystem (DVCS) skapat av Linus Torvalds och underhållet av Junio Hamano.
+
+I Git, liksom i många andra versionshanteringssystem (VCS), kallas de olika tillstånden för data som hanteras av systemet för incheckningar. Eftersom VCS oftast används för att hantera programvarans källkod introduceras ibland "intressanta" beteendeförändringar i vissa incheckningar.
+
+Faktum är att folk är särskilt intresserade av incheckningar som introducerar ett "dåligt" beteende, kallat ett programfel eller en regression. De är intresserade av dessa incheckningar eftersom en incheckning (förhoppningsvis) innehåller en mycket liten uppsättning källkodsändringar. Och det är mycket lättare att förstå och korrekt åtgärda ett problem när man bara behöver kontrollera en mycket liten uppsättning ändringar, än när man inte vet var man ska leta från första början.
+
+Så för att hjälpa folk att hitta incheckningar som introducerar ett "dåligt" beteende uppfanns kommandouppsättningen "git bisect". Och det följer naturligtvis att i "git bisect"-språk kallas incheckningar där det "intressanta beteendet" finns för "dåliga" incheckningar, medan andra incheckningar kallas "bra" incheckningar. Och en incheckning som introducerar det beteende vi är intresserade av kallas en "första dåliga incheckning". Observera att det kan finnas mer än en "första dåliga incheckning" i det incheckningsutrymme vi söker i.
+
+Så "git bisect" är utformad för att hjälpa till att hitta en "första dålig incheckning". Och för att vara så effektiv som möjligt försöker den utföra en binär sökning.
+
+
+Fighting regressions overview
+-----------------------------
+
+Regressioner: ett stort problem
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Regressioner är ett stort problem inom mjukvaruindustrin. Men det är svårt att lägga några riktiga siffror bakom det påståendet.
+
+Det finns några siffror om programfel i allmänhet, som en NIST-studie från 2002 <<1>> som sa:
+
+_____________
+Programvarufel är så vanliga och skadliga att de kostar den amerikanska ekonomin uppskattningsvis 59,5 miljarder dollar årligen, eller cirka 0,6 procent av bruttonationalprodukten, enligt en nyligen publicerad studie beställd av handelsdepartementets National Institute of Standards and Technology (NIST). På nationell nivå bärs över hälften av kostnaderna av programvaruanvändare och resten av programvaruutvecklare/leverantörer. Studien fann också att även om alla fel inte kan tas bort, skulle mer än en tredjedel av dessa kostnader, eller uppskattningsvis 22,2 miljarder dollar, kunna elimineras genom en förbättrad testinfrastruktur som möjliggör tidigare och mer effektiv identifiering och borttagning av programvarufel. Det är besparingarna som är förknippade med att hitta en ökad andel (men inte 100 procent) fel närmare de utvecklingsstadier där de introduceras. För närvarande hittas inte över hälften av alla fel förrän "nedströms" i utvecklingsprocessen eller under användning av programvara efter försäljning.
+_____________
+
+Och sedan:
+
+_____________
+Programvaruutvecklare spenderar redan ungefär 80 procent av utvecklingskostnaderna på att identifiera och korrigera fel, och ändå levereras få produkter av något annat slag än programvara med så höga felnivåer.
+_____________
+
+Slutligen började slutsatsen med:
+
+_____________
+Vägen till högre programvarukvalitet är avsevärt förbättrad programvarutestning.
+_____________
+
+Det finns andra uppskattningar som säger att 80 % av kostnaden relaterad till programvara går till underhåll <<2>>.
+
+Men, enligt Wikipedia <<3>>:
+
+_____________
+En vanlig uppfattning om underhåll är att det bara handlar om att åtgärda programfel. Studier och undersökningar genom åren har dock visat att majoriteten, över 80 %, av underhållsinsatsen går till icke-korrigerande åtgärder (Pigosky 1997). Denna uppfattning vidmakthålls av att användare skickar in problemrapporter som i själva verket är funktionalitetsförbättringar i systemet.
+_____________
+
+Men vi kan gissa att det är mycket kostsamt att förbättra befintlig programvara eftersom man måste se upp för regressioner. Åtminstone skulle detta göra ovanstående studier konsekventa sinsemellan.
+
+Naturligtvis utvecklas någon form av programvara, används sedan under en tid utan att förbättras särskilt mycket, och kastas sedan slutligen bort. I det här fallet kanske regressioner naturligtvis inte är ett stort problem. Men å andra sidan finns det mycket stor programvara som kontinuerligt utvecklas och underhålls under åratal eller till och med tiotals år av många människor. Och eftersom det ofta finns många människor som är beroende (ibland kritiskt) av sådan programvara, är regressioner ett riktigt stort problem.
+
+En sådan programvara är Linuxkärnan. Och om vi tittar på Linuxkärnan kan vi se att mycket tid och ansträngning läggs ner på att bekämpa regressioner. Utgivningscykeln börjar med ett två veckor långt sammanslagningsfönster. Sedan taggas den första releasekandidatversionen (rc). Och därefter kommer cirka sju eller åtta rc-versioner att dyka upp med ungefär en veckas mellanrum, innan den slutliga utgåvan.
+
+Tiden mellan den första rc-utgåvan och den slutliga utgåvan är tänkt att användas för att testa rc-versioner och bekämpa programfel och särskilt regressioner. Och denna tid är mer än 80 % av utgivningscykeltiden. Men detta är inte slutet på kampen än, eftersom den naturligtvis fortsätter efter utgivningen.
+
+Och så här säger Ingo Molnar (en välkänd Linuxkärnutvecklare) om sin användning av git bisect:
+
+_____________
+Jag använder det mest aktivt under sammanslagningsfönstret (när många träd sammanfogas uppströms och när tillströmningen av programfel är som störst) - och ja, det har funnits tillfällen då jag använt det flera gånger om dagen. Mitt snitt är ungefär en gång per dag.
+_____________
+
+Så utvecklare bekämpar regressioner hela tiden, och det är faktiskt välkänt att programfel bör åtgärdas så snart som möjligt, så snart de hittas. Det är därför det är intressant att ha bra verktyg för detta ändamål.
+
+Andra verktyg för att bekämpa regressioner
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vilka verktyg används då för att bekämpa regressioner? De är nästan desamma som används mot vanliga programfel. De enda specifika verktygen är testsviter och verktyg som "git bisect".
+
+Testsviter är väldigt bra. Men när de används ensamma är det meningen att de ska användas så att alla tester kontrolleras efter varje incheckning. Det betyder att de inte är särskilt effektiva, eftersom många tester körs utan intressanta resultat, och de lider av kombinatorisk explosion.
+
+Problemet är faktiskt att stor programvara ofta har många olika konfigurationsalternativ och att varje testfall ska godkännas för varje konfiguration efter varje incheckning. Så om du för varje utgåva har: N konfigurationer, M incheckningar och T testfall, bör du utföra:
+
+-------------
+N * M * T tester
+-------------
+
+där N, M och T alla växer med storleken på din programvara.
+
+Så snart kommer det inte att vara möjligt att testa allt helt.
+
+Om några programfel slinker igenom testsviten kan du lägga till ett nytt test. Men om du vill använda den förbättrade testsviten för att hitta var programfelet smög sig in måste du antingen emulera en binärsökningsprocess eller helt enkelt testa varje incheckning bakåt från den "dåliga" incheckning du har, vilket kan vara mycket slösaktigt.
+
+"git bisect" översikt
+---------------------
+
+Att starta en binärsökning
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Det första `git bisect`-underkommandot att använda är `git bisect start` för att starta sökningen. Därefter måste gränser sättas för att begränsa incheckningsutrymmet. Detta görs vanligtvis genom att ange en "dålig" och minst en "bra" incheckning. De kan skickas i det första anropet till `git bisect start` så här:
+
+-------------
+$ git bisect start [DÅLIG [BRA...]]
+-------------
+
+eller så kan de ställas in med hjälp av:
+
+-------------
+$ git bisect bad [INCHECKNING]
+-------------
+
+och:
+
+-------------
+$ git bisect good [INCHECKNING...]
+-------------
+
+där DÅLIG, BRA och INCHECKNING är namn som kan lösas till en incheckning.
+
+Sedan kommer "git bisect" att checka ut en incheckning som den väljer och be användaren att testa den, så här:
+
+-------------
+$ git bisect start v2.6.27 v2.6.25
+Bisect: 10928 revisioner kvar att testa efter denna (ungefär 14 steg)
+[2ec65f8b89ea003c27ff7723525a2ee335a2b393] x86: clean up using max_low_pfn on 32-bit
+-------------
+
+Observera att exemplet vi kommer att använda egentligen är ett leksaksexempel. Vi kommer att leta efter den första incheckningen som har en version som "2.6.26-något", det vill säga den incheckning som har en "SUBLEVEL = 26"-rad i Makefile-filen på översta nivån. Detta är ett leksaksexempel eftersom det finns bättre sätt att hitta denna incheckning med Git än att använda "git bisect" (till exempel "git blame" eller "git log -S<string>").
+
+Köra en binärsökning manuellt
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vid det här laget finns det i princip två sätt att köra sökningen. Den kan köras manuellt av användaren eller så kan den köras automatiskt av ett skript eller ett kommando.
+
+Om användaren kör den, måste användaren i varje steg av sökningen testa den aktuella incheckningen och avgöra om den är "bra" eller "dålig" med hjälp av kommandona "git bisect good" respektive "git bisect bad" som har beskrivits ovan. Till exempel:
+
+-------------
+$ git bisect bad
+Bisect: 5480 revisioner kvar att testa efter denna (ungefär 13 steg)
+[66c0b394f08fd89236515c1c84485ea712a157be] KVM: kill file->f_count abuse in kvm
+-------------
+
+Efter ytterligare några sådana steg hittar `git bisect` till slut en första dålig incheckning:
+
+-------------
+$ git bisect bad
+2ddcca36c8bcfa251724fe342c8327451988be0d is the first bad commit
+commit 2ddcca36c8bcfa251724fe342c8327451988be0d
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sat May 3 11:59:44 2008 -0700
+
+    Linux 2.6.26-rc1
+
+:100644 100644 5cf82581... 4492984e... M      Makefile
+-------------
+
+Vid det här laget kan vi se vad incheckningen gör, kolla in den (om den inte redan är utcheckad) eller experimentera med den, till exempel:
+
+-------------
+$ git show HEAD
+commit 2ddcca36c8bcfa251724fe342c8327451988be0d
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sat May 3 11:59:44 2008 -0700
+
+    Linux 2.6.26-rc1
+
+diff --git a/Makefile b/Makefile
+index 5cf8258..4492984 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 2
+ PATCHLEVEL = 6
+-SUBLEVEL = 25
+-EXTRAVERSION =
++SUBLEVEL = 26
++EXTRAVERSION = -rc1
+ NAME = Funky Weasel is Jiggy wit it
+
+ # *DOKUMENTATION*
+-------------
+
+Och när vi är klara kan vi använda "git bisect reset" för att gå tillbaka till grenen vi var i innan vi började binärsökningen:
+
+-------------
+$ git bisect reset
+Checking out files: 100% (21549/21549), done.
+Previous HEAD position was 2ddcca3... Linux 2.6.26-rc1
+Switched to branch 'master'
+-------------
+
+Automatisk körning av en binärsökning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Det andra sättet att driva bisektionsprocessen är att be "git bisect" att starta ett skript eller kommando vid varje bisektionssteg för att veta om den aktuella incheckningen är "bra" eller "dålig". För att göra det använder vi kommandot "git bisect run". Till exempel:
+
+-------------
+$ git bisect start v2.6.27 v2.6.25
+Bisecting: 10928 revisions left to test after this (roughly 14 steps)
+[2ec65f8b89ea003c27ff7723525a2ee335a2b393] x86: clean up using max_low_pfn on 32-bit
+$
+$ git bisect run grep '^SUBLEVEL = 25' Makefile
+running grep ^SUBLEVEL = 25 Makefile
+Bisecting: 5480 revisions left to test after this (roughly 13 steps)
+[66c0b394f08fd89236515c1c84485ea712a157be] KVM: kill file->f_count abuse in kvm
+running grep ^SUBLEVEL = 25 Makefile
+SUBLEVEL = 25
+Bisecting: 2740 revisions left to test after this (roughly 12 steps)
+[671294719628f1671faefd4882764886f8ad08cb] V4L/DVB(7879): Adding cx18 Support for mxl5005s
+...
+...
+running grep ^SUBLEVEL = 25 Makefile
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[2ddcca36c8bcfa251724fe342c8327451988be0d] Linux 2.6.26-rc1
+running grep ^SUBLEVEL = 25 Makefile
+2ddcca36c8bcfa251724fe342c8327451988be0d is the first bad commit
+commit 2ddcca36c8bcfa251724fe342c8327451988be0d
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sat May 3 11:59:44 2008 -0700
+
+    Linux 2.6.26-rc1
+
+:100644 100644 5cf82581... 4492984e... M      Makefile
+bisect run success
+-------------
+
+I det här exemplet skickade vi `grep '^SUBLEVEL = 25' Makefile` som parameter till `git bisect run`. Det betyder att grep-kommandot körs vid varje steg. Om det avslutas med kod 0 (lyckat) markerar `git bisect` det aktuella tillståndet som "bra". Om det avslutas med kod 1 (eller någon kod mellan 1 och 127, utom specialkoden 125) markeras det aktuella tillståndet som "dåligt".
+
+Avslutningskoder mellan 128 och 255 är särskilda för "git bisect run". De gör att bisektionsprocessen stoppas omedelbart. Detta är till exempel användbart om det körda kommandot tar för lång tid, eftersom du då kan avbryta det med en signal och därmed stoppa bisektionen.
+
+Det kan också vara användbart att i skript som körs via "git bisect run" göra "exit 255" om en mycket onormal situation upptäcks.
+
+Undvika otestbara incheckningar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ibland händer det att det aktuella tillståndet inte kan testas, till exempel om det inte kompileras på grund av att det fanns ett programfel som förhindrade det vid den tidpunkten. Det är detta den speciella avslutningskoden 125 är till för. Den talar om för "git bisect run" att den aktuella incheckningen ska markeras som otestbar och att en annan ska väljas och checkas ut.
+
+Om binärsökningsprocessen körs manuellt kan du använda "git bisect skip" för att göra samma sak. (Faktum är att den speciella avslutningskoden 125 gör att "git bisect run" använder "git bisect skip" i bakgrunden.)
+
+Eller om du vill ha mer kontroll kan du inspektera det aktuella tillståndet med hjälp av till exempel "git bisect visualize". Det kommer att starta gitk (eller "git log" om miljövariabeln `DISPLAY` inte är satt) för att hjälpa dig hitta en bättre binärsökningspunkt.
+
+Hur som helst, om du har en rad otestbara incheckningar, kan det hända att regressionen du letar efter har introducerats av en av dessa otestbara incheckningar. I det här fallet är det inte möjligt att säga säkert vilken incheckning som introducerade regressionen.
+
+Om du använder "git bisect skip" (eller om run-skriptet avslutas med specialkod 125) kan du få ett resultat som detta:
+
+-------------
+There are only 'skip'ped commits left to test.
+The first bad commit could be any of:
+15722f2fa328eaba97022898a305ffc8172db6b1
+78e86cf3e850bd755bb71831f42e200626fbd1e0
+e15b73ad3db9b48d7d1ade32f8cd23a751fe0ace
+070eab2303024706f2924822bfec8b9847e4ac1b
+We cannot bisect more!
+-------------
+
+Spara en logg och spela upp den igen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Om du vill visa andra din binärsökningsprocess kan du hämta en logg med hjälp av till exempel:
+
+-------------
+$ git bisect log > bisect_log.txt
+-------------
+
+Och det är möjligt att spela upp det med hjälp av:
+
+-------------
+$ git bisect replay bisect_log.txt
+-------------
+
+
+Detaljer om "git bisect"
+------------------------
+
+Bisektionsalgoritm
+~~~~~~~~~~~~~~~~~~
+
+Eftersom Git-incheckningar bildar en riktad acyklisk graf (DAG) är det inte helt enkelt att hitta den bästa bisektionsincheckningen att testa i varje steg. Linus hittade och implementerade dock en "verkligt dum" algoritm, senare förbättrad av Junio Hamano, som fungerar ganska bra.
+
+Algoritmen som "git bisect" använder för att hitta den bästa bisektionsincheckningen när inga incheckningar har hoppats över är följande:
+
+1) behåll endast de incheckningar som:
+
+a) är förfäder till den "dåliga" incheckningen (inklusive den "dåliga" incheckningen själv),
+b) inte är förfäder till en "bra" incheckning (exklusive de "bra" incheckningarna).
+
+Det innebär att vi blir av med de ointressanta incheckningarna i DAG:en.
+
+Om vi till exempel börjar med en graf som denna:
+
+-------------
+G-Y-G-W-W-W-X-X-X-X
+	   \ /
+	    W-W-B
+	   /
+Y---G-W---W
+ \ /   \
+Y-Y     X-X-X-X
+
+-> tiden går åt det här hållet ->
+-------------
+
+där B är den "dåliga" incheckningen, "G" är "bra" incheckningar och W, X och Y är andra incheckningar, får vi följande graf efter detta första steg:
+
+-------------
+W-W-W
+     \
+      W-W-B
+     /
+W---W
+-------------
+
+Så endast W- och B-incheckningar kommer att behållas. Eftersom incheckningar X och Y kommer att ha tagits bort av regel a) respektive b), och eftersom incheckningar G också tas bort av regel b).
+
+Observera för Git-användare att det är likvärdigt med att endast behålla incheckningen som ges av:
+
+-------------
+git rev-list BAD --not GOOD1 GOOD2...
+-------------
+
+Observera också att vi inte kräver att de incheckningar som sparas ska vara efterkommande av en "bra" incheckning. Så i följande exempel kommer incheckningar W och Z att sparas:
+
+-------------
+G-W-W-W-B
+   /
+Z-Z
+-------------
+
+2) börja från grafens "bra" ändar och associera till varje incheckning antalet förfäder den har plus ett
+
+Till exempel med följande graf där H är den "dåliga" incheckningen och A och D är några föräldrar till några "bra" incheckningar:
+
+-------------
+A-B-C
+     \
+      F-G-H
+     /
+D---E
+-------------
+
+detta kommer att ge:
+
+-------------
+1 2 3
+A-B-C
+     \6 7 8
+      F-G-H
+1   2/
+D---E
+-------------
+
+3) associera till varje incheckning: min(X, N - X)
+
+där X är värdet som är associerat med incheckningen i steg 2) och N är det totala antalet incheckningar i grafen.
+
+I exemplet ovan har vi N = 8, så detta ger:
+
+-------------
+1 2 3
+A-B-C
+     \2 1 0
+      F-G-H
+1   2/
+D---E
+-------------
+
+4) Den bästa binärsökningspunkten är den incheckning med det högsta associerade numret
+
+I exemplet ovan är alltså den bästa bisektionspunkten incheckning C.
+
+5) observera att vissa genvägar är implementerade för att snabba upp algoritmen
+
+Eftersom vi vet N från början, vet vi att min(X, N - X) inte kan vara större än N/2. Så om vi under steg 2) och 3) skulle associera N/2 till en incheckning, då vet vi att detta är den bästa binärsökningspunkten. Så i det här fallet kan vi helt enkelt sluta bearbeta alla andra incheckningar och returnera den aktuella incheckningen.
+
+Felsökning av binärsökingssalgoritmen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+För alla incheckningsgrafer kan du se numret som är associerat med varje incheckning med hjälp av "git rev-list --bisect-all".
+
+Till exempel för grafen ovan, ett kommando som:
+
+-------------
+$ git rev-list --bisect-all BAD --not GOOD1 GOOD2
+-------------
+
+skulle mata ut något liknande:
+
+-------------
+e15b73ad3db9b48d7d1ade32f8cd23a751fe0ace (dist=3)
+15722f2fa328eaba97022898a305ffc8172db6b1 (dist=2)
+78e86cf3e850bd755bb71831f42e200626fbd1e0 (dist=2)
+a1939d9a142de972094af4dde9a544e577ddef0e (dist=2)
+070eab2303024706f2924822bfec8b9847e4ac1b (dist=1)
+a3864d4f32a3bf5ed177ddef598490a08760b70d (dist=1)
+a41baa717dd74f1180abf55e9341bc7a0bb9d556 (dist=1)
+9e622a6dad403b71c40979743bb9d5be17b16bd6 (dist=0)
+-------------
+
+Diskussion om bisektionsalgoritmen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Låt oss först definiera "bästa bisektionspunkt". Vi säger att en incheckning X är en bästa bisektionspunkt, eller bästa bisektionsincheckning, om kunskap om dess tillstånd ("bra" eller "dåligt") ger så mycket information som möjligt, oavsett om tillståndet råkar vara "bra" eller "dåligt".
+
+Det betyder att de bästa bisektionsincheckningarna är de där följande funktion är maximal:
+
+-------------
+f(X) = min(information_if_good(X), information_if_bad(X))
+-------------
+
+där information_if_good(X) är informationen vi får om X är bra och information_if_bad(X) är informationen vi får om X är dåligt.
+
+Nu antar vi att det bara finns en "första dåliga incheckning". Det betyder att alla dess efterföljare är "dåliga" och alla andra incheckningar är "bra". Vi antar också att alla incheckningar har lika stor sannolikhet att vara bra, dåliga eller den första dåliga incheckningen, så att kunskap om tillståndet för c incheckningar alltid ger samma mängd information oavsett var de ligger i grafen och oavsett värdet på c. (Det vill säga: att de till exempel ligger på en viss gren eller nära en bra eller dålig incheckning antas inte ge mer eller mindre information.)
+
+Låt oss också anta att vi har en rensad graf som efter steg
+1) i bisektionsalgoritmen ovan. Det betyder att vi kan mäta informationen vi får i termer av antalet incheckningar vi kan ta bort från grafen.
+
+Och låt oss ta en incheckning X i grafen.
+
+Om X visar sig vara "bra", då vet vi att dess förfäder alla är "bra", så vi vill säga att:
+
+-------------
+information_if_good(X) = number_of_ancestors(X)  (TRUE)
+-------------
+
+Detta är sant eftersom vi i steg 1) b) tar bort förfäderna till de "bra" incheckningarna.
+
+Om X visar sig vara "dålig" vet vi att dess efterföljare alla är "dåliga", så vi vill säga att:
+
+-------------
+information_if_bad(X) = number_of_descendants(X)  (WRONG)
+-------------
+
+Men detta är fel eftersom vi i steg 1) a) bara behåller förfäderna till den dåliga incheckningen. Så vi får mer information när en incheckning markeras som "dålig", eftersom vi också vet att förfäderna till den tidigare "dåliga" incheckningen som inte är förfäder till den nya "dåliga" incheckningen inte är den första dåliga incheckningen. Vi vet inte om de är bra eller dåliga, men vi vet att de inte är den första dåliga incheckningen eftersom de inte är förfäder till den nya "dåliga" incheckningen.
+
+Så när en incheckning markeras som "dålig" vet vi att vi kan ta bort alla incheckningar i grafen förutom de som är föregångare till den nya "dåliga" incheckningen. Det betyder att:
+
+-------------
+information_if_bad(X) = N - number_of_ancestors(X)  (TRUE)
+-------------
+
+där N är antalet incheckningar i den (rensade) grafen.
+
+I slutändan betyder detta att vi, för att hitta de bästa bisektionsincheckningarna, bör maximera funktionen:
+
+-------------
+f(X) = min(number_of_ancestors(X), N - number_of_ancestors(X))
+-------------
+
+And this is nice because at step 2) we compute number_of_ancestors(X) and so at step 3) we compute f(X).
+
+Låt oss ta följande graf som exempel:
+
+-------------
+            G-H-I-J
+           /       \
+A-B-C-D-E-F         O
+           \       /
+            K-L-M-N
+-------------
+
+Om vi beräknar följande icke-optimala funktion på den:
+
+-------------
+g(X) = min(number_of_ancestors(X), number_of_descendants(X))
+-------------
+
+får vi:
+
+-------------
+            4 3 2 1
+            G-H-I-J
+1 2 3 4 5 6/       \0
+A-B-C-D-E-F         O
+           \       /
+            K-L-M-N
+            4 3 2 1
+-------------
+
+men med algoritmen som används av git bisect får vi:
+
+-------------
+            7 7 6 5
+            G-H-I-J
+1 2 3 4 5 6/       \0
+A-B-C-D-E-F         O
+           \       /
+            K-L-M-N
+            7 7 6 5
+-------------
+
+Så vi valde G, H, K eller L som den bästa binärsökningspunkten, vilket är bättre än F. För om till exempel L är dålig, då vet vi inte bara att L, M och N är dåliga utan också att G, H, I och J inte är den första dåliga incheckningen (eftersom vi antar att det bara finns en första dålig incheckning och den måste vara en förfader till L).
+
+Så den nuvarande algoritmen verkar vara den bästa möjliga med tanke på vad vi från början antog.
+
+Överhoppsalgoritm
+~~~~~~~~~~~~~~~~~
+
+När vissa incheckningar har hoppats över (med "git bisect skip") är bisektionsalgoritmen densamma för steg 1) till 3). Därefter används ungefär följande steg:
+
+6) sortera incheckningarna efter fallande associerat värde
+
+7) om den första incheckningen inte har hoppats över kan vi returnera den och stanna här
+
+8) annars filtrera bort alla överhoppade incheckningar i den sorterade listan
+
+9) använd en pseudoslumptalsgenerator (PRNG) för att generera ett slumptal mellan 0 och 1
+
+10) multiplicera slumptalet med dess kvadratrot för att vinkla det mot 0
+
+11) multiplicera resultatet med antalet incheckningar i den filtrerade listan för att få ett index i listan
+
+12) returnera incheckningen vid det beräknade indexet
+
+Överhoppningsalgoritm diskuterad
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Efter steg 7) (i skip-algoritmen) skulle vi kunna kontrollera om den andra incheckningen hade hoppats över och returnera den om så inte var fallet. Det var faktiskt den algoritm vi använde från att "git bisect skip" utvecklades i Git 1.5.4 (släppt 1 februari 2008) fram till Git 1.6.4 (släppt 29 juli 2009).
+
+Men Ingo Molnar och H. Peter Anvin (en annan välkänd Linuxkärnutvecklare) klagade båda på att ibland råkade de bästa binärsökningspunkterna vara i ett område där alla incheckningar är otestbara. Och i det här fallet ombads användaren att testa många otestbara incheckningar, vilket kunde vara mycket ineffektivt.
+
+Faktum är att otestbara incheckningar ofta är otestbara eftersom ett fel introducerades vid en tidpunkt, och det felet åtgärdades först efter att många andra incheckningar introducerades.
+
+Det här fel är naturligtvis oftast inte relaterat till det fel vi försöker hitta i incheckningsgrafen. Men det hindrar oss från att veta om det intressanta "dåliga beteendet" finns eller inte.
+
+Det är alltså ett faktum att incheckningar nära en otestbar incheckning har hög sannolikhet att själva vara otestbara. Och de bästa bisektionsincheckningarna hittas ofta i kluster (på grund av bisektionsalgoritmen).
+
+Det är därför en dålig idé att bara välja den näst bästa icke-överhoppade bisektionsincheckningen när den första har hoppats över.
+
+Vi fann att de flesta incheckningar i grafen kan ge en hel del information när de testas. Och de incheckningar som i genomsnitt inte ger mycket information är de som ligger nära de bra och dåliga incheckningar.
+
+Så att använda en PRNG med en bias för att gynna incheckningar bort från de bra och dåliga incheckningar verkade vara ett bra val.
+
+En uppenbar förbättring av algoritmen vore att leta efter en incheckning med ett associerat värde nära den bästa bisektionsincheckningen, men på en annan gren, innan PRNG används. Om en sådan incheckning finns är det mindre sannolikt att den också är otestbar, och den ger därför troligen mer information än en nästan slumpmässigt vald incheckning.
+
+Kontrollera sammanslagningsbaser
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Det finns ytterligare en justering i binärsökningsalgoritmen som inte har beskrivits i "binärsökningsalgoritmen" ovan.
+
+I de tidigare exemplen antog vi att de "bra" incheckningarna var förfäder till den "dåliga" incheckningen. Men detta är inget krav för "git bisect".
+
+Naturligtvis kan den "dåliga" incheckningen inte vara en förfader till en "bra" incheckning, eftersom förfäderna till bra incheckningar antas vara "bra". Och alla "bra" incheckningar måste vara relaterade till den dåliga incheckningen. De kan inte ligga på en gren som saknar koppling till grenen med den "dåliga" incheckningen. Men det är möjligt att en bra incheckning är relaterad till en dålig incheckning utan att vara vare sig förfader eller efterföljare till den.
+
+Till exempel kan det finnas en "main"-gren och en "dev"-gren som avgrenades från huvudgrenen vid en incheckning med namnet "D" så här:
+
+-------------
+A-B-C-D-E-F-G  <--main
+       \
+        H-I-J  <--dev
+-------------
+
+Incheckningen "D" kallas en "sammanslagningsbas" för grenarna "main" och "dev" eftersom det är den bästa gemensamma förfadern för dessa grenar för en sammanslagning.
+
+Låt oss nu anta att incheckning J är dålig och incheckning G är bra, och att vi tillämpar bisektionsalgoritmen som den tidigare beskrivits.
+
+Som beskrivs i steg 1) b) i bisektionsalgoritmen tar vi bort alla förfäder till de bra incheckningarna eftersom de också ska vara bra.
+
+Så skulle vi bara ha kvar:
+
+-------------
+H-I-J
+-------------
+
+Men vad händer om den första dåliga incheckningen är "B", och den har åtgärdats i huvudgrenen av incheckning "F"?
+
+Resultatet av en sådan bisektion skulle bli att vi hittar H som första dåliga incheckning, när det i själva verket är B. Det vore alltså fel!
+
+Och ja, det kan hända i praktiken att personer som arbetar på en gren inte är medvetna om att personer som arbetar på en annan gren har fixat ett programfel! Det kan också hända att F har fixat mer än ett programfel eller att det är en återställning av någon stor utvecklingssatsning som inte var redo att släppas.
+
+Utvecklingsteam underhåller ofta både en utvecklingsgren och en underhållsgren, och det vore väldigt praktiskt om "git bisect" bara fungerade när de vill bisektera en regression på utvecklingsgrenen som inte finns på underhållsgrenen. De borde kunna starta bisektering med:
+
+-------------
+$ git bisect start dev main
+-------------
+
+För att möjliggöra den extra funktionen gör vi följande när en bisektion startas och vissa bra incheckningar inte är förfäder till den dåliga incheckningen: först beräknas sammanslagningsbaserna mellan den dåliga och de bra incheckningarna, och dessa sammanslagningsbaser väljs som de första incheckningarna att checka ut och testa.
+
+Om det visar sig att en sammanslagningsbas är dålig stoppas bisektionsprocessen med ett meddelande som:
+
+-------------
+Sammanslagningsbasen %s är trasig.
+Det betyder att felet har rättats mellan BBBBBB and [GGGGGG,...].
+-------------
+
+där BBBBBB är sha1-hashen för den felaktiga merge-basen och [GGGGGG,...] är en kommaseparerad lista över sha1 för de bra incheckningar.
+
+Om någon av sammanslagningsbaserna hoppas över fortsätter bisektionsprocessen, men följande meddelande skrivs ut för varje överhoppad sammanslagningsbas:
+
+-------------
+Varning: sammanslagningsbasen mellan BBBBBB och [GGGGGG,...] måste hoppas över.
+Så vi kan inte vara säkra på att den första felaktiga incheckningen är mellan MMMMMM och BBBBBB.
+Vi fortsätter ändå.
+-------------
+
+där BBBBBB är sha1-hashen för den dåliga incheckningen, MMMMMM är sha1-hashen för den sammanslagningsbas som hoppas över och [GGGGGG,...] är en kommaseparerad lista över sha1 för de bra incheckningen.
+
+Om det inte finns någon dålig sammanslagningsbas fortsätter bisektionsprocessen som vanligt efter detta steg.
+
+Bästa praxis för bisektering
+----------------------------
+
+Använda testsviter och git bisect tillsammans
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Om du både har en testsvit och använder git bisect blir det mindre viktigt att kontrollera att alla tester passerar efter varje incheckning. Det är ändå en god idé att ha vissa kontroller för att undvika att för mycket går sönder, eftersom det annars kan göra det svårare att bisektera andra programfel.
+
+Du kan fokusera dina ansträngningar på att kontrollera vid några få punkter (till exempel rc- och betaversioner) att alla T-testfall klarar alla N-konfigurationer. Och när vissa tester inte klarar kan du använda "git bisect" (eller hellre "git bisect run"). Så du bör utföra ungefär:
+
+-------------
+c * N * T + b * M * log2(M) tester
+-------------
+
+där c är antalet testrundor (alltså en liten konstant) och b är förhållandet mellan programfel per incheckning (förhoppningsvis också en liten konstant).
+
+Så det är förstås mycket bättre eftersom det är O(N * T) kontra O(N * T * M) om du testar allt efter varje incheckning.
+
+Det betyder att testsviter är bra för att förhindra att vissa programfel checkas in, och de är också bra på att visa att programfel finns. Men de är inte lika bra på att visa var programfelen introducerades. För att få fram det effektivt behövs git bisect.
+
+Det andra fina med testsviter är att när du har en vet du redan hur man testar för dåligt beteende. Den kunskapen kan du använda för att skapa ett nytt testfall för "git bisect" när en regression verkar ha uppstått. Då blir det lättare att bisektera programfelet och åtgärda den, och därefter kan du lägga till det nya testfallet i testsviten.
+
+Om du vet hur man skapar testfall och hur man bisekterar hamnar du i en positiv spiral:
+
+fler tester => lättare att skapa tester => lättare att binärsöka => fler tester
+
+Så testsviter och "git bisect" är kompletterande verktyg som är mycket kraftfulla och effektiva när de används tillsammans.
+
+Bisektering av byggfel
+~~~~~~~~~~~~~~~~~~~~~~
+
+Du kan mycket enkelt automatiskt binärsöka trasiga byggen med hjälp av något i stil med:
+
+-------------
+$ git bisect start BAD GOOD
+$ git bisect run make
+-------------
+
+Skicka sh -c "några kommandon" till "git bisect run"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Till exempel:
+
+-------------
+$ git bisect run sh -c "make || exit 125; ./my_app | grep 'good output'"
+-------------
+
+Å andra sidan, om du gör detta ofta, kan det vara värt att ha skript för att undvika för mycket skrivande.
+
+Hitta prestandaregressioner
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Här är ett exempelskript som är något modifierat från ett verkligt skript som används av Junio Hamano <<4>>.
+
+Det här skriptet kan skickas till "git bisect run" för att hitta den incheckning som introducerade en prestandaregression:
+
+-------------
+#!/bin/sh
+
+# Byggfel är inte vad jag är intresserad av.
+make my_app || exit 255
+
+# Vi kontrollerar om det stannar inom rimlig tid, så
+# låt det köras i bakgrunden...
+
+./my_app >log 2>&1 &
+
+# ... och hämta dess process-ID.
+pid=$!
+
+# ... och vänta sedan tillräckligt länge.
+sleep $NORMAL_TIME
+
+# ... och se sedan om processen fortfarande finns kvar.
+if kill -0 $pid
+then
+	# Den går fortfarande – det är dåligt.
+	kill $pid; sleep 1; kill $pid;
+	exit 1
+else
+	# Den är redan klar ($pid-processen fanns inte längre),
+	# och vi är nöjda.
+	exit 0
+fi
+-------------
+
+Följa allmänna bästa praxis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Det är uppenbarligen en bra idé att inte ha incheckningar med ändringar som medvetet förstör saker, även om andra incheckningar senare åtgärdar felet.
+
+Det är också en bra idé när man använder VCS att bara ha en liten logisk ändring i varje incheckning.
+
+Ju mindre ändringarna är i din incheckning, desto effektivast blir "git bisect". Och du kommer förmodligen att behöva "git bisect" mindre från början, eftersom små ändringar är lättare att granska även om de bara granskas av incheckaren.
+
+En annan bra idé är att ha bra incheckningsmeddelanden. De kan vara till stor hjälp för att förstå varför vissa ändringar har gjorts.
+
+Dessa allmänna bästa praxis är mycket användbara om du bisekterar ofta.
+
+Undvika problematiska sammanslagningar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sammanslagningar kan i sig introducera regressioner även när sammanslagningen inte kräver konfliktlösning i källkoden. Det beror på att en semantisk förändring kan ske i en gren utan att den andra grenen känner till den.
+
+Till exempel kan en gren ändra semantiken för en funktion medan den andra grenen lägger till fler anrop till samma funktion.
+
+Det här förvärras kraftigt om många filer måste justeras för att lösa konflikter. Därför kallas sådana sammanslagningar "onda sammanslagningar". De kan göra regressioner mycket svåra att spåra. Det kan till och med vara missvisande att veta vilken den första dåliga incheckningen är om den råkar vara en sådan sammanslagning, eftersom man då lätt tror att felet kommer från dålig konfliktlösning när det i själva verket kommer från en semantisk förändring i en gren.
+
+Hur som helst kan "git rebase" användas för att linjärisera historiken. Det kan antingen användas för att undvika sammanslagning från början, eller för att bisektera i en linjär historik i stället för en icke-linjär, vilket bör ge mer information vid en semantisk förändring i en gren.
+
+Sammanslagningar kan också förenklas genom att använda mindre grenar eller genom att använda många ämnesgrenar i stället för bara långa versionsrelaterade grenar.
+
+Testning kan också göras oftare i särskilda integrationsgrenar, som linux-next för Linuxkärnan.
+
+Anpassa ditt arbetsflöde
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ett särskilt arbetsflöde för att bearbeta regressioner kan ge utmärkta resultat.
+
+Här är ett exempel på ett arbetsflöde som används av Andreas Ericsson:
+
+* skriv ett testskript i testsviten som exponerar regressionen
+* använd "git bisect run" för att hitta incheckningen som introducerade den
+* åtgärda felet som ofta blir uppenbart i föregående steg
+* checka in både fixen och testskriptet (och vid behov fler tester)
+
+Och här är vad Andreas sa om detta arbetsflöde <<5>>:
+
+_____________
+För att ge några konkreta siffror brukade vi ha en genomsnittlig rapport-till-åtgärd-cykel på 142,6 timmar (enligt vår något konstiga felspårare som bara mäter väggklockans tid). Sedan vi bytte till Git har vi sänkt den till 16,2 timmar. Främst för att vi nu kan hålla koll på felrättningarna, och för att alla kämpar för att få åtgärda programfel (vi är ganska stolta över hur lata vi är som låter Git hitta programfelen åt oss). Varje ny utgåva resulterar i ~40 % färre programfel (nästan säkert på grund av hur vi nu ser på att skriva tester).
+_____________
+
+Det är uppenbart att detta arbetsflöde använder den positiva spiralen mellan testsviter och "git bisect". Det gör den till ett standardförfarande för att hantera regressioner.
+
+I andra meddelanden säger Andreas att de också använder de "bästa praxis" som beskrivs ovan: små logiska incheckningar, ämnesgrenar, ingen ondska-sammanslagning,... Dessa metoder förbättrar alla incheckning-grafens binärsökningsbarhet genom att göra det enklare och mer användbart att dela upp det.
+
+Ett bra arbetsflöde bör alltså utformas kring punkterna ovan. Det gör bisektering enklare, mer användbar och mer standardiserad.
+
+Involvera QA-personal och om möjligt slutanvändare
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+En fördel med "git bisect" är att det inte bara är ett utvecklarverktyg. Det kan användas effektivt av QA-personal eller till och med slutanvändare (om de har tillgång till källkoden eller kan få tillgång till alla byggen).
+
+Vid ett tillfälle diskuterades på Linuxkärnans e-postlista om det var okej att alltid be slutanvändare bisektera, och starka argument lades fram för att detta är rimligt.
+
+Till exempel skrev David Miller <<6>>:
+
+_____________
+Vad folk inte förstår är att det här är en situation där "slutnodsprincipen" gäller. När man har begränsade resurser (här: utvecklare) lägger man inte huvuddelen av bördan på dem. I stället lägger man saker på de resurser man har många av, slutnoderna (här: användare), så att situationen faktiskt skalas upp.
+_____________
+
+Det betyder att det ofta är "billigare" om QA-personal eller slutanvändare kan göra det.
+
+Det intressanta är också att slutanvändare som rapporterar programfel (eller QA-personal som reproducerat ett programfel) har tillgång till miljön där programfelet uppstår. Därför kan de ofta lättare reproducera en regression. Om de dessutom kan bisektera går det att få ut mer information ur miljön där programfelet uppstår, vilket gör det enklare att förstå och därefter åtgärda programfelet.
+
+För öppen källkodsprojekt kan detta vara ett bra sätt att få mer användbara bidrag från slutanvändare och introducera dem till QA- och utvecklingsarbete.
+
+Använda komplexa skript
+~~~~~~~~~~~~~~~~~~~~~~~
+
+I vissa fall, som vid kärnutveckling, kan det vara värt att utveckla mer komplexa skript för att kunna automatisera bisektering fullt ut.
+
+Här är vad Ingo Molnar säger om det <<7>>:
+
+_____________
+Jag har ett helautomatiserat bisekteringsskript för uppstartslåsningar. Det bygger på "git-bisect run". Jag kör skriptet, det bygger och startar kärnor helt automatiskt, och när uppstarten misslyckas (skriptet märker det via serielloggen som det övervakar kontinuerligt, eller via timeout: om systemet inte kommer upp inom 10 minuter är det en "dålig" kärna) väcker skriptet min uppmärksamhet med ett pip och jag strömcyklar testmaskinen. (Ja, jag borde använda ett hanterat strömuttag för att automatisera det till 100 %.)
+_____________
+
+Kombinera testsviter, git bisect och andra system
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Vi har sett att testsviter och git bisect är mycket kraftfulla när de används tillsammans. De kan bli ännu kraftfullare om man kan kombinera dem med andra system.
+
+Till exempel skulle vissa testsviter kunna köras automatiskt på natten med ovanliga (eller till och med slumpmässiga) konfigurationer. Och om en regression hittas av en testsvit, kan "git bisect" startas automatiskt, och dess resultat kan skickas via e-post till författaren till den första felaktiga incheckning som hittas av "git bisect", och kanske även till andra personer. Och en ny post i felrapporteringssystemet skulle också kunna skapas automatiskt.
+
+
+Framtiden för bisektering
+-------------------------
+
+"git replace"
+~~~~~~~~~~~~~
+
+Vi såg tidigare att "git bisect skip" nu använder en PRNG för att försöka undvika områden i incheckning-grafen där commits är otestbara. Problemet är att ibland kommer den första felaktiga incheckning att vara i ett otestbart område.
+
+För att förenkla diskussionen antar vi att det otestbara området är en enkel kedja av incheckningar och att det skapades av ett brott som introducerades av en incheckning (låt oss kalla den BBC, bisect breaking commit) och senare rättades av en annan (låt oss kalla den BFC, bisect fixing commit).
+
+Till exempel:
+
+-------------
+...-Y-BBC-X1-X2-X3-X4-X5-X6-BFC-Z-...
+-------------
+
+där vi vet att Y är bra och BFC är dålig, och där BBC samt X1 till X6 är otestbara.
+
+I det här fallet, om du bisekterar manuellt, kan du skapa en särskild gren som börjar precis före BBC. Den första incheckningen i den grenen bör vara BBC med BFC sammanpressad in i den. De övriga incheckningarna i grenen bör vara incheckningarna mellan BBC och BFC ombaserade på grenens första incheckning, samt incheckningen efter BFC också ombaserad.
+
+Till exempel:
+
+-------------
+      (BBC+BFC)-X1'-X2'-X3'-X4'-X5'-X6'-Z'
+     /
+...-Y-BBC-X1-X2-X3-X4-X5-X6-BFC-Z-...
+-------------
+
+där incheckningar citerade med ' har ombaserats.
+
+Du kan enkelt skapa en sådan gren med Git med hjälp av interaktiv ombasering.
+
+Till exempel med hjälp av:
+
+-------------
+$ git rebase -i Y Z
+-------------
+
+och därefter flytta BFC efter BBC och pressa samman den.
+
+Efter det kan du börja bisektera som vanligt i den nya grenen, och du bör till slut hitta den första dåliga incheckningen.
+
+Till exempel:
+
+-------------
+$ git bisect start Z' Y
+-------------
+
+Om du använder "git bisect run" kan du använda samma manuella fix som ovan och sedan starta en annan "git bisect run" i den speciella grenen. Eller som "git bisect" manualsidan säger, kan skriptet som skickas till "git bisect run" applicera en patch innan det kompilerar och testar programvaran <<8>>. Patchen bör omvandla en aktuell otestbar incheckning till en testbar. Så testningen kommer att resultera i "bra" eller "dålig" och "git bisect" kommer att kunna hitta den första dåliga incheckningen. Och skriptet bör inte glömma att ta bort patchen när testningen är klar innan det avslutar skriptet.
+
+(Observera att du i stället för en patch kan använda "git cherry-pick BFC" för att applicera fixen, och i det fallet bör du använda "git reset --hard HEAD^" för att återställa cherry-pick efter testningen och innan skriptet avslutas.)
+
+Men ovanstående sätt att hantera otestbara områden är lite klumpiga. Särskilda grenar är bra eftersom de kan delas mellan utvecklare som vanliga grenar, men risken är att det blir många sådana grenar. Dessutom stör det det normala arbetsflödet i "git bisect". Om du vill köra "git bisect run" helt automatiskt måste du därför lägga till särskild kod i skriptet för att starta om bisekteringen i de särskilda grenarna.
+
+Hur som helst kan man i exemplet med den särskilda grenen ovan se att incheckningarna Z' och Z bör peka på samma källkodstillstånd (samma "träd" i Git-språk). Det beror på att Z' uppstår av att applicera samma ändringar som Z, men i lite annan ordning.
+
+Om vi alltså bara kunde "ersätta" Z med Z' när vi bisekterar, skulle vi inte behöva lägga till något i skriptet. Det skulle bara fungera för alla i projektet som delar de särskilda grenarna och ersättningarna.
+
+Med exemplet ovan skulle det ge:
+
+-------------
+      (BBC+BFC)-X1'-X2'-X3'-X4'-X5'-X6'-Z'-...
+     /
+...-Y-BBC-X1-X2-X3-X4-X5-X6-BFC-Z
+-------------
+
+Det är därför kommandot "git replace" skapades. Tekniskt sett lagrar det ersättningsreferenser i hierarkin "refs/replace/". Dessa referenser är som grenar (lagrade i "refs/heads/") eller taggar (lagrade i "refs/tags/"), vilket innebär att de kan delas automatiskt mellan utvecklare på samma sätt som grenar och taggar.
+
+"git replace" är en mycket kraftfull mekanism. Den kan användas för att rätta incheckningar i redan publicerad historik, till exempel för att ändra incheckningsmeddelandet eller författaren. Den kan också användas i stället för git "grafts" för att länka ett kodförråd till ett annat äldre kodförråd.
+
+Det är faktiskt den sista funktionen som "sålde in" den till Git-gemenskapen, så den finns nu i "master"-grenen i Gits eget kodförråd och skulle släppas i Git 1.6.5 i oktober eller november 2009.
+
+Ett problem med "git replace" är att det för närvarande lagrar alla ersättningsreferenser i "refs/replace/", men det vore kanske bättre om ersättningsreferenser som bara är användbara för bisektering låg i "refs/replace/bisect/". På så sätt skulle dessa ersättningsreferenser kunna användas enbart för bisektering, medan andra referenser direkt i "refs/replace/" skulle användas nästan hela tiden.
+
+Bisektera sporadiska programfel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+En annan möjlig förbättring av "git bisect" skulle vara att valfritt lägga till redundans i de utförda testerna så att det skulle vara mer tillförlitligt vid spårning av sporadiska programfel.
+
+Det här har begärts av vissa kärnutvecklare eftersom vissa programfel, så kallade sporadiska programfel, inte förekommer i alla kärnversioner eftersom de är mycket beroende av kompilatorns utdata.
+
+Tanken är att till exempel vart tredje test kan "git bisect" be användaren testa en incheckning som redan bedömts som "bra" eller "dålig" (eftersom en av dess efterföljare respektive förfäder redan bedömts så). Om en incheckning tidigare råkat klassificeras fel kan bisekteringen då avbrytas tidigt, förhoppningsvis innan för många misstag hunnit göras. Därefter måste användaren undersöka vad som hände och starta om bisekteringen med en korrigerad bisektionslogg.
+
+Det finns redan ett projekt som heter BBChop skapat av Ealdwulf Wuffinga på Github som gör något liknande med hjälp av Bayesiansk sökteori <<9>>:
+
+_____________
+BBChop är som 'git bisect' (eller motsvarande), men fungerar när din bugg är intermittent. Det vill säga, den fungerar i närvaro av falska negativa resultat (när en version råkar fungera den här gången trots att den innehåller programfelet). Den antar att det inte finns några falska positiva resultat (i princip skulle samma tillvägagångssätt fungera, men att lägga till den kan vara icke-trivialt).
+_____________
+
+Men BBChop är oberoende av alla VCS och det skulle vara enklare för Git-användare att ha något integrerat i Git.
+
+Slutsats
+--------
+
+Vi har sett att regressioner är ett viktigt problem, och att "git bisect" har bra funktioner som kompletterar metoder och andra verktyg, särskilt testsviter, som ofta används för att bekämpa regressioner. Men det kan behövas ändrade arbetsflöden och (dåliga) vanor för att få ut det mesta av verktyget.
+
+Vissa förbättringar av algoritmerna i "git bisect" är möjliga och vissa nya funktioner skulle kunna hjälpa i vissa fall, men överlag fungerar "git bisect" redan mycket bra, används flitigt och är redan mycket användbart. För att backa upp det sista påståendet, låt oss ge sista ordet till Ingo Molnar när han frågades av författaren hur mycket tid han tror att "git bisect" sparar honom när han använder det:
+
+_____________
+_mycket_.
+
+För ungefär tio år sedan gjorde jag min första "bisection" av en Linux-patchkö. Det var före Git- (och till och med före BitKeeper-) dagarna. Jag tillbringade bokstavligen dagar med att sortera patchar och skapa vad som i praktiken var fristående incheckningar som jag gissade var relaterade till den programfelet.
+
+Det var ett verktyg för absolut sista utvägen. Jag skulle hellre spendera dagar med att titta på printk-utdata än att göra en manuell 'patch-bisektion'.
+
+Med Git bisect är det en barnlek: i bästa fall kan jag göra en kärnbisektering på cirka 15 steg på 20-30 minuter, automatiserat. Även med manuell hjälp eller vid bisektering av flera överlappande programfel är det sällan mer än en timme.
+
+Det är faktiskt ovärderligt eftersom det finns programfel som jag aldrig ens skulle _försöka_ felsöka om det inte vore för git bisect. Förr fanns det felmönster som omedelbart var hopplösa för mig att felsöka - i bästa fall kunde jag skicka krasch-/buggsignaturen till lkml och hoppas att någon annan kan komma på något.
+
+Och även om en bisektering misslyckas i dag säger det oss något värdefullt om programfelet: att den är icke-deterministisk, beroende av timing eller kärnans avbildningslayout.
+
+Så git bisect är ovillkorligt bra - och citera gärna det ;-)
+_____________
+
+Tack
+----
+
+Stort tack till Junio Hamano för hans hjälp med att granska den här artikeln, för att han granskade patcharna jag skickade till Git-e-postlistan, för att han diskuterade några idéer och hjälpte mig att förbättra dem, för att han förbättrade "git bisect" så mycket och för hans fantastiska arbete med att underhålla och utveckla Git.
+
+Stort tack till Ingo Molnar för att han gett mig mycket användbar information som finns i den här artikeln, för att ha kommenterat den, för hans förslag på att förbättra "git bisect" och för att han sprider "git bisect" på Linux-kärnans e-postlistor.
+
+Stort tack till Linus Torvalds för att ha uppfunnit, utvecklat och spridit "git bisect", Git och Linux.
+
+Stort tack till de många andra fantastiska människor som på ett eller annat sätt hjälpte till när jag arbetade med Git, särskilt Andreas Ericsson, Johannes Schindelin, H. Peter Anvin, Daniel Barkalow, Bill Lear, John Hawley, Shawn O. Pierce, Jeff King, Sam Vilain, Jon Seymour.
+
+Stort tack till Linux-Kongress programkommitté för att ha valt författaren att hålla föredraget och för att ha publicerat den här artikeln.
+
+Referenser
+----------
+
+- [[[1]]] https://web.archive.org/web/20091206032101/http://www.nist.gov/public_affairs/releases/n02-10.htm['Programvarufel kostar den amerikanska ekonomin 59,5 miljarder dollar årligen'. Nists pressmeddelande.] Se även https://www.nist.gov/system/files/documents/director/planning/report02-3.pdf['De ekonomiska effekterna av otillräcklig infrastruktur för programvarutestning'. Nists planeringsrapport 02-3], sammanfattning och kapitel 8.
+- [[[2]]] https://www.oracle.com/java/technologies/javase/codeconventions-introduction.html['Code Conventions for the Java Programming Language: 1. Introduction'. Sun Microsystems.]
+- [[[3]]] https://en.wikipedia.org/wiki/Software_maintenance['Software maintenance'. Wikipedia.]
+- [[[4]]] https://lore.kernel.org/git/7vps5xsbwp.fsf_-_@assigned-by-dhcp.cox.net/[Junio C Hamano. 'Automated bisect success story'.]
+- [[[5]]] https://lwn.net/Articles/317154/[Christian Couder. 'Fully automated bisecting with "git bisect run"'. LWN.net.]
+- [[[6]]] https://lwn.net/Articles/277872/[Jonathan Corbet. 'Bisection divides users and developers'. LWN.net.]
+- [[[7]]] https://lore.kernel.org/lkml/20071207113734.GA14598@elte.hu/[Ingo Molnar. 'Re: BUG 2.6.23-rc3 can't see sd partitions on Alpha'. Linux-kernel mailing list.]
+- [[[8]]] https://www.kernel.org/pub/software/scm/git/docs/git-bisect.html[Junio C Hamano and the git-list. 'git-bisect(1) Manual Page'. Linux Kernel Archives.]
+- [[[9]]] https://github.com/Ealdwulf/bbchop[Ealdwulf. 'bbchop'. GitHub.]

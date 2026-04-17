@@ -15,13 +15,28 @@ require_relative 'asciidoctor-extensions'
 
 SITE_ROOT = File.join(File.expand_path(File.dirname(__FILE__)), '../')
 DOCS_INDEX_FILE = "#{SITE_ROOT}external/docs/content/docs/_index.html"
-DATA_FILE = "#{SITE_ROOT}external/docs/data/docs.yml"
+DATA_FILE = "#{SITE_ROOT}external/docs/data/docs.json"
 DOCS_EXTRA_FILE = "#{SITE_ROOT}data/docs_extra.yml"
+
+def convert_timestamps(obj)
+  case obj
+  when Hash
+    obj.each do |k, v|
+      if k == "committed" && v.is_a?(String)
+        obj[k] = Time.parse(v)
+      else
+        convert_timestamps(v)
+      end
+    end
+  when Array
+    obj.each { |v| convert_timestamps(v) }
+  end
+end
 
 def read_data
   if File.exist?(DATA_FILE)
-    # `permitted_classes` required to allow running with Ruby v3.1
-    data = YAML.load_file(DATA_FILE, permitted_classes: [Time])
+    data = JSON.parse(File.read(DATA_FILE))
+    convert_timestamps(data)
   else
     FileUtils.mkdir_p(File.dirname(DATA_FILE))
     data = {}
@@ -140,7 +155,7 @@ def extract_glossary_from_html(content, lang = 'en')
       end
     end
     definition = definition_fragment.to_html
-    
+
     term_names.each do |term|
       glossary[term] = definition
     end
@@ -362,7 +377,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
   end
 
   File.open(DATA_FILE, "w") do |out|
-    YAML.dump(data, out)
+    JSON.dump(data, out)
   end
 end
 
@@ -706,7 +721,7 @@ def index_doc(filter_tags, doc_list, get_content)
             j = i
             j = j + 1 while post_sha == version_map[doc_versions[j + 1]]
             page_versions.unshift({
-              "name" => i == j ? post_version : "#{post_version} &rarr; #{doc_versions[j]}"
+              "name" => i == j ? post_version : "#{post_version} → #{doc_versions[j]}"
             })
             i = j + 1
           else
@@ -764,7 +779,7 @@ def index_doc(filter_tags, doc_list, get_content)
     "subsection" => "reference",
     "title" => "Git - Reference",
     "url" => "/docs.html",
-    "aliases" => ["/docs/index.html"]
+    "aliases" => ["/docs/index.html", "/doc/index.html", "/doc", "/doc.html"]
   }
 
   File.open(DOCS_INDEX_FILE, "w") do |out|
@@ -772,7 +787,7 @@ def index_doc(filter_tags, doc_list, get_content)
   end
 
   File.open(DATA_FILE, "w") do |out|
-    YAML.dump(data, out)
+    JSON.dump(data, out)
   end
 end
 

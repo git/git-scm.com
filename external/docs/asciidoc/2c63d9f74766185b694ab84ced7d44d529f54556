@@ -1,0 +1,165 @@
+git-credential(1)
+=================
+
+NAMN
+----
+git-credential - Hämta och lagra användaruppgifter
+
+SYNOPSIS
+--------
+------------------
+'git credential' (fill|approve|reject|capability)
+------------------
+
+BESKRIVNING
+-----------
+
+Git har ett internt gränssnitt för att lagra och hämta inloggningsuppgifter från systemspecifika hjälpprogram, samt för att be användaren om användarnamn och lösenord. Kommandot git-credential exponerar detta gränssnitt för skript som kan vilja hämta, lagra eller be om inloggningsuppgifter på samma sätt som Git. Utformningen av detta skriptbara gränssnitt modellerar det interna C API:et; se credential.h för mer bakgrund om koncepten.
+
+git-credential tar ett "handlings"-alternativ på kommandoraden (ett av `fill`, `approve` eller `reject`) och läser en beskrivning av legitimationsinformations-beskrivingen på stdin (se <<IOFMT,IN-/UTMATNINGSFORMAT>>).
+
+Om åtgärden är `fill` kommer git-credential att försöka lägga till attributen "username" and "password" i beskrivningen genom att läsa konfigurationsfiler, genom att kontakta eventuella konfigurerade legitimationsinformations-hjälpprogram eller genom att fråga användaren. Attributen "username" och "password" i legitimationsinformationsbeskrivningen skrivs sedan ut till stdout tillsammans med de attribut som redan angetts.
+
+Om åtgärden är `godkänn` skickar git-credential beskrivningen till alla konfigurerade autentiserings-hjälpprogram, som kan lagra legitimationsinformation för senare användning.
+
+Om åtgärden är `reject` skickar git-credential beskrivningen till alla konfigurerade legitimationsinformations-hjälpprogram, vilket kan radera all lagrae legitimationsinformation som matchar beskrivningen.
+
+Om åtgärden är `capability` kommer git-credential att meddela alla funktioner den stöder till standardutdata.
+
+Om åtgärden är `godkänn` eller `avvisa`, ska ingen utdata genereras.
+
+TYPISK ANVÄNDNING AV GIT-AUTENTIERINGSINFORMATION
+-------------------------------------------------
+
+En applikation som använder git-credential använder vanligtvis `git credential` genom att följa dessa steg:
+
+  1. Generera en beskrivning av legitimationsinformation baserat på sammanhanget.
++
+Om vi till exempel vill ha ett lösenord för `https://example.com/foo.git` kan vi generera följande beskrivning av legitimationsinformation (glöm inte den tomma raden i slutet; den talar om för `git credential` att applikationen har matat in all information den har):
+
+	 protocol=https
+	 host=example.com
+	 path=foo.git
+
+  2. Be git-credential att ge oss ett användarnamn och lösenord för denna beskrivning. Detta görs genom att köra `git credential fill` och mata in beskrivningen från steg (1) till dess standardindata. Den fullständiga beskrivningen av legitimationsinformation (inklusive själva legitimationsinformationen, dvs. inloggning och lösenord) kommer att produceras på standardutdata, som:
+
+	protocol=https
+	host=example.com
+	username=bob
+	password=secr3t
++
+I de flesta fall innebär detta att attributen som anges i indata kommer att upprepas i utdata, men Git kan också modifiera beskrivningen av legitimationsinformation, till exempel genom att ta bort attributet `path` när protokollet är HTTP(s) och `credential.useHttpPath` är falskt.
++
+Om `git credential` kände till lösenordet, kanske det här steget inte innebar att användaren faktiskt skrev in detta lösenord (användaren kan ha skrivit ett lösenord för att låsa upp nyckelringen istället, eller så gjordes ingen användarinteraktion om nyckelringen redan var upplåst) innan den returnerade `password=secr3t`.
+
+  3. Använd legitimationsinformationen (t.ex. gå till URL:en med användarnamnet och lösenordet från steg (2)) och se om de accepteras.
+
+  4. Rapportera om lösenordet lyckades eller misslyckades. Om autentiseringsuppgifterna tillät operationen att slutföras korrekt kan de markeras med åtgärden "approve" (godkänn) för att ange att `git credential` ska återanvända den vid nästa anrop. Om autentiseringsuppgifterna avvisades under operationen, använd åtgärden "reject" (avvisa) så att `git credential` kommer att be om ett nytt lösenord vid nästa anrop. I båda fallen ska `git credential` matas med autentiseringsbeskrivningen som erhölls från steg (2) (som också innehåller fälten som anges i steg (1)).
+
+[[IOFMT]]
+INGÅNGS-/UTMATNINGSFORMAT
+-------------------------
+
+`git credential` läser och/eller skriver (beroende på vilken åtgärd som används) legitimationsinformation i sin standardindata/utdata. Denna information kan antingen motsvara nycklar för vilka `git credential` kommer att hämta inloggningsuppgifter (t.ex. värd, protokoll, sökväg), eller de faktiska legitimationsinformationer som ska hämtas (användarnamn/lösenord).
+
+Legitimationsinformationen är uppdelade i en uppsättning namngivna attribut, med ett attribut per rad. Varje attribut anges av ett nyckel-värde-par, separerade med ett `=` (likhetstecken), följt av en ny rad.
+
+Nyckeln får innehålla vilka byte som helst förutom `=`, newline eller NUL. Värdet får innehålla vilka byte som helst förutom newline eller NUL. En rad, inklusive den efterföljande newline, får inte överstiga 65535 byte för att implementeringar ska kunna tolkas effektivt.
+
+Attribut med nycklar som slutar med C-liknande arrayparenteser `[]` kan ha flera värden. Varje instans av ett flervärdigt attribut bildar en ordnad lista med värden - ordningen på de upprepade attributen definierar ordningen på värdena. Ett tomt flervärdigt attribut (`key[]=\n`) rensar eventuella tidigare poster och återställer listan.
+
+I samtliga fall behandlas alla byte som de är (dvs. det finns ingen citering, och man kan inte överföra ett värde med nyrad eller NUL i det). Listan med attribut avslutas med en tom rad eller filslut.
+
+Git förstår följande attribut:
+
+`protocol`::
+
+	Protokollet över vilket legitimationsinformationen kommer att användas (t.ex. `https`).
+
+`host`::
+
+	Fjärrvärdnamnet för en nätverks-legitimationsinformation. Detta inkluderar portnumret om ett sådant angavs (t.ex. "example.com:8088").
+
+`path`::
+
+	Sökvägen som legitimationsinformationen kommer att användas med. T.ex. för åtkomst till ett fjärr-https-arkiv, kommer detta att vara arkivets sökväg på servern.
+
+`username`::
+
+	Legitimationsinformationens användarnamn, om vi redan har ett (t.ex. från en URL, konfigurationen, användaren eller från en tidigare körd hjälpprogram).
+
+`password`::
+
+	Inloggningsuppgifternas lösenord, om vi ber om att det ska lagras.
+
+`password_expiry_utc`::
+
+	Genererade lösenord, till exempel en OAuth-åtkomsttoken, kan ha ett utgångsdatum. När inloggningsuppgifter läses från hjälpprogram ignorerar `git credential fill` utgångna lösenord. Representeras som Unix-tid UTC, sekunder sedan 1970.
+
+`oauth_refresh_token`::
+
+	En OAuth-uppdateringstoken kan medfölja ett lösenord som är en OAuth-åtkomsttoken. Hjälpprogram måste behandla detta attribut som konfidentiellt, precis som lösenordsattributet. Git i sig har inget särskilt beteende för detta attribut.
+
+`url`::
+
+	När detta speciella attribut läses av `git credential`, tolkas värdet som en URL och behandlas som om dess beståndsdelar lästes (t.ex. skulle `url=https://example.com` bete sig som om `protocol=https` och `host=example.com` hade angetts). Denna kan hjälpa anropare att undvika att själva tolka URL:er.
++
+Observera att det är obligatoriskt att ange ett protokoll och om URL:en inte anger ett värdnamn (t.ex. "cert:///sökväg/till/fil") kommer legitimationsinformationen att innehålla ett värdnamnsattribut vars värde är en tom sträng.
++
+Komponenter som saknas i URL:en (t.ex. det finns inget användarnamn i exemplet ovan) kommer att lämnas oinställda.
+
+`authtype`::
+	Detta indikerar att det aktuella autentiseringsschemat ska användas. Vanliga värden för HTTP och HTTPS inkluderar `basic`, `bearer` och `digest`, även om det senare är osäkert och inte bör användas. Om `credential` används kan detta sättas till en godtycklig sträng som är lämplig för protokollet i fråga (vanligtvis HTTP).
++
+Detta värde bör inte skickas om inte lämplig förmåga (se nedan) anges vid inmatning.
+
+`credential`::
+	Den förkodade inloggningsuppgiftern, lämplig för protokollet i fråga (vanligtvis HTTP). Om denna nyckel skickas är `authtype` obligatorisk, och `username` och `password` används inte. För HTTP sammanfogar Git värdet `authtype` och detta värde med ett enda mellanslag för att bestämma `Authorization`-huvudet.
++
+Detta värde bör inte skickas om inte lämplig förmåga (se nedan) anges vid inmatning.
+
+`ephemeral`::
+	Detta booleska värde indikerar, om det är sant, att värdet i fältet `credential` inte ska sparas av legitimationsinformation helpprogramet eftersom dess användbarhet är tidsbegränsad. Till exempel beräknas ett HTTP Digest `credential`-värde med hjälp av en engångstal och återanvändning av det kommer inte att resultera i lyckad autentisering. Detta kan också användas i situationer med kortvariga (t.ex. 24-timmars) legitimationsinformation. Standardvärdet är falskt.
++
+Legitimationsinformations hejälpprogramet kommer fortfarande att anropas med `store` eller `erase` så att den kan avgöra om operationen lyckades.
++
+Detta värde bör inte skickas om inte lämplig förmåga (se nedan) anges vid inmatning.
+
+`state[]`::
+	Detta värde ger ett ogenomskinligt tillstånd som skickas tillbaka till detta hjälpprogram om den anropas igen. Varje olika legitimationsinformation kan ange detta en gång. Värdet ska innehålla ett prefix som är unikt för legitimationsinformationen och ska ignorera värden som inte matchar dess prefix.
++
+Detta värde bör inte skickas om inte lämplig förmåga (se nedan) anges vid inmatning.
+
+`continue`::
+	Detta är ett booleskt värde som, om det är aktiverat, indikerar att denna autentisering inte är en slutgiltig del av ett flerstegsautentiseringssteg. Detta är vanligt i protokoll som NTLM och Kerberos, där två omgångar av klientautentisering krävs, och om denna flagga ställs in kan legitimationsinformation hjälpprogrammet implementera flerstegsautentiseringssteget. Denna flagga bör endast skickas om ytterligare ett steg krävs; det vill säga om ytterligare en autentiseringsrunda förväntas.
++
+Detta värde ska inte skickas om inte lämplig funktion (se nedan) anges vid inmatning. Detta attribut är 'enkelriktat' från en legitimationsinformations hjälpprogramet för att skicka information till Git (eller andra program som anropar `git credential`).
+
+`wwwauth[]`::
+
+	När Git tar emot ett HTTP-svar som innehåller en eller flera 'WWW-Authenticate'-autentiseringshuvuden skickas dessa av Git till legitimationsinformations hjälpprogramet.
++
+Varje 'WWW-Authenticate' huvud-värde skickas som ett flervärdesattribut 'wwwauth[]', där attributens ordning är densamma som de visas i HTTP-svaret. Detta attribut är 'enkelriktat' från Git för att skicka ytterligare information till legitimationsinformations hjälpprogrammet.
+
+`capability[]`::
+	Detta signalerar att Git, eller hjälpprogrammet, beroende på vad som är lämpligt, stöder den aktuella förmågan. Detta kan användas för att tillhandahålla bättre, mer specifik data som en del av protokollet. Direktivet `capability[]` måste föregå alla värden som är beroende av det och dessa direktiv _bör_ vara det första som tillkännages i protokollet.
++
+Det finns för närvarande två förmågorna som stöds. Den första är `authtype`, vilket indikerar att värdena `authtype`, `credential` och `ephemeral` är förstådda. Den andra är `state`, vilket indikerar att värdena `state[]` och `continue` är förstådda.
++
+Det är inte obligatoriskt att använda tilläggsfunktionerna bara för att funktionen stöds, men de bör inte tillhandahållas utan funktionen.
+
+Okända attribut och förmågor förkastas i tysthet.
+
+[[CAPA-IOFMT]]
+FÖRMÅGOR INGÅNGS-/UTGÅNGSFORMAT
+-------------------------------
+
+För `git credential capability` är formatet något annorlunda. Först görs ett `version 0`-meddelande för att indikera den aktuella versionen av protokollet, och sedan meddelas varje funktion med en rad som `capability authtype`. Legitimationsinformations-hjälpprogram kan också implementera detta format, återigen med argumentet `capability`. Ytterligare rader kan läggas till i framtiden; anropare bör ignorera rader som de inte förstår.
+
+Eftersom detta är en ny del av protokollet för legitimationsinformations-hjälpprgram, kanske äldre versioner av Git, såväl som vissa legitimationsinformations-hjälpprogram, inte stöder det. Om en avslutningsstatus som inte är noll tas emot, eller om den första raden inte börjar med ordet "version" och ett mellanslag, bör anropare anta att inga funktioner stöds.
+
+Avsikten med detta format är att skilja det från utdata för legitimationsinformations utskrift på ett entydigt sätt. Det är möjligt att använda mycket enkla legitimationsinformations-hjälpprogram (t.ex. inline-shellskript) som alltid producerar identisk utdata. Genom att använda ett distinkt format kan användare fortsätta använda denna syntax utan att behöva oroa sig för att korrekt implementera förmågoannonser eller av misstag förvirra anropare som frågar efter funktioner.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

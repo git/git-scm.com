@@ -1,0 +1,331 @@
+git-worktree(1)
+===============
+
+NAMN
+----
+git-worktree - Hantera flera arbetskataloger
+
+
+SYNOPSIS
+--------
+[synopsis]
+git worktree add [-f] [--detach] [--checkout] [--lock [--reason <sträng>]]
+		 [--orphan] [(-b | -B) <ny-gren>] <sökväg> [<incheckning-igt>]
+git worktree list [-v | --porcelain [-z]]
+git worktree lock [--reason <string>] <arbetsträd>
+git worktree move <worktree> <ny-sökväg>
+git worktree prune [-n] [-v] [--expire <upphör>]
+git worktree remove [-f] <arbetsträd>
+git worktree repair [<sökväg>...]
+git worktree unlock <arbetsträd>
+
+BESKRIVNING
+-----------
+
+Hantera flera arbetskataloger som är kopplade till samma kodförråd.
+
+Ett git-kodförråd kan stödja flera arbetskataloger, vilket gör att du kan checka ut mer än en gren åt gången. Med `git worktree add` associeras ett nytt arbetskatalog med kodförrådet, tillsammans med ytterligare metadata som skiljer den arbetskatalogen från andra i samma kodförråd. Arbetskatalogen, tillsammans med dessa metadata, kallas ett "arbetsträd".
+
+Detta nya arbetsträd kallas ett "länkat arbetsträd" i motsats till det "huvudarbetsträd" som förberetts av linkgit:git-init[1] eller linkgit:git-clone[1]. Ett kodförråd har ett huvudarbetsträd (om det inte är ett rent kodförråd) och noll eller fler länkade arbetsträd. När du är klar med ett länkat arbetsträd, ta bort det med `git worktree remove`.
+
+I sin enklaste form skapar `git worktree add <sökväg>` automatiskt en ny gren vars namn är den sista komponenten i _<sökväg>_, vilket är praktiskt om du planerar att arbeta med ett nytt ämne. Till exempel skapar `git worktree add ../hotfix` en ny gren `hotfix` och checkar ut den vid sökvägen `../hotfix`. För att istället arbeta med en befintlig gren i ett nytt arbetsträd, använd `git worktree add <sökväg> <gren>`. Å andra sidan, om du bara planerar att göra några experimentella ändringar eller testa utan att störa befintlig utveckling, är det ofta praktiskt att skapa ett 'engångs'-arbetsträd som inte är associerat med någon gren. Till exempel skapar `git worktree add -d <sökväg>` ett nytt arbetsträd med en fristående `HEAD` vid samma incheckning som den aktuella grenen.
+
+Om en arbetskatalog tas bort utan att använda `git worktree remove`, kommer dess tillhörande administrativa filer, som finns i arkivet (se "DETALJER" nedan), så småningom att tas bort automatiskt (se `gc.worktreePruneExpire` i linkgit:git-config[1]), eller så kan du köra `git worktree prune` i huvudträdet eller i något länkat arbetsträd för att rensa upp eventuella inaktuella administrativa filer.
+
+Om arbetskatalogen för ett länkat arbetsträd lagras på en bärbar enhet eller nätverksresurs som inte alltid är monterad, kan du förhindra att dess administrativa filer rensas genom att köra kommandot `git worktree lock`, valfritt ange `--reason` för att förklara varför arbetsträdet är låst.
+
+KOMMANDON
+---------
+`add <sökväg> [<incheckning-igt>]`::
+
+Skapa ett arbetsträd vid _<sökväg>_ och checka ut _<incheckning-igt>_ i det. Det nya arbetsträdet länkas till det aktuella arkivet och delar allt utom per arbetsträds-filer som `HEAD`, `index`, etc. För enkelhetens skull kan _<incheckning-igt>_ vara ett rent "`-`", vilket är synonymt med `@{-1}`.
++
+Om _<incheckning-igth>_ är ett grennamn (kalla det _<gren>_) och inte hittas, och varken `-b`, `-B` eller `--detach` används, men det finns en spårningsgren i exakt en fjärr (kalla den _<fjärr>_) med ett matchande namn, behandla den som likvärdig med:
++
+------------
+$ git worktree add --track -b <gren> <sökväg> <fjärr>/<gren>
+------------
++
+Om grenen finns i flera fjärrer och en av dem namnges av konfigurationsvariabeln `checkout.defaultRemote`, använder vi den för att göra det särskiljning, även om _<gren>_ inte är unik för alla fjärrer. Sätt den till t.ex. `checkout.defaultRemote=origin` för att alltid checka ut fjärrgrenar därifrån om _<gren>_ är tvetydig men finns på `origin`-fjärren. Se även `checkout.defaultRemote` i linkgit:git-config[1].
++
+Om _<incheckning-igt>_ utelämnas och varken `-b`, `-B` eller `--detach` används, så associeras det nya arbetsträdet, för enkelhetens skull, med en gren (kalla den _<gren>_) uppkallad efter `$(basename <sökväg>)`. Om _<gren>_ inte finns, skapas automatiskt en ny gren baserad på `HEAD` som om `-b <gren>` hade angetts. Om _<gren>_ finns, kommer den att checkas ut i det nya arbetsträdet, om den inte är utcheckad någon annanstans, annars kommer kommandot att vägra att skapa arbetsträdet (såvida inte `--force` används).
++
+Om _<incheckning-igt>_ utelämnas, används varken `--detach` eller `--orphan`, och det inte finns några giltiga lokala grenar (eller fjärrgrenar om `--guess-remote` anges) så associeras det nya arbetsträdet, för enkelhetens skull, med en ny ofödd gren med namnet _<gren>_ (efter `$(basename <sökväg>)` om varken `-b` eller `-B` används) som om `--orphan` skickades till kommandot. Om kodförrådet har en fjärr och `--guess-remote` används, men inga fjärr- eller lokala grenar finns, misslyckas kommandot med en varning som påminner användaren om att hämta från sin fjärr först (eller åsidosätta genom att använda `-f`/`--force`).
+
+`list`::
+
+List details of each worktree. The main worktree is listed first, followed by each of the linked worktrees. The output details include whether the worktree is bare, the revision currently checked out, the branch currently checked out (or "detached HEAD" if none), "locked" if the worktree is locked, "prunable" if the worktree can be pruned by the `prune` command.
+
+`lock`::
+
+Om ett arbetsträd finns på en portabel enhet eller nätverksresurs som inte alltid är monterad, lås det för att förhindra att dess administrativa filer rensas automatiskt. Detta förhindrar också att det flyttas eller tas bort. Du kan också ange en orsak till låsningen med `--reason`.
+
+`move`::
+
+Flytta ett arbetsträd till en ny plats. Observera att huvudarbetsträdet eller länkade arbetsträd som innehåller undermoduler inte kan flyttas med detta kommando. (Kommandot `git worktree repair` kan dock återupprätta anslutningen till länkade arbetsträd om du flyttar huvudarbetsträdet manuellt.)
+
+`prune`::
+
+Beskär arbetsträdsinformation i `$GIT_DIR/worktrees`.
+
+`remove`::
+
+Ta bort ett arbetsträd. Endast rena arbetsträd (inga ospårade filer och inga modifieringar i spårade filer) kan tas bort. Orena arbetsträd eller arbetsträd med undermoduler kan tas bort med `--force`. Huvudarbetsträdet kan inte tas bort.
+
+`repair [<sökväg>...]`::
+
+Reparera arbetsträdets administrativa filer, om möjligt , om de har blivit skadade eller föråldrade på grund av externa faktorer.
++
+Till exempel, om huvudarbetsträdet (eller det bara kodförrådet) flyttas, kommer länkade arbetsträd inte att kunna hitta det. Att köra `reparera` i huvudarbetsträdet kommer att återupprätta anslutningen från länkade arbetsträd tillbaka till huvudarbetsträdet.
++
+På samma sätt, om arbetsträdet för ett länkat arbetsträd flyttas utan att använda `git worktree move`, kommer huvudarbetsträdet (eller det bara kodförrådet) inte att kunna hitta det. Att köra `repair` i det nyligen flyttade arbetsträdet kommer att återupprätta anslutningen. Om flera länkade arbetsträd flyttas, kommer att köra `repair` från valfritt arbetsträd med varje träds nya _<sökväg>_ som argument, att återupprätta anslutningen till alla angivna sökvägar.
++
+Om både huvudarbetsträdet och länkade arbetsträd har flyttats eller kopierats manuellt, kommer alla anslutningar i båda riktningarna att återställas om man kör `reparera` i huvudarbetsträdet och anger den nya _<sökvägen>_ för varje länkat arbetsträd.
+
+`unlock`::
+
+Lås upp ett arbetsträd, så att det kan beskäras, flyttas eller tas bort.
+
+ALTERNATIV
+----------
+
+`-f`::
+`--force`::
+	Som standard, vägrar `add` att skapa ett nytt arbetsträd när _<incheckning-igt>_ är ett grennamn och redan är utcheckat av ett annat arbetsträd, eller om _<sökväg>_ redan är tilldelat till ett arbetsträd men saknas (till exempel om _<sökväg>_ har tagits bort manuellt). Det här alternativet åsidosätter dessa skyddsåtgärder. För att lägga till en saknad men låst arbetsträdssökväg, ange `--force` två gånger.
++
+`move` vägrar att flytta ett låst arbetsträd om inte `--force` anges två gånger. Om destinationen redan är tilldelad ett annat arbetsträd men saknas (till exempel om _<ny-sökväg>_ raderades manuellt), så tillåter `--force` att flytten fortsätter; använd `--force` två gånger om destinationen är låst.
++
+`remove` vägrar att ta bort ett orent arbetsträd om inte `--force` används. För att ta bort ett låst arbetsträd, ange `--force` två gånger.
+
+`-b <ny-gren>`::
+`-B <ny-gren>`::
+	Med `add`, skapa en ny gren med namnet _<ny-gren>_ som börjar på _<incheckning-igt>_, och checka ut _<ny-gren>_ i det nya arbetsträdet. Om _<incheckning-igt>_ utelämnas, används `HEAD` som standard. Som standard vägrar `-b` att skapa en ny gren om den redan finns. `-B` åsidosätter denna skyddsåtgärd och återställer _<ny-gren>_ till _<incheckning-igt>_.
+
+`-d`::
+`--detach`::
+	Med `add`, koppla bort `HEAD` i det nya arbetsträdet. Se "FRÅNKOPPLAT HEAD" i linkgit:git-checkout[1].
+
+`--checkout`::
+`--no-checkout`::
+	Som standard, checkar `add` ut _<incheckning-igt>_, men `--no-checkout` kan användas för att undertrycka utcheckning för att göra anpassningar, som att konfigurera gles-utcheckning. Se "gles utcheckning" i linkgit:git-read-tree[1].
+
+`--guess-remote`::
+`--no-guess-remote`::
+	Med `worktree add <sökväg>`, utan _<incheckning-igt>_, istället för att skapa en ny gren från `HEAD`, om det finns en spårningsgren i exakt en fjärr som matchar basnamnet _<sökväg>_, basera den nya grenen på fjärrspårningsgrenen och markera fjärrspårningsgrenen som "uppströms" om den nya grenen.
++
+Detta kan också ställas in som standardbeteende genom att använda konfigurationsalternativet `worktree.guessRemote`.
+
+`--relative-paths`::
+`--no-relative-paths`::
+	Länka arbetsträd med relativa sökvägar eller absoluta sökvägar (standard). Åsidosätter konfigurationsalternativet `worktree.useRelativePaths`, se linkgit:git-config[1].
++
+Med `repair` (reparera) uppdateras länkfilerna om det finns en absolut/relativ avvikelse, även om länkarna är korrekta.
+
+`--track`::
+`--no-track`::
+	När du skapar en ny gren, om _<incheckning-igt>_ är en gren, markera den som "uppströms" från den nya grenen. Detta är standardvärdet om _<incheckning-igt>_ är en fjärrspårningsgren. Se `--track` i linkgit:git-branch[1] för mer information.
+
+`--lock`::
+	Håll arbetsträdet låst efter skapandet. Detta motsvarar `git worktree lock` efter `git worktree add`, men utan en kapplöpningsrisk.
+
+`-n`::
+`--dry-run`::
+	Med `prune` (beskär), ta inte bort något; rapportera bara vad det skulle ta bort.
+
+`--orphan`::
+	Med `add`, lägg till och gör det nya arbetsträdet och indexet tomt, och associera arbetsträdet med en ny ofödd gren med namnet _<ny-gren>_.
+
+`--porcelain`::
+	Med `list`, lista utdata i ett lätttolkat format för skript. Detta format kommer att förbli stabilt i alla Git-versioner och oavsett användarkonfiguration. Det rekommenderas att kombinera detta med `-z`. Se nedan för detaljer.
+
+`-z`::
+	Avsluta varje rad med ett _NUL_ istället för en ny rad när `--porcelain` anges med `list`. Detta gör det möjligt att analysera utdata när en arbetsträdssökväg innehåller ett nyradstecken.
+
+`-q`::
+`--quiet`::
+	Med `add`, undertryck återkopplingsmeddelanden.
+
+`-v`::
+`--verbose`::
+	Med `prune` (beskär), rapportera alla borttagningar.
++
+Med `list`, mata ut ytterligare information om arbetsträd (se nedan).
+
+`--expire <tid>`::
+	Med `prune` får endast oanvända arbetsträd som är äldre än _<tid>_ att upphöra att gälla.
++
+Med `list`, annotera saknade arbetsträd som beskärningsbara om de är äldre än _<tid>_.
+
+`--reason <sträng>`::
+	Med `lock` eller med `add --lock`, en förklaring till varför arbetsträdet är låst.
+
+_<arbetsträd>_::
+	Arbetsträd kan identifieras med hjälp av sökväg, antingen relativ eller absolut.
++
+Om den sista sökvägskomponenten i arbetsträdets sökväg är unik bland arbetsträden kan den användas för att identifiera ett arbetsträd. Om du till exempel bara har två arbetsträd, vid `/abc/def/ghi` och `/abc/def/ggg`, så räcker `ghi` eller `def/ghi` för att peka på det förra arbetsträdet.
+
+REFS
+----
+När man använder flera arbetsträd, delas vissa referenser mellan alla arbetsträd, men andra är specifika för ett enskilt arbetsträd. Ett exempel är `HEAD`, vilket är olika för varje arbetsträd. Det här avsnittet handlar om delningsreglerna och hur man kommer åt referenser för ett arbetsträd från ett annat.
+
+Generellt sett är alla pseudoreferenser per arbetsträd och alla referenser som börjar med `refs/` delas. Pseudoreferenser är sådana som `HEAD` som ligger direkt under `$GIT_DIR` istället för inuti `$GIT_DIR/refs`. Det finns dock undantag: referenser inuti `refs/bisect`, `refs/worktree` och `refs/rewritten` delas inte.
+
+Referenser som är per arbetsträd kan fortfarande nås från ett annat arbetsträd via två speciella sökvägar, `main-worktree` and `worktrees`. Den förra ger åtkomst till referenser per arbetsträd för huvudarbetsträdet, medan den senare ger åtkomst till alla länkade arbetsträd.
+
+Till exempel, `main-worktree/HEAD` eller `main-worktree/refs/bisect/good` upplöses till samma värde som huvudarbetsträdets `HEAD` respektive `refs/bisect/good`. På liknande sätt är `worktrees/foo/HEAD` eller `worktrees/bar/refs/bisect/bad` samma som `$GIT_COMMON_DIR/worktrees/foo/HEAD` och `$GIT_COMMON_DIR/worktrees/bar/refs/bisect/bad`.
+
+To access refs, it's best not to look inside `$GIT_DIR` directly. Instead use commands such as linkgit:git-rev-parse[1] or linkgit:git-update-ref[1] which will handle refs correctly.
+
+KONFIGURATIONSFIL
+-----------------
+Som standard, delas arkivets `config`-fil mellan alla arbetsträd. Om konfigurationsvariablerna `core.bare` eller `core.worktree` finns i den gemensamma konfigurationsfilen och `extensions.worktreeConfig` är inaktiverat, kommer de endast att tillämpas på huvudarbetsträdet.
+
+För att få en arbetsträdsspecifik konfiguration kan du aktivera tillägget `worktreeConfig`, t.ex.:
+
+------------
+$ git config extensions.worktreeConfig true
+------------
+
+I det här läget, stannar den specifika konfigurationen i sökvägen som anges av `git rev-parse --git-path config.worktree`. Du kan lägga till eller uppdatera konfigurationen i den här filen med `git config --worktree`. Äldre Git-versioner kommer att vägra åtkomst till kodförråd med det här tillägget.
+
+Observera att i den här filen, är undantaget för `core.bare` och `core.worktree` borta. Om de finns i `$GIT_DIR/config` måste du flytta dem till `config.worktree` i huvudarbetsträdet. Du kan också ta tillfället i akt att granska och flytta annan konfiguration som du inte vill dela med alla arbetsträd:
+
+ - `core.worktree` ska aldrig delas.
+
+ - `core.bare` ska inte delas om värdet är `core.bare=true`.
+
+ - `core.sparseCheckout` bör inte delas, såvida du inte är säker på att du alltid använder gles utcheckning för alla arbetsträd.
+
+Se dokumentationen för `extensions.worktreeConfig` i linkgit:git-config[1] för mer information.
+
+DETALJER
+--------
+Varje länkat arbetsträd har en privat underkatalog i arkivets katalog `$GIT_DIR/worktrees`. Namnet på den privata underkatalogen är vanligtvis basnamnet på det länkade arbetsträdets sökväg, eventuellt tillagt med ett nummer för att göra det unikt. Till exempel, när `$GIT_DIR=/sökväg/main/.git` skapar kommandot `git worktree add /sökväg/annan/test-next next` det länkade arbetsträdet i `/sökväg/annan/test-next` och skapar även en `$GIT_DIR/worktrees/test-next`-katalog (eller `$GIT_DIR/worktrees/test-next1` om `test-next` redan är upptaget).
+
+Inom ett länkat arbetsträd är `$GIT_DIR` inställt att peka till denna privata katalog (t.ex. `/sökväg/main/.git/worktrees/test-next` i exemplet) och `$GIT_COMMON_DIR` är inställt att peka tillbaka till huvudarbetsträdets `$GIT_DIR` (t.ex. `/sökväg/main/.git`). Dessa inställningar görs i en `.git`-fil som finns i den översta katalogen i det länkade arbetsträdet.
+
+Sökvägsupplösning via `git rev-parse --git-path` använder antingen `$GIT_DIR` eller `$GIT_COMMON_DIR` beroende på sökvägen. Till exempel, i det länkade arbetsträdet returnerar `git rev-parse --git-path HEAD` `/sökväg/main/.git/worktrees/test-next/HEAD` (inte `/sökväg/annan/test-next/.git/HEAD` eller `/sökväg/main/.git/HEAD`) medan `git rev-parse --git-path refs/heads/master` använder `$GIT_COMMON_DIR` och returnerar `/sökväg/main/.git/refs/heads/master`, eftersom referenser delas mellan alla arbetsträd, förutom `refs/bisect`, `refs/worktree` och `refs/rewritten`.
+
+Se linkgit:gitrepository-layout[5] för mer information. Tumregeln är att inte göra några antaganden om huruvida en sökväg tillhör `$GIT_DIR` eller `$GIT_COMMON_DIR` när du behöver komma åt något direkt i `$GIT_DIR`. Använd `git rev-parse --git-path` för att få den slutliga sökvägen.
+
+Om du manuellt flyttar ett länkat arbetsträd måste du uppdatera `gitdir`-filen i postens katalog. Om till exempel ett länkat arbetsträd flyttas till `/nysökväg/test-next` och dess `.git`-fil pekar på `/sökväg/main/.git/worktrees/test-next`, uppdatera då `/sökväg/main/.git/worktrees/test-next/gitdir` för att referera till `/nysökväg/test-next` istället. Ännu bättre, kör `git worktree repair` för att återupprätta anslutningen automatiskt.
+
+För att förhindra att en `$GIT_DIR/worktrees`-post beskärs (vilket kan vara användbart i vissa situationer, till exempel när postens arbetsträd lagras på en portabel enhet), använd kommandot `git worktree lock`, vilket lägger till en fil med namnet `locked` i postens katalog. Filen innehåller orsaken i klartext. Om till exempel ett länkat arbetsträds `.git`-fil pekar på `/sökväg/main/.git/worktrees/test-next`, kommer en fil med namnet `/sökväg/main/.git/worktrees/test-next/locked` att förhindra att `test-next`-posten beskärs. Se linkgit:gitrepository-layout[5] för mer information.
+
+När `extensions.worktreeConfig` är aktiverat, läses konfigurationsfilen `.git/worktrees/<id>/config.worktree` efter `.git/config`.
+
+LIST UTMATNINGS-FORMAT
+----------------------
+Kommandot `worktree list` har två utdataformat. Standardformatet visar detaljerna på en enda rad med kolumner. Till exempel:
+
+------------
+$ git worktree list
+/sökväg/till/bar-källa                (bare)
+/sökväg/till/länkat-arbetsträd        abcd1234 [master]
+/sökväg/till/annat-länkat-arbetsträd  1234abc  (detached HEAD)
+------------
+
+Kommandot visar även anteckningar för varje arbetsträd, beroende på dess tillstånd. Dessa anteckningar är:
+
+ * `locked`, om arbetsträdet är låst.
+ * `prunable`, om arbetsträdet kan beskäras via `git worktree prune`.
+
+------------
+$ git worktree list
+/sökväg/till/länkat-arbetsträd      abcd1234 [master]
+/sökväg/till/låst-arbetsträd        acbd5678 (brancha) locked
+/sökväg/till/beskärbart-arbetsträd  5678abc  (detached HEAD) prunable
+------------
+
+För dessa annoteringar, kan det också finnas en orsak, och detta kan ses med hjälp av utförligt-läget (verbose). Annoteringen flyttas sedan till nästa indragna rad följt av den ytterligare informationen.
+
+------------
+$ git worktree list --verbose
+/sökväg/till/länkat-arbetsträd                abcd1234 [master]
+/sökväg/till/länkat-arbetsträd-ej-anlending   abcd5678 (detached HEAD) locked
+/sökväg/till/länkat-arbetsträd-med-anlending  1234abcd (brancha)
+        locked: arbetsträdssökvägen är monterad på en portabel enhet
+/sökväg/till/prunable-worktree                5678abc1 (detached HEAD)
+        prunable: ”gitdir”-filen pekar på en ickeexisterande plats
+------------
+
+Observera att anteckningen flyttas till nästa rad om den ytterligare informationen är tillgänglig, annars stannar den kvar på samma rad som själva arbetsträdet.
+
+Porslinsformat
+~~~~~~~~~~~~~~
+Porslinsformatet har en rad per attribut. Om `-z` anges avslutas raderna med NUL snarare än en nyrad. Attribut listas med en etikett och ett värde separerade med ett enda mellanslag. Booleska attribut (som `bare` och `detached`) listas endast som en etikett, och finns endast om värdet är sant. Vissa attribut (som `locked`) kan listas endast som en etikett eller med ett värde beroende på om en orsak finns tillgänglig. Det första attributet i ett arbetsträd är alltid `worktree`, en tom rad indikerar slutet på posten. Till exempel:
+
+------------
+$ git worktree list --porcelain
+worktree /sökväg/till/bar-källa
+bare
+
+worktree /sökväg/till/länkat-arbetsträd
+HEAD abcd1234abcd1234abcd1234abcd1234abcd1234
+branch refs/heads/master
+
+worktree /sökväg/till/annat-länkat-arbetsträd
+HEAD 1234abc1234abc1234abc1234abc1234abc1234a
+detached
+
+worktree /sökväg/till/länkat-arbetsträd-låst-ingen-anledning
+HEAD 5678abc5678abc5678abc5678abc5678abc5678c
+branch refs/heads/locked-no-reason
+locked
+
+worktree /sökväg/till/länkat-arbetsträd-låst-med-anledning
+HEAD 3456def3456def3456def3456def3456def3456b
+branch refs/heads/locked-with-reason
+locked anledningen till att den är låst
+
+worktree /sökväg/till/beskärbart-arbetsträd
+HEAD 1233def1234def1234def1234def1234def1234b
+detached
+prunable ”gitdir”-filen pekar på en ickeexisterande plats
+
+------------
+
+Om inte `-z` används citeras alla "ovanliga" tecken i låsorsaken, såsom nyradstecken, och hela orsaken citeras enligt beskrivningen för konfigurationsvariabeln `core.quotePath` (se linkgit:git-config[1]). Till exempel:
+
+------------
+$ git worktree list --porcelain
+...
+locked "orsaken\nvarför är låst"
+...
+------------
+
+EXEMPEL
+-------
+Du är mitt uppe i en refaktorerings-session och din chef kommer in och kräver att du åtgärdar något omedelbart. Du brukar använda linkgit:git-stash[1] för att tillfälligt lagra dina ändringar, men ditt arbetsträd är i ett sådant tillstånd av oordning (med nya, flyttade och borttagna filer, och andra småsaker utspridda) att du inte vill riskera att störa något av det. Istället skapar du ett tillfälligt länkat arbetsträd för att göra nödåtgärden, tar bort det när det är klart och återupptar sedan din tidigare refaktorerings-session.
+
+------------
+$ git worktree add -b kritisk-fix ../temp master
+$ pushd ../temp
+# ... hack hack hack ...
+$ git commit -a -m 'nödlösning för chefen'
+$ popd
+$ git worktree remove ../temp
+------------
+
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+`worktree.guessRemote`::
+	Om ingen gren anges och varken `-b`, `-B` eller `--detach` används, skapar `git worktree add` som standard en ny gren från HEAD. Om `worktree.guessRemote` är satt till sant, försöker `worktree add` hitta en fjärrspårningsgren vars namn unikt matchar det nya grennamnet. Om en sådan gren finns, checkas den ut och sätts som "uppströms" för den nya grenen. Om ingen sådan matchning kan hittas, återgår den till att skapa en ny gren från den aktuella `HEAD`.
+
+`worktree.useRelativePaths`::
+	Länka arbetsträd med relativa sökvägar (när "`true`") eller absoluta sökvägar (när "`false`"). Detta är särskilt användbart för inställningar där förvaret och arbetsträden kan flyttas mellan olika platser eller miljöer. Standardvärdet är "`false`".
++
+Observera att om du ställer in `worktree.useRelativePaths` till "`true`" aktiveras konfigurationen `extensions.relativeWorktrees` (se linkgit:git-config[1]), vilket gör den inkompatibel med äldre versioner av Git.
+[]
+
+BUGGAR
+------
+Flera utcheckningar är generellt sett fortfarande experimentella, och stödet för undermoduler är ofullständigt. Det rekommenderas INTE att göra flera utcheckningar av ett superprojekt.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

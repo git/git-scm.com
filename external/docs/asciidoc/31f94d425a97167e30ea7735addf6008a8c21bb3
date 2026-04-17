@@ -1,0 +1,195 @@
+git-imap-send(1)
+================
+
+NOM
+---
+git-imap-send - Envoye un ensemble de rustines depuis stdin vers un répertoire IMAP
+
+
+SYNOPSIS
+--------
+[verse]
+'git imap-send' [-v] [-q] [--[no-]curl] [(--folder|-f) <répertoire>]
+'git imap-send' --list
+
+
+DESCRIPTION
+-----------
+Cette commande téléverse une boîte aux lettres générée avec `git format-patch` dans un dossier de brouillons IMAP. Cela permet d'envoyer les rustines comme d'autres courriels lorsque l'on utilise des clients de messagerie qui ne peuvent pas lire directement les fichiers de boîtes aux lettres. La commande fonctionne également avec n'importe quelle boîte aux lettres générale dans laquelle les courriels comportent les champs `From`, `Date` et `Subject` dans cet ordre.
+
+L'utilisation typique est quelque chose comme :
+
+------
+git format-patch --signoff --stdout --attach origin | git imap-send
+------
+
+
+OPTIONS
+-------
+
+-v::
+--verbose::
+	Mode bavard.
+
+-q::
+--quiet::
+	Être silencieux.
+
+-f <répertoire>::
+--folder=<répertoire>::
+	Spécifier le dossier dans lequel les courriels doivent être sauvegardés. For example : `--folder=[Gmail]/Drafts` or `-f INBOX/Drafts`.
+
+--curl::
+	Utiliser libcurl pour communiquer avec le serveur IMAP, à moins qu'il ne s'agisse d'un tunnel. Ignoré si Git a été compilé sans l'option USE_CURL_FOR_IMAP_SEND.
+
+--no-curl::
+	Communiquer avec le serveur IMAP en utilisant les propres routines IMAP de Git au lieu d'utiliser libcurl. Ignoré si Git a été compilé avec l'option NO_OPENSSL.
+
+--list::
+	Run the IMAP LIST command to output a list of all the folders present.
+
+CONFIGURATION
+-------------
+
+Pour utiliser l'outil, `imap.folder` et `imap.tunnel` ou `imap.host` doivent être réglés sur les valeurs appropriées.
+
+Tout ce qui se trouve au-dessus de cette ligne dans cette section n'est pas inclus dans la documentation linkgit:git-config[1]. Le contenu qui suit est le même que celui qui s'y trouve :
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/imap.adoc`
+
+See original version for this content.
+====
+
+[]
+
+OBTENIR LA LISTE DES DOSSIERS DISPONIBLES
+-----------------------------------------
+
+Pour envoyer un courriel dans un dossier spécifique, vous devez connaître le nom correct du dossier prévu dans votre boîte aux lettres. Les noms comme "Junk", "Trash" etc. affichés par divers clients de messagerie n'ont pas besoin d'être les noms réels des dossiers stockés dans le serveur de courrier de votre fournisseur de messagerie.
+
+Pour obtenir le bon nom de dossier à utiliser avec `git imap-send`, vous pouvez exécuter `git imap-send --list`. Ceci affichera une liste de noms de dossiers valides. Un exemple d'une telle sortie en cours sur un compte Gmail est :
+
+.........................
+* LIST (\HasNoChildren) "/" "INBOX"
+* LIST (\HasChildren \Noselect) "/" "[Gmail]"
+* LIST (\All \HasNoChildren) "/" "[Gmail]/All Mail"
+* LIST (\Drafts \HasNoChildren) "/" "[Gmail]/Drafts"
+* LIST (\HasNoChildren \Important) "/" "[Gmail]/Important"
+* LIST (\HasNoChildren \Sent) "/" "[Gmail]/Sent Mail"
+* LIST (\HasNoChildren \Junk) "/" "[Gmail]/Spam"
+* LIST (\Flagged \HasNoChildren) "/" "[Gmail]/Starred"
+* LIST (\HasNoChildren \Trash) "/" "[Gmail]/Trash"
+.........................
+
+Ici, vous pouvez observer que le nom correct pour le dossier "Junk" est `[Gmail]/Spam` et pour le dossier "Trash" c'est `[Gmail]/Trash`. Une logique similaire peut également être utilisée pour déterminer d'autres dossiers.
+
+EXEMPLES
+--------
+Utilisation du mode tunnel :
+
+..........................
+[imap]
+    folder = "INBOX.Drafts"
+    tunnel = "ssh -q -C utilisateur@exemple.com /usr/bin/imapd ./Maildir 2> /dev/null"
+..........................
+
+Utilisation du mode direct :
+
+.........................
+[imap]
+    folder = "INBOX.Drafts"
+    host = imap://imap.exemple.com
+    user = bob
+    pass = p4ssw0rd
+.........................
+
+Utilisation du mode direct avec SSL :
+
+.........................
+[imap]
+    folder = "INBOX.Drafts"
+    host = imaps://imap.exemple.com
+    user = bob
+    pass = p4ssw0rd
+    port = 123
+    ; sslVerify = false
+.........................
+
+
+[NOTE]
+Vous pouvez utiliser `sslVerify=false` pendant le dépannage, si vous pensez que la raison pour laquelle vous avez des difficultés à vous connecter est que le certificat que vous utilisez sur le serveur privé `exemple.com` que vous essayez de mettre en place (ou que vous avez mis en place) peut ne pas être vérifié correctement.
+
+Utilisation de l’interface IMAP de Gmail :
+
+---------
+[imap]
+    folder = "[Gmail]/Drafts"
+    host = imaps://imap.gmail.com
+    user = user@gmail.com
+    port = 993
+---------
+
+Gmail does not allow using your regular password for `git imap-send`. If you have multi-factor authentication set up on your Gmail account, you can generate an app-specific password for use with `git imap-send`. Visit https://security.google.com/settings/security/apppasswords to create it. Alternatively, use OAuth2.0 authentication as described below.
+
+[NOTE]
+Il se peut que vous deviez utiliser à la place : `folder = "[Google Mail]/Drafts"` si vous obtenez une erreur indiquant que le "Dossier n'existe pas". Vous pouvez aussi exécuter `git imap-send --list` pour obtenir une liste des répertoires disponibles.
+
+[NOTE]
+Si votre compte Gmail est configuré dans une autre langue que l'anglais, le nom du dossier "Brouillons" sera localisé.
+
+If you want to use OAuth2.0 based authentication, you can specify `OAUTHBEARER` or `XOAUTH2` mechanism in your config. It is more secure than using app-specific passwords, and also does not enforce the need of having multi-factor authentication. You will have to use an OAuth2.0 access token in place of your password when using this authentication.
+
+---------
+[imap]
+	folder = "[Gmail]/Drafts"
+	host = imaps://imap.gmail.com
+	user = user@gmail.com
+	port = 993
+	authmethod = OAUTHBEARER
+---------
+
+Utilisation de l’interface IMAP d'Outlook :
+
+Contrairement à Gmail, Outlook ne gère que l'authentification basée sur OAuth2.0. En outre, il ne prend en charge que le mécanisme `XOAUTH2` .
+
+---------
+[imap]
+    folder = "Drafts"
+    host = imaps://outlook.office365.com
+    user = user@outlook.com
+    port = 993
+    authmethod = XOAUTH2
+---------
+
+Une fois que les commandes sont prêtes à être envoyées, exécutez la commande suivante :
+
+  $ git format-patch --cover-letter -M --stdout origin/master | git imap-send
+
+Veillez simplement à désactiver le retour à la ligne dans le client de messagerie (l'interface web de Gmail revient à la ligne quoi qu'il arrive, vous devez donc utiliser un vrai client IMAP).
+
+Au cas où vous utilisez l'authentification OAuth2.0, il est plus facile d'utiliser des assistant d'identification pour générer des jetons. Les assistants d'identification proposés dans linkgit:git-send-email[1] peuvent également être utilisées pour `git imap-send`.
+
+ATTENTION
+---------
+Il est toujours de votre responsabilité de vous assurer que le message électronique envoyé par votre programme de messagerie répond aux normes de votre projet. De nombreux projets n'aiment pas que des correctifs soient joints. Certains agents de messagerie transforment les rustines (par exemple, en faisant passer les lignes, en les envoyant sous format=flowed) d'une manière qui les fait échouer. Si vous ne vérifiez pas cela, vous recevrez des flammes furieuses qui vous ridiculiseront.
+
+Thunderbird, en particulier, est connu pour ses problèmes.  Les utilisateurs de 
+Thunderbird peuvent consulter cette page web pour plus d'informations :
+  https://kb.mozillazine.org/Plain_text_e-mail_-_Thunderbird#Completely_plain_email
+
+VOIR AUSSI
+----------
+linkgit:git-format-patch[1], linkgit:git-send-email[1], mbox(5)
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

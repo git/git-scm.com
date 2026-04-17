@@ -1,0 +1,219 @@
+git-merge-tree(1)
+=================
+
+NAMN
+----
+git-merge-tree - Utför sammanslagning utan att röra index eller arbetskatalog
+
+
+SYNOPSIS
+--------
+[verse]
+'git merge-tree' [--write-tree] <flaggor> <gren1> <gren2>
+'git merge-tree' [--trivial-merge] <bas-träd> <gren1> <gren2> (föråldrad)
+
+[[NEWMERGE]]
+BESKRIVNING
+-----------
+
+Detta kommando har ett modernt `--write-tree`-läge och ett föråldrat `--trivial-merge`-läge. Med undantag för avsnittet <<DEPMERGE,FÖRÅLDRAD BESKRIVNING>> i slutet beskriver resten av denna dokumentation det moderna `--write-tree`-läget.
+
+Utför en sammanslagning, men gör inga nya incheckningar och läser inte från eller skriver till vare sig arbetskatalog eller indexet.
+
+Den utförda sammanslagningen kommer att använda samma funktioner som den "riktiga" linkgit:git-merge[1], inklusive:
+
+  * trevägs sammanslagning av enskilda filer
+  * omdöpnings-detektering
+  * korrekt hantering av katalog-/fil-konflikter
+  * rekursiv förfaderkonsolidering (dvs. när det finns mer än en sammanslagningsbas, skapa en virtuell sammanslagningsbas genom att slå samman sammanslagningsbaserna)
+  * etc.
+
+När sammanslagningen är klar skapas ett nytt trädobjekt på toppnivå. Se `OUTPUT` nedan för mer information.
+
+ALTERNATIV
+----------
+
+--stdin::
+	Läs incheckningar för att sammanfoga från standardindata istället för kommandoraden. Se <<INPUT,INGÅNGSFORMAT>> nedan för mer information. Innebär `-z`.
+
+-z::
+	Citera inte filnamn i avsnittet <Conflicted file info> och avsluta varje filnamn med ett NUL-tecken istället för en ny rad. Börja även meddelandeavsnittet med ett NUL-tecken istället för en ny rad. Se <<OUTPUT,UTMATNING>> nedan för mer information.
+
+--name-only::
+	I avsnittet Info om konfliktfyllda filer, istället för att skriva en lista med (läge, oid, steg, sökväg) tupler som ska matas ut för konfliktfyllda filer, ange bara en lista med filnamn med konflikter (och lista inte filnamn flera gånger om de har flera konfliktfyllda steg).
+
+--messages::
+--no-messages::
+	Skriv eventuella informationsmeddelanden som "Auto-merging <path>" eller CONFLICT-meddelanden i slutet av stdout. Om inget anges är standardinställningen att inkludera dessa meddelanden om det finns sammanslagningskonflikter, och att utelämna dem annars.
+
+--quiet::
+	Inaktivera all utdata från programmet. Användbart när du bara är intresserad av avslutningsstatus. Tillåter att sammanslagings-tree avslutas tidigt när det hittar en konflikt och gör att det undviker att skriva till de flesta objekt som skapas av sammanslås.
+
+--allow-unrelated-histories::
+	merge-tree kommer som standard att ge ett felmeddelande om de två angivna grenarna inte delar någon gemensam historik. Denna flagga kan anges för att åsidosätta den kontrollen och få sammanslagningen att fortsätta ändå.
+
+--merge-base=<trädlikt>::
+	Istället för att hitta sammanslagings-baserna för <gren1> och <gren2>, ange en merge-base för merge-funktionen. Detta alternativ är inkompatibelt med `--stdin`.
++
+Det stöds för närvarande inte att ange flera baser, vilket innebär att när man slår samman två grenar med mer än en sammanslagings-bas kan användning av det här alternativet orsaka att sammanslagningsresultaten skiljer sig från vad `git merge` skulle beräkna. Detta kan inkludera att man potentiellt förlorar vissa ändringar som gjorts på ena sidan av historiken i den resulterande sammanslagningen.
++
+Med det här alternativet, eftersom sammanslagings-bas tillhandahålls direkt, behöver <gren1> och <gren2> inte ange incheckningar; träd räcker.
+
+-X<flaggor>::
+--strategy-option=<flaggor>::
+	Skicka det merge-strategispecifika alternativet vidare till merge-strategin. Se linkgit:git-merge[1] för mer information.
+
+[[OUTPUT]]
+UTMATNING
+---------
+
+För en lyckad sammanslagning är utdata från git-merge-tree helt enkelt en rad:
+
+	<OID av toppnivåträdet>
+
+Medan för en konfliktfylld sammanslagning är utdata som standard av formen:
+
+	<OID för toppnivåträd>
+	<Konfliktfylld filinformation>
+	<Informationsmeddelandens>
+
+Dessa diskuteras var för sig nedan.
+
+Det finns dock ett undantag. Om `--stdin` skickas, finns det en extra sektion i början, ett NUL-tecken i slutet, och sedan upprepas alla sektioner för varje inmatningsrad. Således, om den första sammanslagningen är i konflikt och den andra är ren, skulle utdata vara av formen:
+
+	<Sammanfogningsstatus>
+	<OID för toppnivåträd>
+	<Konfliktfylld filinformation>
+	<Informationsmeddelanden>
+	NUL
+	<Sammanslagningsstatus>
+	<OID för toppnivåträd>
+	NUL
+
+[[MS]]
+Sammanslagningsstatus
+~~~~~~~~~~~~~~~~~~~~~
+
+Detta är en heltalsstatus följt av ett NUL-tecken. Heltalsstatusen är:
+
+     0: sammanslagningen hade konflikter
+     1: sammanslagningen var ren
+
+[[OIDTLT]]
+OID för toppnivåträd
+~~~~~~~~~~~~~~~~~~~~
+
+Detta är ett trädobjekt som representerar vad som skulle checkas ut i arbetsträdet i slutet av `git merge`. Om det skulle finnas konflikter kan filer i detta träd ha inbäddade konfliktmarkörer. Detta avsnitt följs alltid av en nyrad (eller NUL om `-z` skickas).
+
+[[CFI]]
+Konflikter filinformation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Detta är en radsekvens med formatet
+
+	<läge> <objekt> <stag> <filnamn>
+
+Filnamnet kommer att citeras enligt beskrivningen för konfigurationsvariabeln `core.quotePath` (se linkgit:git-config[1]). Om alternativet `--name-only` skickas kommer dock läget, objektet och scenen att utelämnas. Om `-z` skickas avslutas "raderna" med ett NUL-tecken istället för ett radbrytningstecken.
+
+[[IM]]
+Informationsmeddelanden
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Det här avsnittet innehåller informationsmeddelanden, vanligtvis om konflikter. Avsnittets format varierar avsevärt beroende på om `-z` skickas.
+
+Om `-z` skickas:
+
+Utdataformatet är noll eller fler konfliktinformationsposter, var och en av formen:
+
+	<lista-över-sökvägar><konflikttyp>NUL<konfliktmeddelande>NUL
+
+där <lista-över-sökvägar> är av formen
+
+	<antal-av-sökvägar>NUL<sökväg1>NUL<sökväg2>NUL...<sökvägN>NULL
+
+och inkluderar sökvägar (eller grennamn) som påverkas av konflikten eller informationsmeddelandet i <konfliktmeddelande>. Dessutom är <konflikttyp> en stabil sträng som förklarar typen av konflikt, till exempel
+
+  * "Slår ihop automatiskt"
+  * "KONFLIKT (namnbyte/namnbyte)"
+  * "CONFLICT (submodule lacks merge base)"
+  * "KONFLIKT (binär)"
+
+och <konfliktmeddelande> är ett mer detaljerat meddelande om konflikten som ofta (men inte alltid) bäddar in <stabil-kort-typ-beskrivning> i sig. Dessa strängar kan komma att ändras i framtida Git-versioner. Några exempel:
+
+  * Slår ihop <fil> automatiskt
+  * "KONFLIKT (namnbyte/radera): <gammalfil> namnbytt till <nyttnamn> ..., men borttagen i ..."
+  * "Misslyckades med att sammanfoga undermodulen <undermodul> (ingen sammanslagningsbas)"
+  * "Varning: kan inte sammanfoga binära filer: <filnamn>"
+
+Om `-z` INTE skickas:
+
+Det här avsnittet börjar med en tom rad för att separera det från föregående avsnitt, och innehåller sedan endast <konfliktmeddelande>-informationen från föregående avsnitt (avgränsad med nyradsbrytningar). Dessa är icke-stabila strängar som inte bör tolkas av skript, och är endast avsedda för mänsklig konsumtion. Observera också att även om <konfliktmeddelande>-strängar vanligtvis inte innehåller inbäddade nyradsbrytningar, gör de det ibland. (Fritt formulerade meddelanden kommer dock aldrig att ha ett inbäddat NUL-tecken). Så hela informationsblocket är avsett för mänskliga läsare som en agglomeration av alla konfliktmeddelanden.
+
+UTGÅNGSSTATUS
+-------------
+
+För en lyckad, icke-konfliktfylld sammanslagning är avslutningsstatusen 0. När sammanslagningen har konflikter är avslutningsstatusen 1. Om sammanslagningen inte kan slutföras (eller startas) på grund av någon form av fel är avslutningsstatusen något annat än 0 eller 1 (och utdata är ospecificerad). När --stdin skickas är returstatusen 0 för både lyckade och konfliktfyllda sammanslagningar, och något annat än 0 eller 1 om den inte kan slutföra alla begärda sammanslagningar.
+
+ANVÄNDNINGSANMÄRKNINGAR
+-----------------------
+
+Detta kommando är avsett som lågnivå-rörmokeri, liknande linkgit:git-hash-object[1], linkgit:git-mktree[1], linkgit:git-commit-tree[1], linkgit:git-write-tree[1], linkgit:git-update-ref[1] och linkgit:git-mktag[1]. Således kan det användas som en del av en serie steg som:
+
+       vi meddelande.txt
+       BRANCH1=refs/heads/test
+       BRANCH2=main
+       NEWTREE=$(git merge-tree --write-tree $BRANCH1 $BRANCH2) || {
+           echo "Det fanns konflikter..." 1>&2
+           exit 1
+       }
+       NEWCOMMIT=$(git commit-tree $NEWTREE -F meddelande.txt \
+           -p $BRANCH1 -p $BRANCH2)
+       git update-ref $BRANCH1 $NEWCOMMIT
+
+Observera att när utgångsstatusen inte är noll, kommer `NEWTREE` i den här sekvensen att innehålla mycket mer utdata än bara ett träd.
+
+Vid konflikter innehåller utdata samma information som du skulle få med linkgit:git-merge[1]:
+
+  * vad som skulle skrivas till arbetsträdet (<<OIDTLT,OID för toppnivåträdet>>)
+  * de högre ordningens steg som skulle skrivas till indexet (<<CFI,Konfliktfilinformation>>)
+  * alla meddelanden som skulle ha skrivits ut till stdout (<<IM,Informativa meddelanden>>)
+
+[[INPUT]]
+INMATNINGSFORMAT
+----------------
+Inmatningsformatet 'git merge-tree --stdin' är helt textbaserat. Varje rad har detta format:
+
+	[<bas-incheckning> -- ]<gren1> <gren2>
+
+Om en rad separeras med `--` används strängen före avgränsaren för att ange en sammanslagings-bas för sammanslagningen och strängen efter avgränsaren beskriver de grenar som ska slås samman.
+
+MISSTAG ATT UNDVIKA
+-------------------
+
+Titta INTE igenom det resulterande toppnivåträdet för att försöka hitta vilka filer som är i konflikt; analysera istället avsnittet <<CFI,Konflikt filinformation>>. Det skulle inte bara vara fruktansvärt långsamt att analysera ett helt träd i stora arkiv, det finns också många typer av konflikter som inte kan representeras av konfliktmarkörer (ändra/ta bort, lägeskonflikt, binärfil ändrad på båda sidor, fil-/katalogkonflikter, olika permutationer av namnbyteskonflikter, etc.)
+
+Tolka INTE en tom <<CFI,Konflikt filinformation>>-lista som en ren sammanslagning; kontrollera avslutningsstatusen. En sammanslagning kan ha konflikter utan att enskilda filer står i konflikt (det finns några typer av katalognamnskonflikter som faller inom denna kategori, och andra kan också läggas till i framtiden).
+
+Försök INTE gissa eller få användaren att gissa konflikttyperna från listan <<CFI,Konflikt filinformation>>. Informationen där är otillräcklig för att göra det. Till exempel: Namnbyte/namnbyte(1till2)-konflikter (båda sidor döper om samma fil på olika sätt) kommer att resultera i tre olika filer med högre ordningsstadier (men var och en har bara ett högre ordningsstadium), utan något sätt (förutom avsnittet <<IM,Informationsmeddelanden>>) att avgöra vilka tre filer som är relaterade. Fil-/katalogkonflikter resulterar också i en fil med exakt ett högre ordningsstadium. Möjligen-inblanda-i-katalog-omdöpnings-konflikter (när "merge.directoryRenames" inte är inställt eller inställt på "conflicts") resulterar också i en fil med exakt ett högre ordningsstadium. I samtliga fall har avsnittet <<IM,Informationsmeddelanden>> den nödvändiga informationen, även om det inte är utformat för att kunna tolkas av maskiner.
+
+Anta INTE att varje sökväg från <<CFI,Konflikt filinformation>> och de logiska konflikterna i <<IM,Informationsmeddelanden>> har en en-till-en-mappning, inte heller att det finns en en-till-många-mappning eller en många-till-en-mappning. Många-till-många-mappningar finns, vilket innebär att varje sökväg kan ha många logiska konflikttyper i en enda sammanslagning, och varje logisk konflikttyp kan påverka många sökvägar.
+
+Anta INTE att alla filnamn som listas i avsnittet <<IM,Informativt meddelande>> hade konflikter. Meddelanden kan inkluderas för filer som inte har några konflikter, till exempel "Automatisk sammanslagning av <fil>".
+
+UNDVIK att ta OIDS från <<CFI,Konflikt filinformation>> och slå ihop dem igen för att presentera konflikterna för användaren. Detta kommer att förlora information. Sök istället upp versionen av filen som finns i <<OIDTLT,OID i toppnivåträdet>> och visa det istället. I synnerhet kommer det senare att ha konfliktmarkörer kommenterade med den ursprungliga grenen/incheckningen som slås ihop och, om namnändringar var inblandade, det ursprungliga filnamnet. Även om du skulle kunna inkludera den ursprungliga grenen/incheckningen i konfliktmarköranteckningarna vid återsammanslagningen, är det ursprungliga filnamnet inte tillgängligt från <<CFI,Konflikt filinformation>> och därmed skulle du förlora information som kan hjälpa användaren att lösa konflikten.
+
+[[DEPMERGE]]
+FÖRÅLDRAD BESKRIVNING
+---------------------
+
+Enligt <<NEWMERGE,BESKRIVNING>> och till skillnad från resten av den här dokumentationen beskriver det här avsnittet det föråldrade `--trivial-merge`-läget.
+
+Förutom det valfria `--trivial-merge` accepterar det här läget inga alternativ.
+
+Det här läget läser tre-träd-liknande format och matar ut triviala sammanslagningsresultat och motstridiga steg till standardutdata i ett semi-diff-format. Eftersom detta utformades för att skript på högre nivå skulle kunna konsumera och sammanfoga resultaten tillbaka till indexet, utelämnas poster som matchar <gren1>. Resultatet av denna andra form liknar vad trevägs 'git read-tree -m' gör, men istället för att lagra resultaten i indexet matar kommandot ut posterna till standardutdata.
+
+Den här formen har inte bara begränsad tillämpbarhet (en trivial sammanslagning kan inte hantera innehållssammanslagningar av enskilda filer, namnbytesdetektering, korrekt hantering av katalog-/filkonflikter etc.), utdataformatet är också svårt att arbeta med, och det kommer generellt att vara mindre presterande än den första formen även vid lyckade sammanslagningar (särskilt om man arbetar i stora arkiv).
+
+GIT
+---
+En del av linkgit:git[1]-sviten

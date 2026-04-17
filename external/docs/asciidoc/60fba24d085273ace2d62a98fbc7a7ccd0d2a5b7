@@ -1,0 +1,1970 @@
+git-config(1)
+=============
+
+NAMN
+----
+git-config - Hämta och ange förvar eller globala alternativ
+
+
+SYNOPSIS
+--------
+[verse]
+'git config list' [<fil-flaggor>] [<visningsalternativ] [--includes]
+'git config get' [<fil-flaggor>] [<visningsalternativ>] [--includes] [--all] [--regexp] [--value=<mönster>] [--fixed-value] [--default=<standard>] [--url=<url>] <namn>
+'git config set' [<fil-flaggor>] [--type=<typ>] [--all] [--value=<mönster>] [--fixed-value] <namn> <värde>
+'git config unset' [<fil-flaggor>] [--all] [--value=<mönster>] [--fixed-value] <namn>
+'git config rename-section' [<fil-flaggor>] <gammalt-namn> <nytt-namn>
+'git config remove-section' [<fil-flaggor>] <namn>
+'git config edit' [<fil-flaggor>]
+'git config' [<file-option>] --get-colorbool <namn> [<stdout-is-tty>]
+
+BESKRIVNING
+-----------
+Du kan söka efter/ställa in/ersätta/avaktivera alternativ med det här kommandot. Namnet är egentligen sektionen och nyckeln separerade med en punkt, och värdet kommer att vara ett escape-tecken.
+
+Multiple lines can be added to an option by using the `--append` option. If you want to update or unset an option which can occur on multiple lines, `--value=<pattern>` (which is an extended regular expression, unless the `--fixed-value` option is given) needs to be given. Only the existing values that match the pattern are updated or unset. If you want to handle the lines that do *not* match the pattern, just prepend a single exclamation mark in front (see also <<EXAMPLES>>), but note that this only works when the `--fixed-value` option is not in use.
+
+Alternativet `--type=<typ>` instruerar 'git config' att säkerställa att inkommande och utgående värden kan kanoniseras under den givna <typen>. Om ingen `--type=<typ>` anges kommer ingen kanonisering att utföras. Anropare kan avaktivera en befintlig `--type`-specifikation med `--no-type`.
+
+When reading, the values are read from the system, global and repository local configuration files by default, and options `--system`, `--global`, `--local`, `--worktree` and `--file <filename>` can be used to tell the command to read from only that location (see <<FILES>>).
+
+Vid skrivning, skrivs det nya värdet som standard till den lokala konfigurationsfilen för repot, och alternativen `--system`, `--global`, `--worktree`, `--file <filnamn>` kan användas för att ange att kommandot ska skriva till den platsen (du kan säga `--local` men det är standardvärdet).
+
+Det här kommandot kommer att misslyckas med status som inte är noll vid fel. Några avslutningskoder är:
+
+- Avsnittet eller nyckeln är ogiltig (ret=1),
+- inget avsnitt eller namn angavs (ret=2),
+- konfigurationsfilen är ogiltig (ret=3),
+- konfigurationsfilen kan inte skrivas (ret=4),
+- you try to unset an option which does not exist (ret=5),
+- du försöker avaktivera/aktivera ett alternativ som flera rader matchar för (ret=5), eller
+- Du försöker använda ett ogiltigt regexp (ret=6).
+
+Vid lyckat resultat, returnerar kommandot avslutningskoden 0.
+
+En lista över alla tillgängliga konfigurationsvariabler kan erhållas med hjälp av kommandot `git help --config`.
+
+KOMMANDON
+---------
+
+list::
+	Lista alla variabler som är inställda i konfigurationsfilen, tillsammans med deras värden.
+
+get::
+	Avger värdet för den angivna nyckeln. Om nyckeln finns flera gånger i konfigurationen avges det sista värdet. Om `--all` anges avges alla värden som är associerade med nyckeln. Returnerar felkod 1 om nyckeln inte finns.
+
+set::
+	Ange värde för ett eller flera konfigurationsalternativ. Som standard vägrar det här kommandot att skriva flervärdeskonfigurationsalternativ. Om `--all` skickas ersätts alla flervärdeskonfigurationsalternativ med det nya värdet, medan `--value=` ersätter alla konfigurationsalternativ vars värden matchar det givna mönstret.
+
+unset::
+	Avaktivera värde för ett eller flera konfigurationsalternativ. Som standard vägrar det här kommandot att avaktivera flervärdesnycklar. Om `--all` skickas avaktiveras alla flervärdeskonfigurationsalternativ, medan `--value` avaktiverar alla konfigurationsalternativ vars värden matchar det givna mönstret.
+
+rename-section::
+	Byt namn på det angivna avsnittet till ett nytt namn.
+
+remove-section::
+	Ta bort det angivna avsnittet från konfigurationsfilen.
+
+edit::
+	Öppnar en editor för att ändra den angivna konfigurationsfilen; antingen `--system`, `--global`, `--local` (standard), `--worktree` eller `--file <konfigurationsfil>`.
+
+[[OPTIONS]]
+ALTERNATIV
+----------
+
+--replace-all::
+	Standardbeteendet är att ersätta högst en rad. Detta ersätter alla rader som matchar nyckeln (och valfritt `--value=<mönster>`).
+
+--append::
+	Lägger till en ny rad i alternativet utan att ändra några befintliga värden. Detta är samma sak som att ange '--value=^$' i `set`.
+
+--comment <meddelande>::
+	Lägg till en kommentar i slutet av nya eller ändrade rader.
++
+Om _<meddelande>_ börjar med ett eller flera blanksteg följt av "#" används det som det är. Om det börjar med "#" läggs ett mellanslag till innan det används. Annars läggs en sträng " # " (ett mellanslag följt av en hash följt av ett mellanslag) till. Och den resulterande strängen placeras omedelbart efter det värde som definierats för variabeln. _<meddelande>_ får inte innehålla radmatningstecken (inga kommentarer med flera rader är tillåtna).
+
+--all::
+	Med `get` returnerar du alla värden för en nyckel med flera värden.
+
+--regexp::
+	Med `get` tolkas namnet som ett reguljärt uttryck. Matchning av reguljära uttryck är för närvarande skiftlägeskänsligt och görs mot en kanonialiserad version av nyckeln där sektions- och variabelnamn är gemener, men undersektionsnamn inte.
+
+--url=<URL>::
+	När ett tvådelat <namn> anges som <sektion>.<nyckel>, returneras värdet för <sektion>.<URL>.<nyckel> vars <URL>-del bäst matchar den angivna URL:en (om ingen sådan nyckel finns används värdet för <sektion>.<nyckel> som reserv). När endast <sektion> anges som namn, gör det för alla nycklar i sektionen och lista dem. Returnerar felkod 1 om inget värde hittas.
+
+--global::
+	För skrivalternativ: skriv till den globala `~/.gitconfig`-filen istället för arkivet `.git/config`, skriv till `$XDG_CONFIG_HOME/git/config`-filen om den här filen finns och `~/.gitconfig`-filen inte gör det.
++
+För läsalternativ: läs endast från global `~/.gitconfig` och från `$XDG_CONFIG_HOME/git/config` snarare än från alla tillgängliga filer.
++
+See also <<FILES>>.
+
+--system::
+	För skrivalternativ: skriv till systemomfattande `$(prefix)/etc/gitconfig` istället för förvarets `.git/config`.
++
+För läsalternativ: läs endast från systemomfattande `$(prefix)/etc/gitconfig` snarare än från alla tillgängliga filer.
++
+See also <<FILES>>.
+
+--local::
+	För skrivalternativ: skriv til förvarets `.git/config`-fil. Detta är standardbeteendet.
++
+För läsalternativ: läs endast från arkivet `.git/config` snarare än från alla tillgängliga filer.
++
+See also <<FILES>>.
+
+--worktree::
+	Liknar `--local` förutom att `$GIT_DIR/config.worktree` läses från eller skrivs till om `extensions.worktreeConfig` är aktiverat. Om inte är det samma sak som `--local`. Observera att `$GIT_DIR` är lika med `$GIT_COMMON_DIR` för det huvudsakliga arbetskatalog, men har formen `$GIT_DIR/worktrees/<id>/` för andra arbetsträd. Se linkgit:git-worktree[1] för att lära dig hur man aktiverar `extensions.worktreeConfig`.
+
+-f <<konfigurationsfil>::
+--file <c<konfigurationsfil>::
+	För skrivalternativ: skriv till den angivna filen istället för förvaret `.git/config`.
++
+För läsalternativ: läs endast från den angivna filen istället för från alla tillgängliga filer.
++
+See also <<FILES>>.
+
+--blob <blob>::
+	Liknar `--file` men använd den givna blobben istället för en fil. Du kan t.ex. använda 'master:.gitmodules' för att läsa värden från filen '.gitmodules' i master-grenen. Se avsnittet "SPECIFICERING AV REVISIONER" i linkgit:gitrevisions[7] för en mer komplett lista över sätt att stava blobbnamn.
+
+`--value=<mönster>`::
+`--no-value`::
+	Med `get`, `set` och `unset`, matchas endast mot _<mönster>_. Mönstret är ett utökat reguljärt uttryck om inte `--fixed-value` anges.
++
+Använd `--no-value` för att avaktivera _<mönster>_.
+
+--fixed-value::
+	När det används med `--value=<mönster>`, behandla _<mönster>_ som en exakt sträng istället för ett reguljärt uttryck. Detta begränsar namn/värde-paren som matchas till endast de där värdet är exakt lika med _<mönster>_.
+
+--type <typ>::
+  'git config' säkerställer att all in- eller utdata är giltig under den/de givna typbegränsningen/-begränsningarna, och kanoniserar utgående värden i `<typ>`s kanoniska form.
++
+Valid `<typ>`'s include:
++
+- 'bool': kanonisera värdena `true`, `yes`, `on` och positiva tal som "true", och värdena `false`, `no`, `off` och `0` som "false".
+- 'int': kanoniserar värden som enkla decimaltal. Ett valfritt suffix av 'k', 'm' eller 'g' gör att värdet multipliceras med 1024, 1048576 eller 1073741824 vid inmatning.
+- 'bool-or-int': kanonisera enligt antingen 'bool' eller 'int', som beskrivits ovan.
+- 'path': kanonisera genom att expandera ett inledande `~` till värdet `$HOME` och `~user` till hemkatalogen för den angivna användaren. Denna specificeraren har ingen effekt när värdet anges (men du kan använda `git config section.variable ~/` från kommandoraden för att låta ditt shell utföra expansionen.)
+- 'expiry-date': kanonisera genom att konvertera från en fast eller relativ datumsträng till en tidsstämpel. Denna specifikation har ingen effekt när värdet anges.
+- 'color': När ett värde hämtas, kanonisera genom att konvertera till en ANSI-färg escape-sekvens. När ett värde anges utförs en rimlighetskontroll för att säkerställa att det givna värdet kan kanoniseras som en ANSI-färg, men att det skrivs som det är.
++
+
+--bool::
+--int::
+--bool-or-int::
+--path::
+--expiry-date::
+  Historiska alternativ för att välja en typspecifikation. Föredra istället `--type` (se ovan).
+
+--no-type::
+  Avaktiverar den tidigare angivna typspecifikationen (om en sådan tidigare angavs). Detta alternativ begär att 'git config' inte kanoniserar den hämtade variabeln. `--no-type` har ingen effekt utan `--type=<typ>` eller `--<typ>`.
+
+-z::
+--null::
+	För alla alternativ som matar ut värden och/eller nycklar, avsluta alltid värden med null-tecknet (istället för en nyrad). Använd istället nyrad som avgränsare mellan nyckel och värde. Detta möjliggör säker parsning av utdata utan att bli förvirrad av t.ex. värden som innehåller radbrytningar.
+
+--name-only::
+	Matar endast ut namnen på konfigurationsvariablerna för `list` eller `get`.
+
+`--show-names`::
+`--no-show-names`::
+	Med `get` visas konfigurationsnycklar utöver deras värden. Standardvärdet är `--no-show-names` om inte `--url` anges och det inte finns några underavsnitt i _<namn>_.
+
+--show-origin::
+	Utöka utdata för alla efterfrågade konfigurationsalternativ med ursprungstypen (fil, standardindata, blob, kommandorad) och det faktiska ursprunget (konfigurationsfilens sökväg, referens eller blob-id om tillämpligt).
+
+--show-scope::
+	Liknar `--show-origin` i det att den utökar utdata från alla efterfrågade konfigurationsalternativ med omfattningen av det värdet (arbetsträd, lokalt, globalt, system, kommando).
+
+--get-colorbool <namn> [<stdout-är-tty>]::
+
+	Hitta färginställningen för `<namn>` (t.ex. `color.diff`) och skriv ut "true" eller "false". `<stdout-is-tty>` ska vara antingen "true" eller "false" och beaktas när konfigurationen säger "auto". Om `<stdout-is-tty>` saknas kontrolleras standardutdata för själva kommandot och avslutas med status 0 om färg ska användas, eller avslutas med status 1 annars. När färginställningen för `namn` är odefinierad använder kommandot `color.ui` som reserv.
+
+--includes::
+--no-includes::
+	Respektera `include.*`-direktiven i konfigurationsfiler när du söker efter värden. Standardinställningen är `off` när en specifik fil anges (t.ex. genom att använda `--file`, `--global`, etc.) och `on` när du söker i alla konfigurationsfiler.
+
+--default <värde>::
+  När `get` används och den begärda variabeln inte hittas, bete dig som om <värde> vore det värde som tilldelats variabeln.
+
+FÖRÅLDRDE LÄGEN
+---------------
+
+Följande lägen har föråldrats till förmån för underkommandon. Det rekommenderas att migrera till den nya syntaxen.
+
+'git config <namn>'::
+	Ersatt av `git config get <namn>`.
+
+'git config <namn> <värde> [<värde-mönster>]'::
+	Ersatt av `git config set [--value=<mönster>] <namn> <värde>`.
+
+-l::
+--list::
+	Ersatt av `git config list`.
+
+--get <namn> [<värde-mönster>]::
+	Ersatt av `git config get [--value=<mönster>] <namn>`.
+
+--get-all <namn> [<värde-mönster>]::
+	Ersatt av `git config get [--value=<mönster>] --all <namn>`.
+
+--get-regexp <namn-regexp>::
+	Replaced by `git config get --all --show-names --regexp <namn-regexp>`.
+
+--get-urlmatch <namn> <URL>::
+	Ersatt av `git config get --all --show-names --url=<URL> <namn>`.
+
+--get-color <namn> [<standard>]::
+	Ersatt av `git config get --type=color [--default=<standard>] <namn>`.
+
+--add <namn> <värde>::
+	Ersatt av `git config set --append <namn> <värde>`.
+
+--unset <namn> [<värde-mönster>]::
+	Ersatt av `git config unset [--value=<mönster>] <namn>`.
+
+--unset-all <namn> [<värde-mönster>]::
+	Ersatt av `git config unset [--value=<mönster>] --all <namn>`.
+
+--rename-section <gammalt-namn> <nytt-namn>::
+	Ersatt av `git config rename-section <gammalt-namn> <nytt-namn>`.
+
+--remove-section <namn>::
+	Ersatt av `git config remove-section <namn>`.
+
+-e::
+--edit::
+	Ersatt av `git config edit`.
+
+KONFIGURATION
+-------------
+`pager.config` is only respected when listing configuration, i.e., when using `list` or `get` which may return multiple results. The default is to use a pager.
+
+[[FILES]]
+FILER
+-----
+
+Som standard läser 'git config' konfigurationsalternativ från flera filer:
+
+$(prefix)/etc/gitconfig::
+	Systemomfattande konfigurationsfil.
+
+$XDG_CONFIG_HOME/git/config::
+~/.gitconfig::
+	Användarspecifika konfigurationsfiler. När miljövariabeln XDG_CONFIG_HOME inte är angiven eller tom används $HOME/.config/ som $XDG_CONFIG_HOME.
++
+Dessa kallas även "globala" konfigurationsfiler. Om båda filerna finns läses båda filerna i den ordning som anges ovan.
+
+$GIT_DIR/config::
+	Förvars specifik konfigurationsfil.
+
+$GIT_DIR/config.worktree::
+	Detta är valfritt och söks endast efter när `extensions.worktreeConfig` finns i $GIT_DIR/config.
+
+Du kan också ange ytterligare konfigurationsparametrar när du kör ett git-kommando genom att använda alternativet `-c`. Se linkgit:git[1] för mer information.
+
+Alternativ kommer att läsas från alla dessa tillgängliga filer. Om de globala eller systemomfattande konfigurationsfilerna saknas eller är oläsliga kommer de att ignoreras. Om förvarets konfigurationsfil saknas eller är oläslig kommer 'git config' att avslutas med en felkod som inte är noll. Ett felmeddelande visas om filen är oläslig, men inte om den saknas.
+
+Filerna läses i den ordning som anges ovan, där det senast funna värdet prioriteras framför det tidigare lästa värdet. När flera värden tas kommer alla värden från en nyckel från alla filer att användas.
+
+Som standard, skrivs alternativ endast till den specifika konfigurationsfilen för arkivet. Observera att detta även påverkar alternativ som `set` och `unset`. *'git config' kommer bara att ändra en fil åt gången*.
+
+You can limit which configuration sources are read from or written to by specifying the path of a file with the `--file` option, or by specifying a configuration scope with `--system`, `--global`, `--local`, or `--worktree`. For more, see <<OPTIONS>> above.
+
+[[SCOPES]]
+OMFATTNINGAR
+------------
+
+Varje konfigurationskälla faller inom ett konfigurationsomfång. Omfången är:
+
+system::
+	$(prefix)/etc/gitconfig
+
+global::
+	$XDG_CONFIG_HOME/git/config
++
+~/.gitconfig
+
+lokal::
+	$GIT_DIR/config
+
+arbetsträd::
+	$GIT_DIR/config.worktree
+
+kommando::
+	GIT_CONFIG_{COUNT,KEY,VALUE} miljövariabler (se <<ENVIRONMENT>> nedan)
++
+alternativet `-c`
+
+Med undantag för 'command' motsvarar varje omfång ett kommandoradsalternativ: `--system`, `--global`, `--local`, `--worktree`.
+
+When reading options, specifying a scope will only read options from the files within that scope. When writing options, specifying a scope will write to the files within that scope (instead of the repository specific configuration file). See <<OPTIONS>> above for a complete description.
+
+De flesta konfigurationsalternativ respekteras oavsett vilket omfång de definieras i, men vissa alternativ respekteras endast i vissa omfång. Se respektive alternativs dokumentation för fullständig information.
+
+Skyddad konfiguration
+~~~~~~~~~~~~~~~~~~~~~
+
+Skyddad konfiguration hänvisar till omfången 'system', 'global' och 'kommando'. Av säkerhetsskäl respekteras vissa alternativ endast när de anges i skyddad konfiguration och ignoreras annars.
+
+Git behandlar dessa omfång som om de kontrolleras av användaren eller en betrodd administratör. Detta beror på att en angripare som kontrollerar dessa omfång kan orsaka betydande skada utan att använda Git, så det antas att användarens miljö skyddar dessa omfång mot angripare.
+
+[[ENVIRONMENT]]
+MILJÖ
+-----
+
+GIT_CONFIG_GLOBAL::
+GIT_CONFIG_SYSTEM::
+	Hämta konfigurationen från de givna filerna istället från global eller systemnivåkonfiguration. Se linkgit:git[1] för mer information.
+
+GIT_CONFIG_NOSYSTEM::
+	Om läsning av inställningar från den systemomfattande $(prefix)/etc/gitconfig-filen ska hoppas över. Se linkgit:git[1] för mer information.
+
+See also <<FILES>>.
+
+GIT_CONFIG_COUNT::
+GIT_CONFIG_KEY_<n>::
+GIT_CONFIG_VALUE_<n>::
+	Om GIT_CONFIG_COUNT sätts till ett positivt tal, kommer alla miljöpar GIT_CONFIG_KEY_<n> och GIT_CONFIG_VALUE_<n> upp till det numret att läggas till i processens körtidskonfiguration. Konfigurationsparen nollindexeras. Alla saknade nyckelr eller värden behandlas som ett fel. En tom GIT_CONFIG_COUNT behandlas på samma sätt som GIT_CONFIG_COUNT=0, det vill säga inga par bearbetas. Dessa miljövariabler kommer att åsidosätta värden i konfigurationsfiler, men kommer att åsidosättas av eventuella explicita alternativ som skickas via `git -c`.
++
+Detta är användbart i fall där du vill skapa flera git-kommandon med en gemensam konfiguration men inte kan vara beroende av en konfigurationsfil, till exempel när du skriver skript.
+
+GIT_CONFIG::
+	Om ingen `--file`-inställning finns i `git config`, använd filen som ges av `GIT_CONFIG` som om den tillhandahölls via `--file`. Denna variabel har ingen effekt på andra Git-kommandon och är främst till för historisk kompatibilitet; det finns generellt ingen anledning att använda den istället för `--file`-inställningen.
+
+[[EXAMPLES]]
+EXEMPEL
+-------
+
+Givet en .git/config som denna:
+
+------------
+#
+# Detta är konfigurationsfilen, och
+# ett '#' eller ';'-tecken indikerar
+# en kommentar
+#
+
+; kärnvariabler
+[core]
+	; Lita inte på fillägen
+	filemode = false
+
+; Vår diff-algoritm
+[diff]
+	external = /usr/local/bin/diff-wrapper
+	renames = true
+
+; Proxyinställningar
+[core]
+	gitproxy=proxy-command for kernel.org
+	gitproxy=default-proxy ; för alla de andra
+
+; HTTP
+[http]
+	sslVerify
+[http "https://weak.example.com"]
+	sslVerify = false
+	cookieFile = /tmp/cookie.txt
+------------
+
+du kan ställa in filläget till sant med
+
+------------
+% git config set core.filemode true
+------------
+
+De hypotetiska proxykommandoposterna har faktiskt ett postfix för att urskilja vilken URL de gäller. Så här ändrar du posten för kernel.org till "ssh".
+
+------------
+% git config set --value='for kernel.org$' core.gitproxy '"ssh" for kernel.org'
+------------
+
+Detta säkerställer att endast nyckel/värde-paret för kernel.org ersätts.
+
+För att ta bort posten för namnbyten, gör
+
+------------
+% git config unset diff.renames
+------------
+
+Om du vill ta bort en post för en multivariabel (som core.gitproxy ovan) måste du ange en regex som matchar värdet på exakt en rad.
+
+För att fråga efter värdet för en given nyckel, gör
+
+------------
+% git config get core.filemode
+------------
+
+eller, för att fråga en multivariabel:
+
+------------
+% git config get --value="for kernel.org$" core.gitproxy
+------------
+
+Om du vill veta alla värden för en multivariabel, gör:
+
+------------
+% git config get --all --show-names core.gitproxy
+------------
+
+Om du gillar att leva farligt, kan du ersätta *all* core.gitproxy med en ny med
+
+------------
+% git config set --all core.gitproxy ssh
+------------
+
+Men om du bara vill ersätta raden för standardproxyn, dvs. den utan ett "för ..."-postfix, gör något så här:
+
+------------
+% git config set --value='! for ' core.gitproxy ssh
+------------
+
+För att faktiskt bara matcha värden med ett utropstecken, måste du
+
+------------
+% git config set --value='[!]' section.key value
+------------
+
+För att lägga till en ny proxy utan att ändra någon av de befintliga, använd
+
+------------
+% git config set --append core.gitproxy '"proxy-command" for example.com'
+------------
+
+Ett exempel på hur man använder anpassad färg från konfigurationen i ditt skript:
+
+------------
+#!/bin/sh
+WS=$(git config get --type=color --default="blue reverse" color.diff.whitespace)
+RESET=$(git config get --type=color --default="reset" "")
+echo "${WS}your whitespace color or blue reverse${RESET}"
+------------
+
+För URL:er i `https://weak.example.com` är `http.sslVerify` satt till falskt, medan det är satt till `true` för alla andra:
+
+------------
+% git config get --type=bool --url=https://good.example.com http.sslverify
+true
+% git config get --type=bool --url=https://weak.example.com http.sslverify
+false
+% git config get --url=https://weak.example.com http
+http.cookieFile /tmp/cookie.txt
+http.sslverify false
+------------
+
+KONFIGURATIONSFIL
+-----------------
+
+Git-konfigurationsfilen innehåller ett antal variabler som påverkar Git-kommandonas beteende. Filerna `.git/config` och eventuellt `config.worktree` (se avsnittet "KONFIGURATIONSFIL" i linkgit:git-worktree[1]) i varje förvar används för att lagra konfigurationen för det förvaret, och `$HOME/.gitconfig` används för att lagra en konfiguration per användare som reservvärden för `.git/config`-filen. Filen `/etc/gitconfig` kan användas för att lagra en systemomfattande standardkonfiguration.
+
+Konfigurationsvariablerna används av både Git Rörmokeri- och Porcelain-kommandona. Variablerna är indelade i sektioner, där det fullständigt kvalificerade variabelnamnet av variabeln själv är det sista punktseparerade segmentet och sektionsnamnet är allt före den sista punkten. Variabelnamnen är Skiftlägesoberoende, tillåter endast alfanumeriska tecken och `-`, och måste börja med ett alfabetiskt tecken. Vissa variabler kan förekomma flera gånger; vi säger då att variabeln är flervärdig.
+
+Syntax
+~~~~~~
+
+Syntaxen är ganska flexibel och tillåtande. Blanktecken, som i detta sammanhang är mellanslagstecknet (SP) och horisontell tabuleringstecken (HT), ignoreras oftast. Tecknen '#' och ';' börjar kommentarer till slutet av raden. Tomma rader ignoreras.
+
+Filen består av sektioner och variabler. Ett avsnitt börjar med avsnittets namn inom hakparenteser och fortsätter tills nästa avsnitt börjar. Sektionsnamn är inte skiftlägeskänsliga. Endast alfanumeriska tecken, `-` och `.` är tillåtna i sektionsnamn. Varje variabel måste tillhöra ett avsnitt, vilket innebär att det måste finnas en sektionsrubrik före den första inställningen av en variabel.
+
+Avsnitt kan vidare delas in i underavsnitt. För att börja ett underavsnitt, skriv dess namn inom dubbla citationstecken, separerade med mellanslag från avsnittsnamnet, i avsnittsrubriken, som i exemplet nedan:
+
+--------
+	[section "underavsnitt"]
+
+--------
+
+Namn på underavsnitt är skiftlägeskänsliga och kan innehålla vilka tecken som helst förutom nyrad och nullbyte. Dubbelcitat `"` och bakåtsnedstreck kan inkluderas genom att använda escape-tecken som `\"` respektive `\\`. Bakåtsnedstreck som föregår andra tecken tas bort vid läsning; till exempel läses `\t` som `t` och `\0` läses som `0`. Avsnittsrubriker kan inte sträcka sig över flera rader. Variabler kan tillhöra direkt ett avsnitt eller ett givet underavsnitt. Du kan ha `[avsnitt]` om du har `[avsnitt "underavsnitt"]`, men du behöver inte ha det.
+
+Det finns också en föråldrad syntax `[section.subsection]`. Med denna syntax konverteras underavdelningsnamnet till gemener och jämförs även med gemener/skiftlägeskänslighet. Dessa underavdelningsnamn följer samma begränsningar som sektionsnamn.
+
+Alla andra rader (och resten av raden efter avsnittsrubriken) känns igen som inställningsvariabler i formen 'namn = värde' (eller bara 'namn', vilket är en förkortning för att variabeln är den booleska "sant"). Variabelnamnen är skiftlägesoberoende, tillåter endast alfanumeriska tecken och `-` och måste börja med ett alfabetiskt tecken.
+
+Blanktecken som omger `name`, `=` och `value` kasseras. Interna blanktecken inom 'value' behålls ordagrant. Kommentarer som börjar med antingen `#` eller `;` och fortsätter till slutet av raden kasseras. En rad som definierar ett värde kan fortsätta till nästa rad genom att avsluta den med ett bakåtsnedstreck (`\`); det bakåtsnedstreck och radslutstecknen kasseras.
+
+Om `value` behöver innehålla inledande eller efterföljande blanksteg måste det omges av dubbla citattecken (`"`). Inom dubbla citattecken måste dubbla citattecken (`"`) och bakåtsnedstreck (`\`) omges av escape-tecken: använd `\`` för `"` och `\\` för `\`.
+
+Följande escape-sekvenser (förutom `\"` och `\\`) känns igen: `\n` för nyradstecken (NL), `\t` för horisontell tabulering (HT, TAB) och `\b` för backsteg (BS). Andra tecken-escape-sekvenser (inklusive oktala escape-sekvenser) är ogiltiga.
+
+
+Inkluderar
+~~~~~~~~~~
+
+Avsnitten `include` och `includeIf` låter dig inkludera konfigurationsdirektiv från en annan källa. Dessa avsnitt beter sig identiskt med varandra med undantaget att `includeIf`-avsnitt kan ignoreras om deras villkor inte utvärderas till sant; se "Villkorliga inkluderingar" nedan.
+
+Du kan inkludera en konfigurationsfil från en annan genom att sätta den speciella variabeln `include.path` (eller `includeIf.*.path`) till namnet på den fil som ska inkluderas. Variabeln tar ett sökvägsnamn som värde och är föremål för tildeexpansion. Dessa variabler kan anges flera gånger.
+
+Innehållet i den inkluderade filen infogas omedelbart, som om det hade hittats på platsen för include-direktivet. Om variabelns värde är en relativ sökväg anses sökvägen vara relativ till konfigurationsfilen där include-direktivet hittades. Se nedan för exempel.
+
+Villkorliga inkluderingar
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Du kan villkorligt inkludera en konfigurationsfil från en annan genom att ställa in variabeln `includeIf.<villkor>.path` i namnet på den fil som ska inkluderas.
+
+Villkoret börjar med ett nyckelord följt av ett kolon och lite data vars format och betydelse beror på nyckelordet. Nyckelord som stöds är:
+
+`gitdir`::
+	Data som följer efter nyckelordet `gitdir` och ett kolon används som ett glob-mönster. Om platsen för .git-katalogen matchar mönstret är include-villkoret uppfyllt.
++
+.git-platsen kan vara auto-upptäckt, eller komma från miljövariabeln `$GIT_DIR`. Om förvaret är auto-upptäckt via en .git-fil (t.ex. från undermoduler eller ett länkat arbetsträd), skulle .git-platsen vara den slutliga platsen där .git-katalogen finns, inte där .git-filen finns.
++
+Mönstret kan innehålla vanliga globbing-jokertecken och två ytterligare, `**/` och `/**`, som kan matcha flera sökvägskomponenter. Se linkgit:gitignore[5] för mer information. För enkelhetens skull:
+
+ * Om mönstret börjar med `~/` kommer `~` att ersättas med innehållet i miljövariabeln `HOME`.
+
+ * Om mönstret börjar med `./` ersätts det med katalogen som innehåller den aktuella konfigurationsfilen.
+
+ * Om mönstret inte börjar med vare sig `~/`, `./` eller `/`, kommer `**/` automatiskt att läggas till före. Till exempel blir mönstret `foo/bar` till `**/foo/bar` och skulle matcha `/any/path/to/foo/bar`.
+
+ * Om mönstret slutar med `/`, läggs `**` till automatiskt. Till exempel blir mönstret `foo/` till `foo/**`. Med andra ord matchar det "foo" och allt inuti, rekursivt.
+
+`gitdir/i`::
+	Detta är samma sak som `gitdir` förutom att matchningen görs skiftlägesoberoende (t.ex. på filsystem som är skiftlägesoberoende)
+
+`onbranch`::
+	Data som följer nyckelordet `onbranch` och ett kolon tas som ett mönster med vanliga globbing-jokertecken och två ytterligare, `**/` och `/**`, som kan matcha flera sökvägskomponenter. Om vi befinner oss i ett arbetsträd där namnet på den gren som för närvarande är utcheckad matchar mönstret, är include-villkoret uppfyllt.
++
+Om mönstret slutar med `/` läggs `**` till automatiskt. Till exempel blir mönstret `foo/` till `foo/**`. Med andra ord matchar det alla grenar som börjar med `foo/`. Detta är användbart om dina grenar är organiserade hierarkiskt och du vill tillämpa en konfiguration på alla grenar i den hierarkin.
+
+`hasconfig:remote.*.url`::
+	Data som följer efter detta nyckelord och ett kolon tas som ett mönster med vanliga globbing-jokertecken och två ytterligare, `**/` och `/**`, som kan matcha flera komponenter. Första gången detta nyckelord ses kommer resten av konfigurationsfilerna att skannas efter fjärr-URL:er (utan att tillämpa några värden). Om det finns minst en fjärr-URL som matchar detta mönster är inkluderingsvillkoret uppfyllt.
++
+Filer som inkluderas av det här alternativet (direkt eller indirekt) får inte innehålla fjärr-URL:er.
++
+Observera att till skillnad från andra includeIf-villkor, är lösningen av detta villkor beroende av information som ännu inte är känd vid tidpunkten för läsning av villkoret. Ett typiskt användningsfall är att detta alternativ finns som en konfiguration på systemnivå eller global nivå, och att fjärr-URL:en finns i en konfiguration på lokal nivå; därav behovet av att skanna framåt när detta villkor löses. För att undvika hönan-och-ägget-problemet där potentiellt inkluderade filer kan påverka huruvida sådana filer potentiellt inkluderas, bryter Git cykeln genom att förbjuda dessa filer att påverka lösningen av dessa villkor (och därmed förbjuda dem att deklarera fjärr-URL:er).
++
+När det gäller namngivningen av detta nyckelord, så är det för framåtkompatibilitet med ett namngivningsschema som stöder mer variabelbaserade inkluderingsvillkor, men för närvarande stöder Git bara exakt det nyckelord som beskrivs ovan.
+
+Några fler anteckningar om matchning via `gitdir` och `gitdir/i`:
+
+ * Symlänkar i `$GIT_DIR` löses inte innan matchning.
+
+ * Både symlänk- och realpath-versionerna av sökvägarna kommer att matchas utanför `$GIT_DIR`. T.ex. om ~/git är en symlänk till /mnt/storage/git, kommer både `gitdir:~/git` och `gitdir:/mnt/storage/git` att matcha.
++
+This was not the case in the initial release of this feature in v2.13.0, which only matched the realpath version. Configuration that wants to be compatible with the initial release of this feature needs to either specify only the realpath version, or both versions.
+
+ * Observera att "../" inte är speciellt och kommer att matcha bokstavligt, vilket sannolikt inte är vad du vill ha.
+
+Exempel
+~~~~~~~
+
+----
+# Kärnvariabler
+[core]
+	; Lita inte på fillägen
+	filemode = false
+
+# Vår diff-algoritm
+[diff]
+	external = /usr/local/bin/diff-wrapper
+	renames = true
+
+[branch "utveckling"]
+	remote = origin
+	merge = refs/heads/devel
+
+# Proxyinställningar
+[core]
+	gitProxy="ssh" for "kernel.org"
+	gitProxy=default-proxy ; för resten
+
+[include]
+	path = /path/to/foo.inc ; inkludera med absolut sökväg
+	path = foo.inc ; hitta "foo.inc" relativt till den aktuella filen
+	path = ~/foo.inc ; hitta "foo.inc" i din `$HOME`-katalog
+
+; inkludera om $GIT_DIR är /path/to/foo/.git
+[includeIf "gitdir:/path/to/foo/.git"]
+	path = /path/to/foo.inc
+
+; inkludera för alla förvar inuti /path/to/group
+[includeIf "gitdir:/path/to/group/"]
+	path = /path/to/foo.inc
+
+; inkludera för alla förvar i $HOME/to/group
+[includeIf "gitdir:~/to/group/"]
+	path = /path/to/foo.inc
+
+; relativa sökvägar är alltid relativa till den inkluderande
+; filen (om villkoret är sant); deras plats påverkas inte
+; av villkoret
+[includeIf "gitdir:/path/to/group/"]
+	path = foo.inc
+
+; inkludera endast om vi är i ett arbetsträd där foo-branch är
+; för närvarande utcheckad
+[includeIf "onbranch:foo-branch"]
+	path = foo.inc
+
+; include only if a remote with the given URL exists (note
+; that such a URL may be provided later in a file or in a
+; file read after this file is read, as seen in this example)
+[includeIf "hasconfig:remote.*.url:https://example.com/**"]
+	path = foo.inc
+[remote "origin"]
+	url = https://example.com/git
+----
+
+Värden
+~~~~~~
+
+Värden för många variabler behandlas som en enkel sträng, men det finns variabler som tar värden av specifika typer och det finns regler för hur man stavar dem.
+
+boolesk::
+
+       När en variabel sägs anta ett booleskt värde accepteras många synonymer för 'sant' och 'falskt'; dessa är alla skiftlägesoberoende.
+
+	sant;; Booleska sanna literaler är `yes`, `on`, `sant` och `1`. Dessutom tas en variabel definierad utan `= <value>` som sann.
+
+	false;; Booleska falska literaler är `no`, `off`, `false`, `0` och den tomma strängen.
++
+När man konverterar ett värde till dess kanoniska form med typspecifikationen `--type=bool`, kommer `git config' att säkerställa att utdata är "true" eller "false" (stavat med gemener).
+
+heltal::
+       Värdet för många variabler som anger olika storlekar kan ges suffix med `k`, `M`,... för att betyda "skala talet med 1024", "med 1024x1024", etc.
+
+color::
+       Värdet för en variabel som tar en färg är en lista med färger (högst två, en för förgrund och en för bakgrund) och attribut (så många du vill), separerade med mellanslag.
++
+De accepterade grundfärgerna är `normal`, `black` (svart), `red` (röd), `green` (grön), `yellow` (gul), `blue` (blå), `magenta`, `cyan`, `white` (vit) and `default` (standard). Den första färgen som anges är förgrunden; den andra är bakgrunden. Alla grundfärger utom `normal` och `default` har en ljus variant som kan anges genom att prefixet `bright` (ljus) skrivs ut för färgen, som `brightred` (ljusröd).
++
+Färgen `normal` ändrar inte färgen. Den är samma som en tom sträng, men kan användas som förgrundsfärg när man anger enbart en bakgrundsfärg (till exempel "normal red" (normal röd)).
++
+Färgen `standard` återställer explicit färgen till terminalens standardinställning, till exempel för att ange en ren bakgrund. Även om det varierar mellan terminaler är detta vanligtvis inte detsamma som att ställa in den på "white black" (vit svart).
++
+Färger kan också anges som siffror mellan 0 och 255; dessa använder ANSI 256-färgläge (men observera att inte alla terminaler stöder detta). Om din terminal stöder det kan du också ange 24-bitars RGB-värden som hexagoner, som `#ff0ab3`, eller 12-bitars RGB-värden som `#f1b`, vilket motsvarar 24-bitarsfärgen `#ff11bb`.
++
+De accepterade attributen är `bold` (fet), `dim`, `ul` (understruken), `blink` (blinka), `reverse` (omvänd), `italic` (kursiv) och `strike` (för överstrukna eller genomstrukna bokstäver). Attributens position i förhållande till färgerna (före, efter eller däremellan) spelar ingen roll. Specifika attribut kan stängas av genom att prefixet `no` eller `no-` läggs till (t.ex. `noreverse`, `no-ul`, etc.).` och `strike` (för överstrukna eller genomstrukna bokstäver).
++
+Pseudoattributet `reset` återställer alla färger och attribut innan den angivna färgen tillämpas. Till exempel kommer `reset green` att resultera i en grön förgrund och standardbakgrund utan några aktiva attribut.
++
+En tom färgsträng ger ingen färgeffekt alls. Detta kan användas för att undvika att färglägga specifika element utan att helt inaktivera färg.
++
+For git's pre-defined color slots, the attributes are meant to be reset at the beginning of each item in the colored output. So setting `color.decorate.branch` to `black` will paint that branch name in a plain `black`, even if the previous thing on the same output line (e.g. opening parenthesis before the list of branch names in `log --decorate` output) is set to be painted with `bold` or some other attribute. However, custom log formats may do more complicated and layered coloring, and the negated forms may be useful there.
+
+sökvägsnamn::
+	En variabel som tar ett sökvägsvärde kan ges en sträng som börjar med "`~/`" eller "`~user/`", och den vanliga tilde-expansionen sker för en sådan sträng: `~/` expanderas till värdet `$HOME` och `~user/` till den angivna användarens hemkatalog.
++
+Om en sökväg börjar med `%(prefix)/` tolkas resten som en sökväg relativt till Gits "runtime prefix", d.v.s. relativt till platsen där Git självt installerades. Till exempel refererar `%(prefix)/bin/` till katalogen där själva Git-filen finns. Om Git kompilerades utan stöd för runtime prefix kommer det kompilerade prefixet att ersättas. I det osannolika fallet att en litteral sökväg behöver anges som _inte_ ska expanderas, måste den prefixas med `./`, så här: `./%(prefix)/bin`.
++
+Om prefixet `:(valfritt)` används behandlas konfigurationsvariabeln som om den inte existerar, om den namngivna sökvägen inte existerar.
+
+Variabler
+~~~~~~~~~
+
+Observera att den här listan inte är heltäckande och inte nödvändigtvis komplett. För kommandospecifika variabler hittar du en mer detaljerad beskrivning på motsvarande manualsida.
+
+Andra git-relaterade verktyg kan använda, och använder, sina egna variabler. När du uppfinner nya variabler för användning i ditt eget verktyg, se till att deras namn inte står i konflikt med de som används av Git självt och andra populära verktyg, och beskriv dem i din dokumentation.
+
+`add.ignoreErrors`::
+`add.ignore-errors` (föråldrad)::
+	Anger att `git add` ska fortsätta lägga till filer när vissa filer inte kan läggas till på grund av indexeringsfel.
+ifdef::git-add[]
+	Motsvarande alternativet `--ignore-errors`.
+endif::git-add[]
+ifndef::git-add[]
+	Motsvarar alternativet `--ignore-errors` i linkgit:git-add[1].
+endif::git-add[]
+	`add.ignore-errors` är föråldrad eftersom den inte följer den vanliga namngivningskonventionen för
+	konfigurationsvariabler.
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/advice.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/alias.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/am.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/apply.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/attr.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/bitmap-pseudo-merge.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/blame.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/branch.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/browser.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/bundle.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/checkout.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/clean.adoc`
+
+See original version for this content.
+====
+
+[]
+
+`clone.defaultRemoteName`::
+	Namnet på den fjärren som ska skapas vid kloning av ett arkiv. Standardvärdet är `origin`.
+ifdef::git-clone[]
+	Det kan åsidosättas genom att använda 
+	kommandoradsalternativet `--origin`.
+endif::[]
+ifndef::git-clone[]
+	Den kan åsidosättas genom att skicka
+	kommandoradsalternativet `--origin` till linkgit:git-clone[1].
+endif::[]
+
+`clone.rejectShallow`::
+	Avvisa kloning av ett förvar om det är ett ytligt sådant; detta kan åsidosättas genom att skicka alternativet `--reject-shallow` på kommandoraden.
+ifndef::git-clone[]
+	Se linkgit:git-clone[1].
+endif::[]
+
+`clone.filterSubmodules`::
+	Om ett partiellt klonfilter tillhandahålls (se `--filter` i linkgit:git-rev-list[1]) och `--recurse-submodules` används, använd även filtret på undermoduler.
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/color.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/column.adoc`
+
+See original version for this content.
+====
+
+[]
+
+ifdef::git-commit[]
+:see-git-commit:
+endif::git-commit[]
+ifndef::git-commit[]
+:see-git-commit: See linkgit:git-commit[1] for details.
+endif::git-commit[]
+`commit.cleanup`::
+	Den här inställningen åsidosätter standardinställningen för `--cleanup`-alternativet i `git commit`. {see-git-commit} Att ändra standardinställningen kan vara användbart när du alltid vill behålla rader som börjar med kommentartecknet (`core.commentChar`, standard `#`) i ditt loggmeddelande, i vilket fall du skulle göra `git config commit.cleanup whitespace` (observera att du själv måste ta bort hjälpraderna som börjar med kommentartecknet i incheckning-loggmallen om du gör detta).
+
+`commit.gpgSign`::
+	En boolesk kod som anger om alla incheckningar ska GPG-signeras. Användning av det här alternativet vid operationer som ombasering kan resultera i att ett stort antal incheckningar signeras. Det kan vara praktiskt att använda en agent för att undvika att skriva in din GPG-lösenfras flera gånger.
+
+`commit.status`::
+	Ett booleskt värde för att aktivera/inaktivera inkludering av statusinformation i inchecknings-meddelandemallen när en editor används för att förbereda inchecknings-meddelandet. Standardvärdet är `true`.
+
+`commit.template`::
+	Ange sökvägen till en fil som ska användas som mall för nya inchecknings-meddelanden.
+
+`commit.verbose`::
+	Ett booleskt värde eller ett heltal för att ange utförlighetsnivån med `git commit`. {see-git-commit}
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/commitgraph.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/completion.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/core.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/credential.adoc`
+
+See original version for this content.
+====
+
+[]
+
+`diff.autoRefreshIndex`::
+	När du använder `git diff` för att jämföra med arbetsträdfiler, betrakta inte ändringar som endast innehåller statistiska data som ändrade. Kör istället `git update-index --refresh` i tysthet för att uppdatera den cachade statistiska informationen för sökvägar vars innehåll i arbetsträdet matchar innehållet i indexet. Standardvärdet för detta alternativ är `true`. Observera att detta endast påverkar `git diff` Porcelain, och inte `diff`-kommandon på lägre nivå som `git diff-files`.
+
+`diff.dirstat`::
+ifdef::git-diff[]
+	En kommaseparerad lista med `--dirstat`-parametrar som anger
+	standardbeteendet för `--dirstat`-alternativet för `git diff` och vänner.
+endif::git-diff[]
+ifndef::git-diff[]
+	En kommaseparerad lista med `--dirstat`-parametrar som anger 
+	standardbeteendet för `--dirstat`-alternativet till linkgit:git-diff[1]
+	och vänner.
+endif::git-diff[]
+	Standardvärdena kan åsidosättas på kommandoraden
+	(med `--dirstat=<param>,...`). Reservstandardvärdena
+	(när de inte ändras av `diff.dirstat`) är `changes,noncumulative,3`.
+	Följande parametrar är tillgängliga:
++
+--
+`changes`;;
+	Beräkna dirstat-talen genom att räkna raderna som har tagits bort från källan eller lagts till i destinationen. Detta ignorerar mängden rena kodförflyttningar inom en fil. Med andra ord räknas inte omarrangemang av rader i en fil lika mycket som andra ändringar. Detta är standardbeteendet när ingen parameter anges.
+`lines`;;
+	Beräkna dirstat-talen genom att göra den vanliga radbaserade diff-analysen och summera antalet borttagna/tillagda rader. (För binära filer, räkna istället 64-byte-block, eftersom binära filer inte har något naturligt koncept för rader). Detta är ett dyrare `--dirstat`-beteende än `changes`-beteendet, men det räknar omordnade rader i en fil lika mycket som andra ändringar. Den resulterande utdata överensstämmer med vad du får från de andra `--*stat`-alternativen.
+`files`;;
+	Beräkna dirstat-talen genom att räkna antalet ändrade filer. Varje ändrad fil räknas lika i dirstat-analysen. Detta är det beräkningsmässigt billigaste beteendet för `--dirstat`, eftersom det inte behöver titta på filinnehållet alls.
+`cumulative`;;
+	Count changes in a child directory for the parent directory as well. Note that when using `cumulative`, the sum of the percentages reported may exceed 100%. The default (non-cumulative) behavior can be specified with the `noncumulative` parameter.
+_<gränsvärde>_;;
+	En heltalsparameter anger en gränsvärde i procent (3 % som standard). Kataloger som bidrar med mindre än denna procentandel av ändringarna visas inte i utdata.
+--
++
+Exempel: Följande räknar ändrade filer, ignorerar kataloger med mindre än 10 % av den totala mängden ändrade filer och ackumulerar antal underkataloger i de överordnade katalogerna: `files,10,cumulative`.
+
+`diff.statNameWidth`::
+	Begränsa bredden på filnamnsdelen i `--stat`-utdata. Om angivet gäller det alla kommandon som genererar `--stat`-utdata förutom `format-patch`.
+
+`diff.statGraphWidth`::
+	Begränsa bredden på grafdelen i `--stat`-utdata. Om angivet gäller det alla kommandon som genererar `--stat`-utdata förutom `format-patch`.
+
+`diff.context`::
+	Generera diffar med _<n>_ rader kontext istället för standardvärdet 3. Detta värde åsidosätts av alternativet `-U`.
+
+`diff.interHunkContext`::
+	Visa sammanhanget mellan olika stycken, upp till det angivna antalet rader, och sammanfoga därmed de stycken som ligger nära varandra. Detta värde fungerar som standardvärde för kommandoradsalternativet `--inter-hunk-context`.
+
+`diff.external`::
+	Om denna konfigurationsvariabel är satt, utförs diff-generering inte med hjälp av den interna diff-maskineriet, utan med hjälp av det givna kommandot. Kan åsidosättas med miljövariabeln `GIT_EXTERNAL_DIFF`. Kommandot anropas med parametrar som beskrivs under "git Diffs" i linkgit:git[1]. Obs: om du bara vill använda ett externt diff-program på en delmängd av dina filer, kanske du vill använda linkgit:gitattributes[5] istället.
+
+`diff.trustExitCode`::
+	Om detta booleska värde är satt till `true` förväntas kommandot `diff.external` returnera avslutningskoden 0 om det anser att indatafilerna är lika eller 1 om det anser att de är olika, som `diff`(1). Om det är satt till `false`, vilket är standardvärdet, förväntas kommandot returnera avslutningskoden `0` oavsett likhet. All annan avslutningskod gör att Git rapporterar ett allvarligt fel.
+
+`diff.ignoreSubmodules`::
+	Ställer in standardvärdet för `--ignore-submodules`. Observera att detta endast påverkar `git diff` Porcelain, och inte lägre nivåer av `diff`-kommandon som `git diff-files`. `git checkout` och `git switch` respekterar också denna inställning vid rapportering av ej incheckade ändringar. Om den ställs in på `all` inaktiveras undermoduls-ammanfattningen som normalt visas av `git commit` och `git status` när `status.submoduleSummary` är inställt om den inte åsidosätts med hjälp av kommandoradsalternativet `--ignore-submodules`. Kommandona `git submodule` påverkas inte av denna inställning. Som standard är detta inställt på ospårad så att eventuella ej spårade undermoduler ignoreras.
+
+`diff.mnemonicPrefix`::
+	Om detta är satt använder `git diff` ett prefixpar som skiljer sig från standard `a/` och `b/` beroende på vad som jämförs. När denna konfiguration är aktiv byter även omvänd diff-utmatning ordningen på prefixen:
+`git diff`;;
+	compares the (i)ndex and the (w)ork tree;
+`git diff HEAD`;;
+	 compares a (c)ommit and the (w)ork tree;
+`git diff --cached`;;
+	compares a (c)ommit and the (i)ndex;
+`git diff HEAD:<fil1> <fil2>`;;
+	compares an (o)bject and a (w)ork tree entity;
+`git diff --no-index <a> <b>`;;
+	jämför två icke-git-saker _<a>_ och _<b>_.
+
+`diff.noPrefix`::
+	Om angivet visar `git diff` inget käll- eller destinationsprefix.
+
+`diff.srcPrefix`::
+	Om angivet använder `git diff` detta källkodsprefix. Standardvärdet är `a/`.
+
+`diff.dstPrefix`::
+	Om angivet använder `git diff` detta destinationsprefix. Standardvärdet är `b/`.
+
+`diff.relative`::
+	Om den är satt till `true` visar `git diff` inte ändringar utanför katalogen och visar sökvägar i förhållande till den aktuella katalogen.
+
+`diff.orderFile`::
+	Fil som anger hur filer ska ordnas inom en diff.
+ifdef::git-diff[]
+	Se alternativet `-O` för mer information.
+endif::git-diff[]
+ifndef::git-diff[]
+	Se `-O`-flaggan till linkgit:git-diff[1] för mer information..
+endif::git-diff[]
+	Om `diff.orderFile` är en relativ sökväg behandlas den som
+	relativt till toppen av arbetskatalogen.
+
+`diff.renameLimit`::
+	Antalet filer som ska beaktas i den uttömmande delen av kopierings-/namnbytesdetektering; motsvarande `git diff`flaggan `-l`. Om det inte är inställt är standardvärdet för närvarande 1000. Denna inställning har ingen effekt om namnbytesdetektering är avstängd.
+
+`diff.renames`::
+	Om och hur Git identifierar namnbyten. Om det är satt till `false` är namnbytesdetektering inaktiverad. Om det är satt till `true` är grundläggande namnbytesdetektering aktiverad. Om det är satt till `copies` eller `copy` kommer Git även att identifiera kopior. Standardvärdet är `true`. Observera att detta endast påverkar `git diff` Porslinskommandon som linkgit:git-diff[1] och linkgit:git-log[1], och inte lägre kommandon som linkgit:git-diff-files[1].
+
+`diff.suppressBlankEmpty`::
+	Ett booleskt värde för att förhindra standardbeteendet att skriva ut ett mellanslag före varje tom utdatarad. Standardvärdet är `false`.
+
+`diff.submodule`::
+	Ange formatet i vilket skillnader i undermoduler visas. Formatet `short` visar bara namnen på incheckningar i början och slutet av intervallet. Formatet `log` listar incheckningar i intervallet, precis som linkgit:git-submodule[1] `summary` gör. Formatet `diff` visar en inline-diff av det ändrade innehållet i undermodulen. Standardinställningen är `short`.
+
+`diff.wordRegex`::
+	Ett utökat reguljärt uttryck i POSIX som används för att avgöra vad som är ett "ord" vid ord-för-ord-differensberäkningar. Teckensekvenser som matchar det reguljära uttrycket är "ord", alla andra tecken är *ignorerbara* blanksteg.
+
+`diff.<förare>.command`::
+	Anpassat diff förare kommando. Se linkgit:gitattributes[5] för mer information.
+
+`diff.<förare>.trustExitCode`::
+	Om detta booleska värde är satt till `true` förväntas kommandot `diff.<förare>.command` returnera avslutningskod 0 om det anser att indatafilerna är lika eller 1 om det anser att de är olika, som `diff`(1). Om det är satt till `false`, vilket är standardvärdet, förväntas kommandot returnera avslutningskod 0 oavsett likhet. All annan avslutningskod gör att Git rapporterar ett allvarligt fel.
+
+`diff.<förare>.xfuncname`::
+	Det reguljära uttryck som diff-föraren ska använda för att känna igen hunk-huvud. Ett inbyggt mönster kan också användas. Se linkgit:gitattributes[5] för mer information.
+
+`diff.<driver>.binary`::
+	Sätt det här alternativet till `true` för att få diff-förare att behandla filer som binära. Se linkgit:gitattributes[5] för mer information.
+
+`diff.<förare>.textconv`::
+	Kommandot som diff-drivrutinen ska anropa för att generera den textkonverterade versionen av en fil. Resultatet av konverteringen används för att generera en människoläsbar diff. Se linkgit:gitattributes[5] för mer information.
+
+`diff.<förare>.wordRegex`::
+	Det reguljära uttryck som diff-drivrutinen ska använda för att dela upp ord på en rad. Se linkgit:gitattributes[5] för mer information.
+
+`diff.<förare>.cachetextconv`::
+	Sätt det här alternativet till `true` för att få diff-drivrutinen att cachelagra textkonverteringsutdata. Se linkgit:gitattributes[5] för mer information.
+
+`diff.indentHeuristic`::
+	Ställ in det här alternativet på `false` för att inaktivera standardheuristiken som flyttar olika hunk-gränser för att göra patchar lättare att läsa.
+
+`diff.algorithm`::
+	Välj en diff-algoritm. Varianterna är följande:
++
+--
+`default`;;
+`myers`;;
+	Den grundläggande giriga diff-algoritmen. För närvarande är detta standard.
+`minimal`;;
+	Lägg extra tid på att se till att minsta möjliga skillnad produceras.
+`patience`;;
+	Använd algoritmen "patience diff" när du genererar patchar.
+`histogram`;;
+	Denna algoritm utökar tålamodsalgoritmen till att "stödja vanliga element med låg förekomst".
+--
++
+
+`diff.wsErrorHighlight`::
+	Markera blankteckenfel i raderna `context`, `old` eller `new` i diff-filen. Flera värden separeras med kommatecken, `none` återställer tidigare värden, `default` återställer listan till `new` och `all` är en förkortning för `old,new,context`. Blankteckenfelen är färgade med `color.diff.whitespace`. Kommandoradsalternativet `--ws-error-highlight=<slag>` åsidosätter denna inställning.
+
+`diff.colorMoved`::
+	Om den är satt till antingen ett giltigt _<läge>_ eller ett `sant`-värde, färgas flyttade linjer i en diff olika.
+ifdef::git-diff[]
+	För detaljer om giltiga lägen, se `--color-moved`.
+endif::git-diff[]
+ifndef::git-diff[]
+	För detaljer om giltiga lägen, se `--color-moved` i linkgit:git-diff[1].
+endif::git-diff[]
+	Om den bara ställs in på `sant` används standardfärgläget. När
+	den ställs in på `false` färgas inte flyttade linjer.
+
+`diff.colorMovedWS`::
+	När flyttade linjer färgläggs med t.ex. inställningen `diff.colorMoved`, styr detta alternativ läget för hur mellanslag behandlas. För detaljer om giltiga lägen, se `--color-moved-ws` i linkgit:git-diff[1].
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/difftool.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/extensions.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/fastimport.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/feature.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/fetch.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/filter.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/format.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/fsck.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/fsmonitor--daemon.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/gc.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/gitcvs.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/gitweb.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/gpg.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/grep.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/gui.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/guitool.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/help.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/http.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/i18n.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/imap.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/includeif.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/index.adoc`
+
+See original version for this content.
+====
+
+[]
+
+:see-git-init:
+ifndef::git-init[]
+:see-git-init: (See the "TEMPLATE DIRECTORY" section of linkgit:git-init[1].)
+endif::[]
+
+`init.templateDir`::
+	Ange katalogen från vilken mallarna ska kopieras. {see-git-init}
+`init.defaultBranch`::
+	Tillåter att åsidosätta standardgrennamnet, t.ex. vid initialisering av ett nytt förvar.
+`init.defaultObjectFormat`::
+	Tillåter att åsidosätta standardobjektformatet för nya arkiv. Se `--object-format=` i linkgit:git-init[1]. Både kommandoradsalternativet och miljövariabeln `GIT_DEFAULT_HASH` har företräde framför denna konfiguration.
+`init.defaultRefFormat`::
+	Tillåter åsidosättning av standardformatet för referenslagring för nya arkiv. Se `--ref-format=` i linkgit:git-init[1]. Både kommandoradsalternativet och miljövariabeln `GIT_DEFAULT_REF_FORMAT` har företräde framför denna konfiguration.
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/instaweb.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/interactive.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/log.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/lsrefs.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/mailinfo.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/mailmap.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/maintenance.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/man.adoc`
+
+See original version for this content.
+====
+
+[]
+
+`merge.conflictStyle`::
+	Ange stilen med vilken konfliktfyllda stycken skrivs ut till arbetsträdfiler
+vid sammanslagning. Standardinställningen är "merge", som visar en +<<<<<<<+
+konfliktmarkör, ändringar gjorda av ena sidan, en `=======`-markör,
+ändringar gjorda av den andra sidan och sedan en +>>>>>>>+ markör. En
+alternativ stil, "diff3", lägger till en +||||||||+ markör och
+originaltexten före `=======`-markören. Stilen "merge" tenderar att
+producera mindre konfliktområden än diff3, både på grund av att
+originaltexten utesluts och för att när en delmängd av rader matchar på de
+två sidorna, dras de bara ut ur konfliktområdet. En annan alternativ stil,
+"zdiff3", liknar diff3 men tar bort matchande rader på de två sidorna från
+konfliktområdet när dessa matchande rader visas nära antingen början eller
+slutet av ett konfliktområde.
+
+`merge.defaultToUpstream`::
+	Om merge anropas utan något inchecknings-argument, sammanfogas de uppströmsgrenar som konfigurerats för den aktuella grenen med hjälp av deras senast observerade värden som lagrats i deras fjärrspårningsgrenar. Värdena för `branch.<nuvarande gren>.merge` som namnger grenarna på fjärrvärd namngiven av `branch.<nuvarande gren>.remote` konsulteras, och sedan mappas de via `remote.<fjärrvärd>.fetch` till deras motsvarande fjärrspårningsgrenar, och topparna för dessa spårningsgrenar sammanfogas. Standardvärdet är sant.
+
+`merge.ff`::
+	Som standard, skapar Git inte en extra sammanslagnings-incheckningar när den sammanfogar en incheckning som är en underordnad till den topen av aktuell incheckning. Istället snabbspolas spetsen för den aktuella grenen framåt. När den är satt till `false`, talar denna variabel om för Git att skapa en extra sammanslagnings-incheckning i ett sådant fall (motsvarande att ge alternativet `--no-ff` från kommandoraden). När den är satt till `only`, tillåts endast sådana snabbspolnings-sammanfogningar (motsvarande att ge alternativet `--ff-only` från kommandoraden).
+
+`merge.verifySignatures`::
+	Om sant, motsvarar detta kommandoradsalternativet `--verify-signatures`. Se linkgit:git-merge[1] för mer information.
+
+`merge.branchdesc`::
+	Förutom grennamnen, fyll i loggmeddelandet med den grenbeskrivningstext som är associerad med dem. Standardvärdet är falskt.
+
+`merge.log`::
+	Förutom grennamn, fyll i loggmeddelandet med högst det angivna antalet enradsbeskrivningar från de faktiska incheckningar som sammanfogas. Standardvärdet är falskt, och sant är en synonym för 20.
+
+`merge.suppressDest`::
+	Genom att lägga till en glob som matchar namnen på integrationsgrenar till denna flervärdeskonfigurationsvariabel, kommer standardmeddelandet för sammanslagningar som beräknas för sammanslagningar i dessa integrationsgrenar att utelämna "into _<gren-namn>_" från titeln.
++
+Ett element med ett tomt värde kan användas för att rensa listan över globs som ackumulerats från tidigare konfigurationsposter. När ingen variabel `merge.suppressDest` har definierats används standardvärdet `master` för bakåtkompatibilitet.
+[]
+
+`merge.renameLimit`::
+	Antalet filer som ska beaktas i den uttömmande delen av namnbytesdetektering under en sammanslagning. Om inget anges används standardvärdet `diff.renameLimit`. Om varken `merge.renameLimit` eller `diff.renameLimit` anges används standardvärdet för närvarande 7000. Denna inställning har ingen effekt om namnbytesdetektering är avstängd.
+
+`merge.renames`::
+	Huruvida Git detekterar namnbyten. Om det är satt till `false` är namnbytesdetektering inaktiverad. Om det är satt till `true` är grundläggande namnbytesdetektering aktiverad. Standardvärdet är diff.renames.
+
+`merge.directoryRenames`::
+	Huruvida Git detekterar katalogbyten, vilket påverkar vad som händer vid sammanslagningstillfället med nya filer som läggs till i en katalog på ena sidan av historiken när den katalogen döptes om på den andra sidan av historiken. Möjliga värden är:
++
+--
+`false`;; Detektering av katalog-namnbyte är inaktiverat, vilket innebär att sådana nya filer kommer att lämnas kvar i den gamla katalogen.
+`true`;; Detektering av katalog namnbyte är aktiverat, vilket innebär att sådana nya filer flyttas till den nya katalogen.
+`conflict`;; En konflikt kommer att rapporteras för sådana sökvägar.
+--
++
+Om `merge.renames` är `false` ignoreras `merge.directoryRenames` och behandlas som `false`. Standardvärdet är `conflict`.
+
+`merge.renormalize`::
+	Informera Git om att den kanoniska representationen av filer i förvar har förändrats över tid (t.ex. tidigare incheckningar registrerade textfiler med _CRLF_ radslut, men nyare använder _LF_ radslut). I ett sådant förvar kan Git, för varje fil där en trevägs innehållssammanslagning behövs, konvertera data som registrerats i incheckningar till en kanonisk form innan en sammanslagning utförs för att minska onödiga konflikter. För mer information, se avsnittet "Sammanfoga grenar med olika inchecknings-/utcheckningsattribut" i linkgit:gitattributes[5].
+
+`merge.stat`::
+	Vad, om något, ska skrivas ut mellan `ORIG_HEAD` och sammanslagningsresultatet i slutet av sammanslagningen. Möjliga värden är:
++
+--
+`false`;; Visa ingenting.
+`true`;; Visa `git diff --diffstat --summary ORIG_HEAD`.
+`compact`;; Visa `git diff --compact-summary ORIG_HEAD`.
+--
++
+men alla okända värden (t.ex. ett värde som läggs till av en framtida version av Git) tas som `sant` istället för att utlösa ett fel. Standardvärdet är `sant`.
+
+`merge.autoStash`::
+	När den är satt till `true` skapas automatiskt en tillfällig gömma-post innan operationen börjar och tillämpas efter att operationen är avslutad. Detta innebär att du kan köra merge på ett smutsigt arbetsträd. Använd dock med försiktighet: den slutliga stash-applikationen efter en lyckad merge kan resultera i icke-triviala konflikter. Detta alternativ kan åsidosättas av alternativen `--no-autostash` och `--autostash` i linkgit:git-merge[1]. Standardvärdet är `false`.
+
+`merge.tool`::
+	Kontrollerar vilket sammanslagningsverktyg som används av linkgit:git-mergetool[1]. Listan nedan visar de giltiga inbyggda värdena. Alla andra värden behandlas som ett anpassat sammanslagningsverktyg och kräver att en motsvarande `mergetool.<verktyg>.cmd`-variabel definieras.
+
+`merge.guitool`::
+	Styr vilket sammanslagningsverktyg som används av linkgit:git-mergetool[1] när flaggan `-g`/`--gui` är specificerad. Listan nedan visar de giltiga inbyggda värdena. Alla andra värden behandlas som ett anpassat sammanslagningsverktyg och kräver att en motsvarande variabel `mergetool.<gui-verktyg>.cmd` definieras.
+
+
+
+[WARNING]
+====
+Missing `sv/config/{build_dir}/mergetools-merge.adoc`
+
+See original version for this content.
+====
+
+[]
+
+`merge.verbosity`::
+	Styr mängden utdata som visas av den rekursiva sammanslagningsstrategin. Nivå 0 matar ut ingenting förutom ett slutligt felmeddelande om konflikter upptäcktes. Nivå 1 matar endast ut konflikter, 2 matar ut konflikter och filändringar. Nivå 5 och högre matar ut felsökningsinformation. Standardinställningen är nivå 2. Kan åsidosättas av miljövariabeln `GIT_MERGE_VERBOSITY`.
+
+`merge.<förare>.name`::
+	Definierar ett människoläsbart namn för en anpassad lågnivå-sammanslagningsdrivrutin. Se linkgit:gitattributes[5] för mer information.
+
+`merge.<förare>.driver`::
+	Definierar kommandot som implementerar en anpassad lågnivå-sammanslagningsdrivrutin. Se linkgit:gitattributes[5] för mer information.
+
+`merge.<förare>.recursive`::
+	Namnger en lågnivå-sammanslagningsdrivrutin som ska användas vid intern sammanslagning mellan gemensamma förfäder. Se linkgit:gitattributes[5] för mer information.
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/mergetool.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/notes.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/pack.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/pager.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/pretty.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/promisor.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/protocol.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/pull.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/push.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/rebase.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/receive.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/reftable.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/remote.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/remotes.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/repack.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/rerere.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/revert.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/safe.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/sendemail.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/sequencer.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/showbranch.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/sparse.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/splitindex.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/ssh.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/stash.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/status.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/submodule.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/tag.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/tar.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/trace2.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/trailer.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/transfer.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/uploadarchive.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/uploadpack.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/url.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/user.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/versionsort.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/web.adoc`
+
+See original version for this content.
+====
+
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/worktree.adoc`
+
+See original version for this content.
+====
+
+[]
+[]
+
+BUGGAR
+------
+När man använder den föråldrade syntaxen `[section.subsection]` kommer ändring av ett värde att resultera i att en flerradig nyckel läggs till istället för en ändring, om underavsnittet anges med minst en versal. Till exempel när konfigurationen ser ut så här
+
+--------
+  [sektion.undersecktion]
+    nyckel = värde1
+--------
+
+och att köra `git config sektion.Undersektion.key värde2` kommer att resultera i
+
+--------
+  [sektion.undersecktion]
+    nyckel = värde1
+    nyckel = värde2
+--------
+
+
+GIT
+---
+En del av linkgit:git[1]-sviten

@@ -1,0 +1,280 @@
+git-cvsserver(1)
+================
+
+NAMN
+----
+git-cvsserver - En CVS-serveremulator för Git
+
+SYNOPSIS
+--------
+
+SSH:
+
+[verse]
+export CVS_SERVER="git cvsserver"
+'cvs' -d :ext:anvädare@server/sökväg/kodförråd.git co <HEAD_namn>
+
+pserver (/etc/inetd.conf):
+
+[verse]
+cvspserver stream tcp nowait nobody /usr/bin/git-cvsserver git-cvsserver pserver
+
+Användning:
+
+[verse]
+'git-cvsserver' [<flaggor>] [pserver|server] [<katalog> ...]
+
+BESKRIVNING
+-----------
+
+Programmet är ett CVS-emuleringslager för Git.
+
+Den är mycket funktionell. Emellertid är inte alla metoder implementerade, och för de metoder som är implementerade är inte alla flaggor implementerade.
+
+Testning har utförts med både CLI CVS-klienten och Eclipse CVS-plugin:en. De flesta funktionerna fungerar bra med båda dessa klienter.
+
+ALTERNATIV
+----------
+
+Alla dessa alternativ är uppenbarligen bara meningsfulla om de tillämpas av serversidan. De har implementerats för att så nära som möjligt likna alternativen i linkgit:git-daemon[1].
+
+--base-path <sökväg>::
+Lägg till 'sökväg' före begärd CVSROOT
+
+--strict-paths::
+Tillåt inte rekursiv inmatning i underkataloger
+
+--export-all::
+Kontrollera inte `gitcvs.enabled` i konfigurationsmenyn. Du måste också ange en lista över tillåtna kataloger (se nedan) om du vill använda det här alternativet.
+
+-V::
+--version::
+Skriv ut versions-information och avsluta
+
+-h::
+-H::
+--help::
+Skriv ut användningsinformation och avsluta
+
+<katalog>::
+De återstående argumenten ger en lista över kataloger. Om inga kataloger anges är alla tillåtna. Arkiv inom dessa kataloger kräver fortfarande konfigurationsalternativet `gitcvs.enabled`, såvida inte `--export-all` anges.
+
+BEGRÄNSNINGAR
+-------------
+
+CVS-klienter kan inte tagga, förgrena eller utföra Git-sammanslagningar.
+
+'git-cvsserver' mappar Git-grenar till CVS-moduler. Detta skiljer sig mycket från vad de flesta CVS-användare förväntar sig eftersom moduler i CVS vanligtvis representerar en eller flera kataloger.
+
+INSTALLATION
+------------
+
+1. Om du ska erbjuda CVS-åtkomst via pserver, lägg till en rad i /etc/inetd.conf som
++
+--
+------
+   cvspserver stream tcp nowait nobody git-cvsserver pserver
+
+------
+Obs: Vissa inetd-servrar låter dig ange namnet på den körbara filen oberoende av värdet på argv[0] (dvs. det namn som programmet antar att det kördes med). I det här fallet ser den korrekta raden i /etc/inetd.conf ut så här
+
+------
+   cvspserver stream tcp nowait nobody /usr/bin/git-cvsserver git-cvsserver pserver
+
+------
+
+Som standard tillhandahålls endast anonym åtkomst av pserver. För att incheckning måste du skapa pserver-konton, lägg helt enkelt till inställningen gitcvs.authdb i konfigurationsfilen för de kodförråd som du vill att cvsservern ska tillåta skrivningar till, till exempel:
+
+------
+
+   [gitcvs]
+	authdb = /etc/cvsserver/passwd
+
+------
+Formatet för dessa filer är användarnamn följt av det krypterade lösenordet, till exempel:
+
+------
+   myuser:sqkNi8zPf01HI
+   myuser:$1$9K7FzU28$VfF6EoPYCJEYcVQwATgOP/
+   myuser:$5$.NqmNH1vwfzGpV8B$znZIcumu1tNLATgV2l6e1/mY8RzhUDHMOaVOeL1cxV3
+------
+Du kan använda funktionen 'htpasswd' som följer med Apache för att skapa dessa filer, men bara med alternativet -d (eller -B om ditt system stöder det).
+
+Använd helst det systemspecifika verktyg som hanterar skapande av lösenordshash på din plattform (t.ex. mkpasswd i Linux, encrypt i OpenBSD eller pwhash i NetBSD) och klistra in det på rätt plats.
+
+Ange sedan ditt lösenord via pserver-metoden, till exempel:
+
+------
+   cvs -d:pserver:someuser:somepassword@server:/path/kodförråd.git co <HEAD_namn>
+------
+
+Ingen speciell konfiguration behövs för SSH-åtkomst, förutom att ha Git-verktyg i PATH. Om du har klienter som inte accepterar miljövariabeln CVS_SERVER kan du byta namn på 'git-cvsserver' till `cvs`.
+
+Obs: Nyare CVS-versioner (>= 1.12.11) har även stöd för att ange CVS_SERVER direkt i CVSROOT, som
+
+------
+   cvs -d ":ext;CVS_SERVER=git cvsserver:user@server/path/repo.git" co <HEAD_namn>
+------
+
+Det här har fördelen att det sparas i dina 'CVS/Root'-filer och du behöver inte oroa dig för att alltid ställa in rätt miljövariabel. SSH-användare som är begränsade till 'git-shell' behöver inte åsidosätta standardvärdet med CVS_SERVER (och borde inte göra det) eftersom 'git-shell' förstår 'cvs' som 'git-cvsserver' och låtsas att den andra änden kör den riktiga 'cvs' bättre.
+--
+2. För varje kodförråd som du vill ha åtkomst till från CVS måste du redigera konfigurationen i kodförrådet och lägga till följande avsnitt.
++
+--
+------
+   [gitcvs]
+        enabled=1
+        # valfritt för felsökning
+	logFile=/sökväg/till/loggfil
+
+------
+Obs: du måste se till att varje användare som ska anropa 'git-cvsserver' har skrivåtkomst till loggfilen och till databasen (se <<dbbackend,Databasbakände>>). Om du vill erbjuda skrivåtkomst via SSH behöver användarna naturligtvis också skrivåtkomst till själva Git-kodförrådet.
+
+Du måste också se till att varje kodförråd är "bart" (utan en Git-indexfil) för att `cvs commit` ska fungera. Se linkgit:gitcvs-migration[7].
+
+[[configaccessmethod]]
+Alla konfigurationsvariabler kan också åsidosättas för en specifik åtkomstmetod. Giltiga metodnamn är "ext" (för SSH-åtkomst) och "pserver". Följande exempelkonfiguration skulle inaktivera pserver-åtkomst samtidigt som åtkomst via SSH fortfarande tillåts.
+
+------
+   [gitcvs]
+        enabled=0
+
+   [gitcvs "ext"]
+        enabled=1
+------
+--
+3. Om du inte angav CVSROOT/CVS_SERVER direkt i utchecknings-kommandot, vilket automatiskt sparade det i dina 'CVS/Root'-filer, måste du ställa in dem explicit i din miljö. CVSROOT bör ställas in som vanligt, men katalogen bör peka på lämpligt Git-kodförråd. Som ovan, för SSH-klienter som _inte_ är begränsade till 'git-shell', bör CVS_SERVER ställas in på 'git-cvsserver'.
++
+--
+------
+   export CVSROOT=:ext:user@server:/var/git/projekt.git
+   export CVS_SERVER="git cvsserver"
+------
+--
+4. För SSH-klienter som ska göra incheckningar, se till att deras .ssh/miljö-filer (eller .bashrc, etc., enligt deras specifika skal) på server-sidan exporterar lämpliga värden för GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME och GIT_COMMITTER_EMAIL. För SSH-klienter vars inloggningsskal är bash kan .bashrc vara ett rimligt alternativ.
+
+5. Klienter borde nu kunna checka ut projektet. Använd CVS-modulnamnet för att ange vilket Git-huvud du vill checka ut. Detta anger också namnet på din nyligen utcheckade katalog, om du inte anger något annat med `-d <katalognamn>`. Till exempel checkar detta ut grenen `master` till katalogen `projekt-master`:
++
+------
+   cvs co -d projekt-master master
+------
+
+[[dbbackend]]
+DATABASBAKÄNDA
+--------------
+
+'git-cvsserver' använder en databas per Git-huvud (dvs. CVS-modul) för att lagra information om arkivet för att upprätthålla konsekventa CVS-revisionsnummer. Databasen måste uppdateras (dvs. skrivas till) efter varje incheckning.
+
+Om incheckningsåtgärden görs direkt med hjälp av `git` (i motsats till att använda 'git-cvsserver') måste uppdateringen ske vid nästa åtkomst till kodförrådet via 'git-cvsserver', oberoende av åtkomstmetod och begärd åtgärd.
+
+Det betyder att även om du endast erbjuder läsåtkomst (t.ex. genom att använda pserver-metoden), bör 'git-cvsserver' ha skrivåtkomst till databasen för att fungera tillförlitligt (annars måste du se till att databasen är uppdaterad varje gång 'git-cvsserver' körs).
+
+Som standard använder den SQLite-databaser i Git-katalogen, med namnet `gitcvs.<modulnamn>.sqlite`. Observera att SQLite-bakänden skapar temporära filer i samma katalog som databasfilen vid skrivning, så det kanske inte räcker att ge användarna som använder 'git-cvsserver' skrivåtkomst till databasfilen utan att ge dem skrivåtkomst till katalogen också.
+
+Databasen kan inte regenereras på ett tillförlitligt sätt i en konsekvent form efter att grenen den spårar har ändrats. Exempel: För sammanslagna grenar spårar 'git-cvsserver' bara en utvecklingsgren, och efter en 'git merge' kan en stegvis uppdaterad databas spåra en annan gren än en databas som regenererats från grunden, vilket orsakar inkonsekventa CVS-revisionsnummer. `git-cvsserver` har inget sätt att veta vilken gren den skulle ha valt om den hade körts stegvis före sammanslagningen. Så om du måste regenerera databasen helt eller delvis (från gammal säkerhetskopia) bör du vara misstänksam mot befintliga CVS-sandlådor.
+
+Du kan konfigurera databasens bakände med följande konfigurationsvariabler:
+
+Konfigurera databasbakänden
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+'git-cvsserver' använder Perl DBI-modulen. Läs även dess dokumentation om du ändrar dessa variabler, särskilt om `DBI->connect()`.
+
+gitcvs.dbName::
+	Databasnamn. Den exakta betydelsen beror på den valda databasdrivrutinen, för SQLite är detta ett filnamn. Stöder variabelsubstitution (se nedan). Får inte innehålla semikolon (`;`). Standard: '%Ggitcvs.%m.sqlite'
+
+gitcvs.dbDriver::
+	Använd DBI-drivrutin. Du kan ange vilken tillgänglig drivrutin som helst för detta här, men det kanske inte fungerar. cvsserver är testad med 'DBD::SQLite', rapporteras fungera med 'DBD::Pg' och rapporteras *inte* fungera med 'DBD::mysql'. Betrakta detta som en experimentell funktion. Får inte innehålla kolon (`:`). Standard: 'SQLite'
+
+gitcvs.dbuser::
+	Databasanvändare. Endast användbar om `dbDriver` är inställd, eftersom SQLite inte har något koncept för databasanvändare. Stöder variabelsubstitution (se nedan).
+
+gitcvs.dbPass::
+	Databaslösenord. Endast användbart om du anger `dbDriver`, eftersom SQLite inte har något koncept med databaslösenord.
+
+gitcvs.dbTableNamePrefix::
+	Prefix för databastabellnamn. Stöder variabelsubstitution (se nedan). Alla icke-alfabetiska tecken ersätts med understreck.
+
+Alla variabler kan också ställas in per åtkomstmetod, se <<configaccessmethod,ovan>>.
+
+Variabelsubstitution
+^^^^^^^^^^^^^^^^^^^^
+I `dbDriver` och `dbUser` kan du använda följande variabler:
+
+%G::
+	Git-katalognamn
+%g::
+	Git-katalognamn, där alla tecken förutom alfanumeriska tecken, `.` och `-` ersätts med `_` (detta bör göra det enklare att använda katalognamnet i ett filnamn om så önskas)
+%m::
+	CVS-modul/Git-huvudnamn
+%a::
+	åtkomstmetod (en av "ext" eller "pserver")
+%u::
+	Namn på användaren som kör 'git-cvsserver'. Om inget namn kan fastställas används den numeriska uid:en.
+
+MILJÖ
+-----
+
+Dessa variabler eliminerar behovet av kommandoradsalternativ under vissa omständigheter, vilket möjliggör enklare begränsad användning via git-shell.
+
+GIT_CVSSERVER_BASE_PATH::
+	Denna variabel ersätter argumentet till --base-path.
+
+GIT_CVSSERVER_ROOT::
+	Denna variabel anger en enda katalog och ersätter argumentlistan `<katalog>...`. Arkivet kräver fortfarande konfigurationsalternativet `gitcvs.enabled`, såvida inte `--export-all` anges.
+
+När dessa miljövariabler är angivna, kan motsvarande kommandoradsargument inte användas.
+
+ECLIPSE CVS KLIENTANMÄRKNINGAR
+------------------------------
+
+För att få en utcheckning med Eclipse CVS-klienten:
+
+1. Välj "Skapa ett nytt projekt -> Från CVS-utcheckning"
+2. Skapa en ny plats. Se anvisningarna nedan för information om hur du väljer rätt protokoll.
+3. Bläddra bland tillgängliga "moduler". Det ger dig en lista över huvudena i kodförrådet. Du kommer inte att kunna bläddra i trädet därifrån. Bara huvudena.
+4. Välj `HEAD` när den frågar vilken gren/tagg som ska checkas ut. Avmarkera "launch commit wizard" för att undvika att checka in .project-filen.
+
+Protokollnoteringar: Om du använder anonym åtkomst via pserver, välj bara det. De som använder SSH-åtkomst bör välja protokollet 'ext' och konfigurera 'ext'-åtkomst i rutan Inställningar->Team->CVS->ExtConnection. Ställ in CVS_SERVER till "`git cvsserver`". Observera att lösenordsstöd inte är bra när du använder 'ext', du bör definitivt ha SSH-nycklar konfigurerade.
+
+Alternativt, kan du helt enkelt använda det icke-standardiserade extssh-protokollet som Eclipse erbjuder. I så fall ignoreras CVS_SERVER, och du måste ersätta cvs-verktyget på servern med 'git-cvsserver' eller manipulera din `.bashrc` så att anropet av 'cvs' effektivt anropar 'git-cvsserver'.
+
+KLIENTER KÄNDA ATT FUNGERA
+--------------------------
+
+- CVS 1.12.9 på Debian
+- CVS 1.11.17 på MacOSX (från Fink-paketet)
+- Eclipse 3.0, 3.1.2 på MacOSX (se Eclipse CVS-klientnoteringar)
+- TortoiseCVS
+
+OPERATIONER SOM STÖDS
+---------------------
+
+Alla operationer som krävs för normal användning stöds, inklusive utcheckning, diff, status, uppdatering, logg, lägg till, ta bort och incheckning.
+
+De flesta CVS-kommandoargument som läser CVS-taggar eller revisionsnummer (vanligtvis -r) fungerar och stöder även alla git-referensspecifikationer (tagg, gren, inchecknings-ID, etc.). CVS-revisionsnummer för grenar som inte är standard emuleras dock inte väl, och cvs-loggen visar inte taggar eller grenar alls. (CVS-revisionsnummer som inte är huvudgrenar liknar ytligt sett CVS-revisionsnummer, men de kodar faktiskt ett git inchecknings-ID direkt, snarare än att representera antalet revisioner sedan grenpunkten.)
+
+Observera att det finns två sätt att checka ut en viss gren. Som beskrivs på annan plats på den här sidan tolkas parametern "module" i cvs checkout som ett grennamn, och den blir huvudgrenen. Den förblir huvudgrenen för en given sandlåda även om du tillfälligt gör en annan gren klibbig med cvs update -r. Alternativt kan argumentet -r indikera någon annan gren att faktiskt checka ut, även om modulen fortfarande är "huvudgrenen". Avvägningar (som för närvarande implementerat): Varje ny "module" skapar en ny databas på disken med en historik för den givna modulen, och efter att databasen har skapats är operationerna mot den huvudgrenen snabba. Eller alternativt tar -r inte något extra diskutrymme, men kan vara betydligt långsammare för många operationer, som cvs update.
+
+Om du vill referera till en git-refspec som innehåller tecken som inte är tillåtna av CVS har du två alternativ. För det första kan det fungera att ange git-refspecen direkt till lämpligt CVS -r-argument; vissa CVS-klienter verkar inte göra särskilt mycket rimlighetskontroll av argumentet. För det andra, om det misslyckas, kan du använda en speciell tecken-escape-mekanism som bara använder tecken som är giltiga i CVS-taggar. En sekvens av 4 eller 5 tecken av formen (understreck (`"_"`), bindestreck (`"-"`), ett eller två tecken och bindestreck (`"-"`)) kan koda olika tecken baserat på en eller två bokstäver: `"s"` för snedstreck (`"/"`), `"p"` för punkt (`"."`), `"u"` för understreck (`"_"`), eller två hexadecimala siffror för vilket bytevärde som helst (vanligtvis ett ASCII-nummer, eller kanske en del av ett UTF-8-kodat tecken).
+
+Äldre övervakningsåtgärder stöds inte (redigering, bevakning och relaterade). Exporter och taggning (taggar och grenar) stöds inte i detta skede.
+
+CRLF-radavslutningskonverteringar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Som standard lämnar servern `-k`-läget tomt för alla filer, vilket gör att CVS-klienten behandlar dem som textfiler, med förbehåll för konvertering vid radslut på vissa plattformar.
+
+Du kan få servern att använda attributen för radslutskonvertering för att ställa in `-k`-lägena för filer genom att ställa in konfigurationsvariabeln `gitcvs.usecrlfattr`. Se linkgit:gitattributes[5] för mer information om radslutskonvertering.
+
+Alternativt, om `gitcvs.usecrlfattr`-konfigurationen inte är aktiverad eller attributen inte tillåter automatisk identifiering av ett filnamn, använder servern `gitcvs.allBinary`-konfigurationen som standardinställning. Om `gitcvs.allBinary` är inställt, kommer fil som inte anges på annat sätt att använda läget '-kb'. Annars lämnas läget '-k' tomt. Men om `gitcvs.allBinary` är inställt på "gissning", kommer rätt `-k`-läge att gissas baserat på filens innehåll.
+
+För bästa överensstämmelse med 'cvs' är det förmodligen bäst att åsidosätta standardinställningarna genom att sätta `gitcvs.usecrlfattr` till true och `gitcvs.allBinary` till "guess".
+
+BEROENDEN
+---------
+'git-cvsserver' är beroende av DBD::SQLite.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

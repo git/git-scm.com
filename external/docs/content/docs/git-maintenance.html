@@ -6,7 +6,7 @@ section: documentation
 subsection: manual
 title: Git - git-maintenance Documentation
 docname: git-maintenance
-version: 2.50.0
+version: 2.53.0
 headings:
 - text: NAME
   id: _name
@@ -34,7 +34,7 @@ headings:
   id: _configuration
 - text: GIT
   id: _git
-latest-changes: 2.50.0
+latest-changes: 2.53.0
 aliases:
 - "/docs/git-maintenance/index.html"
 ---
@@ -52,7 +52,8 @@ aliases:
 <div class="verseblock">
 <pre class="content"><em>git maintenance</em> run [&lt;options&gt;]
 <em>git maintenance</em> start [--scheduler=&lt;scheduler&gt;]
-<em>git maintenance</em> (stop|register|unregister) [&lt;options&gt;]</pre>
+<em>git maintenance</em> (stop|register|unregister) [&lt;options&gt;]
+<em>git maintenance</em> is-needed [&lt;options&gt;]</pre>
 </div>
 </div>
 </div>
@@ -155,6 +156,18 @@ stop the background maintenance processes from running.</p>
 <p>The <span class='synopsis'><code>unregister</code></span> subcommand will report an error if the current repository
 is not already registered. Use the <span class='synopsis'><code>--force</code></span> option to return success even
 when the current repository is not registered.</p>
+</div>
+</dd>
+<dt class="hdlist1" id="Documentation/git-maintenance.txt-is-needed"><a class="anchor" href="#Documentation/git-maintenance.txt-is-needed"></a>is-needed </dt>
+<dd>
+<p>Check whether maintenance needs to be run without actually running it.
+Exits with a 0 status code if maintenance needs to be run, 1 otherwise.
+Ideally used with the <em>--auto</em> flag.</p>
+<div class="paragraph">
+<p>If one or more <span class='synopsis'><code>--task</code></span> options are specified, then those tasks are checked
+in that order. Otherwise, the tasks are determined by which
+<span class='synopsis'><code>maintenance.</code><em>&lt;task&gt;</em><code>.enabled</code></span> config options are true. By default, only
+<span class='synopsis'><code>maintenance.gc.enabled</code></span> is true.</p>
 </div>
 </dd>
 </dl>
@@ -282,7 +295,9 @@ only if certain thresholds are met. For example, the <span class='synopsis'><cod
 runs when the number of loose objects exceeds the number stored
 in the <span class='synopsis'><code>gc.auto</code></span> config setting, or when the number of pack-files
 exceeds the <span class='synopsis'><code>gc.autoPackLimit</code></span> config setting. Not compatible with
-the <span class='synopsis'><code>--schedule</code></span> option.</p>
+the <span class='synopsis'><code>--schedule</code></span> option.
+When combined with the <span class='synopsis'><code>is-needed</code></span> subcommand, check if the required
+thresholds are met without actually running maintenance.</p>
 </dd>
 <dt class="hdlist1" id="Documentation/git-maintenance.txt---schedule"><a class="anchor" href="#Documentation/git-maintenance.txt---schedule"></a>--schedule </dt>
 <dd>
@@ -602,23 +617,47 @@ detach.</p>
 <dt class="hdlist1" id="Documentation/git-maintenance.txt-maintenancestrategy"><a class="anchor" href="#Documentation/git-maintenance.txt-maintenancestrategy"></a>maintenance.strategy </dt>
 <dd>
 <p>This string config option provides a way to specify one of a few
-recommended schedules for background maintenance. This only affects
-which tasks are run during <span class='synopsis'><code>git</code> <code>maintenance</code> <code>run</code> <code>--schedule=X</code></span>
-commands, provided no <span class='synopsis'><code>--task=</code><em>&lt;task&gt;</em></span> arguments are provided.
-Further, if a <span class='synopsis'><code>maintenance.</code><em>&lt;task&gt;</em><code>.schedule</code></span> config value is set,
-then that value is used instead of the one provided by
-<span class='synopsis'><code>maintenance.strategy</code></span>. The possible strategy strings are:</p>
+recommended strategies for repository maintenance. This affects
+which tasks are run during <span class='synopsis'><code>git</code> <code>maintenance</code> <code>run</code></span>, provided no
+<span class='synopsis'><code>--task=</code><em>&lt;task&gt;</em></span> arguments are provided. This setting impacts manual
+maintenance, auto-maintenance as well as scheduled maintenance. The
+tasks that run may be different depending on the maintenance type.</p>
+<div class="paragraph">
+<p>The maintenance strategy can be further tweaked by setting
+<span class='synopsis'><code>maintenance.</code><em>&lt;task&gt;</em><code>.enabled</code></span> and <span class='synopsis'><code>maintenance.</code><em>&lt;task&gt;</em><code>.schedule</code></span>. If set, these
+values are used instead of the defaults provided by <span class='synopsis'><code>maintenance.strategy</code></span>.</p>
+</div>
+<div class="paragraph">
+<p>The possible strategies are:</p>
+</div>
 <div class="ulist">
 <ul>
 <li>
-<p><span class='synopsis'><code>none</code></span>: This default setting implies no tasks are run at any schedule.</p>
+<p><span class='synopsis'><code>none</code></span>: This strategy implies no tasks are run at all. This is the default
+strategy for scheduled maintenance.</p>
+</li>
+<li>
+<p><span class='synopsis'><code>gc</code></span>: This strategy runs the <span class='synopsis'><code>gc</code></span> task. This is the default strategy for
+manual maintenance.</p>
+</li>
+<li>
+<p><span class='synopsis'><code>geometric</code></span>: This strategy performs geometric repacking of packfiles and
+keeps auxiliary data structures up-to-date. The strategy expires data in the
+reflog and removes worktrees that cannot be located anymore. When the
+geometric repacking strategy would decide to do an all-into-one repack, then
+the strategy generates a cruft pack for all unreachable objects. Objects that
+are already part of a cruft pack will be expired.</p>
+<div class="paragraph">
+<p>This repacking strategy is a full replacement for the <span class='synopsis'><code>gc</code></span> strategy and is
+recommended for large repositories.</p>
+</div>
 </li>
 <li>
 <p><span class='synopsis'><code>incremental</code></span>: This setting optimizes for performing small maintenance
 activities that do not delete any data. This does not schedule the <span class='synopsis'><code>gc</code></span>
 task, but runs the <span class='synopsis'><code>prefetch</code></span> and <span class='synopsis'><code>commit-graph</code></span> tasks hourly, the
 <span class='synopsis'><code>loose-objects</code></span> and <span class='synopsis'><code>incremental-repack</code></span> tasks daily, and the <span class='synopsis'><code>pack-refs</code></span>
-task weekly.</p>
+task weekly. Manual repository maintenance uses the <span class='synopsis'><code>gc</code></span> task.</p>
 </li>
 </ul>
 </div>
@@ -673,6 +712,24 @@ option. A negative value will force the task to run every time.
 Otherwise, a positive value implies the command should run when the
 number of pack-files not in the multi-pack-index is at least the value
 of <span class='synopsis'><code>maintenance.incremental-repack.auto</code></span>. The default value is 10.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-maintenance.txt-maintenancegeometric-repackauto"><a class="anchor" href="#Documentation/git-maintenance.txt-maintenancegeometric-repackauto"></a>maintenance.geometric-repack.auto </dt>
+<dd>
+<p>This integer config option controls how often the <span class='synopsis'><code>geometric-repack</code></span>
+task should be run as part of <span class='synopsis'><code>git</code> <code>maintenance</code> <code>run</code> <code>--auto</code></span>. If zero,
+then the <span class='synopsis'><code>geometric-repack</code></span> task will not run with the <span class='synopsis'><code>--auto</code></span>
+option. A negative value will force the task to run every time.
+Otherwise, a positive value implies the command should run either when
+there are packfiles that need to be merged together to retain the
+geometric progression, or when there are at least this many loose
+objects that would be written into a new packfile. The default value is
+100.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-maintenance.txt-maintenancegeometric-repacksplitFactor"><a class="anchor" href="#Documentation/git-maintenance.txt-maintenancegeometric-repacksplitFactor"></a>maintenance.geometric-repack.splitFactor </dt>
+<dd>
+<p>This integer config option controls the factor used for the geometric
+sequence. See the <span class='synopsis'><code>--geometric=</code></span> option in <a href='{{< relurl "docs/git-repack" >}}'>git-repack[1]</a> for
+more details. Defaults to <span class='synopsis'><code>2</code></span>.</p>
 </dd>
 <dt class="hdlist1" id="Documentation/git-maintenance.txt-maintenancereflog-expireauto"><a class="anchor" href="#Documentation/git-maintenance.txt-maintenancereflog-expireauto"></a>maintenance.reflog-expire.auto </dt>
 <dd>

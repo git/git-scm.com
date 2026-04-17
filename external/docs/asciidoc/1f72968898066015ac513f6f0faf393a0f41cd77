@@ -1,0 +1,441 @@
+git-send-email(1)
+=================
+
+NOM
+---
+git-send-email - Envoie une collection de rustine comme courriels
+
+
+SYNOPSIS
+--------
+[verse]
+'git send-email' [<options>] (<fichier>|<répertoire>)...
+'git send-email' [<options>] <options-de-format-patch>
+'git send-email' --dump-aliases
+'git send-email' --translate-aliases
+
+
+DESCRIPTION
+-----------
+Prend les rustines données sur la ligne de commande et les envoie par courriel. Les rustines peuvent être spécifiées comme fichiers, répertoires (qui enverront tous les fichiers dans le répertoire), ou directement comme liste de révision. Dans le dernier cas, tout format accepté par linkgit:git-format-patch[1] peut être transmis à `git send-email`, ainsi que les options comprises par linkgit:git-format-patch[1].
+
+L'entête de l’e-mail peut être configuré avec des options en ligne de commande. Si ce n'est pas spécifié en ligne de commande, les informations nécessaires seront demandées à l'utilisateur par une interface utilisant ReadLine.
+
+Deux formats sont acceptés pour les fichiers rustine :
+
+1. fichiers au format mbox
++
+C'est ce qui est généré par linkgit:git-format-patch[1]. La plupart des entêtes et du formatage MIME sont ignorés.
+
+2. Le format originel utilisé par le script `send_lots_of_email.pl` de Greg Kroah-Hartman
++
+Ce format s'attend à ce que la première ligne du fichier contienne la valeur `Cc:` et le `Subject:` du message comme deuxième ligne.
+
+
+OPTIONS
+-------
+
+Composer
+~~~~~~~~
+
+--annotate::
+	Réviser et modifier chaque rustine que vous allez envoyer. La valeur par défaut est celle de `sendemail.annotate ' . Voir la section CONFIGURATION pour `sendemail.multiEdit ' .
+
+`--bcc=<adresse>,...`::
+	Précise une valeur `Bcc:` pour chaque email. Par défaut, c'est la valeur de `sendemail.bcc`.
++
+Cette option peut être utilisée plusieurs fois.
+
+`--cc=<adresse>,...`::
+	Précise une valeur `Cc:` de départ pour chaque email. Par défaut, c'est la valeur de `sendemail.cc`.
++
+Cette option peut être utilisée plusieurs fois.
+
+--compose::
+	Invoquer une éditeur de texte (voir GIT_EDITOR dans linkgit:git-var[1]) pour éditer un message d'introduction à la série de rustines.
++
+Lorsque `--compose` est utilisé, `git send-email` utilisera les en-têtes `From`, `To`, `Cc`, `Bcc`, `Subject`, `Reply-To` et `In-Reply-To` spécifiés dans le message. Si le corps du message (ce que vous tapez après les en-têtes et une ligne vierge) contient seulement des lignes vides (ou préfixées par `Git:`), le résumé ne sera pas envoyé, mais les en-têtes mentionnés ci-dessus seront utilisés à moins qu'ils ne soient enlevés.
++
+Les en-têtes manquants `From` ou `In-Reply-To` seront demandés.
++
+Voir la section CONFIGURATION pour `sendemail.multiEdit`.
+
+`--from=<adresse>`::
+	Spécifier l'expéditeur des emails. Si elle n'est pas spécifiée sur la ligne de commande, la valeur de l'option de configuration `sendemail.from ' est utilisée. Si ni l'option de ligne de commande ni `sendemail.from` ne sont définies, l'utilisateur sera invité à saisir la valeur. La valeur par défaut de l'invite sera la valeur de `GIT_AUTHOR_IDENT`, ou `GIT_COMMITTER_IDENT` si celle-ci n'est pas définie, telle que retournée par `git var -l`.
+
+--reply-to=<adresse>::
+	Préciser l'adresse où les réponses des destinataires doivent aller. Utiliser ceci si les réponses aux messages doivent aller à une autre adresse que ce qui est spécifié avec le paramètre `--from`.
+
+--in-reply-to=<identifiant>::
+	Faire en sorte que le premier message (ou tous les messages si `--no-thread` est spécifié) apparaisse comme une réponse au id message donné, ce qui évite de casser les fils de discussion lors d'une nouvelle série de patchs. Le second courriel et les suivants seront envoyés en tant que réponses selon le paramètre `--[no-]chain-reply-to`.
++
+Ainsi, par exemple lorsque `--thread` et `--no-chain-reply-to` sont spécifiés, les rustines subséquentes seront des réponses au premier message comme dans l'illustration ci-dessous où `[PATCH v2 0/3]` est en réponse à `[PATCH 0/2] :
++
+  [PATCH 0/2] Voici ce que j'ai fait..
+    [PATCH 1/2] Nettoyage et essais
+    [PATCH 2/2] Implémentation
+    [PATCH v2 0/3] Voici une deuxième relance
+      [PATCH v2 1/3] Nettoyage
+      [PATCH v2 2/3] Nouveaux tests
+      [PATCH v2 3/3] Implémentation
++
+Seulement nécessaire si `--compose` est également défini. Si `--compose` n'est pas spécifié, l'_<identifiant>_ sera demandé interactivement.
+
+--outlook-id-fix::
+--no-outlook-id-fix::
+	Les serveurs SMTP Microsoft Outlook rejettent le Message-ID envoyé par courriel et attribuent un nouveau Message-ID aléatoire, brisant ainsi les fils.
++
+Avec `--outlook-id-fix`, `git send-email` utilise un mécanisme spécifique aux serveurs Outlook pour apprendre le Message-ID que le serveur a assigné pour réparer le fil. Utilisez-le seulement lorsque vous savez que le serveur réécrit le message-ID de la même manière que les serveurs Outlook.
++
+Sans cette option spécifiée, la correction est effectuée par défaut lors des échanges avec 'smtp.office365.com' ou 'smtp-mail.outlook.com'. Utilisez `--no-outlook-id-fix` pour désactiver même lors de communication avec ces deux serveurs.
+
+--subject=<chaîne>::
+	Spécifier le sujet initial du fil de courriel. Seulement nécessaire si `--compose` est également défini. Si `--compose` n'est pas réglé, cela sera demandé.
+
+--to=<addresse>,...::
+	Précise le destinataire principal des emails générés. En général, ce sera le mainteneur upstream du projet. Par défaut, c'est la valeur de configuration `sendemail.to` ; si elle n'est pas précisée, et que `--to-cmd` n'est pas spécifié, elle sera demandée.
++
+Cette option peut être utilisée plusieurs fois.
+
+--8bit-encoding=<codage>::
+	Lorsqu'un message ou un sujet non ASCII ne déclare son encodage, ajouter des en-têtes/signaler pour indiquer qu'il est encodé en <encodage>. Le défaut est la valeur du `sendemail.assume8bitEncoding` ; si cela n'est pas précisé, cela sera demandé si des fichiers non ASCII sont rencontrés.
++
+À noter : aucune tentative de valider l'encodage n'est faite.
+
+--compose-encoding=<codage>::
+	Spécifier l'encodage du message. La valeur par défaut est celle de `sendemail.composeEncoding` ; si cela n'est pas précisé, UTF-8 est supposé.
+
+--transfer-encoding=(7bit|8bit|quoted-printable|base64|auto)::
+	Préciser l'encodage de transfert à utiliser pour envoyer le message sur SMTP. `7bit` échouera sur un message non-ASCII. `quoted-printable` peut être utile lorsque le dépôt contient des fichiers contenant des retours chariot, mais rend le fichier brut d'email de rustine (comme sauvegardé depuis un MUA) beaucoup plus difficile à inspecter manuellement. `base64` est encore plus infaillible, mais aussi plus opaque. `auto` utilisera `8bit` si possible et `quoted-printable` autrement.
++
+Par défaut, utilise la valeur de la variable de configuration `sendemail.transferEncoding`. Si celle-ci n'est pas précisée, se rabat sur `auto`.
+
+--xmailer::
+--no-xmailer::
+	Ajouter (ou empêcher d'ajouter) l'en-tête `X-Mailer:`. Par défaut, l'en-tête est ajouté, mais il peut être désactivé en définissant la variable de configuration `sendemail.xmailer ` à `false`.
+
+Envoi
+~~~~~
+
+--envelope-sender=<addresse>::
+	Spécifier l'expéditeur d'enveloppe utilisé pour envoyer les emails. Ceci est utile si votre adresse par défaut n'est pas l'adresse qui est souscrite à une liste. Afin d'utiliser l'adresse `De`, définir la valeur `auto`. Si vous utilisez le binaire `sendmail`, vous devez avoir des privilèges appropriés pour le paramètre `-f`. Par défaut, c'est la valeur de la variable de configuration `sendemail.envelopeSender` ; si elle n'est pas spécifiée, le choix de l'enveloppe est laissé à votre MTA.
+
+--sendmail-cmd=<commande>::
+	Spécifier une commande à exécuter pour envoyer le courriel. La commande doit être similaire à sendmail ; plus précisément, elle doit gérer l'option `-i`. La commande sera exécutée dans le shell si nécessaire. Le défaut est la valeur de `sendemail.sendmailCmd`. Si elle n'est pas précisée, et si `--smtp-server` n'est pas précisé, `git send-email` cherchera `sendmail` dans `/usr/sbin`, `/usr/lib` et `$PATH`.
+
+--smtp-encryption=<chiffrement>::
+	Spécifie comment le chiffrement commence pour la connexion SMTP. Les valeurs valides sont `ssl` et `tls`. Toute autre valeur revient à simple SMTP (non crypté), qui correspond par défaut au port 25. Malgré les noms, les deux valeurs utiliseront la même nouvelle version de TLS, mais pour des raisons historiques elles ont ces noms. `ssl` se réfère au chiffrement "implicite" (parfois appelé SMTPS), qui utilise le port 465 par défaut. `tls` se réfère au chiffrement "explicite" (souvent appelé STARTTLS), qui utilise le port 25 par défaut. D'autres ports peuvent être utilisés par le serveur SMTP, qui ne sont pas ceux par défaut. Un port alternatif commun pour les protocoles `tls` et non chiffré est 587. Vérifiez la documentation de votre fournisseur ou la configuration de votre serveur pour vous assurer de votre propre cas. La valeur par défaut est la valeur de `sendemail.smtpEncryption ` .
+
+--smtp-domain=<FQDN>::
+	Spécifier le nom de domaine complet (FQDN) utilisé dans la commande HELO/EHLO au serveur SMTP. Certains serveurs exigent que le FQDN corresponde à votre adresse IP. Si ce n'est pas le cas, `git send-email` tente de déterminer votre FQDN automatiquement. La valeur par défaut est celle de `sendemail.smtpDomain ' .
+
+--smtp-auth=<mécanisme>::
+	Liste séparée par espaces des mécanismes SMTP-AUTH autorisés. Ce réglage n'utilise que les mécanismes énumérés. Exemple :
++
+------
+$ git send-email --smtp-auth="PLAIN LOGIN GSSAPI" ...
+------
++
+Si au moins un des mécanismes spécifiés correspond à ceux annoncés par le serveur SMTP et s'il est pris en charge par la bibliothèque SASL utilisée, le mécanisme est utilisé pour l'authentification. Si ni `sendemail.smtpAuth` ni `--smtp-auth` ne sont spécifiés, tous les mécanismes pris en charge par la bibliothèque SASL peuvent être utilisés. La valeur spéciale `none` peut être spécifiée pour désactiver complètement l'authentification indépendamment de `--smtp-user`.
+
+--smtp-pass[=<mot-de-passe>]::
+	Mot-de-passe pour SMTP-AUTH. L'argument est optionnel : si aucun argument n'est précisé, alors la chaîne de caractères vide est utilisée comme mot-de-passe. Par défaut, utilise la valeur de `sendemail.smtpPass`, cependant `--smtp-pass` a priorité et écrase toujours cette valeur.
++
+De plus, les mots-de-passe n'ont pas besoin d'être précisés dans les fichiers de configuration ou en ligne de commande. Si un nom d'utilisateur a été précisé (avec `--smtp-user` ou `sendemail.smtpUser`), mais qu'aucun mot-de-passe n'a été précisé (avec `--smtp-pass` ou `sendemail.smtpPass`), alors un mot-de-passe est obtenu en utilisant linkgit:git-credential[1].
+
+--no-smtp-auth::
+	Désactive l'authentification SMTP. Raccourcis pour `--smtp-auth=none`.
+
+--smtp-server=<hôte>::
+	Spécifier le serveur SMTP sortant à utiliser (par exemple `smtp.example.com` ou une adresse IP brute). Si elle n'est pas précisée et que `--sendmail-cmd` n'est pas précisée, la valeur par défaut est de rechercher `sendmail` dans `/usr/sbin`, `/usr/lib` et `$PATH` si un tel programme est disponible, en revenant à `localhost` autrement.
++
+Concernant la compatibilité rétroactive, cette option peut également spécifier un nom de chemin complet d'un programme de type sendmail ; le programme doit prendre en charge l'option `-i`. Cette méthode ne supporte pas le passage d'arguments ou l'utilisation de noms de commande complets. Pour ces cas d'utilisation, envisagez d'utiliser `--sendmail-cmd` à la place.
+
+`--smtp-server-port=<port>`::
+	Spécifier un port différent du port par défaut (les serveurs SMTP écoutent généralement sur le port smtp 25, mais peuvent également écouter sur le port 587, ou le port smtp SSL habituel 465) ; les noms de port symbolique (par exemple `submission` au lieu de 587) sont également acceptés. Le port peut également être indiqué avec la variable de configuration `sendemail.smtpServerPort.
+
+--smtp-server-option=<option>::
+	Spécifier l'option de serveur SMTP sortante à utiliser. La valeur par défaut peut être spécifiée par l ' option de configuration `sendemail.smtpServerOption ' .
++
+L'option `--smtp-server-option` doit être répétée pour chaque option à envoyer au serveur. De même, il faut utiliser une ligne différente pour chaque option dans les fichiers de configuration.
+
+--smtp-ssl::
+	Alias historique pour `--smtp-encryption ssl`.
+
+`--smtp-ssl-cert-path <chemin>`::
+	Chemin vers un magasin de certificats de confiance de CA pour la validation de certificat SMTP SSL/TLS (soit un répertoire qui a été traité par `c_rehash`, ou un seul fichier contenant un ou plusieurs certificats de format PEM concaténés : voir la description de options `-CAfile <fichier>` et `-CApath <chemin>` de https://docs.openssl.org/master/man1/openssl-verify/ [La page de manuel de `verify`(1) d'OpenSSL] pour plus d'information sur ceux-ci). Réglez-le à une chaîne vide pour désactiver la vérification des certificats. Vaut par défaut la valeur de la variable de configuration `sendemail.smtpSSLCertPath`, si elle est définie ou le chemin compilé par défaut de la bibliothèque de gestion SSL (ce qui devrait être le meilleur choix sur la plupart des plateformes).
+
+--smtp-user=<utilisateur>::
+	Nom d'utilisateur pour SMTP-AUTH. Par défaut, c'est la valeur de `sendemail.smtpUser`. Si un nom d'utilisateur n'est pas spécifié (avec `--smtp-user` ou `sendemail.smtpUser`), alors l'authentification n'est pas tentée.
+
+--smtp-debug=(0|1)::
+	Active (1) or désactive (0) les messages de débugage. S'ils sont activés, les commandes SMTP et réponses seront affichées. Utile pour débuguer les problèmes de connexion TLS et d'authentification.
+
+--imap-sent-folder=<répertoire>::
+	Certains fournisseurs de courriel (par exemple iCloud) n'envoient pas une copie des courriels envoyés en utilisant SMTP dans le dossier `Sent` ou similaire dans votre boîte aux lettres. Utilisez cette option pour utiliser `git imap-send` pour envoyer une copie des courriels dans le dossier spécifié en utilisant cette option. Vous pouvez exécuter `git imap-send --list` pour obtenir une liste de noms de dossiers valides, y compris le nom correct du dossier `Sent` dans votre boîte aux lettres. Vous pouvez également utiliser cette option pour envoyer des courriels dans un dossier IMAP dédié de votre choix.
++
+Cette fonction nécessite la mise en place de `git imap-send`. Voir linkgit:git-imap-send[1] pour les instructions.
+
+--use-imap-only::
+--no-use-imap-only::
+	Si défini, tous les courriels seront copiés uniquement dans le dossier IMAP spécifié avec `--imap-sent-folder` ou `sendemail.imapSentFolder` et ne seront pas envoyés aux destinataires. Utile si vous voulez simplement créer une ébauche des courriels et utiliser un autre client courriel pour les envoyer. Si désactivé avec `--no-use-imap-only`, les courriels seront envoyés comme d'habitude. Désactivé par défaut, mais la variable de configuration `sendemail.useImapOnly' peut être utilisée pour l'activer.
++
+Cette fonction nécessite la mise en place de `git imap-send`. Voir linkgit:git-imap-send[1] pour les instructions.
+
+--batch-size=<num>::
+	Certains serveurs de messagerie (p. ex. 'smtp.163.com') limitent le nombre maximum de courriel à envoyer par session (connexion) et cela entraînera un échec lors de l'envoi de nombreux messages. Avec cette option, send-email se déconnectera après l'envoi de _<num>_ messages et attendra quelques secondes (voir `--relogin-delay`) et se reconnectera, pour contourner une telle limite. Vous pouvez utiliser un assistant d'identification pour éviter de devoir resaisir votre mot de passe à chaque fois que cela se produit. Vaut par défaut la variable de configuration `sendemail.smtpBatchSize.
+
+--relogin-delay=<int>::
+	Attend _<int>_ secondes avant de se reconnecter à un serveur SMTP. Utilisé avec l'option `--batch-size`. Par défaut, utilise la variable de configuration `sendemail.smtpReloginDelay`.
+
+Automatisation
+~~~~~~~~~~~~~~
+
+--no-to::
+--no-cc::
+--no-bcc::
+	Effacer toute liste des entêtes `To:`, `Cc:`, `Bcc:` précédemment définis par config.
+
+--no-identity::
+	Effacer la valeur précédemment lue de `sendemail.identity ' réglée par config, le cas échéant.
+
+--to-cmd=<commande>::
+	Spécifie une commande à exécuter une fois par fichier rustine qui devrait générer une entrée `To:` spécifique au fichier rustine. La sortie de cette commande doit être une seule adresse courriel par ligne. La valeur par défaut est la valeur de configuration `sendemail.toCmd ' .
+
+--cc-cmd=<commande>::
+	Spécifie une commande à exécuter une fois par fichier rustine qui devrait générer une entrée `Cc:` spécifique par fichier rustine. La sortie de cette commande doit être une seule adresse courriel par ligne. La valeur par défaut est la valeur de configuration `sendemail.ccCmd ' .
+
+--header-cmd=<commande>::
+	Spécifie une commande qui est exécutée une fois par message sortant et sort des lignes d'entête RFC 2822 à insérer. Lorsque la variable de configuration `sendemail.headerCmd` est définie, sa valeur est toujours utilisée. Lorsque `--header-cmd` est fourni sur la ligne de commande, sa valeur a préséance sur la variable de configuration `sendemail.headerCmd`.
+
+--no-header-cmd::
+	Désactive toute commande d'en-tête utilisée.
+
+--chain-reply-to::
+--no-chain-reply-to::
+	Si c'est le cas, chaque email sera envoyé en réponse à l'e-mail précédent envoyé. Si désactivé avec `--no-chain-reply-to`, tous les emails après le premier seront envoyés comme réponses au premier email envoyé. Lors de cette utilisation, il est recommandé que le premier fichier donné soit un aperçu de toute la série patch. Désactivé par défaut, mais la variable de configuration `sendemail.chainReplyTo` peut être utilisée pour l'activer.
+
+--identity=<identité>::
+	Une identité de configuration. Lorsqu'elles sont données, les valeurs de la sous-section `sendemail.<identité>` prévalent sur les valeurs de la section `sendemail`. L'identité par défaut est la valeur de `sendemail.identity` .
+
+--signed-off-by-cc::
+--no-signed-off-by-cc::
+	Si tel est le cas, ajouter des courriels dans la ligne terminale `Signed-off-by` ou les lignes `Cc:` à la liste cc. La valeur par défaut est la valeur de la valeur de configuration `sendemail.signedOffByCc` ; si non spécifié, vaut par défaut `--signed-off-by-cc`.
+
+--cc-cover::
+--no-cc-cover::
+	Si défini, les courriels trouvés dans les entêtes `Cc:` dans la première rustine de la série (généralement la lettre de couverture) sont ajoutés à la liste cc pour chaque jeu de courriel. La valeur par défaut est la valeur de la variable de configuration `sendemail.ccCover` ; si non spécifiée, vaut par défaut à `--no-cc-cover`.
+
+--to-cover::
+--no-to-cover::
+	Si cela est défini, les courriels trouvés dans les entêtes `To:` dans la première rustine de la série (généralement la lettre de couverture) sont ajoutés à la liste pour chaque courriel. La valeur par défaut est la valeur de la variable de configuration `sendemail.toCover` ; si celle-ci est non spécifiée, elle vaut par défaut `--no-to-cover`.
+
+--suppress-cc=<catégorie>::
+	Préciser une catégorie supplémentaire de destinataires pour supprimer l'auto-cc de :
++
+--
+- `author` évitera d'inclure l'auteur du patch.
+- `self` évitera d'inclure l'expéditeur.
+- `cc` évitera d'inclure toute personne mentionnée dans les lignes Cc dans l'en-tête de la rustine, sauf elle-même (utilisez `self` pour cela).
+- `bodycc` évitera d'inclure toute personne mentionnée dans les lignes Cc dans le corps de la rustine (message de commit), sauf elle-même (utilisez `self` pour cela).
+- `sob` évitera d'inclure toute personne mentionnée dans les lignes Signed-off-by, sauf elle-même (utilisez `self` pour cela).
+- `misc-by` évitera d'inclure toute personne mentionnée dans Acked-by, Reviewed-by, Tested-by et d'autres lignes "-by" dans le corps de la rustine, sauf Signed-off-by (utilisez `sob` pour cela).
+- `cccmd` évitera le lancement de --cc-cmd.
+- `body` est équivalent à `sob` + `bodycc` + `misc-by`.
+- `all` va supprimer toutes les valeurs auto cc.
+--
++
+Par défaut, utilise la valeur de la variable de configuration `sendemail.suppressCc`. Si celle-ci n'est pas précisée, se rabat sur `self` si `--suppress-from` est indiqué, ainsi que `body`, si `--no-signed-off-cc` est indiqué.
+
+--suppress-from::
+--no-suppress-from::
+	Si actif, n'ajoute pas l'adresse `From:` à la liste `Cc:`. Par défaut, la valeur correspond à la valeur de configuration `sendemail.suppressFrom`. Si celle-ci n'est pas précisée, se rabat sur `--no-suppress-from`.
+
+--thread::
+--no-thread::
+	Si cela est défini, les en-têtes `In-Reply-To' et `References` seront ajoutés à chaque courriel envoyé. Que chaque courriel se réfère à l'email précédent (filage profond `deep` en langage de `git format-patch`) ou au premier courriel (filage superficiel `shallow`) est régi par `--[no-]chain-reply-to`.
++
+Si désactivé avec `--no-thread`, ces en-têtes ne seront pas ajoutées (sauf si indiqué par `--in-reply-to`). Par défaut, utilise la valeur de la variable de configuration `sendemail.thread`. Si celle-ci n'est pas précisée, se rabat sur `--thread`.
++
+C'est à l'utilisateur de s'assurer qu'il n'existe pas d'en-tête In-Reply-To déjà lorsqu'il demander à `git send-email` de l'ajouter (en particulier noter que `git format-patch` peut être configuré pour faire le filage lui-même). Un échec peut ne pas produire le résultat attendu dans le MUA du receveur.
+
+--mailmap::
+--no-mailmap::
+	Utiliser le fichier mailmap (voir linkgit:gitmailmap[5]) pour faire correspondre toutes les adresses à leur nom réel et adresse courriel canoniques . D'autres données de correspondances spécifiques aux valeurs de configuration `git send-email` peuvent être fournies en utilisant les variables de configuration `sendemail.mailmap.file` ou `sendemail.mailmap.blob` . Vaut par défaut `sendemail.mailmap`.
+
+Administration
+~~~~~~~~~~~~~~
+
+--confirm=<mode>::
+	Confirmer juste avant d'envoyer :
++
+--
+- `always` confirmera toujours avant d'envoyer.
+- `never` ne confirmera jamais avant d'envoyer.
+- `cc` confirmera avant l'envoi lorsque send-email a automatiquement ajouté des adresses issues de la rustine à la liste Cc.
+- `compose` confirmera avant d'envoyer le premier message lors de l'utilisation de --compose.
+- `auto` est équivalent à `cc` + `compose`.
+--
++
+Par défaut, utilise la valeur de la variable de configuration `sendemail.confirm`. Si celle-ci n'est pas précisée, se rabat sur `auto` sauf si n'importe quelle option de suppression a été précisée. Dans ce cas, se rabat sur `compose`.
+
+--dry-run::
+	Fait tout sauf envoyer réellement les courriels.
+
+--format-patch::
+--no-format-patch::
+	Lorsqu'un argument peut être compris soit comme une référence ou comme le nom d'un fichier, choisir de le comprendre comme argument de format-patch (`--format-patch`) ou comme un nom de fichier (`--no-format-patch`). Par défaut, quand un tel conflit se produit, `git send-email` échouera.
+
+--quiet::
+	Rendre `git send-email` moins de verbeux. Une ligne par courriel devrait être tout ce qui est émis.
+
+--validate::
+--no-validate::
+	Effectuer une vérification de santé sur les rustines. Actuellement, la validation est la suivante :
++
+--
+* Invoquer le crochet sendemail-validate si présent (voir linkgit:githooks[5]).
+* Avertit en cas de rustine qui contient des lignes plus longues que 998 caractères à moins qu'un encodage de transfert approprié (`auto`, `base64`, ou `quoted-printable`) ne soit indiqué;Ceci est dû aux limites SMTP décrites par https://www.ietf.org/rfc/rfc5322.txt.
+--
++
+La valeur par défaut est la valeur de `sendemail.validate`, sinon `--validate`.
+
+--force::
+	Envoyer des courriels même si les contrôles de sécurité l'empêcheraient.
+
+
+Information
+~~~~~~~~~~~
+
+--dump-aliases::
+	Au lieu de l'opération normale, décharger les noms d'alias courts du ou des fichiers d'alias configurés, un par ligne dans l'ordre alphabétique. Notez que cela ne comprend que le nom d'alias et non ses adresses courriel étendues. Voir `sendemail.aliasesFile` pour plus d'informations sur les alias.
+
+--translate-aliases::
+	Au lieu de l'opération normale, lire à partir de l'entrée standard et interpréter chaque ligne comme alias courriel. La traduire en fonctions des fichiers d'alias configurés. Fournir chaque nom traduit et adresse courriel à la sortie standard, une par ligne. Voir `sendemail.aliasFile` pour plus d'informations sur les alias.
+
+CONFIGURATION
+-------------
+
+Tout ce qui se trouve en dessous de cette ligne dans cette section est inclus de manière sélective à partir de la documentation linkgit:git-config[1]. Le contenu est le même que celui qui s'y trouve :
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/sendemail.adoc`
+
+See original version for this content.
+====
+
+[]
+
+EXEMPLES DE SERVEURS SMTP
+-------------------------
+Utiliser Gmail comme serveur SMTP
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pour des conseils sur l'utilisation de `git send-email` pour envoyer vos rustines via le serveur SMTP GMail, éditez `~/.gitconfig` pour spécifier vos réglages de compte :
+
+----
+[sendemail]
+	smtpEncryption = ssl
+	smtpServer = smtp.gmail.com
+	smtpUser = yourname@gmail.com
+	smtpServerPort = 465
+----
+
+Gmail ne permet pas d'utiliser votre mot de passe habituel pour `git send-email`. Si vous avez activé une authentification multi-facteurs sur votre compte Gmail, vous pouvez générer un mot de passe spécifique à `git send-email`. Visitez https://security.google.com/settings/security/apppasswords pour le créer.
+
+Autrement, au lieu d'utiliser un mot de passe spécifique à l'application, vous pouvez utiliser l'authentification OAuth2.0 avec Gmail. OAuth2.0 est plus sûr que les mots de passe spécifiques à l'application, et fonctionne peu importe si vous avez une authentification multi-factor. `OAUTHBEARER` et `XOAUTH2` sont des mécanismes communément utilisés pour ce type d'authentification. Gmail les gère tous les deux. Par exemple, si vous voulez utiliser `OAUTHBEARER`, modifiez votre fichier `~/.gitconfig` et ajoutez `smtpAuth = OAUTHBEARER` aux paramètres de votre compte :
+
+----
+[sendemail]
+	smtpEncryption = ssl
+	smtpServer = smtp.gmail.com
+	smtpUser = yourname@gmail.com
+	smtpServerPort = 465
+	smtpAuth = OAUTHBEARER
+----
+
+Une autre alternative utilise un outil développé par Google connu sous le nom de https://github.com/google/gmail-oauth2-tools/tree/master/go/sendgmail[sendgmail] pour envoyer des courriels en utilisant `git send-email`.
+
+Utiliser Microsoft Outlook comme serveur SMTP
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Contrairement à Gmail, Microsoft Outlook ne supporte plus les mots de passe spécifiques aux applications. Par conséquent, l'authentification OAuth2.0 doit être utilisée pour Outlook. En outre, il ne prend en charge que le mécanisme d'authentification `XOAUTH2 ' .
+
+Modifier `~/.gitconfig` pour spécifier vos paramètres de compte pour Outlook et utiliser son serveur SMTP avec `git send-email` :
+
+----
+[sendemail]
+	smtpEncryption = tls
+	smtpServer = smtp.office365.com
+	smtpUser = yourname@outlook.com
+	smtpServerPort = 587
+	smtpAuth = XOAUTH2
+----
+
+ENVOYER LES RUSTINES
+--------------------
+Une fois vos commits prêts à être envoyés à la liste de diffusion, exécutez les commandes suivantes :
+
+	$ git format-patch --cover-letter -M origin/master -osortant/
+	$ edit sortant/0000-*
+	$ git send-email sortant/*
+
+La première fois que vous l'exécutez, vous serez invité à saisir vos identifiants. Entrez votre mot de passe régulier ou celui d'application spécifique selon le cas.
+
+Si vous avez un assistant d'authentification configuré (voir linkgit:git-credential[1]), le mot de passe sera sauvegardé dans le magasin de secrets, donc vous n'aurez pas à le taper la fois suivante.
+
+Si vous utilisez l'authentification OAuth2.0, vous devez utiliser un jeton d'accès à la place d'un mot de passe lorsqu'il est demandé. Divers générateurs de jetons OAuth2.0 sont disponibles en ligne. Des assistants maintenus par la communauté sont également disponibles :
+
+	- https://github.com/AdityaGarg8/git-credential-email[git-credential-gmail]] (cross plate-forme, assistant dédié à l'authentification des comptes Gmail)
+
+	- https://github.com/AdityaGarg8/git-credential-email[git-credential-outlook]] (cross plate-forme, assistant dédié à l'authentification des comptes Microsoft Outlook)
+
+	- https://github.com/AdityaGarg8/git-credential-email[git-credential-yahoo]] (cross plateforme, assistant dédié à l'authentification des comptes Yahoo)
+
+	- https://github.com/AdityaGarg8/git-credential-email[git-credential-aol]] (cross-plateforme, assistant dédié à l'authentification des comptes AOL)
+
+Vous pouvez également voir linkgit:gitcredentials[7] pour plus d'assistants d'authentification basées sur OAuth.
+
+Proton Mail ne fournit pas de serveur SMTP pour envoyer des courriels. Si vous êtes un client payant de Proton Mail, vous pouvez utiliser https://proton.me/mail/bridge[Proton Mail Bridge] officiellement fourni par Proton Mail pour créer un serveur SMTP local pour envoyer des courriels. Pour les utilisateurs gratuits et payants, des projets communautaires tels que https://github.com/AdityaGarg8/git-credential-email[git-protonmail peuvent être utilisés.
+
+Note : Les modules noyau Perl suivants qui peuvent être installés avec votre distribution de Perl sont requis :
+
+https://metacpan.org/pod/MIME::Base64[MIME::Base64], https://metacpan.org/pod/MIME::QuotedPrint[MIME::QuotedPrint], https://metacpan.org/pod/Net::Domain[Net::Domain] and https://metacpan.org/pod/Net::SMTP[Net::SMTP].
+
+Ces modules Perl supplémentaires sont également nécessaires :
+
+https://metacpan.org/pod/Authen::SASL[Authen::SASL] and https://metacpan.org/pod/Mail::Address[Mail::Address].
+
+Exploiter l'option `sendmailCmd` de `git send-email`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Outre l'envoi de courriels via un serveur SMTP, `git send-email` peut également envoyer des courriels via toute application qui prend en charge les commandes de type sendmail. Vous pouvez lire la documentation de `--sendmail-cmd= supra pour plus d'informations. Cette capacité peut être très utile si vous voulez utiliser une autre application comme client SMTP pour `git send-email`, ou si votre fournisseur d'email utilise des API propriétaires au lieu de SMTP pour envoyer des courriels.
+
+Par exemple, permet de voir comment configurer https://marlam.de/msmtp/[msmtp], un client SMTP populaire disponible dans de nombreuses distributions Linux. Modifiez `~/.gitconfig` pour demander à `git-send-email` de l'utiliser pour envoyer des courriels.
+
+----
+[sendemail]
+	sendmailCmd = /usr/bin/msmtp # Changez ceci pour le chemin dans lequel msmtp est installé
+----
+
+Les liens de quelques assistants communautaires sont les suivants :
+
+	- https://marlam.de/msmtp/[msmtp] (client populaire SMTP avec de nombreuses fonctionnalités, disponible pour Linux et macOS)
+
+	- https://github.com/AdityaGarg8/git-credential-email[git-protonmail] (client cross plate-forme qui peut envoyer des courriels en utilisant l'API ProtonMail)
+
+	- https://github.com/AdityaGarg8/git-credential-email[git-msgraph] (client de cross-plateforme qui peut envoyer des courriels en utilisant l'API de Microsoft Graph)
+
+VOIR AUSSI
+----------
+linkgit:git-format-patch[1], linkgit:git-imap-send[1], mbox(5)
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

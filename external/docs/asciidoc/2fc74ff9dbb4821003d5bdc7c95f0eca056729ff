@@ -1,0 +1,143 @@
+git-rerere(1)
+=============
+
+NOM
+---
+git-rerere - Réutilise une résolution enregistrée de fusions conflictuelles
+
+SYNOPSIS
+--------
+[verse]
+'git rerere' [clear | forget <spec-de-chemin>... | diff | status | remaining | gc]
+
+DESCRIPTION
+-----------
+
+Dans un workflow employant des branches de sujet relativement longues, le développeur a parfois besoin de résoudre les mêmes conflits encore et encore jusqu'à ce que les branches de sujet soient faites (soit fusionnées à la branche "release" ou envoyées et acceptées en amont).
+
+Cette commande aide le développeur dans ce processus en enregistrant des résultats d'autofusion en conflit et les résultats correspondants de la fusion manuelle initiale, et en appliquant des résolutions à la main précédemment enregistrées à leurs résultats d'autofusion correspondants.
+
+[NOTE]
+Vous devez configurer la variable de configuration `rerere.enabled` pour activer cette commande.
+
+
+COMMANDES
+---------
+
+Normalement, 'git rerere' est exécuté sans arguments ou intervention utilisateur. Cependant, il a plusieurs commandes qui lui permettent d'interagir avec son état de fonctionnement.
+
+'clear'::
+
+Réinitialiser les meta-données utilisées par rerere si une résolution de fusion doit être annulée. Appeler 'git am [--skip|--abort]' ou 'git rebase [--skip|--abort]' invoque automatiquement cette commande.
+
+'forget' <spéc-de-chemin>::
+
+Réinitialiser les résolutions de conflit que rerere a enregistrées pour le conflit actuel dans ­_<spéc-de-chemin>_.
+
+'diff'::
+
+Afficher les diffs pour l'état actuel de la résolution. Il est utile de suivre ce qui a changé pendant que l'utilisateur résout les conflits. Des arguments supplémentaires sont transmis directement à la commande système 'diff' installée dans PATH.
+
+'status'::
+
+Afficher les chemins avec des conflits dont la résolution de fusion sera enregistrée par rerere.
+
+'remaining'::
+
+Afficher les chemins avec des conflits qui n'ont pas été autorésolus par rerere. Cela inclut les chemins dont les résolutions ne peuvent pas être suivies par rerere, telles que des sous-modules en conflit.
+
+'gc'::
+
+Élaguer les enregistrements des fusions en conflit qui sont arrivées il y a longtemps. Par défaut, les conflits non résolus de plus de 15 jours et les conflits résolus de plus de 60 jours sont élagués. Ces valeurs par défaut sont contrôlées par les variables de configuration `gc.rerereUnresolved` et `gc.rerereResolved`.
+
+
+DISCUSSION
+----------
+
+Lorsque votre branche de sujet modifie une zone de chevauchement que votre branche principale (ou amont) a touchée depuis que votre branche de sujet en a divergé, vous pouvez la tester avec le dernier master, même avant que votre branche de sujet soit prête à être poussée en amont :
+
+------------
+              o---*---o thème
+             /
+    o---o---o---*---o---o master
+------------
+
+Pour un tel test, vous devez fusionner master et la branche thématique d'une manière ou d'une autre. Une façon de le faire est de tirer master dans la branche thématique :
+
+------------
+	$ git switch sujet
+	$ git merge master
+
+              o---*---o---+ sujet
+             /           /
+    o---o---o---*---o---o master
+------------
+
+Les commits marqués de `*` touchent la même zone dans le même fichier ; vous devez résoudre les conflits en créant le commit marqué `+`. Ensuite, vous pouvez tester le résultat pour vous assurer que votre travail en cours fonctionne toujours avec ce qui est dans le dernier master.
+
+Après cette fusion de test, il y a deux façons de poursuivre votre travail sur la branche thématique. Le plus facile est de construire par dessus le commit de fusion test `+`, et lorsque votre travail dans la branche thématique est enfin prêt, fusionner la branche thématique dans master, et/ou demander à l'amont de tirer de vous. A ce moment-là, cependant, le master ou l'amont aurait pu être avancé depuis la fusion de test `+`, auquel cas le graphe final de commits ressemblerait à ceci :
+
+------------
+	$ git switch sujet
+	$ git merge master
+	$ ... travail sur la branche thématique et sur la branche master
+	$ git switch master
+	$ git merge sujet
+
+              o---*---o---+---o---o sujet
+             /           /         \
+    o---o---o---*---o---o---o---o---+ master
+------------
+
+Lorsque votre branche thématique est au long cours, cependant, votre branche thématique finirait par avoir beaucoup de tels commits de "fusion depuis master" sur elle, qui encombreraient inutilement l'historique de développement. Les lecteurs de la liste de diffusion du noyau Linux se rappellent peut-être que Linus s'est plaint de fusions de tests trop fréquentes lorsqu'un mainteneur d'un sous-système a demandé de tirer d'une branche pleine de « fusions inutiles ».
+
+Comme alternative, pour garder la branche thématique exempte de fusions d'essai, vous pourriez exploser la fusion d'essai, et continuer à construire sur le sommet de la branche avant la fusion d'essai :
+
+------------
+	$ git switch sujet
+	$ git merge master
+	$ git reset --hard HEAD^ ;# rembobine la fusion de test
+	$ ... travail sur les deux branches thématique et master
+	$ git switch master
+	$ git merge sujet
+
+              o---*---o-------o---o sujet
+             /                     \
+    o---o---o---*---o---o---o---o---+ master
+------------
+
+Cela ne laisserait qu’un seul commit de fusion lorsque votre branche thématique est enfin prête et fusionnée dans la branche master. Cette fusion vous obligerait à résoudre le conflit introduit par les commits marqués d’un `*`. Cependant, il s’agit souvent du même conflit que celui que vous avez résolu lors de la création de la fusion de test que vous avez explosée. 'git rerere' vous aide à résoudre cette fusion finale conflictuelle en utilisant les informations de votre résolution à la main précédente.
+
+Lancer la commande 'git rerere' immédiatement après une autofusion conflictuelle enregistre les fichiers d'arbres de travail en conflit, avec les marqueurs de conflit habituels `<<<<<<<`, `=======` and `>>>>>>>`. Plus tard, après que vous avez fini de résoudre les conflits, exécuter 'git rerere' à nouveau enregistrera l'état résolu de ces fichiers. Supposez que vous avez fait cela lorsque vous avez créé la fusion de test de master dans la branche thématique.
+
+La prochaine fois, après avoir vu la même autofusion conflictuelle, lancer `git rerere` effectuera une fusion de trois points entre l'autofusion antérieure en conflit, la résolution manuelle antérieure et l'autofusion en conflit actuelle. Si cette fusion à trois points se résout proprement, le résultat est écrit à votre fichier d'arbre de travail, de sorte que vous n'avez pas à le résoudre manuellement. Notez que 'git rerere' laisse le fichier index seul, donc vous devez toujours faire les vérifications de sanity finales avec `git diff` (ou `git diff -c`) et `git add` lorsque vous êtes satisfait.
+
+Comme mesure de commodité, 'git merge' invoque automatiquement 'git rerere' à la sortie d'une autofusion ratée et 'git rerere' enregistre la résolution manuelle lorsqu'il s'agit d'un nouveau conflit, ou réutilise la résolution manuelle antérieure sinon. 'git commit' invoque également 'git rerere' lors de la validation d'un résultat de fusion. Ce que cela signifie, c'est que vous n'avez rien de spécial à faire vous-même (à moins d'avoir désactivé la variable de configuration `rerere.enabled`).
+
+Dans notre exemple, lorsque vous faites la fusion de test, la résolution manuelle est enregistrée, et elle sera réutilisée lorsque vous faites la fusion réelle plus tard avec les branches master et topic mises à jour, tant que la résolution enregistrée est toujours applicable.
+
+Les enregistrement d'information `git rerere` sont également utilisées lors de l'exécution de `git rebase`. Après avoir fait exploser la fusion de test et continué le développement sur la branche thématique :
+
+------------
+              o---*---o-------o---o sujet
+             /
+    o---o---o---*---o---o---o---o   master
+
+	$ git rebase master sujet
+
+				  o---*---o-------o---o sujet
+				 /
+    o---o---o---*---o---o---o---o   master
+------------
+
+vous pouvez lancer `git rebase master topic`, pour vous mettre à jour avant que votre sujet soit prêt à être envoyé en amont. Cela entraînerait un retour à une fusion à trois points et cela serait incompatible avec la fusion que vous avez résolue plus tôt. 'git rerere' sera lancé par 'git rebase' pour vous aider à résoudre ce conflit.
+
+[NOTE] 'git rerere' s'appuie sur les marqueurs de conflit dans le dossier pour détecter le conflit. Si le fichier contient déjà des lignes qui ressemblent aux lignes avec des marqueurs de conflit, « git rerere» peut ne pas enregistrer une résolution de conflit. Pour contourner cette limitation, on peut utiliser le réglage de la taille de la marqueur de conflit `conflict-marker-size` dans linkgit:gitattributes[5].
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

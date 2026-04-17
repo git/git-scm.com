@@ -1,0 +1,309 @@
+git-interpret-trailers(1)
+=========================
+
+NOM
+---
+git-interpret-trailers - Ajoute ou analyse de l'information structurée dans les messages de validation
+
+SYNOPSIS
+--------
+[verse]
+'git interpret-trailers' [--in-place] [--trim-empty]
+			[(--trailer (<clé>|<alias-de-clé>)[(=|:)<valeur>])...]
+			[--parse] [<fichier>...]
+
+DESCRIPTION
+-----------
+Ajouter ou analyser des lignes terminales, qui ressemblent à des en-têtes de courriel RFC 822, à la fin de la partie autrement libre d'un message de validation. Par exemple, dans le message de validation suivant
+
+------------------------------------------------
+titre
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+Signed-off-by: Alice <alice@exemple.com>
+Signed-off-by: Bob <bob@exemple.com>
+------------------------------------------------
+
+les deux dernières lignes commençant par "Signed-off-by" sont des lignes terminales.
+
+Cette commande lit des messages de validation provenant soit des <fichier>s en argument, soit de l'entrée standard, si aucun <fichier> n'est spécifié. Si `--parse` est spécifié, la sortie se compose des lignes terminales analysées provenant de l ' entrée, sans les influencer avec des options de ligne de commande ou des variables de configuration.
+
+Sinon, cette commande s'applique les variables de configuration`trailer.*` (qui pourraient potentiellement ajouter de nouvelles lignes terminales, ainsi que les repositionner), ainsi que tous les arguments de ligne de commande qui peuvent remplacer les variables de configuration (comme `--trailer=...` qui pourraient également ajouter de nouvelles lignes terminales), à chaque fichier d'entrée. Le résultat est émis sur la sortie standard.
+
+Cette commande peut également fonctionner sur la sortie de linkgit:git-format-patch[1], qui est plus élaboré qu'un simple message de validation. Plus précisément, cette sortie comprend un message de validation (comme ci-dessus), une ligne de séparation "---" et une rustine. Pour ces entrées, le séparateur et les rustines ne sont pas modifiés par cette commande et sont émis tel quels sur la sortie, à moins que `--no-divider` soit spécifié.
+
+Certaines variables de configuration contrôlent la façon dont les arguments `--trailer` sont appliqués à chaque entrée et la façon dont toute ligne terminale existante dans l'entrée est changée. Elles permettent également d'ajouter automatiquement des lignes terminales.
+
+Par défaut, l'argument '<clé>=<valeur>' or '<clé>:<valeur>' fourni en utilisant `--trailer` ne sera ajouté après les lignes terminales existantes que si la dernière ligne terminale a une paire (<clé>, <valeur>) différente (ou s'il n'y a pas de ligne terminale). Les parties <clé> et <valeur> seront raccourcis pour supprimer les espaces blancs de début et de fin, et les <clé> et <valeur> nettoyés résultants seront apposés dans la sortie comme ceci :
+
+------------------------------------------------
+clé:valeur
+------------------------------------------------
+
+Cela signifie que les <clé> et <valeur> nettoyés seront séparés par `': '` (deux points suivis d'un espace).
+
+Pour plus de commodité, on peut configurer un <alias-de-clé> afin d'utiliser un `--trailer` plus court à taper sur la ligne de commande. Cela peut être configuré à l'aide de la variable de configuration 'trailer.<alias-de-clé>.key'. L'<alias-de-clé> doit être un préfixe de la chaîne complète <clé>, bien que la sensibilité à la casse n'a pas d'importance. Par exemple, si vous avez
+
+------------------------------------------------
+trailer.sign.key "Signed-off-by: "
+------------------------------------------------
+
+dans votre configuration, vous devez seulement spécifier `--trailer="sign: foo"` sur la ligne de commande au lieu de `--trailer="Signed-off-by: foo"`.
+
+Par défaut, la nouvelle ligne terminale apparaîtra après toutes les lignes terminales existantes. S'il n'y a pas de ligne terminale existante, la nouvelle ligne terminale apparaîtra à la fin de l'entrée. S'il n'y a pas déjà de ligne avec seulement des espaces à la fin, une ligne vierge sera ajoutée avant la nouvelle ligne terminale.
+
+Les lignes terminales existantes sont extraites de l'entrée en recherchant un groupe d'une ou plusieurs lignes qui (i) n'est constitué que de lignes terminales, ou (ii) contient au moins une ligne terminale générée par Git ou pour par la configuration utilisateur et se compose d'au moins 25% de lignes terminales. Le groupe doit être précédé d'une ou de plusieurs lignes vides (ou espace seulement). Le groupe doit soit être à la fin de l'entrée, soit être les dernières lignes non blanches avant une ligne qui commence par '---' (suivi par un espace ou la fin de la ligne).
+
+Lors de la lecture des lignes terminales, il ne doit pas y avoir d'espace blanc avant ou à l'intérieur du <clé>, mais les caractères d'espace normaux ou de tabulations sont autorisés entre la <clé> et le séparateur. Il peut y avoir des espaces blancs avant, à l'intérieur ou après la <valeur.> La <valeur> peut être divisée sur plusieurs lignes avec chaque ligne subséquente commençant par au moins un espace blanc, comme le "folding" dans RFC 822. Exemple :
+
+------------------------------------------------
+clé: C'est une très longue ligne, avec des espaces et
+  des retours chariots.
+------------------------------------------------
+
+Notez que les lignes terminales ne suivent pas (et ne sont pas destinées à suivre) de nombreuses règles pour les en-têtes RFC 822. Par exemple, elles ne suivent pas les règles d'encodage.
+
+OPTIONS
+-------
+--in-place::
+	Éditer les fichiers sur place.
+
+--trim-empty::
+	Si la partie <valeur> d'une ligne terminale ne contient que des espaces blancs, la totalité de la ligne terminale est éliminée de la sortie résultante. Ceci s'applique aux lignes terminales pré-existantes ainsi qu'aux nouvelles lignes terminales.
+
+--trailer <clé>[(=| :)<valeur>]::
+	Spécifier une paire (<clé>, <valeur> ) qui devrait être appliquée comme ligne terminale à l'entrée. Voir la description de cette commande.
+
+--where <placement>::
+--no-where::
+	Préciser où toutes les nouvelles lignes terminales seront ajoutées. Un paramètre fourni avec '--where' a précédence sur la variable de configuration `trailer.where` et toute autre `trailer.<alias-de-clé>.where` et s'applique à toutes les options '--trailer' jusqu'à la prochaine occurrence de '--where' ou '--no-where'. La présence du `--no-where`réinitialise l'effet de toute utilisation antérieure de `--where`, de sorte que les variables de configuration pertinentes ne sont plus outrepassées. Les placements possibles sont `after`, `before`, `end` ou `start`.
+
+--if-exists <action>::
+--no-if-exists::
+	Spécifier l'action qui sera exécutée lorsqu'il y a déjà au moins une ligne terminale avec la même _<clé>_ dans l'entrée. Un paramètre fourni avec `--if-exists` surcharge les variables de configuration `trailer.ifExists`et toute autre `trailer.<alias-de-clé>.ifExists` et s'applique à toutes les options `--trailer` jusqu'à la prochaine occurrence de `--if-exists` ou `--no-if-exists`. L'occurrence de `--no-if-exists` réinitialise l'effet de toute utilisation antérieure de `--if-exists`, de sorte que les variables de configurations pertinentes ne sont plus surchargées. Les actions possibles sont `addIfDifferent`, `addIfDifferentNeighbor`, `add`, `replace` et `doNothing`.
+
+--if-missing <action>::
+--no-if-missing::
+	Spécifier l'action qui sera exécutée lorsqu'il n'y a pas d'autre ligne-terminale avec le même <clé> dans l'entrée. Un paramètre fourni avec `--if-missing` surcharge les variables de configuration `trailer.ifMissing` et toute autre `trailer.<alias-de-clé>.ifMissing` et s'applique à toutes les options `--trailer` jusqu'à la prochaine occurrence de `--if-missing` ou `--no-if-missing`. L'occurrence de `--no-if-missing` réinitialise l'effet de toute utilisation antérieure de `--if-missing`, de sorte que les variables de configurations pertinentes ne sont plus surchargées. Les actions possibles sont `doNothing` ou `add`.
+
+--only-trailers::
+	Extraire seulement les lignes terminales, pas d'autres parties de l'entrée.
+
+--only-input::
+	Ne sortir que les lignes terminales qui existent dans l'entrée ; n'ajouter aucune depuis la ligne de commande ou en appliquant les variables de configuration`trailer.*`.
+
+--unfold::
+	Si une ligne terminale a une valeur qui se suit sur plusieurs lignes (aka "folded"), reformater la valeur en une seule ligne.
+
+--parse::
+	Un alias de commodité pour les `--only-trailers --only-input --unfold` . Cela rend plus facile de voir seulement les lignes terminales provenant de l'entrée sans les influer sur toutes les options de ligne de commande ou de configuration, tout en rendant la sortie compatible avec un traitement automatique e avec --unfold.
+
+--no-divider::
+	Ne pas traiter `---` comme la fin du message de validation. Utilisez ceci lorsque vous savez que votre entrée contient simplement le message de validation lui-même (et non un courriel ou la sortie de `git format-patch`).
+
+VARIABLES DE CONFIGURATION
+--------------------------
+
+Tout ce qui se trouve en dessous de cette ligne dans cette section est inclus de manière sélective à partir de la documentation linkgit:git-config[1]. Le contenu est le même que celui qui s'y trouve :
+[]
+
+
+
+[WARNING]
+====
+Missing `fr/config/trailer.adoc`
+
+See original version for this content.
+====
+
+[]
+
+EXEMPLES
+--------
+
+* Configurer une ligne terminale 'signature' avec une clé 'Signed-off-by', puis ajouter deux de ces lignes terminales à un fichier de message de validation :
++
+------------
+$ git config trailer.sign.key "Signed-off-by"
+$ cat msg.txt
+subject
+
+corps du message
+$ git interpret-trailers --trailer 'sign: Alice <alice@exemple.com>' --trailer 'sign: Bob <bob@exemple.com>' <msg.txt
+subject
+
+corps du message
+
+Signed-off-by: Alice <alice@exemple.com>
+Signed-off-by: Bob <bob@exemple.com>
+------------
+
+* Utilisez l'option `--in-place` pour modifier un fichier de message de validation en place :
++
+------------
+$ cat msg.txt
+subject
+
+corps du message
+
+Signed-off-by: Bob <bob@exemple.com>
+$ git interpret-trailers --trailer 'Acked-by: Alice <alice@exemple.com>' --in-place msg.txt
+$ cat msg.txt
+subject
+
+corps du message
+
+Signed-off-by: Bob <bob@exemple.com>
+Acked-by: Alice <alice@exemple.com>
+------------
+
+* Éxtraire le dernier commit comme une rustine, et y ajouter des lignes terminales "Cc" et "Reviewed-by' :
++
+------------
+$ git format-patch -1
+0001-foo.patch
+$ git interpret-trailers --trailer 'Cc: Alice <alice@exemple.com>' --trailer 'Reviewed-by: Bob <bob@exemple.com>' 0001-foo.patch >0001-bar.patch
+------------
+
+* Configurer une ligne terminale "sign" avec une commande pour ajouter automatiquement un "Signed-off-by :" avec les informations sur l'auteur uniquement s'il n'y a pas déjà de "Signed-off-by:", et montrer comment cela fonctionne :
++
+------------
+$ cat msg1.txt
+subject
+
+corps du message
+$ git config trailer.sign.key "Signed-off-by: "
+$ git config trailer.sign.ifmissing add
+$ git config trailer.sign.ifexists doNothing
+$ git config trailer.sign.cmd 'echo "$(git config user.name) <$(git config user.email)>"'
+$ git interpret-trailers --trailer sign <msg1.txt
+titre
+
+corps du message
+
+Signed-off-by: Bob <bob@exemple.com>
+$ cat msg2.txt
+subject
+
+corps du message
+
+Signed-off-by: Alice <alice@exemple.com>
+$ git interpret-trailers --trailer sign <msg2.txt
+subject
+
+corps du message
+
+Signed-off-by: Alice <alice@exemple.com>
+------------
+
+* Configurer une ligne terminale 'fix' avec une clé qui contient un '#' et aucun espace après ce caractère, et montrer comment il fonctionne :
++
+------------
+$ git config trailer.separators ":#"
+$ git config trailer.fix.key "Fix #"
+$ echo "subject" | git interpret-trailers --trailer fix=42
+subject
+
+Fix #42
+------------
+
+* Configurer une ligne terminale 'help' avec un cmd, utiliser un script `glog-find-author` qui recherche l'identité de l'auteur spécifié dans le journal git dans le dépôt git et montrer comment cela fonctionne :
++
+------------
+$ cat ~/bin/glog-find-author
+#!/bin/sh
+test -n "$1" && git log --author="$1" --pretty="%an <%ae>" -1 || true
+$ cat msg.txt
+subject
+
+corps du message
+$ git config trailer.help.key "Helped-by: "
+$ git config trailer.help.ifExists "addIfDifferentNeighbor"
+$ git config trailer.help.cmd "~/bin/glog-find-author"
+$ git interpret-trailers --trailer="help:Junio" --trailer="help:Couder" <msg.txt
+titre
+
+corps du message
+
+Helped-by: Junio C Hamano <gitster@pobox.com>
+Helped-by: Christian Couder <christian.couder@gmail.com>
+------------
+
+* Configurer une ligne terminale 'ref' avec un script `glog-grep` pour rechercher le dernier commit pertinent dans le journal git du dépôt git et montrer comment cela fonctionne :
++
+------------
+$ cat ~/bin/glog-grep
+#!/bin/sh
+test -n "$1" && git log --grep "$1" --pretty=reference -1 || true
+$ cat msg.txt
+subject
+
+corps du message
+$ git config trailer.ref.key "Reference-to: "
+$ git config trailer.ref.ifExists "replace"
+$ git config trailer.ref.cmd "~/bin/glog-grep"
+$ git interpret-trailers --trailer="ref:Add copyright notices." <msg.txt
+titre
+
+corps du message
+
+Reference-to: 8bc9a0c769 (Add copyright notices., 2005-04-07)
+------------
+
+* Configurer une ligne terminale 'see' avec une commande pour montrer le sujet d'un commit qui est lié, et montrer comment cela fonctionne :
++
+------------
+$ cat msg.txt
+subject
+
+corps du message
+
+see: HEAD~2
+$ cat ~/bin/glog-ref
+#!/bin/sh
+git log -1 --oneline --format="%h (%s)" --abbrev-commit --abbrev=14
+$ git config trailer.see.key "See-also: "
+$ git config trailer.see.ifExists "replace"
+$ git config trailer.see.ifMissing "doNothing"
+$ git config trailer.see.cmd "glog-ref"
+$ git interpret-trailers --trailer=see <msg.txt
+subject
+
+corps du message
+
+See-also: fe3187489d69c4 (subject of related commit)
+------------
+
+* Configurer un modèle de commit avec quelques lignes terminales avec des valeurs vides (en utilisant sed pour afficher et conserver les espaces à la fin des lignes terminales), puis configurer un crochet commit-msg qui utilise 'git interpret-trailers' pour supprimer les lignes terminales avec des valeurs vides et pour ajouter une ligne terminale 'git-version' :
++
+------------
+$ cat temp.txt
+***subject***
+
+***message***
+
+Fixes: Z
+Cc: Z
+Reviewed-by: Z
+Signed-off-by: Z
+$ sed -e 's/ Z$/ /' temp.txt > commit_template.txt
+$ git config commit.template commit_template.txt
+$ cat .git/hooks/commit-msg
+#!/bin/sh
+git interpret-trailers --trim-empty --trailer "git-version: \$(git describe)" "\$1" > "\$1.new"
+mv "\$1.new" "\$1"
+$ chmod +x .git/hooks/commit-msg
+------------
+
+VOIR AUSSI
+----------
+linkgit:git-commit[1], linkgit:git-format-patch[1], linkgit:git-config[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

@@ -6,7 +6,7 @@ section: documentation
 subsection: manual
 title: Git - gitprotocol-v2 Documentation
 docname: gitprotocol-v2
-version: 2.51.0
+version: 2.52.0
 headings:
 - text: NAME
   id: _name
@@ -26,7 +26,7 @@ headings:
   id: _capabilities
 - text: GIT
   id: _git
-latest-changes: 2.51.0
+latest-changes: 2.52.0
 aliases:
 - "/docs/gitprotocol-v2/index.html"
 ---
@@ -1109,31 +1109,79 @@ headers of that bundle or bundles.</p>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_promisor_remotepr_infos"><a class="anchor" href="#_promisor_remotepr_infos"></a>promisor-remote=&lt;pr-infos&gt;</h3>
+<h3 id="_promisor_remotepr_info"><a class="anchor" href="#_promisor_remotepr_info"></a>promisor-remote=&lt;pr-info&gt;</h3>
 <div class="paragraph">
 <p>The server may advertise some promisor remotes it is using or knows
 about to a client which may want to use them as its promisor remotes,
-instead of this repository. In this case &lt;pr-infos&gt; should be of the
+instead of this repository. In this case &lt;pr-info&gt; should be of the
 form:</p>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>pr-infos = pr-info | pr-infos ";" pr-info</pre>
+<pre>pr-info = pr-fields | pr-info ";" pr-fields</pre>
 </div>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>pr-info = "name=" pr-name | "name=" pr-name "," "url=" pr-url</pre>
+<pre>pr-fields = pr-field | pr-fields "," pr-field</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>pr-field = field-name "=" field-value</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>where <span class='synopsis'><code>pr-name</code></span> is the urlencoded name of a promisor remote, and
-<span class='synopsis'><code>pr-url</code></span> the urlencoded URL of that promisor remote.</p>
+<p>where all the <span class='synopsis'><code>field-name</code></span> and <span class='synopsis'><code>field-value</code></span> in a given <span class='synopsis'><code>pr-fields</code></span>
+are field names and values related to a single promisor remote. A
+given <span class='synopsis'><code>field-name</code></span> MUST NOT appear more than once in given
+<span class='synopsis'><code>pr-fields</code></span>.</p>
 </div>
 <div class="paragraph">
-<p>In this case, if the client decides to use one or more promisor
-remotes the server advertised, it can reply with
-"promisor-remote=&lt;pr-names&gt;" where &lt;pr-names&gt; should be of the form:</p>
+<p>The server MUST advertise at least the "name" and "url" field names
+along with the associated field values, which are the name of a valid
+remote and its URL, in each <span class='synopsis'><code>pr-fields</code></span>. The "name" and "url" fields
+MUST appear first in each pr-fields, in that order.</p>
+</div>
+<div class="paragraph">
+<p>After these mandatory fields, the server MAY advertise the following
+optional fields in any order:</p>
+</div>
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/gitprotocol-v2.txt-spanclasssynopsiscodepartialCloneFiltercodespan"><a id="Documentation/gitprotocol-v2.txt-partialCloneFilter" class="anchor" href="#Documentation/gitprotocol-v2.txt-partialCloneFilter"></a><span class='synopsis'><code>partialCloneFilter</code></span> </dt>
+<dd>
+<p>The filter specification used by the remote.
+Clients can use this to determine if the remote&#8217;s filtering strategy
+is compatible with their needs (e.g., checking if both use "blob:none").
+It corresponds to the "remote.&lt;name&gt;.partialCloneFilter" config setting.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/gitprotocol-v2.txt-spanclasssynopsiscodetokencodespan"><a id="Documentation/gitprotocol-v2.txt-token" class="anchor" href="#Documentation/gitprotocol-v2.txt-token"></a><span class='synopsis'><code>token</code></span> </dt>
+<dd>
+<p>An authentication token that clients can use when
+connecting to the remote. It corresponds to the "remote.&lt;name&gt;.token"
+config setting.</p>
+</dd>
+</dl>
+</div>
+<div class="paragraph">
+<p>No other fields are defined by the protocol at this time. Field names
+are case-sensitive and MUST be transmitted exactly as specified
+above. Clients MUST ignore fields they don&#8217;t recognize to allow for
+future protocol extensions.</p>
+</div>
+<div class="paragraph">
+<p>For now, the client can only use information transmitted through these
+fields to decide if it accepts the advertised promisor remote. In the
+future that information might be used for other purposes though.</p>
+</div>
+<div class="paragraph">
+<p>Field values MUST be urlencoded.</p>
+</div>
+<div class="paragraph">
+<p>If the client decides to use one or more promisor remotes the server
+advertised, it can reply with "promisor-remote=&lt;pr-names&gt;" where
+&lt;pr-names&gt; should be of the form:</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -1145,9 +1193,8 @@ remotes the server advertised, it can reply with
 advertised and the client accepts.</p>
 </div>
 <div class="paragraph">
-<p>Note that, everywhere in this document, <span class='synopsis'><code>pr-name</code></span> MUST be a valid
-remote name, and the <em>;</em> and <em>,</em> characters MUST be encoded if they
-appear in <span class='synopsis'><code>pr-name</code></span> or <span class='synopsis'><code>pr-url</code></span>.</p>
+<p>Note that, everywhere in this document, the <em>;</em> and <em>,</em> characters
+MUST be encoded if they appear in <span class='synopsis'><code>pr-name</code></span> or <span class='synopsis'><code>field-value</code></span>.</p>
 </div>
 <div class="paragraph">
 <p>If the server doesn&#8217;t know any promisor remote that could be good for
@@ -1161,9 +1208,10 @@ the server advertised, the client shouldn&#8217;t advertise the
 "promisor-remote" capability at all in its reply.</p>
 </div>
 <div class="paragraph">
-<p>The "promisor.advertise" and "promisor.acceptFromServer" configuration
-options can be used on the server and client side to control what they
-advertise or accept respectively. See the documentation of these
+<p>On the server side, the "promisor.advertise" and "promisor.sendFields"
+configuration options can be used to control what it advertises. On
+the client side, the "promisor.acceptFromServer" configuration option
+can be used to control what it accepts. See the documentation of these
 configuration options for more information.</p>
 </div>
 <div class="paragraph">
