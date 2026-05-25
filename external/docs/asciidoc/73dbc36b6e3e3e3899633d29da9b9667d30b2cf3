@@ -1,0 +1,1087 @@
+git-format-patch(1)
+===================
+
+NAMN
+----
+git-format-patch - Förbered patchar för att skickas via e-post
+
+
+SYNOPSIS
+--------
+[verse]
+'git format-patch' [-k] [(-o|--output-directory) <kat> | --stdout]
+		   [--no-thread | --thread[=<stil>]]
+		   [(--attach|--inline)[=<gräns>] | --no-attach]
+		   [-s | --signoff]
+		   [--signature=<signature> | --no-signature]
+		   [--signature-file=<fil>]
+		   [-n | --numbered | -N | --no-numbered]
+		   [--start-number <n>] [--numbered-files]
+		   [--in-reply-to=<meddelande-id>] [--suffix=.<sfx>]
+		   [--ignore-if-in-upstream] [--always]
+		   [--cover-from-description=<läge>]
+		   [--rfc[=<rfc>]] [--subject-prefix=<ärende-prefix>]
+		   [(--reroll-count|-v) <n>]
+		   [--to=<mejl>] [--cc=<mejl>]
+		   [--[no-]cover-letter] [--quiet]
+		   [--[no-]encode-email-headers]
+		   [--no-notes | --notes[=<ref>]]
+		   [--interdiff=<föregående>]
+		   [--range-diff=<föregående> [--creation-factor=<procent>]]
+		   [--filename-max-length=<n>]
+		   [--progress]
+		   [<common-diff-options>]
+		   [ <sedan> | <revision-intervall> ]
+
+BESKRIVNING
+-----------
+
+Förbered varje incheckning som inte är en sammanslagning med sin "patch" i ett "meddelande" per incheckning, formaterat så att det liknar en UNIX-brevlåda. Utdata från kommandot är praktiskt för e-postutskick eller för användning med 'git am'.
+
+Ett "meddelande" som genereras av kommandot består av tre delar:
+
+* En kort metadatarubrik som börjar med `From <commit>` med en fast `Mon Sep 17 00:00:00 2001` datumstämpel för att hjälpa program som "file(1)" att känna igen att filen är ett resultat av detta kommando, fält som registrerar författaridentiteten, författardatumet och titeln på ändringen (hämtad från första stycket i incheckningsloggmeddelandet).
+
+* Det andra och efterföljande styckena i incheckningsloggmeddelandet.
+
+* "Patchen", som är utdatan "diff -p --stat" (se linkgit:git-diff[1]) mellan incheckningen och dess förälder.
+
+Loggmeddelandet och patchen skiljs åt av en rad med tre bindestreck (---).
+
+Det finns två sätt att ange vilka incheckningar som ska behandlas.
+
+1. En enda incheckning, <sedan>, anger att de incheckningar som leder till toppen av den aktuella grenen men som inte finns i historiken som leder till <sedan> ska matas ut.
+
+2. Generiskt <revisionsintervall>-uttryck (se avsnittet "SPECIFICERING AV REVISIONER" i linkgit:gitrevisions[7]) avser incheckningar inom det angivna intervallet.
+
+Den första regeln har företräde vid en enskild <incheckning>. För att tillämpa den andra regeln, dvs. formatera allt från historikens början fram till <incheckning>, använd `--root`: `git format-patch --root <incheckning>`. Om du bara vill formatera själva <incheckning> kan du göra det med `git format-patch -1 <incheckning>`.
+
+Som standard numreras varje utdatafil sekventiellt från 1 och använder den första raden i incheckningsmeddelandet (anpassad för sökvägssäkerhet) som filnamn. Med `--numbered-files` blir utdatafilernas namn bara siffror, utan att första raden i incheckningsmeddelandet läggs till. Namnen på utdatafilerna skrivs ut till standardut, om inte `--stdout` anges.
+
+Om `-o` anges, skapas utdatafiler i <kat>. Annars skapas de i den aktuella arbetskatalogen. Standardsökvägen kan ställas in med konfigurationsalternativet `format.outputDirectory`. Alternativet `-o` har företräde framför `format.outputDirectory`. För att lagra patchar i den aktuella arbetskatalogen även när `format.outputDirectory` pekar någon annanstans, använd `-o .`. Alla katalogkomponenter kommer att skapas.
+
+Som standard är ämnet för en enskild patch "[PATCH]" följt av en sammanslagning av rader från incheckningsmeddelandet fram till första tomma raden (se avsnittet DISCUSSION i linkgit:git-commit[1]).
+
+När flera patchar skrivs ut blir ämnesprefixet i stället "[PATCH n/m]". För att tvinga fram 1/1 för en enskild patch, använd `-n`. För att utelämna patchnummer i ämnet, använd `-N`.
+
+Om `--thread` anges, kommer `git-format-patch` att generera huvudena `In-Reply-To` och `References` för att få det andra och efterföljande patch-meddelandena att visas som svar på det första meddelandet; detta genererar också en `Message-ID`-rubrik att referera till.
+
+ALTERNATIV
+----------
+:git-format-patch: 1
+// Please don't remove this comment as asciidoc behaves badly when
+// the first non-empty line is ifdef/ifndef. The symptom is that
+// without this comment the <git-diff-core> attribute conditionally
+// defined below ends up being defined unconditionally.
+// Last checked with asciidoc 7.0.2.
+
+ifndef::git-format-patch[]
+ifndef::git-diff[]
+ifndef::git-log[]
+:git-diff-core: 1
+endif::git-log[]
+endif::git-diff[]
+endif::git-format-patch[]
+
+ifdef::git-format-patch[]
+-p::
+--no-stat::
+	Generera vanliga patchar utan diffstat.
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+`-p`::
+`-u`::
+`--patch`::
+	Generera patch (se <<generate_patch_text_with_p>>).
+ifdef::git-diff[]
+	Detta är standardvärdet..
+endif::git-diff[]
+
+`-s`::
+`--no-patch`::
+	Undertryck all utdata från diffmaskineriet. Användbart för kommandon som `git show` som visar patchen som standard för att undertrycka deras utdata, eller för att avbryta effekten av alternativ som `--patch`, `--stat` tidigare på kommandoraden i ett alias.
+
+endif::git-format-patch[]
+
+ifdef::git-log[]
+`-m`::
+	Visa differenser för sammanslagningsincheckningar i standardformatet. Detta liknar `--diff-merges=on`, förutom att `-m` inte kommer att producera någon utdata om inte `-p` också anges.
+
+`-c`::
+	Producera kombinerad diff-utdata för sammanslagningsincheckningar. Genväg för `--diff-merges=combined -p`.
+
+`--cc`::
+	Producera tät kombinerad diff-utdata för sammanslagningsincheckningar. Genväg för `--diff-merges=dense-combined -p`.
+
+`--dd`::
+	Skapa diff med avseende på första föräldern för både sammanslå- och reguljära incheckningar. Genväg för `--diff-merges=first-parent -p`.
+
+`--remerge-diff`::
+	Producera remerge-diff-utdata för sammanslagningsincheckningar. Genväg för `--diff-merges=remerge -p`.
+
+`--no-diff-merges`::
+	Synonym för `--diff-merges=off`.
+
+`--diff-merges=<format>`::
+	Ange diff-formatet som ska användas för sammanslagningsincheckningar. Standardinställningen är {diff-merges-default} om inte `--first-parent` används, i vilket fall `first-parent` är standardinställningen.
++
+Följande format stöds:
++
+--
+`off`::
+`none`::
+	Inaktivera utdata för diffar för sammanslagningsincheckningar. Användbart för att åsidosätta implicita värden.
+
+`on`::
+`m`::
+	Gör diff-utdata för sammanslagningsincheckningar så att de visas i standardformatet. Standardformatet kan ändras med hjälp av konfigurationsvariabeln `log.diffMerges`, vars standardvärde är `separate`.
+
+`first-parent`::
+`1`::
+	Visa fullständig skillnad med avseende på första föräldern. Detta är samma format som `--patch` producerar för ej sammanfogade incheckningar.
+
+`separate`::
+	Visa fullständig differens med avseende på varje förälder. Separat loggpost och differens genereras för varje förälder.
+
+`combined`::
+`c`::
+	Visa skillnader från varje förälder till sammanslagningsresultatet samtidigt i stället för att visa parvisa skillnader mellan en förälder och resultatet en i taget. Dessutom listas endast filer som har ändrats från alla föräldrar.
+
+`dense-combined`::
+`cc`::
+	Komprimera ytterligare utdata som produceras av `--diff-merges=combined` genom att utelämna ointressanta stycken vars innehåll i föräldrarna bara har två varianter och sammanslagningsresultatet väljer en av dem utan modifiering.
+
+`remerge`::
+`r`:: Återsammanfoga två-föräldra sammanslagningsincheckningar för att skapa ett temporärt trädobjekt – potentiellt innehållande filer med konfliktmarkörer och liknande. En skillnad visas sedan mellan det temporära trädet och den faktiska sammanslagningsincheckningen.
+--
++
+Utdata som genereras när detta alternativ används kan komma att ändras, och detsamma gäller dess interaktion med andra alternativ (såvida det inte uttryckligen dokumenterats).
+
+
+`--combined-all-paths`::
+	Gör att kombinerade diffar (används för sammanslagningsincheckningar) listar namnet på filen från alla föräldrar. Det har således bara effekt när `--diff-merges=[dense-]combined` används, och är sannolikt bara användbart om filnamnsändringar upptäcks (d.v.s. när antingen namnbyte eller kopieringsdetektering har begärts).
+endif::git-log[]
+
+`-U<n>`::
+`--unified=<n>`::
+	Generate diffs with _<n>_ lines of context. The number of context lines defaults to `diff.context` or 3 if the configuration variable is unset. (`-U` without `<n>` is silently accepted as a synonym for `-p` due to a historical accident).
+ifndef::git-format-patch[]
+	implicerar `--patch`.
+endif::git-format-patch[]
+
+`--output=<fil>`::
+	Skriv utdata till en specifik fil i stället för stdout.
+
+`--output-indicator-new=<tecken>`::
+`--output-indicator-old=<tecken>`::
+`--output-indicator-context=<tecken>`::
+	Ange tecknet som används för att indikera nya, gamla eller kontextuella rader i den genererade patchen. Normalt är de `+`, `-` respektive ' '.
+
+ifndef::git-format-patch[]
+`--raw`::
+ifndef::git-log[]
+	generera diff i råformat
+ifdef::git-diff-core[]
+	Detta är standardvärdet..
+endif::git-diff-core[]
+endif::git-log[]
+ifdef::git-log[]
+	För varje incheckning, visa en sammanfattning av ändringarna med hjälp av raw diff
+	-formatet. Se avsnittet "RÅTTUTGÅNGSFORMAT" i
+	linkgit:git-diff[1]. Detta skiljer sig från att visa själva loggen 
+	i råformat, vilket du kan uppnå med
+	`--format=raw`.
+endif::git-log[]
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+`--patch-with-raw`::
+	Synonym till `-p --raw`.
+endif::git-format-patch[]
+
+ifdef::git-log[]
+`-t`::
+	Visa trädobjekten i diff-utdata.
+endif::git-log[]
+
+`--indent-heuristic`::
+	Aktivera heuristiken som flyttar olika styckesgränser för att göra patchar lättare att läsa. Detta är standardinställningen.
+
+`--no-indent-heuristic`::
+	Inaktivera indenteringsheuristiken.
+
+`--minimal`::
+	Lägg extra tid på att se till att minsta möjliga skillnad produceras.
+
+`--patience`::
+	Generera en diff med algoritmen "patience diff".
+
+`--histogram`::
+	Generera en diff med algoritmen "histogram diff".
+
+`--anchored=<text>`::
+	Generera en diff med algoritmen "anchored diff".
++
+Det här alternativet kan anges mer än en gång.
++
+Om en rad finns i både käll- och destinationsraden, bara finns en gång och börjar med _<text>_, försöker den här algoritmen förhindra att den visas som en borttagning eller tillägg i utdata. Den använder algoritmen "patience diff" internt.
+
+`--diff-algorithm=(patience|minimal|histogram|myers)`::
+	Välj en diff-algoritm. Varianterna är följande:
++
+--
+   `default`;;
+   `myers`;;
+	Den grundläggande giriga diff-algoritmen. För närvarande är detta standard.
+   `minimal`;;
+	Lägg extra tid på att se till att minsta möjliga skillnad produceras.
+   `patience`;;
+	Använd algoritmen "patience diff" när du genererar patchar.
+   `histogram`;;
+	Denna algoritm utökar tålamodsalgoritmen till att "stödja vanliga element med låg förekomst".
+--
++
+Om du till exempel, konfigurerade variabeln `diff.algorithm` till ett värde som inte är standard och vill använda standardvärdet, måste du använda alternativet `--diff-algorithm=default`.
+[]
+
+`--stat[=<bredd>[,<namn-bredd>[,<antal>]]`::
+	Generera en diffstat. Som standard används så mycket utrymme som behövs för filnamnsdelen och resten för grafdelen. Maximal bredd är som standard terminalbredd, eller 80 kolumner om den inte är ansluten till en terminal, och kan åsidosättas av _<bredd>_. Bredden på filnamnsdelen kan begränsas genom att ge en annan bredd _<namnbredd>_ efter ett kommatecken eller genom att ställa in `diff.statNameWidth=<namnbredd>`. Bredden på grafdelen kan begränsas genom att använda `--stat-graph-width=<grafbredd>` eller genom att ställa in `diff.statGraphWidth=<grafbredd>`. Att använda `--stat` eller `--stat-graph-width` påverkar alla kommandon som genererar en statistisk graf, medan att ställa in `diff.statNameWidth` eller `diff.statGraphWidth` inte påverkar `git format-patch`. Genom att ange en tredje parameter _<count>_ kan du begränsa utdata till de första _<count>_ raderna, följt av `...` om det finns fler.
++
+Dessa parametrar kan också ställas in individuellt med `--stat-width=<bredd>`, `--stat-name-width=<namn-bredd>` och `--stat-count=<antal>`.
+
+`--compact-summary`::
+	Skriv ut en komprimerad sammanfattning av utökad huvud-information, såsom skapande eller borttagning av filer ("ny" eller "borta", valfritt `+l` om det är en symbolisk länk) och lägesändringar (`+x` eller `-x` för att lägga till respektive ta bort en körbar bit) i diffstat. Informationen placeras mellan filnamnsdelen och grafdelen. Innebär `--stat`.
+
+`--numstat`::
+	Liknar `--stat`, men visar antalet tillagda och borttagna rader i decimalnotation och sökväg utan förkortning, för att göra det mer maskinvänligt. För binära filer matas två `-` ut i stället för `0 0`.
+
+`--shortstat`::
+	Skriv endast ut den sista raden i formatet `--stat` som innehåller det totala antalet ändrade filer, samt antalet tillagda och borttagna rader.
+
+`-X [<param>,...]`::
+`--dirstat[=<param>,...]`::
+	Visar fördelningen av den relativa mängden ändringar för varje underkatalog. Beteendet för `--dirstat` kan anpassas genom att skicka en kommaseparerad lista med parametrar. Standardvärdena styrs av konfigurationsvariabeln `diff.dirstat` (se linkgit:git-config[1]). Följande parametrar är tillgängliga:
++
+--
+`changes`;;
+	Beräkna dirstat-talen genom att räkna raderna som har tagits bort från källan eller lagts till i destinationen. Detta ignorerar mängden rena kodförflyttningar inom en fil. Med andra ord räknas inte omarrangemang av rader i en fil lika mycket som andra ändringar. Detta är standardbeteendet när ingen parameter anges.
+`lines`;;
+	Beräkna dirstat-talen genom att göra den vanliga radbaserade diff-analysen och summera antalet borttagna/tillagda rader. (För binära filer, räkna i stället 64-byte-block, eftersom binära filer inte har något naturligt koncept för rader). Detta är ett dyrare `--dirstat`-beteende än `changes`-beteendet, men det räknar omordnade rader i en fil lika mycket som andra ändringar. Den resulterande utdata överensstämmer med vad du får från de andra `--*stat`-alternativen.
+`files`;;
+	Beräkna dirstat-talen genom att räkna antalet ändrade filer. Varje ändrad fil räknas lika i dirstat-analysen. Detta är det beräkningsmässigt billigaste beteendet för `--dirstat`, eftersom det inte behöver titta på filinnehållet alls.
+`cumulative`;;
+	Count changes in a child directory for the parent directory as well. Note that when using `cumulative`, the sum of the percentages reported may exceed 100%. The default (non-cumulative) behavior can be specified with the `noncumulative` parameter.
+_<gränsvärde>_;;
+	En heltalsparameter anger en gränsvärde i procent (3 % som standard). Kataloger som bidrar med mindre än denna procentandel av ändringarna visas inte i utdata.
+--
++
+Exempel: Följande räknar ändrade filer, ignorerar kataloger med mindre än 10 % av den totala mängden ändrade filer och ackumulerar antal underkataloger i överordnade kataloger: `--dirstat=files,10,cumulative`.
+
+`--cumulative`::
+	Synonym för `--dirstat=cumulative`.
+
+`--dirstat-by-file[=<param>,...]`::
+	Synonym för `--dirstat=files,<param>,...`.
+
+`--summary`::
+	Skriv ut en komprimerad sammanfattning av utökad huvud-information, såsom skapanden, namnbyten och läges-ändringar.
+
+ifndef::git-format-patch[]
+`--patch-with-stat`::
+	Synonym till `-p --stat`.
+endif::git-format-patch[]
+
+ifndef::git-format-patch[]
+
+`-z`::
+ifdef::git-log[]
+	Separera incheckningar med __NUL__ i stället för nyrader.
++
+Also, when `--raw` or `--numstat` has been given, do not munge pathnames and use __NUL__s as output field terminators.
+endif::git-log[]
+ifndef::git-log[]
+	När `--raw`, `--numstat`, `--name-only` eller `--name-status` har angetts,
+	ändra inte sökvägar och använd NUL:er som terminatorer för utdatafält.
+endif::git-log[]
++
+Utan detta alternativ, citeras sökvägar med "ovanliga" tecken enligt beskrivningen för konfigurationsvariabeln `core.quotePath` (se linkgit:git-config[1]).
+
+`--name-only`::
+	Visa endast namnet på varje ändrad fil i trädet efter avbildningen. Filnamnen är ofta kodade i UTF-8. För mer information, se diskussionen om kodning på manualsidan för linkgit:git-log[1].
+
+`--name-status`::
+	Visa endast namn och status för varje ändrad fil. Se beskrivningen av alternativet `--diff-filter` för information om vad statusbokstäverna betyder. Precis som `--name-only` är filnamnen ofta kodade i UTF-8.
+
+`--submodule[=<format>]`::
+	Ange hur skillnader i undermoduler visas. När `--submodule=short` anges används formatet `short`. Detta format visar bara namnen på incheckningar i början och slutet av intervallet. När `--submodule` eller `--submodule=log` anges används formatet `log`. Detta format listar incheckningar i intervallet, precis som linkgit:git-submodule[1] `summary` gör. När `--submodule=diff` anges används formatet `diff`. Detta format visar en inline-diff av ändringarna i undermodulinnehållet mellan incheckningsintervallet. Standardinställningen är `diff.submodule` eller formatet `short` om konfigurationsalternativet inte är inställt.
+
+`--color[=<när>]`::
+	Visa färglagd skillnad. `--color` (d.v.s. utan `=<när>`) är samma sak som `--color=always`. _<när>_ kan vara en av `always`, `aldrig` eller `auto`.
+ifdef::git-diff[]
+	Det kan ändras med konfigurationsinställningarna
+	`color.ui` och `color.diff`.
+endif::git-diff[]
+
+`--no-color`::
+	Stäng av färgad diff.
+ifdef::git-diff[]
+	Detta kan användas för att åsidosätta konfigurationsinställningar.
+endif::git-diff[]
+	Det är samma sak som `--color=never`.
+
+`--color-moved[=<läge>]`::
+	Flyttade kodrader färgas annorlunda.
+ifdef::git-diff[]
+	Det kan ändras med konfigurationsinställningen `diff.colorMoved`.
+endif::git-diff[]
+	Standardvärdet för _<läge>_ är `no` om alternativet inte anges
+	och `zebra` om alternativet utan läge anges.
+	Läget måste vara ett av:
++
+--
+`no`::
+	Flyttade linjer markeras inte.
+`default`::
+	Är en synonym för "zebra". Detta kan komma att ändras till ett mer förnuftigt läge i framtiden.
+`plain`::
+	Alla rader som läggs till på en plats och togs bort på en annan plats kommer att färgas med `color.diff.newMoved`. På liknande sätt kommer `color.diff.oldMoved` att användas för borttagna rader som läggs till någon annanstans i diff-filen. Det här läget plockar upp alla flyttade rader, men det är inte särskilt användbart i en granskning för att avgöra om ett kodblock flyttades utan permutation.
+`blocks`::
+	Block med flyttad text på minst 20 alfanumeriska tecken upptäcks snabbt. De upptäckta blocken målas med antingen färgen `color.diff.(old|new)Moved`. Intilliggande block kan inte skiljas åt.
+`zebra`::
+	Block med flyttad text identifieras som i `blocks`-läge. Blocken målas med antingen färgen `color.diff.(old|new)Moved` eller `color.diff.(old|new)MovedAlternative`. Växlingen mellan de två färgerna indikerar att ett nytt block har identifierats.
+`dimmed-zebra`::
+	Liknar `zebra`, men ytterligare nedtoning av ointressanta delar av flyttad kod utförs. Gränslinjerna för två intilliggande block anses intressanta, resten är ointressant. `dimmed_zebra` är en föråldrad synonym.
+--
+
+`--no-color-moved`::
+	Stäng av rörelsedetektering. Detta kan användas för att åsidosätta konfigurationsinställningar. Det är samma sak som `--color-moved=no`.
+
+`--color-moved-ws=<läge>,...`::
+	Det konfigurerar hur blanksteg ignoreras när rörelsedetektering utförs för `--color-moved`.
+ifdef::git-diff[]
+	Det kan ställas in med konfigurationsinställningen `diff.colorMovedWS`.
+endif::git-diff[]
+	Dessa lägen kan anges som en kommaseparerad lista:
++
+--
+`no`::
+	Ignorera inte blanksteg när du utför rörelsedetektering.
+`ignore-space-at-eol`::
+	Ignorera ändringar i blanktecken vid radslut.
+`ignore-space-change`::
+	Ignorera ändringar i mängden blanktecken. Detta ignorerar blanktecken i radslutet och betraktar alla andra sekvenser av ett eller flera mellanslagstecken som likvärdiga.
+`ignore-all-space`::
+	Ignorera blanktecken när du jämför rader. Detta ignorerar skillnader även om en rad har blanktecken medan den andra raden inte har något.
+`allow-indentation-change`::
+	Ignorera först eventuella blanksteg i flyttdetekteringen, gruppera sedan de flyttade kodblocken endast i ett block om ändringen i blanksteg är densamma per rad. Detta är inkompatibelt med de andra lägena.
+--
+
+`--no-color-moved-ws`::
+	Ignorera inte blanksteg när du utför rörelsedetektering. Detta kan användas för att åsidosätta konfigurationsinställningar. Det är samma sak som `--color-moved-ws=no`.
+
+`--word-diff[=<läge>]`::
+	Som standard avgränsas ord med blanksteg; se `--word-diff-regex` nedan. _<läge>_ har som standard `plain` och måste vara en av:
++
+--
+`color`::
+	Markera ändrade ord med endast färger. Innebär `--color`.
+`plain`::
+	Visar ord som ++[-borttagen-]++ och ++{+tillagd+}++. Gör inga försök att ta escape avgränsare om de förekommer i indata, så utdata kan vara tvetydig.
+`porcelain`::
+	Använd ett speciellt radbaserat format avsett för skriptanvändning. Tillagda/borttagna/oändrade körningar skrivs ut i det vanliga enhetliga diff-formatet, med början med ett `+`/`-`/` `-tecknet i början av raden och sträcker sig till slutet av raden. Nya rader i inmatningen representeras av en tilde `~` på en egen rad.
+`none`::
+	Inaktivera orddiff igen.
+--
++
+Observera att trots namnet på det första läget, används färg för att markera de ändrade delarna i alla lägen om det är aktiverat.
+
+`--word-diff-regex=<regex>`::
+	Använd _<regex>_ för att avgöra vad ett ord är, i stället för att betrakta sträckor av icke-blanksteg som ett ord. Innebär även `--word-diff` om det inte redan var aktiverat.
++
+Varje icke-överlappande matchning av _<regex>_ betraktas som ett ord. Allt mellan dessa matchningar betraktas som blanktecken och ignoreras(!) i syfte att hitta skillnader. Du kanske vill lägga till `|[^[:space:]]` i ditt reguljära uttryck för att se till att det matchar alla tecken som inte är blanktecken. En matchning som innehåller en nyrad avkortas tyst(!) vid nyradslinjen.
++
+Till exempel kommer `--word-diff-regex=.` att behandla varje tecken som ett ord och, på motsvarande sätt, visa skillnader tecken för tecken.
++
+Regex-funktionen kan också ställas in via en diff-drivrutin eller ett konfigurationsalternativ, se linkgit:gitattributes[5] eller linkgit:git-config[1]. Om du anger den explicit åsidosätts alla diff-drivrutiner eller konfigurationsinställningar. Diff-drivrutiner åsidosätter konfigurationsinställningar.
+
+`--color-words[=<regex>]`::
+	Motsvarande `--word-diff=color` plus (om ett regex angavs) `--word-diff-regex=<regex>`.
+endif::git-format-patch[]
+
+`--no-renames`::
+	Stäng av namnbytesdetektering, även när konfigurationsfilen anger standardinställningen för det.
+
+`--rename-empty`::
+`--no-rename-empty`::
+	Huruvida tomma blobbar ska användas som namnbyteskälla.
+
+ifndef::git-format-patch[]
+`--check`::
+	Varna om ändringar introducerar konfliktmarkörer eller blankteckenfel. Vad som anses vara blankteckenfel styrs av konfigurationen av `core.whitespace`. Som standard betraktas efterföljande blanktecken (inklusive rader som enbart består av blanktecken) och ett mellanslagstecken som omedelbart följs av ett tabbtecken inuti radens första indrag som blankteckenfel. Avslutas med status som inte är noll om problem upptäcks. Inte kompatibel med `--exit-code`.
+
+`--ws-error-highlight=<slag>`::
+	Markera blankteckenfel i raderna `context`, `old` eller `new` i diff-filen. Flera värden separeras med kommatecken, `none` återställer tidigare värden, `default` återställer listan till `new` och `all` är en förkortning för `old,new,context`. När detta alternativ inte anges och konfigurationsvariabeln `diff.wsErrorHighlight` inte är angiven, markeras endast blankteckenfel i raderna `new`. Blankteckenfelen är färgade med `color.diff.whitespace`.
+
+endif::git-format-patch[]
+
+`--full-index`::
+	I stället för de första tecknen, visa de fullständiga namnen på blob-objekten före och efter avbildningen på "index"-raden när du genererar utdata för patch-format.
+
+`--binary`::
+	Förutom `--full-index`, mata ut en binär diff som kan tillämpas med `git-apply`.
+ifndef::git-format-patch[]
+	implicerar `--patch`.
+endif::git-format-patch[]
+
+`--abbrev[=<n>]`::
+	I stället för att visa det fullständiga 40-byte hexadecimala objektnamnet i utdata i diff-raw-format och diff-tree-rubrikrader, visa det kortaste prefixet som är minst _<n>_ hexdigits långt och som unikt refererar till objektet. I diff-patch-utdataformat har `--full-index` högre prioritet, d.v.s. om `--full-index` anges kommer fullständiga blobnamn att visas oavsett `--abbrev`. Antal siffror som inte är standard kan anges med `--abbrev=<n>`.
+
+`-B[<n>][/<m>]`::
+`--break-rewrites[=[<n>][/<m>]]`::
+	Dela upp fullständiga omskrivningsändringar i par av radera och skapa. Detta tjänar två syften:
++
+Det påverkar hur en förändring som innebär en total omskrivning av en fil, inte som en serie borttagningar och infogningar blandade med ett fåtal rader som råkar matcha textuellt som kontexten, utan som en enda borttagning av allt gammalt följt av en enda infogning av allt nytt, och siffran _<m>_ styr denna aspekt av `-B`-alternativet (standard är 60%). `-B/70%` anger att mindre än 30% av originalet ska finnas kvar i resultatet för att Git ska betrakta det som en total omskrivning (d.v.s. annars kommer den resulterande patchen att vara en serie borttagningar och infogningar blandade med kontextrader).
++
+När den används med `-M` betraktas även en helt omskriven fil som källa till ett namnbyte (vanligtvis betraktar `-M` bara en fil som försvunnit som källa till ett namnbyte), och siffran _<n>_ styr denna aspekt av alternativet `-B` (standard är 50%). `-B20%` anger att en ändring med tillägg och borttagning jämfört med 20% eller mer av filens storlek är berättigad att plockas upp som en möjlig källa till ett namnbyte till en annan fil.
+
+`-M[<n>]`::
+`--find-renames[=<n>]`::
+ifndef::git-log[]
+	detektera namnändringar
+endif::git-log[]
+ifdef::git-log[]
+	Om du genererar diffs, upptäck och rapportera namnbyten för varje .
+	incheckning För att följa filer över namnbyten medan du går igenom 
+	historiken, se `--follow`.
+endif::git-log[]
+	Om _<n>_ anges, är det ett tröskelvärde för likhetsindexet (dvs. 
+	mängden tillägg/borttagningar jämfört med filens storlek).
+	Till exempel betyder `-M90%` att Git ska betrakta ett 
+	borttagnings-/tilläggspar som ett namnbyte om mer än 90 % av filen
+	inte har ändrats. Utan ett `%`-tecken ska talet läsas som
+	ett bråktral, med ett decimaltecken före. Dvs. `-M5` blir 0,5 
+	och är således detsamma som `-M50%`. På liknande sätt är 
+	`-M05` detsamma som `-M5%`. För att begränsa detekteringen 
+	till exakta namnbyten, använd `-M100%`. Standardlikhetsindexet är 50 %.
+
+`-C[<n>]`::
+`--find-copies[=<n>]`::
+	Identifiera kopior såväl som byt namn. Se även `--find-copies-harder`. Om _<n>_ anges har det samma betydelse som för `-M<n>`.
+
+`--find-copies-harder`::
+	Av prestandaskäl hittar `-C`-alternativet som standard bara kopior om originalfilen för kopian ändrades i samma ändringsuppsättning. Denna flagga gör att kommandot inspekterar omodifierade filer som kandidater för kopians källa. Detta är en mycket dyr operation för stora projekt, så använd den med försiktighet. Att ge mer än ett `-C`-alternativ har samma effekt.
+
+`-D`::
+`--irreversible-delete`::
+	Utelämna preimage för borttagningar, d.v.s. skriv bara ut huvudet men inte skillnaden mellan preimage och `/dev/null`. Den resulterande patchen är inte avsedd att tillämpas med `patch` eller `git apply`; detta är enbart för personer som bara vill koncentrera sig på att granska texten efter ändringen. Dessutom saknar utdata uppenbarligen tillräckligt med information för att tillämpa en sådan patch i omvänd ordning, även manuellt, därav namnet på alternativet.
++
+När det används tillsammans med `-B`, utelämna även förbilden i borttagningsdelen av ett borttagnings-/skaparpar.
+
+`-l<num>`::
+	Alternativen `-M` och `-C` involverar några preliminära steg som kan upptäcka delmängder av namnbyten/kopior billigt, följt av en uttömmande del som jämför alla återstående oparade destinationer med alla relevanta källor. (För namnbyten är endast återstående oparade källor relevanta; för kopior är alla originalkällor relevanta.) För N källor och destinationer är denna uttömmande kontroll O(N^2). Detta alternativ förhindrar att den uttömmande delen av namnbytes-/kopieringsdetektering körs om antalet inblandade käll-/destinationsfiler överstiger det angivna antalet. Standardvärdet är `diff.renameLimit`. Observera att värdet 0 behandlas som obegränsat.
+
+ifndef::git-format-patch[]
+`--diff-filter=[(A|C|D|M|R|T|U|X|B)...[*]]`::
+	Markera endast filer som är Tillagda (`A`), Kopierade (`C`), Borttagna (`D`), Modifierade (`M`), Omdöpta (`R`), har sin typ (d.v.s. vanlig fil, symlänk, undermodul, ...) ändrad (`T`), är Osammanslagna (`U`), är Okända (`X`) eller har fått sin parning Bruten (`B`). Vilken kombination som helst av filtertecknen (inklusive inga) kan användas. När `*` (Allt-eller-inget) läggs till i kombinationen markeras alla sökvägar om det finns någon fil som matchar andra kriterier i jämförelsen; om det inte finns någon fil som matchar andra kriterier markeras ingenting.
++
+Även, dessa versaler kan ändras till gemener för att exkludera. T.ex. exkluderar `--diff-filter=ad` tillagda och borttagna sökvägar.
++
+Observera att inte alla diffar kan innehålla alla typer. Till exempel kan kopierade och omdöpta poster inte visas om identifieringen för dessa typer är inaktiverad.
+
+`-S<sträng>`::
+	Leta efter skillnader som ändrar antalet förekomster av den angivna _<sträng>_ (d.v.s. tillägg/borttagning) i en fil. Avsedd för skriptutvecklarens bruk.
++
+Det är användbart när du letar efter ett exakt kodblock (som en struktur) och vill veta blockets historia sedan det först kom till: använd funktionen iterativt för att mata in det intressanta blocket i föravbildningen tillbaka till `-S` och fortsätt tills du får den allra första versionen av blocket.
++
+Binära filer genomsöks också.
+
+`-G<regex>`::
+	Leta efter skillnader vars patchtext innehåller tillagda/borttagna rader som matchar _<regex>_.
++
+För att illustrera skillnaden mellan `-S<regex>` `--pickaxe-regex` och `-G<regex>`, betrakta en incheckning med följande diff i samma fil:
++
+----
++    return frotz(nitfol, two->ptr, 1, 0);
+...
+-    hit = frotz(nitfol, mf2.ptr, 1, 0);
+----
++
+Medan `git log -G"frotz\(nitfol"` visar denna incheckning, gör `git log -S"frotz\(nitfol" --pickaxe-regex` inte det (eftersom antalet förekomster av den strängen inte ändrades).
++
+Om inte `--text` anges kommer patchar av binära filer utan ett textconv-filter att ignoreras.
++
+Se posten 'pickaxe' i linkgit:gitdiffcore[7] för mer information.
+
+`--find-object=<objekt-id>`::
+	Leta efter skillnader som ändrar antalet förekomster av det angivna objektet. I likhet med `-S` är det bara argumentet som skiljer sig genom att det inte söker efter en specifik sträng utan efter ett specifikt objekt-id.
++
+Objektet kan vara en blob eller en undermodul-incheckning. Det innebär att `-t`-alternativet i `git-log` också kan hitta träd.
+
+`--pickaxe-all`::
+	När `-S` eller `-G` hittar en ändring, visa alla ändringar i den ändringsmängden, inte bara de filer som innehåller ändringen i _<sträng>_.
+
+`--pickaxe-regex`::
+	Behandla _<sträng>_ som ges till `-S` som ett utökat POSIX-reguljärt uttryck som matchar.
+
+endif::git-format-patch[]
+
+`-O<ordingsfil>`::
+	Styr ordningen i vilka filer visas i utdata. Detta åsidosätter konfigurationsvariabeln `diff.orderFile` (se linkgit:git-config[1]). För att avbryta `diff.orderFile`, använd `-O/dev/null`.
++
+Utmatningsordningen bestäms av ordningen på glob-mönstren i _<ordingsfil>_. Alla filer med sökvägar som matchar det första mönstret matas ut först, alla filer med sökvägar som matchar det andra mönstret (men inte det första) matas ut härnäst, och så vidare. Alla filer med sökvägar som inte matchar något mönster matas ut sist, som om det fanns ett implicit match-all-mönster i slutet av filen. Om flera sökvägar har samma rangordning (de matchar samma mönster men inga tidigare mönster), är deras utmatningsordning i förhållande till varandra den normala ordningen.
++
+_<ordingsfil>_ tolkas enligt följande:
++
+--
+ - Tomma rader ignoreras, så de kan användas som avgränsare för läsbarhet.
+
+ - Rader som börjar med en hash ("`#`") ignoreras, så de kan användas för kommentarer. Lägg till ett bakåtsnedstreck ("`\`") i början av mönstret om det börjar med en hash.
+
+ - Varje annan rad innehåller ett enda mönster.
+--
++
+Mönster har samma syntax och semantik som mönster som används för `fnmatch`(3) utan `FNM_PATHNAME`-flaggan, förutom att ett sökvägsnamn också matchar ett mönster om borttagning av ett antal av de slutliga sökvägsnamnskomponenterna matchar mönstret. Till exempel matchar mönstret "`foo*bar`" "`fooasdfbar`" och "`foo/bar/baz/asdf`" men inte "`foobarx`".
+
+`--skip-to=<fil>`::
+`--rotate-to=<fil>`::
+	Släng filerna före den namngivna _<fil>_ från utdata (d.v.s. 'hoppa till'), eller flytta dem till slutet av utdata (d.v.s. 'rotera till'). Dessa alternativ uppfanns främst för användning av `git difftool`-kommandot, och kanske inte är särskilt användbara annars.
+
+ifndef::git-format-patch[]
+`-R`::
+	Växla två indata; det vill säga visa skillnader mellan index eller fil på disk och trädinnehåll.
+endif::git-format-patch[]
+
+`--relative[=<sökväg>]`::
+`--no-relative`::
+	När den körs från en underkatalog till projektet kan den få instruktioner att exkludera ändringar utanför katalogen och visa sökvägar relativa till den med detta alternativ. När du inte befinner dig i en underkatalog (t.ex. i ett bart arkiv) kan du namnge vilken underkatalog som utdata ska vara relativ till genom att ange _<sökväg>_ som argument. `--no-relative` kan användas för att ångra både konfigurationsalternativet `diff.relative` och föregående `--relative`.
+
+`-a`::
+`--text`::
+	Hantera alla filer som text.
+
+`--ignore-cr-at-eol`::
+	Ignorera vagnretur i slutet av raden vid en jämförelse.
+
+`--ignore-space-at-eol`::
+	Ignorera ändringar i blanktecken vid radslut.
+
+`-b`::
+`--ignore-space-change`::
+	Ignorera ändringar i mängden blanktecken. Detta ignorerar blanktecken i radslutet och betraktar alla andra sekvenser av ett eller flera mellanslagstecken som likvärdiga.
+
+`-w`::
+`--ignore-all-space`::
+	Ignorera blanktecken när du jämför rader. Detta ignorerar skillnader även om en rad har blanktecken medan den andra raden inte har något.
+
+`--ignore-blank-lines`::
+	Ignorera ändringar i rader som är helt blanka.
+
+
+`-I<regex>`::
+`--ignore-matching-lines=<regex>`::
+	Ignorera ändringar vars alla rader matchar _<regex>_. Det här alternativet kan anges mer än en gång.
+
+`--inter-hunk-context=<nummer>`::
+	Visar sammanhanget mellan olika stycken, upp till det angivna _<antal>_ rader, och sammanfogar därmed stycken som ligger nära varandra. Standardvärdet är `diff.interHunkContext` eller 0 om konfigurationsalternativet inte är inställt.
+
+`-W`::
+`--function-context`::
+	Visa hela funktionen som kontextrader för varje ändring. Funktionsnamnen bestäms på samma sätt som `git diff` räknar ut patch-hunk-huvuden (se "Definiera en anpassad styckes-huvud" i linkgit:gitattributes[5]).
+
+ifndef::git-format-patch[]
+ifndef::git-log[]
+`--exit-code`::
+	Få programmet att avslutas med koder som liknar `diff`(1). Det vill säga, det avslutas med 1 om det fanns skillnader och 0 betyder inga skillnader.
+
+`--quiet`::
+	Inaktivera all utdata från programmet. Innebär `--exit-code`. Inaktiverar exekvering av externa diff-hjälpprogram vars avslutningskod inte är betrodd, d.v.s. deras respektive konfigurationsalternativ `diff.trustExitCode` eller ++diff.++__<driver>__++.trustExitCode++ eller miljövariabeln `GIT_EXTERNAL_DIFF_TRUST_EXIT_CODE` är falskt.
+endif::git-log[]
+endif::git-format-patch[]
+
+`--ext-diff`::
+	Tillåt att en extern diff-hjälp körs. Om du ställer in en extern diff-drivrutin med linkgit:gitattributes[5], måste du använda den här alternativet med linkgit:git-log[1] och vänner.
+
+`--no-ext-diff`::
+	Tillåt inte externa diff-drivrutiner.
+
+`--textconv`::
+`--no-textconv`::
+	Tillåt (eller förbjud) att externa textkonverteringsfilter körs vid jämförelse av binära filer. Se linkgit:gitattributes[5] för mer information. Eftersom textconv-filter vanligtvis är en envägskonvertering är den resulterande diff-funktionen lämplig för mänsklig konsumtion, men kan inte tillämpas. Av denna anledning är textconv-filter som standard endast aktiverade för linkgit:git-diff[1] och linkgit:git-log[1], men inte för linkgit:git-format-patch[1] eller diff rörmokeri-kommandon.
+
+
+`--ignore-submodules[=(none|untracked|dirty|all)]`::
+	Ignorera ändringar i undermoduler i diff-genereringen. `all` är standardinställningen. Om `none` används betraktas undermodulen som modifierad när den antingen innehåller ospårade eller modifierade filer, eller om dess `HEAD` skiljer sig från incheckningen som registrerats i superprojektet, och kan användas för att åsidosätta alla inställningar i `ignore`-alternativet i linkgit:git-config[1] eller linkgit:gitmodules[5]. När `untracked` används anses undermoduler inte vara smutsiga när de bara innehåller ospårat innehåll (men de skannas fortfarande efter modifierat innehåll). Om `dirty` används ignoreras alla ändringar i arbetsträdet för undermoduler, endast ändringar i de incheckningar som lagras i superprojektet visas (detta var beteendet fram till 1.7.0). Om `all` används döljs alla ändringar i undermoduler.
+
+`--src-prefix=<prefix>`::
+	Visa det angivna käll_<prefix>_ i stället för "a/".
+
+`--dst-prefix=<prefix>`::
+	Visa det angivna mål_<prefix>_ i stället för "b/".
+
+`--no-prefix`::
+	Visa inte käll- eller målprefix.
+
+`--default-prefix`::
+ifdef::git-format-patch[]
+Använd standard käll- och destinationsprefixen ("a/" och "b/"). Detta åsidosätter konfigurationsvariabler som `diff.noprefix`, `diff.srcPrefix`, `diff.dstPrefix` och `diff.mnemonicPrefix` (se linkgit:git-config[1]).
+endif::git-format-patch[]
+ifndef::git-format-patch[]
+Använd standard käll- och destinationsprefixen ("a/" och "b/"). Detta åsidosätter konfigurationsvariabler som `diff.noprefix`, `diff.srcPrefix`, `diff.dstPrefix` och `diff.mnemonicPrefix` (se linkgit:git-config[1]).
+endif::git-format-patch[]
+
+`--line-prefix=<prefix>`::
+	Lägg till ett ytterligare _<prefix>_ före varje utdatarad.
+
+`--ita-invisible-in-index`::
+	Som standard visas poster som läggs till av `git add -N` som en befintlig tom fil i `git diff` och en ny fil i `git diff --cached`. Det här alternativet gör att posten visas som en ny fil i `git diff` och obefintlig i `git diff --cached`. Det här alternativet kan ångras med `--ita-visible-in-index`. Båda alternativen är experimentella och kan komma att tas bort i framtiden.
+
+--max-depth=<djup>::
+	För varje sökvägsmönster som anges på kommandoraden, gå ner högst `<djup>`-nivåer i kataloger. Värdet `-1` betyder ingen gräns. Kan inte kombineras med jokertecken i sökvägsmönster. Givet ett träd som innehåller `foo/bar/baz` visar följande lista de träffar som genereras av varje uppsättning alternativ:
++
+--
+ - `--max-depth=0 -- foo`: `foo`
+
+ - `--max-depth=1 -- foo`: `foo/bar`
+
+ - `--max-depth=1 -- foo/bar`: `foo/bar/baz`
+
+ - `--max-depth=1 -- foo foo/bar`: `foo/bar/baz`
+
+ - `--max-depth=2 -- foo`: `foo/bar/baz`
+--
++
+Om ingen sökvägsmönster anges mäts djupet som om alla poster på toppnivå vore angivna. Observera att detta skiljer sig från att mäta från roten, eftersom `--max-depth=0` fortfarande skulle returnera `foo`. Detta gör det fortfarande möjligt att begränsa djupet samtidigt som en delmängd av posterna på toppnivå.
++
+Observera att det här alternativet endast stöds för skillnader mellan trädobjekt, inte mot indexet eller arbetsträd.
+
+För en mer detaljerad förklaring av dessa vanliga alternativ, se även linkgit:gitdiffcore[7].
+[]
+
+-<n>::
+	Förbered patchar från de senaste <n> incheckningarna.
+
+-o <kat>::
+--output-directory <kat>::
+	Använd <kat> för att lagra de resulterande filerna, i stället för den aktuella arbetskatalogen.
+
+-n::
+--numbered::
+	Namnge utdata i formatet '[PATCH n/m]', även med en enda patch.
+
+-N::
+--no-numbered::
+	Namnge utdata i formatet '[PATCH]'.
+
+--start-number <n>::
+	Börja numrera patcherna vid <n> i stället för 1.
+
+--numbered-files::
+	Utdatafilernas namn blir en enkel nummersekvens utan den normala första raden från incheckningsmeddelandet.
+
+-k::
+--keep-subject::
+	Ta inte bort/lägg inte till '[PATCH]' i första raden av incheckningsloggmeddelandet.
+
+-s::
+--signoff::
+	Lägg till en `Signed-off-by`-slutrad till incheckningsmeddelandet, med din egen incheckare-identitet. Se signoff-alternativet i linkgit:git-commit[1] för mer information.
+
+--stdout::
+	Skriv ut alla incheckningar till standardutdata i mbox-format, i stället för att skapa en fil för varje enskild incheckning.
+
+--attach[=<gräns>]::
+	Skapa en multipart/mixed-bilaga där första delen är incheckningsmeddelandet och patchen själv ligger i andra delen, med `Content-Disposition: attachment`.
+
+--no-attach::
+	Inaktivera skapandet av en bilaga, vilket åsidosätter konfigurationsinställningen.
+
+--inline[=<gräns>]::
+	Skapa en multipart/mixed-bilaga där första delen är incheckningsmeddelandet och patchen själv ligger i andra delen, med `Content-Disposition: inline`.
+
+--thread[=<stil>]::
+--no-thread::
+	Styr tillägg av rubrikerna `In-Reply-To` och `References` för att få det andra och efterföljande e-postmeddelandena att visas som svar på det första. Styr också genereringen av rubriken `Message-ID` att referera till.
++
+Det valfria argumentet <stil> kan vara antingen `shallow` eller `deep`. 'Shallow'-trådning gör varje e-postmeddelande till ett svar på seriens rubrik, där rubriken väljs från följebrevet, `--in-reply-to` och det första patch-mejlet, i denna ordning. 'Deep'-trådning gör varje e-postmeddelande till ett svar på det föregående.
++
+Standardvärdet är `--no-thread`, såvida inte konfigurationen `format.thread` är angiven. `--thread` utan ett argument motsvarar `--thread=shallow`.
++
+Observera att standardinställningen för 'git send-email' är att själv tråda e-postmeddelanden. Om du vill att `git format-patch` ska ta hand om trådningen, bör du se till att trådning är inaktiverad för `git send-email`.
+
+--in-reply-to=<meddelande-id>::
+	Få det första mejlet (eller alla mejl med `--no-thread`) att visas som ett svar på det angivna <meddelande-id>, vilket undviker att trådar bryts för att tillhandahålla en ny patchserie.
+
+--ignore-if-in-upstream::
+	Inkludera inte en patch som matchar en incheckning i <tills>..<sedan>. Detta kommer att undersöka alla patchar som är åtkomliga från <sedan> men inte från <tills> och jämföra dem med de patchar som genereras, och alla patchar som matchar ignoreras.
+
+--always::
+	Inkludera patchar för incheckningar som inte introducerar några ändringar, vilka utelämnas som standard.
+
+--cover-from-description=<läge>::
+	Styr vilka delar av följebrevet som fylls i automatiskt med hjälp av grenens beskrivning.
++
+Om `<läge>` är `message` eller `default` kommer ämnet för följebrevet att fyllas med platshållartext. Huvuddelen av följebrevet kommer att fyllas med grenens beskrivning. Detta är standardläget när ingen konfiguration eller kommandoradsalternativ har angetts.
++
+Om `<läge>` är `subject` kommer det första stycket i grenbeskrivningen att fylla i ämnet för följebrevet. Resten av beskrivningen kommer att fylla i brödtexten i följebrevet.
++
+Om `<läge>` är `auto`, och det första stycket i grenbeskrivningen är större än 100 byte, blir läget `message`, annars används `subject`.
++
+Om `<läge>` är `none` kommer både ämnet och brödtexten i följebrevet att fyllas med platshållartext.
+
+--description-file=<fil>::
+	Använd innehållet i <fil> i stället för grenens beskrivning för att generera följebrevet.
+
+--subject-prefix=<ämnesprefix>::
+	I stället för standardprefixet '[PATCH]' i ämnesraden, använd i stället '[<ämnesprefix>]'. Detta kan användas för att namnge en patchserie och kan kombineras med alternativet `--numbered`.
++
+Konfigurationsvariabeln `format.subjectPrefix` kan också användas för att ange ett ämnesprefix som ska gälla för alla patchar i ett visst kodförråd. Det är ofta användbart på e-postlistor som tar emot patchar för flera kodförråd och kan användas för att skilja patcharna åt (med ett värde som till exempel "PATCH mitt-projekt").
+
+--filename-max-length=<n>::
+	I stället för standardvärdet 64 byte kapas de genererade utdatafilnamnen till ungefär '<n>' byte (ett för kort värde höjs tyst till en rimlig längd). Standardvärdet är värdet i konfigurationsvariabeln `format.filenameMaxLength`, eller 64 om den inte är satt.
+
+--rfc[=<rfc>]::
+	Lägger till strängen _<rfc>_ (standardinställningen är "RFC") framför ämnesprefixet. Eftersom ämnesprefixet är standardinställt på "PATCH" får du "RFC PATCH" som standard.
++
+RFC står för "Request For Comments"; använd detta när du skickar en experimentell patch för diskussion snarare än för direkt användning. "--rfc=WIP" kan också vara ett bra sätt att visa att en patch ännu inte är färdig ("WIP" står för "Work In Progress").
++
+Om konventionen i den mottagande gemenskapen för en viss extra sträng är att den ska stå _efter_ ämnesprefixet, kan strängen _<rfc>_ inledas med ett bindestreck ("`-`") för att signalera att resten av _<rfc>_-strängen ska läggas till efter ämnesprefixet i stället, till exempel ger `--rfc='-(WIP)'` "PATCH (WIP)".
+
+-v <n>::
+--reroll-count=<n>::
+	Markera serien som den <n>:te iterationen av ämnet. Utdatafilnamnen får prefixet `v<n>`, och ämnesprefixet ("PATCH" som standard, men konfigurerbart med alternativet `--subject-prefix`) får tillägget ` v<n>`. Till exempel kan `--reroll-count=4` skapa filen `v4-0001-add-makefile.patch`, som innehåller "Subject: [PATCH v4 1/20] Add makefile". `<n>` behöver inte vara ett heltal (till exempel tillåts "--reroll-count=4.4" eller "--reroll-count=4rev2"), men nackdelen med ett sådant värde är att range-diff/interdiff mot föregående version inte exakt anger vilken version den nya iterationen jämförs med.
+
+--to=<mejl>::
+	Lägg till en `To:`-huvudrad i e-posthuvudena. Detta läggs ovanpå eventuella konfigurerade huvudrader och kan användas flera gånger. Den negerade formen `--no-to` kastar bort alla `To:`-huvudrader som lagts till hittills (från konfiguration eller kommandorad).
+
+--cc=<mejl>::
+	Lägg till en `Cc:`-huvudrad i e-posthuvudena. Detta läggs ovanpå eventuella konfigurerade huvudrader och kan användas flera gånger. Den negerade formen `--no-cc` kastar bort alla `Cc:`-huvudrader som lagts till hittills (från konfiguration eller kommandorad).
+
+--from::
+--from=<ident>::
+	Använd `ident` i `From:`-huvudraden i varje incheckningsmejl. Om författaridentiteten för incheckningen inte textuellt matchar angiven `ident`, lägg en `From:`-huvudrad i meddelandets brödtext med den ursprungliga författaren. Om ingen `ident` anges används incheckarens identitet.
++
+Observera att det här alternativet bara är användbart om du faktiskt skickar e-postmeddelandena och vill identifiera dig som avsändare men behålla den ursprungliga författaren (och `git am` läser då korrekt in huvudet i brödtexten). Observera också att `git send-email` redan hanterar den här omvandlingen åt dig, och att det här alternativet inte bör användas om du skickar resultatet till `git send-email`.
+
+--force-in-body-from::
+--no-force-in-body-from::
+	När e-postavsändaren anges via alternativet `--from` läggs som standard en in-body-`From:` högst upp i incheckningsloggmeddelandet för att identifiera den verkliga författaren, om avsändaren skiljer sig från författaren. Med det här alternativet läggs in-body-`From:` till även när avsändaren och författaren har samma namn och adress, vilket kan hjälpa om e-postlistans programvara förvanskar avsändaridentiteten. Standardvärdet hämtas från konfigurationsvariabeln `format.forceInBodyFrom`.
+
+--add-header=<huvudrad>::
+	Lägg till en godtycklig huvudrad i e-posthuvudena. Detta läggs ovanpå eventuella konfigurerade huvudrader och kan användas flera gånger. Till exempel `--add-header="Organization: git-foo"`. Den negerade formen `--no-add-header` kastar bort *alla* (`To:`, `Cc:` och anpassade) huvudrader som hittills lagts till från konfiguration eller kommandorad.
+
+--cover-letter::
+--no-cover-letter::
+	Generera, utöver patcharna, en följebrevsfil som innehåller grenbeskrivningen, shortlog och den övergripande diffstat. Du kan fylla i en beskrivning i filen innan du skickar den.
+
+--encode-email-headers::
+--no-encode-email-headers::
+	Koda e-posthuvuden som innehåller icke-ASCII-tecken med "Q-encoding" (beskrivet i RFC 2047), i stället för att skriva ut huvudraderna ordagrant. Standardvärdet hämtas från konfigurationsvariabeln `format.encodeEmailHeaders`.
+
+--interdiff=<föregående>::
+	Som hjälp för granskare kan du infoga en interdiff i följebrevet, eller som kommentar till den enda patchen i en 1-patchserie, som visar skillnaderna mellan den tidigare versionen av patchserien och serien som formateras nu. `föregående` är en enskild revision som anger toppen för den föregående serien, vilken delar en gemensam bas med serien som formateras (till exempel `git format-patch --cover-letter --interdiff=feature/v1 -3 feature/v2`).
+
+--range-diff=<föregående>::
+	Som hjälp för granskare kan du infoga en range-diff (se linkgit:git-range-diff[1]) i följebrevet, eller som kommentar till den enda patchen i en 1-patchserie, som visar skillnaderna mellan den tidigare versionen av patchserien och serien som formateras nu. `föregående` kan vara en enskild revision som anger toppen för den tidigare serien om den delar en gemensam bas med serien som formateras (till exempel `git format-patch --cover-letter --range-diff=feature/v1 -3 feature/v2`), eller ett revisionsintervall om de två versionerna av serien är åtskilda (till exempel `git format-patch --cover-letter --range-diff=feature/v1~3..feature/v1 -3 feature/v2`).
++
+Observera att diff-alternativ som skickas till kommandot påverkar hur huvudresultatet från `format-patch` genereras, och de skickas inte vidare till den underliggande `range-diff`-mekanismen som används för att skapa följebrevsinnehållet (detta kan ändras i framtiden).
+
+--creation-factor=<procent>::
+	Använd tillsammans med `--range-diff` för att justera heuristiken som matchar incheckningar mellan den föregående och den aktuella patchserien genom att ändra justeringsfaktorn för kostnad vid skapande/borttagning. Se linkgit:git-range-diff[1] för detaljer.
++
+Standardvärdet är 999 (linkgit:git-range-diff[1] använder 60), eftersom användningsfallet är att jämföra med en äldre iteration av samma ämne och verktyget då bör hitta fler motsvarigheter mellan de två patchuppsättningarna.
+
+--notes[=<ref>]::
+--no-notes::
+	Lägg till anteckningarna (se linkgit:git-notes[1]) för incheckningen efter raden med tre bindestreck.
++
+Det avsedda användningsfallet är att skriva kompletterande förklaring till en incheckning som inte hör hemma i själva incheckningsloggmeddelandet, och ta med den i patchinskicket. Man kan förstås skriva sådana förklaringar efter att `format-patch` har körts men före utskick, men om de sparas som Git-anteckningar kan de underhållas mellan olika versioner av patchserien (se diskussionen om konfigurationsalternativen `notes.rewrite` i linkgit:git-notes[1] för detta arbetsflöde).
++
+Standardvärdet är `--no-notes`, såvida inte konfigurationen `format.notes` är inställd.
+
+--signature=<signatur>::
+--no-signature::
+	Lägg till en signatur i varje meddelande som skapas. Enligt RFC 3676 separeras signaturen från brödtexten med en rad som innehåller '-- '. Om signaturalternativet utelämnas används Git-versionsnumret som standardsignatur.
+
+--signature-file=<fil>::
+	Fungerar precis som `--signature`, förutom att signaturen läses från en fil.
+
+--suffix=.<sfx>::
+	I stället för att använda `.patch` som suffix för genererade filnamn, använd det angivna suffixet. Ett vanligt alternativ är `--suffix=.txt`. Om du lämnar detta tomt tas suffixet `.patch` bort.
++
+Observera att inledande tecken inte behöver vara en punkt; du kan till exempel använda `--suffix=-patch` för att få `0001-beskrivning-av-min-ändringspatch`.
+
+-q::
+--quiet::
+	Skriv inte ut namnen på de genererade filerna till standardutdata.
+
+--no-binary::
+	Visa inte innehållet i ändringarna i binära filer, utan visa i stället ett meddelande om att filerna har ändrats. Patchar som genereras med det här alternativet kan inte tillämpas korrekt, men de är fortfarande användbara för kodgranskning.
+
+--zero-commit::
+  Skriv ut en hash med enbart nollor i varje patchs `From:`-huvud i stället för incheckningens hash.
+
+--no-base::
+--base[=<incheckning>]::
+	Registrera basträdinformationen för att identifiera det tillstånd som patchserien gäller för. Se avsnittet BASTRÄDINFORMATION nedan för mer information. Om <incheckning> är "auto" väljs en basincheckning automatiskt. Alternativet `--no-base` åsidosätter en `format.useAutoBase`-konfiguration.
+
+--root::
+	Behandla revisionsargumentet som ett <revisionsintervall>, även om det bara är en enda incheckning (som normalt skulle behandlas som en <sedan>). Observera att rotincheckningar som ingår i det angivna intervallet alltid formateras som skapandepatchar, oberoende av denna flagga.
+
+--progress::
+	Visa förloppsrapporter på stderr när patchar genereras.
+
+KONFIGURATION
+-------------
+Du kan med konfigurationsvariabler ange extra e-posthuvudrader som ska läggas till i varje meddelande, standardvärden för ämnesprefix och filsuffix, numrering av patchar när fler än en patch skrivs ut, `To:`- eller `Cc:`-huvudrader, bilagor, utdatakatalog för patchar samt signoff för patchar.
+
+------------
+[format]
+	headers = "Organization: git-foo\n"
+	subjectPrefix = CHANGE
+	suffix = .txt
+	numbered = auto
+	to = <email>
+	cc = <email>
+	attach [ = mime-boundary-string ]
+	signOff = true
+	outputDirectory = <directory>
+	coverLetter = auto
+	coverFromDescription = auto
+------------
+
+
+DISKUSSION
+----------
+
+Patchen som produceras av 'git format-patch' är i UNIX-brevlådaformat, med en fast "magisk" tidsstämpel som indikerar att filen matas ut från format-patch snarare än en riktig brevlåda, så här:
+
+------------
+arch/arm-konfigurationsfiler bantades ner med hjälp av ett python-skript
+(Se kommentaren i incheckning c2330e286f68f1c408b4aa6515ba49d57f05beae)
+
+arch/arm config files were slimmed down using a python script
+(See commit c2330e286f68f1c408b4aa6515ba49d57f05beae comment)
+
+Gör samma sak för ia64 så att vi kan få ett elegant och prydligt utseende
+...
+------------
+
+Vanligtvis placeras den i en MUA:s utkastmapp, redigeras för att lägga till aktuell kommentar som inte ska in i ändringsloggen efter de tre strecken, och skickas sedan som ett meddelande vars brödtext i vårt exempel börjar med "arch/arm config files were...". Hos mottagaren kan läsare spara intressanta patchar i en UNIX-brevlåda och applicera dem med linkgit:git-am[1].
+
+När en patch är del av en pågående diskussion kan patchen som genereras av 'git format-patch' justeras för att dra nytta av funktionen 'git am --scissors'. Efter ditt svar i diskussionen kommer en rad som enbart består av "`-- >8 --`" (sax och perforering), följd av patchen med onödiga huvudrader borttagna:
+
+------------
+...
+> Så vi borde göra si och så.
+
+Det låter rimligt för mig. Hur är det med den här patchen?
+
+-- >8 --
+Subject: [IA64] Lägg till ia64-konfigurationsfiler på Uwe Kleine-König-dieten
+
+arch/arm-konfigurationsfiler bantades ner med hjälp av ett python-skript
+...
+------------
+
+När du skickar en patch på det här sättet, skickar du oftast din egen patch, så utöver markören "`From $SHA1 $magic_timestamp`" bör du utelämna raderna `From:` och `Date:` från patchfilen. Patchtiteln kommer sannolikt att skilja sig från ämnet för den diskussion som patchen svarar på, så det är troligt att du vill behålla raden Ämne:, som i exemplet ovan.
+
+Kontrollerar om patchkorruption uppstår
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Många e-postklienter korrumperar blanktecken om de inte är rätt konfigurerade. Här är två vanliga typer av korruption:
+
+* Tomma kontextrader som inte har _något_ blanksteg.
+
+* Icke-tomma kontextrader som har ett extra blanksteg i början.
+
+Ett sätt att testa om din MUA är korrekt konfigurerad är:
+
+* Skicka patchen till dig själv, exakt som du annars skulle göra, men med `To:`- och `Cc:`-rader som inte innehåller listans och underhållarens adresser.
+
+* Spara den där patchen till en fil i UNIX-brevlådans format. Kalla den a.patch, till exempel.
+
+* Applicera den:
+
+    $ git fetch <projekt> master:test-apply
+    $ git switch test-apply
+    $ git restore --source=HEAD --staged --worktree :/
+    $ git am a.patch
+
+Om den inte går att applicera korrekt kan det bero på flera saker.
+
+* Själva patchen appliceras inte ordentligt. Det är _dåligt_ men har inte mycket att göra med din MUA. I det här fallet kanske du vill ombasera patchen med linkgit:git-rebase[1] innan du genererar den på nytt.
+
+* MUA:n korrumperade din patch; `am` kommer då att klaga på att patchen inte går att applicera. Titta i underkatalogen `.git/rebase-apply/`, se vad filen `patch` innehåller och kontrollera efter de vanliga korruptionsmönster som nämns ovan.
+
+* När du ändå är igång, kontrollera även filerna `info` och `final-commit`. Om innehållet i `final-commit` inte är exakt det du vill se i incheckningsloggmeddelandet är det mycket troligt att mottagaren behöver handredigera loggmeddelandet när patchen appliceras. Saker som "Hi, this is my first patch.\n" i patchmejlet ska komma efter raden med tre bindestreck som markerar slutet på incheckningsmeddelandet.
+
+MUA-SPECIFIKA TIPS
+------------------
+Här är några tips för hur du skickar in patchar inline på ett fungerande sätt med olika e-postklienter.
+
+GMail
+~~~~~
+Gmail har inget sätt att stänga av radbrytning i webbgränssnittet, så det kommer att manipulera alla e-postmeddelanden du skickar. Du kan dock använda "git send-email" och skicka dina patchar via Gmails SMTP-server, eller använda valfri IMAP-e-postklient för att ansluta till Googles IMAP-server och vidarebefordra e-postmeddelandena via den.
+
+För tips om hur man använder 'git send-email' för att skicka patchar via Gmails SMTP-server, se EXEMPEL-avsnittet i linkgit:git-send-email[1].
+
+För tips om hur man skickar med IMAP-gränssnittet, se EXEMPEL-avsnittet i linkgit:git-imap-send[1].
+
+Thunderbird
+~~~~~~~~~~~
+Som standard radbryter Thunderbird både e-postmeddelanden och märker dem som 'format=flowed', vilket gör det resulterande mejlet oanvändbart för Git.
+
+Det finns tre olika sätt: använd ett tillägg för att stänga av radbrytning, konfigurera Thunderbird så att det inte förvanskar patchar, eller använd en extern redigerare för att hindra Thunderbird från att förvanska patcharna.
+
+Metod #1 (tillägg)
+^^^^^^^^^^^^^^^^^^
+
+Installera tillägget Toggle Line Wrap som finns tillgängligt från https://addons.thunderbird.net/thunderbird/addon/toggle-line-wrap. Det lägger till en knapp "Line Wrap" i verktygsfältet för skrivandet som du kan bocka av. Nu kan du skriva meddelandet som du annars gör (klipp ut + klistra in, 'git format-patch' | 'git imap-send', etc.), men du måste infoga radbrytningar manuellt i all text du skriver.
+
+Som bonus kan tillägget upptäcka patchtext i redigeringsfönstret och varna när radbrytning ännu inte har stängts av.
+
+Tillägget kräver några justeringar av den avancerade konfigurationen (about:config). Dessa listas på nedladdningssidan.
+
+Metod #2 (konfiguration)
+^^^^^^^^^^^^^^^^^^^^^^^^
+Tre steg:
+
+1. Konfigurera meddelandeskrivning för kontot som vanlig text: Redigera...Kontoinställningar...Sammansättning och adressering, avmarkera "Skriv meddelanden i HTML".
+
+2. Konfigurera ditt allmänna kompositionsfönster så att det inte radbryts.
++
+I Thunderbird 2: Redigera..Inställningar..Komposition, radbryt vanliga textmeddelanden vid 0
++
+I Thunderbird 3: Redigera..Inställningar..Avancerat..Konfigurationsredigerare. Sök efter "mail.wrap_long_lines". Växla den så att den är inställd på `false`. Sök också efter "mailnews.wraplength" och sätt värdet till 0.
+
+3. Inaktivera användningen av format=flowed: Redigera..Inställningar..Avancerad..Konfigurationsredigerare. Sök efter "mailnews.send_plaintext_flowed". Växla tills den är inställd på `false`.
+
+När detta är gjort bör du kunna skriva e-post som vanligt (klipp + klistra, 'git format-patch' | 'git imap-send', etc.), och patcharna förvanskas inte.
+
+Metod #3 (extern redigerare)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Följande Thunderbird-tillägg behövs: AboutConfig från https://mjg.github.io/AboutConfig/ och External Editor från https://globs.org/articles.php?lng=en&pg=8
+
+1. Förbered patchen som en textfil med hjälp av din valda metod.
+
+2. Innan du öppnar ett skrivfönster, använd Redigera->Kontoinställningar för att avmarkera inställningen "Skriv meddelanden i HTML-format" i panelen "Sammansättning och adressering" för kontot som ska användas för att skicka patchen.
+
+3. I huvudfönstret i Thunderbird, innan du öppnar skrivfönstret för patchen, använd Verktyg->om:config för att ställa in följande till de angivna värdena:
++
+----------
+	mailnews.send_plaintext_flowed  => false
+	mailnews.wraplength             => 0
+----------
+
+4. Öppna ett skrivfönster och klicka på ikonen för den externa redigeraren.
+
+5. I det externa redigeringsfönstret läser du in patchfilen och avslutar redigeraren normalt.
+
+Sidoanteckning: det kan vara möjligt att göra steg 2 med about:config och följande inställningar, men ingen har provat det än.
+
+----------
+	mail.html_compose                       => false
+	mail.identity.default.compose_html      => false
+	mail.identity.id?.compose_html          => false
+----------
+
+Det finns ett skript i contrib/thunderbird-patch-inline som kan hjälpa dig att lägga till patchar med Thunderbird på ett enkelt sätt. För att använda det, följ stegen ovan och använd sedan skriptet som extern redigerare.
+
+KMail
+~~~~~
+Det här bör hjälpa dig att skicka in patchar inline med KMail.
+
+1. Förbered patchen som en textfil.
+
+2. Klicka på Nytt meddelande.
+
+3. Gå till "Alternativ" i skrivfönstret och se till att "Word wrap" inte är aktiverat.
+
+4. Använd Meddelande -> Infoga fil... och infoga patchen.
+
+5. Tillbaka i skrivfönstret: lägg till önskad annan text i meddelandet, fyll i adress- och ämnesfälten och tryck på skicka.
+
+BASTRÄDSINFORMATION
+-------------------
+
+Informationsblocket för basträdet används så att underhållare eller testare från tredje part ska veta exakt vilket tillstånd patchserien gäller för. Det består av en "base commit", vilket är en välkänd incheckning i den stabila delen av projekthistoriken som andra arbetar utifrån, och noll eller flera "prerequisite patches", det vill säga välkända patchar under arbete som ännu inte ingår i "base commit" och som måste appliceras ovanpå "base commit" i topologisk ordning innan patcharna kan appliceras.
+
+'Base commit' visas som "base-commit: " följt av incheckningsobjektnamnets 40-hex. En 'prerequisite patch' visas som "prerequisite-patch-id: " följt av 40-hex-"patch id", som kan fås genom att köra patchen genom kommandot `git patch-id --stable`.
+
+Tänk dig att du, ovanpå den publika incheckningen P, applicerade välkända patchar X, Y och Z från någon annan och sedan byggde din patchserie med tre patchar: A, B, C. Historiken skulle då se ut så här:
+
+................................................
+---P---X---Y---Z---A---B---C
+................................................
+
+Med `git format-patch --base=P -3 C` (eller varianter av det, till exempel med `--cover-letter` eller med `Z..C` i stället för `-3 C` för att ange intervallet) visas informationsblocket för basträdet i slutet av det första meddelande som kommandot skriver ut (antingen den första patchen eller följebrevet), så här:
+
+------------
+base-commit: P
+prerequisite-patch-id: X
+prerequisite-patch-id: Y
+prerequisite-patch-id: Z
+------------
+
+För icke-linjär topologi, som
+
+................................................
+---P---X---A---M---C
+    \         /
+     Y---Z---B
+................................................
+
+Du kan också använda `git format-patch --base=P -3 C` för att generera patchar för A, B och C, och identifierarna för P, X, Y, Z läggs till i slutet av det första meddelandet.
+
+Om `--base=auto` anges på kommandoraden beräknas `base commit` automatiskt som merge-bas mellan toppincheckningen för fjärrspårade grenen och revisionsintervallet som anges på kommandoraden. För en lokal gren behöver du först låta den spåra en fjärrgren med `git branch --set-upstream-to` innan du använder detta alternativ.
+
+EXEMPEL
+-------
+
+* Extrahera incheckningar mellan revisionerna R1 och R2, och applicera dem ovanpå den aktuella grenen med 'git am' för att cherry-picka dem:
++
+------------
+$ git format-patch -k --stdout R1..R2 | git am -3 -k
+------------
+
+* Extrahera alla incheckningar som finns i den aktuella grenen men inte i grenen origin:
++
+------------
+$ git format-patch origin
+------------
++
+För varje incheckning skapas en separat fil i den aktuella katalogen.
+
+* Extrahera alla incheckningar som leder till 'origin' sedan projektets start:
++
+------------
+$ git format-patch --root origin
+------------
+
+* Samma som den föregående:
++
+------------
+$ git format-patch -M -B origin
+------------
++
+Dessutom upptäcker och hanterar den namnbyten och fullständiga omskrivningar på ett intelligent sätt för att skapa en namnbytespatch. En namnbytespatch minskar mängden text som skrivs ut och gör det oftast enklare att granska. Observera att icke-Git-"patch"-program inte förstår namnbytespatchar, så använd detta bara när du vet att mottagaren använder Git för att applicera patchen.
+
+* Extrahera de tre senaste incheckningarna från den aktuella grenen och formatera dem som patchar för e-post:
++
+------------
+$ git format-patch -3
+------------
+
+FÖRBEHÅLL
+---------
+
+Observera att `format-patch` utelämnar sammanslagningsincheckningar från utdata, även om de ingår i det begärda intervallet. En enkel "patch" innehåller inte tillräckligt med information för att mottagaren ska kunna återskapa samma sammanslagningsincheckning.
+
+SE ÄVEN
+-------
+linkgit:git-am[1], linkgit:git-send-email[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

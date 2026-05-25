@@ -1,0 +1,139 @@
+git-rerere(1)
+=============
+
+NAMN
+----
+git-rerere - Återanvänd sparad lösning av sammanslagningskonflikter
+
+SYNOPSIS
+--------
+[verse]
+'git rerere' [clear | forget <sökvägsmönster>... | diff | status | remaining | gc]
+
+BESKRIVNING
+-----------
+
+I ett arbetsflöde som använder relativt långlivade ämnesgrenar, behöver utvecklaren ibland lösa samma konflikter om och om igen tills ämnesgrenarna är klara (antingen sammanslagna med "release"-grenen, eller skickade ut och accepterade uppströms).
+
+Det här kommandot hjälper utvecklaren i den här processen genom att registrera motstridiga autosammanslagings-resultat och motsvarande handlösnings-resultat vid den initiala manuella sammanslagingen, och tillämpa tidigare registrerade handlösningar på deras motsvarande autosammanslå-resultat.
+
+[NOTE]
+Du måste ställa in konfigurationsvariabeln `rerere.enabled` för att aktivera det här kommandot.
+
+
+KOMMANDON
+---------
+
+Normalt körs 'git rerere' utan argument eller användarintervention. Den har dock flera kommandon som gör att den kan interagera med sitt arbetsläge.
+
+'clear'::
+
+Återställ metadata som används av rerere om en sammanslagningslösning ska avbrytas. Om du anropar 'git am [--skip|--abort]' eller 'git rebase [--skip|--abort]' anropas det här kommandot automatiskt.
+
+'glöm' <sökvägsmönster>::
+
+Återställ konfliktlösningarna som rerere har registrerat för den aktuella konflikten i <sökvägsmönster>.
+
+'diff'::
+
+Visa differenser för lösningens aktuella tillstånd. Det är användbart för att spåra vad som har ändrats medan användaren löser konflikter. Ytterligare argument skickas direkt till systemets 'diff'-kommando som är installerat i PATH.
+
+'status'::
+
+Skriv ut sökvägar med konflikter vars sammanslagningslösning kommer att registreras.
+
+'remaining'::
+
+Skriv ut sökvägar med konflikter som inte har lösts automatiskt av rerere. Detta inkluderar sökvägar vars lösningar inte kan spåras av rerere, till exempel motstridiga undermoduler.
+
+'gc'::
+
+Rensa poster över konfliktfyllda sammanslagningar som inträffade för länge sedan. Som standard rengörs olösta konflikter som är äldre än 15 dagar och lösta konflikter som är äldre än 60 dagar. Dessa standardvärden styrs via konfigurationsvariablerna `gc.rerereUnresolved` respektive `gc.rerereResolved`.
+
+
+DISKUSSION
+----------
+
+När din ämnesgren modifierar ett överlappande område som din huvudgren (eller uppströms) har berört sedan din ämnesgren har förgrenat sig från den, kanske du vill testa den med den senaste huvudgrenen, redan innan din ämnesgren är redo att skickas uppströms:
+
+------------
+              o---*---o ämne
+             /
+    o---o---o---*---o---o master
+------------
+
+För ett sådant test behöver du på något sätt slå samman master och ämne. Ett sätt att göra det är att dra master in i topic-grenen:
+
+------------
+	$ git switch topic
+	$ git merge master
+
+              o---*---o---+ ämne
+             /           /
+    o---o---o---*---o---o master
+------------
+
+De incheckningar som är markerade med `*` berör samma område i samma fil; du måste lösa konflikterna när du skapar incheckningen som är markerad med `+`. Sedan kan du testa resultatet för att se till att ditt pågående arbete fortfarande fungerar med det som finns i den senaste master.
+
+Efter denna testsammanslagning finns det två sätt att fortsätta ditt arbete med ämnet. Det enklaste är att bygga vidare på testsammanslagnings-incheckningen `+`, och när ditt arbete i ämnesgrenen äntligen är klart, dra ämnesgrenen till mastern och/eller be uppströmsgrenen att hämta från dig. Vid det laget kan dock mastern eller uppströmsgrenen ha avancerat sedan testsammanslagningen `+`, i vilket fall den slutliga inchecknings-grafen skulle se ut så här:
+
+------------
+	$ git switch topic
+	$ git merge master
+	$ ... arbeta med både ämnes- och huvudgrenar
+	$ git switch master
+	$ git merge topic
+
+              o---*---o---+---o---o ämne
+             /           /         \
+    o---o---o---*---o---o---o---o---+ master
+------------
+
+När din ämnesgren är långlivad skulle den dock få många sådana "Sammanslagning från master"-incheckningar, vilket i onödan skulle skräpa in utvecklingshistoriken. Läsare av Linuxkärnans e-postlista kanske minns att Linus klagade över så frekventa testsammanslagningar när en delsystemsansvarig bad om att hämta från en gren full av "värdelösa sammanslagningar".
+
+Som ett alternativ, för att hålla ämnesgrenen ren från testsammanslagningar, kan du ta bort testsammanslagningen och fortsätta bygga ovanpå toppen före testsammanslagningen:
+
+------------
+	$ git switch topic
+	$ git merge master
+	$ git reset --hard HEAD^ ;# spola tillbaka testsammanslagningen
+	$ ... arbeta med både ämnes- och huvudgrenar
+	$ git switch master
+	$ git merge topic
+
+              o---*---o-------o---o ämne
+             /                     \
+    o---o---o---*---o---o---o---o---+ master
+------------
+
+Detta skulle bara lämna en sammanslagnings-incheckning kvar när din ämnesgren äntligen är klar och sammanfogad med huvudgrenen. Denna sammanslagning skulle kräva att du löser konflikten, som introduceras av incheckningar markerade med `*`. Denna konflikt är dock ofta samma konflikt som du löste när du skapade testsammanslagningen som du förstörde. 'git rerere' hjälper dig att lösa denna slutliga konfliktfyllda sammanslagning med hjälp av informationen från din tidigare handlösning.
+
+Om du kör kommandot 'git rerere' omedelbart efter en konfliktfylld autosammanslagingar registreras de konfliktfyllda arbetskatalogen, med de vanliga konfliktmarkörerna `<<<<<<<<`, `=======` och `>>>>>>>` i dem. Senare, när du är klar med att lösa konflikterna, kommer körning av 'git rerere' igen att registrera det lösta tillståndet för dessa filer. Anta att du gjorde detta när du skapade testmerge av master i ämnesgrenen.
+
+Nästa gång, efter att ha sett samma konfliktfyllda autosammanslaging, kommer körning av 'git rerere' att utföra en trevägssammanslagning mellan den tidigare konfliktfyllda autosammanslaging, den tidigare manuella lösningen och den nuvarande konfliktfyllda autosammanslagingen. Om denna trevägssammanslagning löses utan problem skrivs resultatet ut till din arbetsträdsfil, så du behöver inte lösa den manuellt. Observera att 'git rerere' lämnar indexfilen ifred, så du behöver fortfarande göra de slutliga rimlighetskontrollerna med `git diff` (eller `git diff -c`) och 'git add' när du är nöjd.
+
+Som en bekvämlighetsåtgärd, anropar 'git merge' automatiskt 'git rerere' vid avslutande med en misslyckad autosammanslaging och 'git rerere' registrerar handlösningen när det är en ny konflikt, eller återanvänder den tidigare handlösningen när den inte är det. 'git commit' anropar också 'git rerere' vid incheckning av ett mergeresultat. Det betyder att du inte behöver göra något speciellt själv (förutom att aktivera konfigurationsvariabeln rerere.enabled).
+
+I vårt exempel, när du gör testsammanslagningen, registreras den manuella lösningen, och den kommer att återanvändas när du gör den faktiska sammanslagningen senare med den uppdaterade huvud- och ämnesgrenen, så länge den registrerade lösningen fortfarande är tillämplig.
+
+Informationen 'git rerere' används också när 'git rebase' körs. Efter att ha blåst bort testsammanslagningen och fortsatt utveckling av ämnesgrenen:
+
+------------
+              o---*---o-------o---o ämne
+             /
+    o---o---o---*---o---o---o---o   master
+
+	$ git rebase master ämne
+
+				  o---*---o-------o---o ämne
+				 /
+    o---o---o---*---o---o---o---o   master
+------------
+
+Du kan köra `git rebase master ämne` för att uppdatera dig själv innan ditt ämne är redo att skickas uppströms. Detta skulle resultera i att du återgår till en trevägssammanslagning, och det skulle skapa konflikter på samma sätt som testsammanslagningen du löste tidigare. 'git rerere' kommer att köras av 'git rebase' för att hjälpa dig lösa denna konflikt.
+
+[OBS] 'git rerere' använder konfliktmarkörerna i filen för att upptäcka konflikten. Om filen redan innehåller rader som ser likadana ut som rader med konfliktmarkörer, kan 'git rerere' misslyckas med att registrera en konfliktlösning. För att kringgå detta kan inställningen `conflict-marker-size` i linkgit:gitattributes[5] användas.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

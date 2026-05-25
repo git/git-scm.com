@@ -1,0 +1,175 @@
+git-merge-base(1)
+=================
+
+NAMN
+----
+git-merge-base - Hitta så bra gemensamma förfäder som möjligt för en sammanslagning
+
+
+SYNOPSIS
+--------
+[verse]
+'git merge-base' [-a | --all] <incheckning> <incheckning>...
+'git merge-base' [-a | --all] --octopus <incheckning>...
+'git merge-base' --is-ancestor <incheckning> <incheckning>
+'git merge-base' --independent <incheckning>...
+'git merge-base' --fork-point <ref> [<incheckning>]
+
+BESKRIVNING
+-----------
+
+'git merge-base' hittar den/de bästa gemensamma förfadern/förfäderna mellan två incheckningar att använda i en trevägssammanslagning. En gemensam förfader är 'bättre' än en annan gemensam förfader om den senare är en förfader till den förra. En gemensam förfader som inte har någon bättre gemensam förfader är en 'bästa gemensamma förfader', d.v.s. en 'sammanslagningsbas'. Observera att det kan finnas mer än en sammanslagningsbas för ett par incheckningar.
+
+DRIFTLÄGEN
+----------
+
+I det vanligaste specialfallet innebär det att ange endast två incheckningar på kommandoraden att sammanslagningsbasen beräknas mellan de två angivna incheckningarna.
+
+Mer generellt: av de två incheckningar som sammanslagningsbasen beräknas från anges den ena av det första incheckningsargumentet på kommandoraden; den andra incheckningen är en (möjligen hypotetisk) incheckning som är en sammanslagning över alla återstående incheckningar på kommandoraden.
+
+Som en konsekvens av detta finns inte nödvändigtvis sammanslagningsbasen med i vart och ett av incheckningsargumenten om fler än två incheckningar anges. Detta skiljer sig från linkgit:git-show-branch[1] när det används med alternativet `--merge-base`.
+
+--octopus::
+	Beräkna de bästa gemensamma förfäderna för alla angivna incheckningar, som förberedelse för en n-vägssammanslagning. Detta härmar beteendet hos 'git show-branch --merge-base'.
+
+--independent::
+	I stället för att skriva ut sammanslagningsbaser, skriv ut en minimal delmängd av de angivna incheckningarna med samma förfäder. Med andra ord: bland de angivna incheckningarna listas de som inte kan nås från någon annan. Detta efterliknar beteendet hos 'git show-branch --independent'.
+
+--is-ancestor::
+	Kontrollera om den första <incheckning> är en föregångare till den andra <incheckning>, och avsluta med status 0 om sant, eller med status 1 om inte. Fel signaleras av en status som inte är noll men inte är 1.
+
+--fork-point::
+	Hitta punkten där en gren (eller någon historik som leder till <incheckning>) avgrenades från en annan gren (eller någon referens) <ref>. Detta letar inte bara efter den gemensamma förfadern till de två incheckning, utan tar också hänsyn till refloggen för <ref> för att se om historiken som leder till <incheckning> avgrenades från en tidigare inkarnation av grenen <ref> (se diskussion om detta läge nedan).
+
+ALTERNATIV
+----------
+-a::
+--all::
+	Skriv ut alla sammanslagningsbaser för incheckningarna, i stället för bara en.
+
+DISKUSSION
+----------
+
+Givet två incheckning 'A' och 'B', kommer `git merge-base A B` att mata ut en incheckning som är nåbar från både 'A' och 'B' via den överordnade relationen.
+
+Till exempel, med denna topologi:
+
+....
+	 o---o---o---B
+	/
+---o---1---o---o---o---A
+....
+
+Sammanslagningsbasen mellan 'A' och 'B' är '1'.
+
+Givet tre incheckning 'A', 'B' och 'C', kommer `git merge-base A B C` att beräkna sammanslagningsbasen mellan 'A' och en hypotetisk incheckning 'M', vilket är en merge mellan 'B' och 'C'. Till exempel, med denna topologi:
+
+....
+       o---o---o---o---C
+      /
+     /   o---o---o---B
+    /   /
+---2---1---o---o---o---A
+....
+
+Resultatet av `git merge-base A B C` är '1'. Detta beror på att den ekvivalenta topologin med en sammanslagningsincheckning 'M' mellan 'B' och 'C' är:
+
+
+....
+       o---o---o---o---o
+      /                 \
+     /   o---o---o---o---M
+    /   /
+---2---1---o---o---o---A
+....
+
+och resultatet av `git merge-base A M` är '1'. Incheckning '2' är också en gemensam förfader mellan 'A' och 'M', men '1' är en bättre gemensam förfader, eftersom '2' är en förfader till '1'. Därför är '2' inte en sammanslagningsbas.
+
+Resultatet av `git merge-base --octopus A B C` är '2', eftersom '2' är den bästa gemensamma förfadern till alla incheckningar.
+
+När historiken innefattar kors- och tvärgående sammanslagningar kan det finnas mer än en "bästa" gemensam förfader för två incheckningar. Till exempel, med denna topologi:
+
+....
+---1---o---A
+    \ /
+     X
+    / \
+---2---o---o---B
+....
+
+Både '1' och '2' är sammanslagningsbaser för A och B. Ingen av dem är bättre än den andra (båda är 'bästa' sammanslagningsbaser). När alternativet `--all` inte anges är det inte angivet vilken av de bästa som matas ut.
+
+Ett vanligt sätt att kontrollera "snabbspolningsbarhet" mellan två incheckningar A och B är (eller var åtminstone tidigare) att beräkna sammanslagningsbasen mellan A och B och kontrollera om den är samma som A; i så fall är A en förfader till B. Du kommer ofta att se detta i äldre skript.
+
+....
+A=$(git rev-parse --verify A)
+if test "$A" = "$(git merge-base A B)"
+then
+	...A är en förfader till B ...
+fi
+....
+
+I modern git kan man säga detta på ett mer direkt sätt:
+
+....
+if git merge-base --is-ancestor A B
+then
+	... A är en förfader till B ...
+fi
+....
+
+i stället.
+
+Diskussion om avgreningspunkts-läge
+-----------------------------------
+
+Efter att ha arbetat med grenen `ämne` som skapades med `git switch -c ämne origin/master`, kan historiken för fjärrspårade grenen `origin/master` ha spolats tillbaka och byggts om, vilket lett till en historik av denna form:
+
+....
+		 o---B2
+		/
+---o---o---B1--o---o---o---B (origin/master)
+	\
+	 B0
+	  \
+	   D0---D1---D (ämne)
+....
+
+där `origin/master` brukade peka på incheckningar B0, B1, B2 och nu pekar på B, och din `topic`-gren startades ovanpå den när `origin/master` var på B0, och du byggde tre commits, D0, D1 och D, ovanpå den. Tänk dig att du nu vill ombasera det arbete du gjorde på topic ovanpå den uppdaterade origin/master.
+
+I ett sådant fall skulle `git merge-base origin/master ämne` returnera föräldern till B0 i bilden ovan, men B0^..D är *inte* det intervall av incheckningar du vill spela upp ovanpå B (det inkluderar B0, vilket inte är vad du skrev; det är en incheckning som den andra sidan ignorerade när den flyttade sin top från B0 till B1).
+
+`git merge-base --fork-point origin/master topic` är utformad för att hjälpa till i ett sådant fall. Den tar inte bara hänsyn till B utan även B0, B1 och B2 (d.v.s. gamla toppar från de fjärrspårade grenar som ditt kodförråds reflog känner till) för att se vilken incheckning din ämnesgren byggdes på och hittar B0, vilket gör att du bara kan spela upp incheckningar på ditt ämne, exklusive de incheckningar som den andra sidan senare kasserade.
+
+Därför
+
+    $ fork_point=$(git merge-base --fork-point origin/master ämne)
+
+kommer att hitta B0, och
+
+    $ git rebase --onto origin/master $fork_point ämne
+
+kommer att spela upp D0, D1 och D ovanpå B för att skapa en ny historik för denna form:
+
+....
+		 o---B2
+		/
+---o---o---B1--o---o---o---B (origin/master)
+	\                   \
+	 B0                  D0'--D1'--D' (ämne - uppdaterat)
+	  \
+	   D0---D1---D (ämne - gammalt)
+....
+
+En fallgrop är att äldre reflog-poster i ditt kodförråd kan ha gått ut och städats bort av `git gc`. Om B0 inte längre visas i refloggen för fjärrspårade grenen `origin/master`, kan `--fork-point`-läget uppenbarligen inte hitta den och misslyckas, vilket undviker att ge ett slumpmässigt och värdelöst resultat (som föräldern till B0, som samma kommando utan `--fork-point`-alternativet ger).
+
+Dessutom måste den fjärrspårade gren som du använder med `--fork-point`-läget vara den som ditt ämne avgrenades från vid dess spets. Om du avgrenade från en äldre incheckning än spetsen skulle detta läge inte hitta avgreningspunkten (tänk dig att i exemplet ovan existerade historiken B0 inte, origin/master startade vid B1, flyttade till B2 och sedan B, och du avgrenade ditt ämne vid origin/master^ när origin/master var B1; historikens form skulle vara densamma som ovan, utan B0, och föräldern till B1 är vad `git merge-base origin/master topic` korrekt hittar, men `--fork-point`-läget gör det inte, eftersom det inte är en av de incheckningar som brukade vara vid toppen av origin/master).
+
+
+Se även
+-------
+linkgit:git-rev-list[1], linkgit:git-show-branch[1], linkgit:git-merge[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

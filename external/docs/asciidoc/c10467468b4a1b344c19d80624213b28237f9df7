@@ -1,0 +1,359 @@
+git-clone(1)
+============
+
+NAMN
+----
+git-clone - Klona ett kodförråd till en ny katalog
+
+
+SYNOPSIS
+--------
+[synopsis]
+git clone [--template=<mall-katalog>]
+	  [-l] [-s] [--no-hardlinks] [-q] [-n] [--bare] [--mirror]
+	  [-o <namn>] [-b <name>] [-u <upload-pack>] [--reference <repository>]
+	  [--dissociate] [--separate-git-dir <git-kat>]
+	  [--depth <depth>] [--[no-]single-branch] [--[no-]tags]
+	  [--recurse-submodules[=<sökvägsmönster>]] [--[no-]shallow-submodules]
+	  [--[no-]remote-submodules] [--jobs <n>] [--sparse] [--[no-]reject-shallow]
+	  [--filter=<filter-spec> [--also-filter-submodules]] [--] <repository>
+	  [<katalog>]
+
+BESKRIVNING
+-----------
+
+Klonar ett kodförråd till en nyskapad katalog, skapar fjärrspårade grenar för varje gren i det klonade kodförrådet (synligt med `git branch --remotes`), och skapar och checkar ut en initial gren som förgrenas från det klonade kodförrådets för närvarande aktiva gren.
+
+Efter klonen kommer en vanlig `git fetch` utan argument att uppdatera alla fjärrspårade grenar, och en `git pull` utan argument kommer dessutom att sammanfoga den fjärrstyrda huvudgrenen med den aktuella huvudgrenen, om någon (detta är inte sant när `--single-branch` anges; se nedan).
+
+Denna standardkonfiguration uppnås genom att skapa referenser till fjärrgrenhuvudena under `refs/remotes/origin` och genom att initiera konfigurationsvariblerna `remote.origin.url` och `remote.origin.fetch`.
+
+
+ALTERNATIV
+----------
+`-l`::
+`--local`::
+	När arkivet som ska klonas från finns på en lokal maskin, kringgår denna flagga den normala "Git aware" transportmekanismen och klonar arkivet genom att skapa en kopia av `HEAD` och allt under objekt- och refs-katalogerna. Filerna under `.git/objects/`-katalogen är hårdlänkade för att spara utrymme när det är möjligt.
++
+Om kodförrådet anges som en lokal sökväg (t.ex. `/sökväg/till/kodförråd`) är detta standardinställningen, och `--local` är i princip utan verkan. Om kodförrådet anges som en URL ignoreras denna flagga (och vi använder aldrig de lokala optimeringarna). Att ange `--no-local` åsidosätter standardinställningen när `/sökväg/till/kodförråd` anges, och använder i stället den vanliga Git-transporten.
++
+Om kodförrådets `$GIT_DIR/objects` har symboliska länkar eller är en symbolisk länk, kommer klonen att misslyckas. Detta är en säkerhetsåtgärd för att förhindra oavsiktlig kopiering av filer genom att avreferensera de symboliska länkarna.
++
+Av säkerhetsskäl fungerar det här alternativet inte med arkiv som ägs av andra användare, och `--no-local` måste anges för att klonen ska lyckas.
++
+*OBS*: den här operationen kan köras med samtidig modifiering av källkods-fövaret, ungefär som att köra `cp -r <src> <mål>` medan _<src>_ modifieras.
+
+`--no-hardlinks`::
+	Tvinga kloningsprocessen från ett kodförråd på ett lokalt filsystem att kopiera filerna under katalogen `.git/objects` i stället för att använda hårda länkar. Detta kan vara önskvärt om du försöker göra en säkerhetskopia av ditt kodförråd.
+
+`-s`::
+`--shared`::
+	När kodförrådet som ska klonas finns på den lokala maskinen konfigureras `.git/objects/info/alternates` automatiskt för att dela objekten med källkodförrådet i stället för att använda hårda länkar. Det resulterande kodförrådet börjar utan egna objekt.
++
+*OBS*: detta är en potentiellt farlig operation; använd den *inte* om du inte förstår vad den gör. Om du klonar ditt kodförråd med det här alternativet och sedan tar bort grenar (eller använder något annat Git-kommando som gör att en befintlig incheckning blir orefererad) i källförrådet, kan vissa objekt bli orefererade (eller hänga kvar). Dessa objekt kan tas bort med vanliga Git-operationer (som `git commit`) som automatiskt anropar `git maintenance run --auto`. (Se linkgit:git-maintenance[1].) Om dessa objekt tas bort och refererades till av det klonade kodförrådet, kommer det klonade kodförrådet att bli korrupt.
++
+Observera att om man kör `git repack` utan `--local`-alternativet i ett kodförråd klonat med `--shared`, kopieras objekt från källkodförrådet till ett pack i det klonade kodförrådet, vilket tar bort diskutrymmesbesparingarna med `clone --shared`. Det är dock säkert att köra `git gc`, som använder `--local`-alternativet som standard.
++
+Om du vill bryta beroendet mellan ett kodförråd som klonats med `--shared` och dess källkodförråd kan du helt enkelt köra `git repack -a` för att kopiera alla objekt från källkodförrådet till ett pack i det klonade kodförrådet.
+
+`--reference[-if-able] <kodförråd>`::
+	Om referensen _<repository>_ finns på den lokala maskinen, konfigurera automatiskt `.git/objects/info/alternates` för att hämta objekt från referensen _<repository>_. Att använda ett redan befintligt kodförråd som ett alternativ kräver att färre objekt kopieras från kodförråd som klonas, vilket minskar nätverks- och lokallagringskostnader. När `--reference-if-able` används hoppas en icke-befintlig katalog över med en varning i stället för att klonningen avbryts.
++
+*OBS*: se OBS för alternativet `--shared` och även alternativet `--dissociate`.
+
+`--dissociate`::
+	Låna objekten från referens-kodförråd som anges med `--reference`-alternativen endast för att minska nätverksöverföring, och stoppa lån från dem efter att en klon har gjorts genom att göra nödvändiga lokala kopior av lånade objekt. Det här alternativet kan också användas vid kloning lokalt från ett kodförråd som redan lånar objekt från ett annat kodförråd – det nya kodförrådet kommer att låna objekt från samma kodförråd, och det här alternativet kan användas för att stoppa lånet.
+
+`-q`::
+`--quiet`::
+	Arbeta tyst. Förloppet rapporteras inte till standardfelströmmen.
+
+`-v`::
+`--verbose`::
+	Kör utförligt. Påverkar inte rapporteringen av förloppsstatus till standardfelströmmen.
+
+`--progress`::
+	Förloppsstatus rapporteras som standard i standardfelströmmen när den är kopplad till en terminal, såvida inte `--quiet` anges. Denna flagga tvingar fram förloppsstatus även om standardfelströmmen inte dirigeras till en terminal.
+
+`--server-option=<alternativ>`::
+	Skicka den givna strängen till servern vid kommunikation med protokollversion 2. Den givna strängen får inte innehålla tecknet NUL eller LF. Serverns hantering av serveralternativ, inklusive okända, är serverspecifik. När flera `--server-option=<alternativ>` anges skickas de alla till den andra sidan i den ordning som anges på kommandoraden. När ingen ++--server-option=++__<alternativ>__ anges från kommandoraden används istället värdena för konfigurationsvariabeln `remote.<namn>.serverOption`.
+
+`-n`::
+`--no-checkout`::
+	Ingen utcheckning av `HEAD` utförs efter att klonen är klar.
+
+`--`[`no-`]`reject-shallow`::
+	Misslyckas om källkodförrådet är ett ytligt kodförråd. Konfigurationsvariabeln `clone.rejectShallow` kan användas för att ange standardvärdet.
+
+`--bare`::
+	Skapa ett bart Git-kodförråd. Det vill säga: i stället för att skapa _<katalog>_ och placera administrationsfilerna i `<katalog>/.git`, gör själva _<katalog>_ till `$GIT_DIR`. Detta innebär uppenbarligen `--no-checkout` eftersom det inte finns någonstans att checka ut arbetsträdet. Dessutom kopieras grenhuvudena på fjärrsidan direkt till motsvarande lokala grenhuvuden, utan att mappa dem till `refs/remotes/origin/`. När detta alternativ används skapas varken fjärrspårade grenar eller relaterade konfigurationsvariabler.
+
+`--sparse`::
+	Använd en sparse-checkout, där endast filer i den översta katalogen initialt finns. Kommandot linkgit:git-sparse-checkout[1] kan användas för att utöka arbetskatalogen efter behov.
+
+`--filter=<filter-spec>`::
+	Använd funktionen för partiell kloning och begär att servern skickar en delmängd av nåbara objekt enligt ett givet objektfilter. När du använder `--filter` används den angivna _<filter-spec>_ för det partiella klonfiltret. Till exempel kommer `--filter=blob:none` att filtrera bort alla blobbar (filinnehåll) tills de behövs av Git. Dessutom kommer `--filter=blob:limit=<storlek>` att filtrera bort alla blobbar med en storlek på minst _<storlek>_. För mer information om filterspecifikationer, se alternativet `--filter` i linkgit:git-rev-list[1].
+
+`--also-filter-submodules`::
+	Använd även det partiella klonfiltret på alla undermoduler i kodförrådet. Kräver `--filter` och `--recurse-submodules`. Detta kan aktiveras som standard genom att ställa in konfigurationsalternativet `clone.filterSubmodules`.
+
+`--mirror`::
+	Ställ in en spegel av källkodförrådet. Detta innebär `--bare`. Jämfört med `--bare` mappar `--mirror` inte bara lokala grenar i källan till lokala grenar i målet, utan mappar också alla referenser (inklusive fjärrspårade grenar, anteckningar etc.) och ställer in en refspec-konfiguration så att alla dessa referenser skrivs över av en `git remote update` i målkodförrådet.
+
+`-o` _<namn>_::
+`--origin` _<namn>_::
+	I stället för att använda fjärrnamnet `origin` för att hålla reda på uppströmskodförrådet, använd _<namn>_. Åsidosätter `clone.defaultRemoteName` från konfigurationsfilen.
+
+`-b` _<namn>_::
+`--branch` _<namn>_::
+	Istället för att peka den nyskapade `HEAD` till grenen som pekas på av det klonade kodförrådets `HEAD`, peka istället på _<namn>_ grenen. I ett icke-bart kodförråd är det detta grenen som kommer att checkas ut. `--branch` kan också ta taggar och kopplar bort `HEAD` vid den incheckningen i det resulterande kodförrådet.
+
+`--revision=<rev>`::
+	Skapa ett nytt kodförråd och hämta historiken som leder till den givna revisionen _<rev>_ (och inget annat), utan att skapa någon fjärrspårad gren och utan att skapa någon lokal gren, och koppla bort `HEAD` till _<rev>_. Argumentet kan vara ett referensnamn (t.ex. `refs/heads/main` eller `refs/tags/v1.0`) som skalar ner till en incheckning, eller ett hexadecimalt objektnamn. Detta alternativ är inkompatibelt med `--branch` och `--mirror`.
+
+`-u` _<uppladdnings-paket>_::
+`--upload-pack` _<uppladdnings-paket>_::
+	När detta anges, och kodförrådet att klona från nås via ssh, anger detta en icke-standardsökväg för kommandot som körs i den andra änden.
+
+`--template=<mallkatalog>`::
+	Ange katalogen från vilken mallar ska användas; (Se avsnittet "MALLKATALOG" i linkgit:git-init[1].)
+
+`-c` `<key>=<värde>`::
+`--config` `<key>=<värde>`::
+	Ställ in en konfigurationsvariabel i det nyskapade kodförrådet; denna träder i kraft omedelbart efter att kodförrådet har initierats, men innan fjärrhistoriken hämtas eller några filer checkas ut. _<nyckeln>_ har samma format som förväntas av linkgit:git-config[1] (t.ex. `core.eol=true`). Om flera värden anges för samma nyckel kommer varje värde att skrivas till konfigurationsfilen. Detta gör det säkert att till exempel lägga till ytterligare hämtningsreferenser till den ursprungliga fjärren.
++
+På grund av begränsningar i den nuvarande implementeringen, träder vissa konfigurationsvariabler inte i kraft förrän efter den initiala hämtningen och utcheckningen. Konfigurationsvariabler som är kända för att inte träda i kraft är: `remote.<namn>.mirror` och `remote.<namn>.tagOpt`. Använd motsvarande alternativ `--mirror` och `--no-tags` i stället.
+
+`--depth <djup>`::
+	Skapa en "ytlig"-klon med en historik avkortad till det angivna antalet incheckningar. Implicerar `--single-branch` om inte `--no-single-branch` anges för att hämta historikerna nära topparna på alla grenar. Om du vill klona undermoduler ytligt, skicka även `--shallow-submodules`.
+
+`--shallow-since=<datum>`::
+	Skapa en ytlig klon med en historik efter den angivna tiden.
+
+`--shallow-exclude=<ref>`::
+	Skapa en ytlig klon med en historik, som exkluderar incheckningar som kan nås från en angiven fjärrgren eller tagg. Det här alternativet kan anges flera gånger.
+
+`--single-branch`::
+`--no-single-branch`::
+	Klona endast historiken som leder till toppen av en enskild gren, antingen angiven av alternativet `--branch` eller den gren som primärfjärrens `HEAD` pekar på. Fortsatta fetchar i det resulterande kodförrådet uppdaterar bara den fjärrspårade grenen för den gren som detta alternativ användes för vid den initiala kloningen. Om `HEAD` på fjärrkodförrådet inte pekade på någon gren när klonen med `--single-branch` gjordes, skapas ingen fjärrspårad gren.
+
+`--tags`::
+`--no-tags`::
+	Styr om taggar ska klonas eller inte. När `--no-tags` anges blir alternativet permanent genom att ställa in konfigurationen `remote.<fjärr>.tagOpt=--no-tags`. Detta säkerställer att framtida `git pull` och `git fetch` inte följer några taggar. Efterföljande explicita tagghämtningar fungerar fortfarande (se linkgit:git-fetch[1]).
++
+Som standard klonas taggar, och att skicka `--tags` är därför vanligtvis utan verkan, såvida det inte upphäver ett tidigare `--no-tags`.
++
+Kan användas tillsammans med `--single-branch` för att klona och underhålla en gren utan några referenser annat än en enda klonad gren. Detta är användbart t.ex. för att underhålla minimala kloner av standardgrenen i ett kodförråd för sökindexering.
+
+`--recurse-submodules[=<sökvägsmönster>]`::
+	Efter att klonen har skapats, initiera och klona delmoduler inom baserat på den angivna _<sökvägsmönster>_. Om ingen `=<sökvägsmönster>` anges, initieras och klonas alla delmoduler. Detta alternativ kan ges flera gånger för sökvägsmönster som består av flera poster. Den resulterande klonen har `submodule.active` satt till den angivna sökvägsmönster, eller "`.`" (vilket betyder alla delmoduler) om ingen sökvägsmönsteranges.
++
+Submoduler initieras och klonas med sina standardinställningar. Detta motsvarar att köra `git submodule update --init --recursive <sökvägsmönster>` omedelbart efter att kloningen är klar. Detta alternativ ignoreras om det klonade kodförrådet inte har ett arbetsträd/checkout (dvs. om något av `--no-checkout`/`-n`, `--bare` eller `--mirror` anges)
+
+`--shallow-submodules`::
+`--no-shallow-submodules`::
+	Alla undermoduler som klonas kommer att vara grunda med ett djup på 1.
+
+`--remote-submodules`::
+`--no-remote-submodules`::
+	Alla undermoduler som klonas kommer att använda statusen för undermodulens fjärrspårade gren för att uppdatera undermodulen, snarare än superprojektets inspelade SHA-1. Motsvarar att skicka `--remote` till `git submodule update`.
+
+`--separate-git-dir=<git-kat>`::
+	I stället för att placera det klonade kodförrådet där det ska vara, placera det klonade kodförrådet i den angivna katalogen och skapa sedan en filsystemsoberoende symbolisk Git-länk dit. Resultatet blir att Git-kodförrådet kan separeras från arbetsträdet.
+
+`--ref-format=<ref-format>`::
+
+Ange det angivna referenslagringsformatet för kodförrådet. Giltiga värden är:
++
+* `files` för lösa filer med packade referenser. Detta är standardinställningen.
+* `reftable` för reftable-formatet. Detta format är experimentellt och dess interna funktioner kan komma att ändras.
+[]
+
+`-j` _<n>_::
+`--jobs` _<n>_::
+	Antalet undermoduler som hämtas samtidigt. Standardvärdet är `submodule.fetchJobs`.
+
+_<repository>_::
+	Det (möjligen fjärr-) _<repository>_ att klona från. Se avsnittet <<URLS,GIT URLS>> nedan för mer information om hur du anger kodförråd.
+
+_<katalog>_::
+	Namnet på en ny katalog att klona till. Den "humanistiska" delen av källkodförrådet används om ingen _<katalog>_ uttryckligen anges (`kodförråd` för `/sökväg/till/kodförråd.git` och `foo` för `host.xz:foo/.git`). Kloning till en befintlig katalog är endast tillåten om katalogen är tom.
+
+`--bundle-uri=<uri>`::
+	Innan du hämtar från fjärren, hämta ett paket från den givna _<uri>_ och upplösa informationen till det lokala kodförrådet. Referenserna i paketet kommer att lagras under det dolda namnutrymmet `refs/bundle/*`. Detta alternativ är inkompatibelt med `--depth`, `--shallow-since` och `--shallow-exclude`.
+
+:git-clone: 1
+GIT URLS[[URLS]]
+----------------
+
+I allmänhet innehåller URL:er information om transportprotokollet, adressen till fjärrservern och sökvägen till kodförråd. Beroende på transportprotokollet kan en del av denna information saknas.
+
+Git stöder ssh-, git-, http- och https-protokollen (dessutom kan ftp och ftps användas för hämtning, men detta är ineffektivt och föråldrat; använd dem inte).
+
+Den inbyggda transporten (dvs. `git://` URL) utför ingen autentisering och bör användas med försiktighet på osäkra nätverk.
+
+Följande syntaxer kan användas med dem:
+
+- `ssh://[<användare>@]<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `git://<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `http[s]://<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `ftp[s]://<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+
+En alternativ scp-liknande syntax kan också användas med ssh-protokollet:
+
+- `[<användare>@]<värd>:/<sökväg-till-git-kodförråd>`
+
+Denna syntax känns bara igen om det inte finns några snedstreck före det första kolonet. Detta hjälper till att skilja en lokal sökväg som innehåller ett kolon. Till exempel kan den lokala sökvägen `foo:bar` anges som en absolut sökväg eller `./foo:bar` för att undvika att misstolkas som en ssh-url.
+
+Protokollen ssh och git stöder dessutom `~<username>`-expansionen:
+
+- `ssh://[<användare>@]<värd>[:<port>]/~<användare>/<sökväg-till-git-kodförråd>`
+- `git://[<användare>@]<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+- `[<användare>@]<värd>[:<port>]/<sökväg-till-git-kodförråd>`
+
+För lokala kodförråd, som också stöds nativt av Git, kan följande syntaxer användas:
+
+- `/sokvag/till/kodförråd.git/`
+- `file:///sokvag/till/kodförråd.git/`
+
+ifndef::git-clone[]
+Dessa två syntaxer är mestadels likvärdiga, förutom vid kloning, då den förra innebär alternativet `--local`. Se linkgit:git-clone[1] för detaljer.
+endif::git-clone[]
+
+ifdef::git-clone[]
+Dessa två syntaxer är mestadels likvärdiga, förutom att den förra innebär alternativet `--local`.
+endif::git-clone[]
+
+`git clone`, `git fetch` och `git pull`, men inte `git push`, accepterar också en lämplig bundle-fil. Se linkgit:git-bundle[1].
+
+När Git inte vet hur ett visst transportprotokoll ska hanteras, försöker det använda fjärr-hjälpprogram `remote-<transport>`, om en sådan finns. För att explicit begära en fjärr-hjälpprogram kan följande syntax användas:
+
+- `<transport>::<adress>`
+
+där _<adress>_ kan vara en sökväg, en server och sökväg, eller en godtycklig URL-liknande sträng som känns igen av den specifika fjärrhjälparen som anropas. Se linkgit:gitremote-helpers[7] för mer information.
+
+Om det finns ett stort antal fjärrdatabaser med liknande namn och du vill använda ett annat format för dem (så att de URL:er du använder skrivs om till URL:er som fungerar), kan du skapa en konfigurationssektion i formatet:
+
+[verse]
+--
+	[url "__<faktisk-url-bas>__"]
+		insteadOf = _<annan-url-bas>_
+--
+
+Till exempel med detta:
+
+------------
+	[url "git://git.host.xz/"]
+		insteadOf = host.xz:/sokvag/till/
+		insteadOf = arbete:
+------------
+
+En URL som "arbete:kodförråd.git" eller "host.xz:/sokvag/till/kodförråd.git" kommer att skrivas om i alla sammanhang som antar att URL:en är "git://git.host.xz/kodförråd.git".
+
+Om du vill skriva om URL:er enbart för sändning (push), kan du skapa en konfigurationssektion i formen:
+
+[verse]
+--
+	[url "__<faktisk-url-bas>__"]
+		pushInsteadOf = _<annan-url-bas>_
+--
+
+Till exempel med detta:
+
+------------
+	[url "ssh://example.org/"]
+		pushInsteadOf = git://example.org/
+------------
+
+En URL som "git://example.org/path/to/repo.git" kommer att skrivas om till "ssh://example.org/path/to/repo.git" för sändning ("pushas"), men pulls kommer fortfarande att använda den ursprungliga URL:en.
+[]
+
+EXEMPEL
+-------
+
+* Klona från uppströms:
++
+------------
+$ git clone git://git.kernel.org/pub/scm/.../linux.git my-linux
+$ cd my-linux
+$ make
+------------
+
+
+* Skapa en lokal klon som lånar från den aktuella katalogen, utan att kontrollera saker:
++
+------------
+$ git clone -l -s -n . ../kopia
+$ cd ../kopia
+$ git show-branch
+------------
+
+
+* Klona från uppströms vid lån från en befintlig lokal katalog:
++
+------------
+$ git clone --reference /git/linux.git \
+	git://git.kernel.org/pub/scm/.../linux.git \
+	my-linux
+$ cd my-linux
+------------
+
+
+* Skapa ett bart kodförråd för att publicera dina ändringar offentligt:
++
+------------
+$ git clone --bare -l /home/proj/.git /pub/scm/proj.git
+------------
+
+* Klona ett lokalt kodförråd från en annan användare:
++
+------------
+$ git clone --no-local /home/annananv/proj.git /pub/scm/proj.git
+------------
+
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+:see-git-init:
+ifndef::git-init[]
+:see-git-init: (See the "TEMPLATE DIRECTORY" section of linkgit:git-init[1].)
+endif::[]
+
+`init.templateDir`::
+	Ange katalogen från vilken mallarna ska kopieras. {see-git-init}
+`init.defaultBranch`::
+	Tillåter att åsidosätta standardgrennamnet, t.ex. vid initialisering av ett nytt kodförråd.
+`init.defaultObjectFormat`::
+	Tillåter att åsidosätta standardobjektformatet för nya arkiv. Se `--object-format=` i linkgit:git-init[1]. Både kommandoradsalternativet och miljövariabeln `GIT_DEFAULT_HASH` har företräde framför denna konfiguration.
+`init.defaultRefFormat`::
+	Tillåter åsidosättning av standardformatet för referenslagring för nya arkiv. Se `--ref-format=` i linkgit:git-init[1]. Både kommandoradsalternativet och miljövariabeln `GIT_DEFAULT_REF_FORMAT` har företräde framför denna konfiguration.
+[]
+
+`clone.defaultRemoteName`::
+	Namnet på den fjärren som ska skapas vid kloning av ett arkiv. Standardvärdet är `origin`.
+ifdef::git-clone[]
+	Det kan åsidosättas genom att använda 
+	kommandoradsalternativet `--origin`.
+endif::[]
+ifndef::git-clone[]
+	Den kan åsidosättas genom att skicka
+	kommandoradsalternativet `--origin` till linkgit:git-clone[1].
+endif::[]
+
+`clone.rejectShallow`::
+	Avvisa kloning av ett kodförråd om det är ett ytligt sådant; detta kan åsidosättas genom att skicka alternativet `--reject-shallow` på kommandoraden.
+ifndef::git-clone[]
+	Se linkgit:git-clone[1].
+endif::[]
+
+`clone.filterSubmodules`::
+	Om ett partiellt klonfilter tillhandahålls (se `--filter` i linkgit:git-rev-list[1]) och `--recurse-submodules` används, använd även filtret på undermoduler.
+[]
+
+
+GIT
+---
+En del av linkgit:git[1]-sviten

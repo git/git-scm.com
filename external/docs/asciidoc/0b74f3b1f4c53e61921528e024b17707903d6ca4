@@ -1,0 +1,176 @@
+git-fast-export(1)
+==================
+
+NAMN
+----
+git-fast-export - Git-dataexportör
+
+
+SYNOPSIS
+--------
+[verse]
+'git fast-export' [<flaggor>] | 'git fast-import'
+
+BESKRIVNING
+-----------
+Programmet dumpar de givna revisionerna i en form som är lämplig att skickas till 'git fast-import'.
+
+Du kan använda den som en människoläsbar bundle-ersättning (se linkgit:git-bundle[1]), eller som ett format som kan redigeras innan det matas till 'git fast-import' för att göra historikomskrivningar (en möjlighet som används av verktyg som 'git filter-repo').
+
+ALTERNATIV
+----------
+--progress=<n>::
+	Infoga 'progress'-satser för varje <n> objekt, som ska visas av 'git fast-import' under importen.
+
+--signed-tags=(verbatim|warn-verbatim|warn-strip|strip|abort)::
+	Ange hur signerade taggar ska hanteras. Eftersom alla transformationer efter exporten (eller under exporten, som att exkludera revisioner) kan ändra de hashkoder som signeras, kan signaturerna bli ogiltiga.
++
+När man frågar om att 'avbryta' (vilket är standard), kommer programmet att dö när det stöter på en signerad tagg. Med 'strip' kommer taggarna att göras osignerade i tysthet, med 'warn-strip' kommer de att göras osignerade men en varning kommer att visas, med 'verbatim' kommer de att exporteras i tysthet och med 'warn-verbatim' (eller 'warn', en föråldrad synonym) kommer de att exporteras, men du kommer att se en varning. 'verbatim' och 'warn-verbatim' bör endast användas om du vet att ingen transformation som påverkar taggar eller någon incheckning i deras historik kommer att utföras av dig eller av fast-export eller fast-import, eller om du inte bryr dig om att den resulterande taggen kommer att ha en ogiltig signatur.
+
+--signed-commits=(verbatim|warn-verbatim|warn-strip|strip|abort)::
+	Ange hur signerade incheckningar ska hanteras. Bete sig exakt som '--signed-tags', men för incheckningar. Standardvärdet är 'strip', vilket är hur tidigare versioner av det här kommandot utan den här inställningen betedde sig.
++
+Vid export, börjar en signatur med:
++
+gpgsig <git-hash-algo> <signatur-format>
++
+där <git-hash-algo> är Git-objektets hash så antingen "sha1" eller "sha256", och <signatur-format> är signaturtypen, så "openpgp", "x509", "ssh" eller "unknown".
++
+Till exempel, börjar en OpenPGP-signatur på en SHA-1-incheckning med `gpgsig sha1 openpgp`, medan en SSH-signatur på en SHA-256-incheckning börjar med `gpgsig sha256 ssh`.
++
+Medan alla signaturer i en incheckning exporteras, kan en importör välja att bara acceptera några av dem. Till exempel lagrar linkgit:git-fast-import[1] för närvarande högst en signatur per Git-hashalgoritm i varje incheckning.
++
+NOTE: Detta är mycket experimentellt och formatet på dataströmmen kan komma att ändras i framtiden utan kompatibilitetsgarantier.
+
+--tag-of-filtered-object=(abort|drop|rewrite)::
+	Ange hur taggar ska hanteras vars taggade objekt filtreras bort. Eftersom revisioner och filer att exportera kan begränsas av sökväg, kan taggade objekt filtreras helt.
++
+När man ber om att "avbryta" (vilket är standard), kommer programmet att dö när det stöter på en sådan tagg. Med 'drop' kommer sådana taggar att utelämnas från utdata. Med 'rewrite', om det taggade objektet är en incheckning, kommer det att skriva om taggen för att tagga en förfader incheckning (via förälder omskriving; se linkgit:git-rev-list[1]).
+
+-M::
+-C::
+	Utför flytt- och/eller kopieringsdetektering, enligt beskrivningen på manualsidan för linkgit:git-diff[1], och använd det för att generera namnbytes och kopierings kommandon i utdatadumpen.
++
+Observera att tidigare versioner av det här kommandot inte klagade och gav felaktiga resultat om du angav dessa alternativ.
+
+--export-marks=<fil>::
+	Dumpar den interna markeringstabellen till <fil> när den är klar. Markeringar skrivs ett per rad som `:markid SHA-1`. Endast markeringar för revisioner dumpas; markeringar för blobbar ignoreras. Bakända-användare kan använda den här filen för att validera importer efter att de har slutförts, eller för att spara markeringstabellen över stegvisa körningar. Eftersom <fil> bara öppnas och avkortas vid slutförande, kan samma sökväg säkert ges till --import-marks. Filen kommer inte att skrivas om inget nytt objekt har markerats/exporterats.
+
+--import-marks=<fil>::
+	Innan du bearbetar någon indata, ladda de markeringar som anges i <fil>. Indatafilen måste finnas, vara läsbar, och använda samma format som produceras av --export-marks.
+
+--mark-tags::
+	Förutom att märka blobbar och incheckningar med mark-id:n, märk även taggar. Detta är användbart tillsammans med `--export-marks` och `--import-marks`, och är också användbart (och nödvändigt) för export av kapslade taggar. Det skadar inte andra fall och skulle vara standard, men många fast-import framändar är inte förberedda för att acceptera taggar med mark-identifierare.
++
+Alla incheckningar (eller taggar) som redan har markerats kommer inte att exporteras igen. Om bakändan använder en liknande --import-marks-fil möjliggör detta stegvis dubbelriktad export av kodförrådet genom att hålla markeringarna desamma över körningar.
+
+--fake-missing-tagger::
+	Vissa gamla kodförråd har taggar utan taggare. Snabbimportprotokollet var ganska strikt gällande det, och tillät inte det. Så fejka en taggare för att kunna snabbimportera utdata.
+
+--use-done-feature::
+	Starta strömmen med en 'feature done'-strof och avsluta den med ett 'done'-kommando.
+
+--no-data::
+	Hoppa över utdata från blobobjekt och referera istället till blobbar via deras ursprungliga SHA-1-hash. Detta är användbart när man skriver om katalogstrukturen eller historiken för ett kodförråd utan att röra innehållet i enskilda filer. Observera att den resulterande strömmen endast kan användas av ett kodförråd som redan innehåller de nödvändiga objekten.
+
+--full-tree::
+	Det här alternativet gör att fast-export utfärdar ett "deleteall"-direktiv för varje incheckning följt av en fullständig lista över alla filer i incheckningen (i motsats till att bara lista de filer som skiljer sig från incheckningens första förälder).
+
+--anonymize::
+	Anonymisera innehållet i kodförrådet samtidigt som historikens och det lagrade trädets form bibehålls. Se avsnittet om "ANONYMISERING" nedan.
+
+--anonymize-map=<från>[:<till>]::
+	Konvertera token `<från>` till `<till>` i den anonymiserade utdatan. Om `<till>` utelämnas, mappa `<från>` till sig själv (dvs. anonymisera den inte). Se avsnittet om `ANONYMISERING` nedan.
+
+--reference-excluded-parents::
+	Som standard, kommer ett kommando som `git fast-export master~5..master` inte att inkludera incheckning master{tilde}5 och kommer att göra att master{tilde}4 inte längre har master{tilde}5 som förälder (även om både den gamla master{tilde}4 och den nya master{tilde}4 kommer att ha samma filer). Använd --reference-excluded-parents för att istället låta strömmen referera till incheckningar i det undantagna historikområdet med deras sha1sum. Observera att den resulterande strömmen endast kan användas av ett kodförråd som redan innehåller de nödvändiga föräldraincheckningarna.
+
+--show-original-ids::
+	Lägg till ett extra direktiv till utdata för incheckningar och blobs, `original-oid <SHA1SUM>`. Även om sådana direktiv sannolikt kommer att ignoreras av importverktyg som git-fast-import, kan det vara användbart för mellanliggande filter (t.ex. för att skriva om inchecknings-meddelanden som refererar till äldre incheckningar, eller för att ta bort blobs efter id).
+
+--reencode=(yes|no|abort)::
+	Ange hur `encoding`-huvudet ska hanteras i inchecknings-objekt. När man frågar om att 'avbryta' (vilket är standard), kommer programmet att avbrytas när det stöter på ett sådant inchecknings-objekt. Med `yes` (ja) kommer inchecknings-meddelandet att kodas om till UTF-8. Med `no` (nej) kommer den ursprungliga kodningen att bevaras.
+
+--referensspecifikation::
+	Tillämpa den angivna referensspecifikation:en på varje exporterad referens. Flera av dem kan anges.
+
+[<git-rev-list-args>...]::
+	En lista med argument, acceptabla för 'git rev-parse' och 'git rev-list', som anger de specifika objekt och referenser som ska exporteras. Till exempel gör `master~10..master` att den aktuella masterreferensen exporteras tillsammans med alla objekt som lagts till sedan dess 10:e förfader-incheckning och (såvida inte alternativet --reference-excluded-parents anges) alla filer som är gemensamma för master{tilde}9 och master{tilde}10.
+
+EXEMPEL
+-------
+
+-------------------------------------------------------------------
+$ git fast-export --all | (cd /tomt/kodförråd && git fast-import)
+-------------------------------------------------------------------
+
+Detta kommer att exportera hela kodförrådet och importera det till det befintliga tomma kodförrådet. Förutom omkodning av incheckningar som inte är i UTF-8, skulle det vara en en-till-en-spegel.
+
+-----------------------------------------------------
+$ git fast-export master~5..master |
+	sed "s|refs/heads/master|refs/heads/other|" |
+	git fast-import
+-----------------------------------------------------
+
+Detta skapar en ny gren som heter 'other' från 'master~5..master' (dvs. om 'master' har linjär historik kommer den att ta de senaste 5 incheckningar).
+
+Observera att detta förutsätter att ingen av de blobbar och inchecknings-meddelanden som refereras till av det revisionsintervallet innehåller strängen 'refs/heads/master'.
+
+
+ANONYMISERING
+-------------
+
+Om alternativet `--anonymize` anges, kommer git att försöka ta bort all identifierande information från kodförrådet samtidigt som tillräckligt med ursprungliga träd- och historik-mönster behålls för att reproducera vissa programfel. Målet är att en git-bugg som hittas i ett privat kodförråd kommer att finnas kvar i det anonymiserade arkivet, och det senare kan delas med git-utvecklare för att hjälpa till att lösa programfelet.
+
+Med det här alternativet, kommer git att ersätta alla refnamn, sökvägar, blobinnehåll, inchecknings- och tagg-meddelanden, namn och e-postadresser i utdata med anonymiserad data. Två instanser av samma sträng kommer att ersättas motsvarande (t.ex. två incheckningar med samma författare kommer att ha samma anonymiserade författare i utdata, men har ingen likhet med den ursprungliga författarsträngen). Relationen mellan incheckningar, grenar och taggar behålls, liksom inchecknings-tidsstämplarna (men inchecknings-meddelandena och refnamnen har ingen likhet med originalen). Trädets relativa sammansättning behålls (t.ex. om du har ett rotträd med 10 filer och 3 träd, kommer även utdata att göra det), men deras namn och innehållet i filerna kommer att ersättas.
+
+Om du tror att du har hittat en git-bugg kan du börja med att exportera en anonymiserad ström av hela kodförrådet:
+
+---------------------------------------------------
+$ git fast-export --anonymize --all >anon-stream
+---------------------------------------------------
+
+Bekräfta sedan att felet kvarstår i ett kodförrådet som skapats från den strömmen (många fel gör det inte, eftersom de egentligen är beroende av det exakta innehållet i kodförrådet):
+
+---------------------------------------------------
+$ git init anon-kodförråd
+$ cd anon-kodförråd
+$ git fast-import <../anon-stream
+$ ... testa din bugg ...
+---------------------------------------------------
+
+Om det anonymiserade kodförrådet visar felet, kan det vara värt att dela `anon-stream` tillsammans med en vanlig felrapport. Observera att den anonymiserade strömmen komprimeras mycket bra, så det rekommenderas att du gzipperar den. Om du vill undersöka strömmen för att se att den inte innehåller någon privat data, kan du granska den direkt innan du skickar den. Du kan också prova:
+
+---------------------------------------------------
+$ perl -pe 's/\d+/X/g' <anon-stream | sort -u | less
+---------------------------------------------------
+
+vilket visar alla unika rader (med siffror konverterade till "X", för att komprimera "User 0", "User 1", etc. till "User X"). Detta ger en mycket mindre utdata, och det är vanligtvis enkelt att snabbt bekräfta att det inte finns någon privat data i strömmen.
+
+Att reproducera vissa programfel kan kräva att man refererar till specifika incheckningar eller sökvägar, vilket blir utmanande efter att refnamn och sökvägar har anonymiserats. Du kan begära att en viss token ska lämnas som den är eller mappas till ett nytt värde. Om du till exempel har ett programfel som reproduceras med `git rev-list sensitive -- secret.c` kan du köra:
+
+---------------------------------------------------
+$ git fast-export --anonymize --all \
+      --anonymize-map=sensitive:foo \
+      --anonymize-map=hemligt.c:bar.c \
+      >stream
+---------------------------------------------------
+
+Efter att du har importerat strömmen, kan du köra `git rev-list foo -- bar.c` i det anonymiserade arkivet.
+
+Observera att sökvägar och referensnamn delas upp i tokens vid snedstreckgränser. Kommandot ovan skulle anonymisera `subdir/hemligt.c` till något i stil med `path123/bar.c`; du kan sedan söka efter `bar.c` i det anonymiserade arkivet för att bestämma det slutliga sökvägsnamnet.
+
+För att göra det enklare att referera till det slutliga sökvägsnamnet, kan du mappa varje sökvägskomponent; så om du också anonymiserar `subdir` till `publicdir`, så blir det slutliga sökvägsnamnet `publicdir/bar.c`.
+
+BEGRÄNSNINGAR
+-------------
+
+Eftersom 'git fast-import' inte kan tagga träd, kommer du inte att kunna exportera linux.git-kodförrådet helt, eftersom det innehåller en tagg som refererar till ett träd istället för en incheckning.
+
+SE ÄVEN
+-------
+linkgit:git-fast-import[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

@@ -1,0 +1,250 @@
+git-bundle(1)
+=============
+
+NAMN
+----
+git-bundle - Flytta objekt och referenser via arkiv
+
+
+SYNOPSIS
+--------
+[verse]
+'git bundle' create [-q | --quiet | --progress]
+		    [--version=<version>] <fil> <git-rev-list-args>
+'git bundle' verify [-q | --quiet] <fil>
+'git bundle' list-heads <file> [<refnamn>...]
+'git bundle' unbundle [--progress] <file> [<refnamn>...]
+
+BESKRIVNING
+-----------
+
+Skapa, packa upp och manipulera "bundle"-filer. Buntar används för "offline"-överföring av Git-objekt utan en aktiv "server" på andra sidan nätverksanslutningen.
+
+De kan användas för att skapa både stegvisa och fullständiga säkerhetskopior av ett arkiv (se exemplet "fullständig säkerhetskopia" i "EXEMPEL"), och för att vidarebefordra statusen för referenserna i ett kodförråd till ett annat (se det andra exemplet).
+
+Git-kommandon som uppdaterar eller på annat sätt "läser" via protokoll som `ssh://` och `https://` kan också fungera på buntfiler. Det är möjligt att med linkgit:git-clone[1] skapa ett nytt kodförråd från en bunt, att använda linkgit:git-fetch[1] för att uppdatera från en, och att lista referenserna i den med linkgit:git-ls-remote[1]. Det finns inget motsvarande "skriv"-stöd, d.v.s. en 'git push' in i en bunt stöds inte.
+
+BUNTFORMAT
+----------
+
+Buntar är `.pack`-filer (se linkgit:git-pack-objects[1]) med en huvud som anger vilka referenser som finns i bunten.
+
+Precis som det packade arkiv-formatet kan buntar antingen vara fristående eller skapas med hjälp av exkluderingar. Se avsnittet "OBJEKT-FÖRUTSÄTTNINGAR" nedan.
+
+Buntar som skapas med hjälp av revisions-exkluderingar är "tunna paket" som skapas med hjälp av alternativet `--thin` till linkgit:git-pack-objects[1], och packas upp med hjälp av alternativet `--fix-thin` till linkgit:git-index-pack[1].
+
+Det finns inget alternativ att skapa ett "tjockt paket" när man använder revisions-exkluderingar, och användare bör inte oroa sig för skillnaden. Genom att använda "tunna paket" blir paket som skapas med undantag mindre i storlek. Att de är "tunna" under huven noteras här endast som en kuriositet och som en hänvisning till annan dokumentation.
+
+Se linkgit:gitformat-bundle[5] för mer information och diskussionen om "tunna paket" i linkgit:gitformat-pack[5] för ytterligare information.
+
+ALTERNATIV
+----------
+
+create [flaggor] <fil> <git-rev-list-args>::
+	Används för att skapa ett paket med namnet 'fil'. Detta kräver argumenten '<git-rev-list-args>' för att definiera paketets innehåll. 'flaggor' innehåller de alternativ som är specifika för underkommandot 'git bundle create'. Om 'fil' är `-` skrivs paketet till stdout.
+
+verify <fil>::
+	Används för att kontrollera att en bunt-fil är giltig och kommer att tillämpas korrekt på det aktuella kodförrådet. Detta inkluderar kontroller av själva bunt-formatet samt kontroll av att nödvändiga incheckningar finns och är fullständigt länkade i det aktuella kodförrådet. Sedan skriver 'git bundle' ut en lista över eventuella saknade incheckningar. Slutligen skrivs information om ytterligare funktioner, såsom "objektfilter", ut. Se "Förmågor" i linkgit:gitformat-bundle[5] för mer information. Avslutningskoden är noll för att lyckas, men kommer att vara annan än noll om bunt-filen är ogiltig. Om 'fil' är `-` läses bundle-filen från stdin.
+
+list-heads <fil>::
+	Listar referenserna som definierats i bunten. Om det följs av en lista med referenser, skrivs endast referenser som matchar de angivna ut. Om 'fil' är `-` läses bunten från stdin.
+
+unbundle <fil>::
+	Skickar objekten i bunten till 'git index-pack' för lagring i kodförrådet och skriver sedan ut namnen på alla definierade referenser. Om en lista med referenser anges, skrivs endast referenser som matchar de i listan ut. Detta kommando är egentligen ett lågnivåkommando, avsett att anropas endast av 'git fetch'. Om 'fil' är `-` läses paketet från stdin.
+
+<git-rev-list-args>::
+	En lista med argument, acceptabla för 'git rev-parse' och 'git rev-list' (och innehållande en namngiven referens, se SPECIFIERING AV REFERENSER nedan), som anger de specifika objekten och referenserna som ska transporteras. Till exempel gör 'master~10..master' att den aktuella master-referensen paketeras tillsammans med alla objekt som lagts till sedan dess 10:e förfader-incheckningen. Det finns ingen uttrycklig gräns för antalet referenser och objekt som kan paketeras.
+
+
+[<refnamn>...]::
+	En lista med referenser som används för att begränsa de referenser som rapporteras som tillgängliga. Detta är huvudsakligen användbart för 'git fetch', som förväntar sig att endast ta emot de referenser som efterfrågas och inte nödvändigtvis allt i paketet (i det här fallet fungerar 'git bundle' som 'git fetch-pack').
+
+--progress::
+	Förloppsstatus rapporteras som standard i standardfelströmmen när den är kopplad till en terminal, såvida inte -q anges. Denna flagga tvingar fram förloppsstatus även om standardfelströmmen inte dirigeras till en terminal.
+
+--version=<version>::
+	Ange bunt-versionen. Version 2 är det äldre formatet och kan endast användas med SHA-1-arkiv; den nyare versionen 3 innehåller funktioner som tillåter tillägg. Standardinställningen är det äldsta formatet som stöds, baserat på den hashalgoritm som används.
+
+-q::
+--quiet::
+	Denna flagga gör att kommandot inte rapporterar sina förlopp i standardfelströmmen.
+
+SPECIFIERING AV REFERENSER
+--------------------------
+
+Revisioner måste åtföljas av referensnamn för att paketeras i en bunt. Alternativt kan `--all` användas för att paketera alla referenser.
+
+Mer än en referens kan paketeras, och mer än en uppsättning förutsättning-objekt kan anges. De paketerade objekten är de som inte ingår i unionen av förutsättningarna.
+
+Kommandot 'git bundle create' löser referensnamnen åt dig med samma regler som `git rev-parse --abbrev-ref=loose`. Varje förutsättning kan anges explicit (t.ex. `^master~10`), eller implicit (t.ex. `master~10..master`, `--since=10.days.ago master`).
+
+Alla dessa enkla fall är OK (förutsatt att vi har en "master"- och en "next"-gren):
+
+----------------
+$ git bundle create master.bundle master
+$ echo master | git bundle create master.bundle --stdin
+$ git bundle create master-and-next.bundle master next
+$ (echo master; echo next) | git bundle create master-och-next.bundle --stdin
+----------------
+
+Och så är dessa (och samma men utelämnade `--stdin` exempel):
+
+----------------
+$ git bundle create recent-master.bundle master~10..master
+$ git bundle create recent-updates.bundle master~10..master next~5..next
+----------------
+
+Ett revisionsnamn eller ett intervall vars högra sida inte kan lösas upp till en referens accepteras inte:
+
+----------------
+$ git bundle create HEAD.bundle $(git rev-parse HEAD)
+fatal: Refusing to create empty bundle.
+$ git bundle create master-yesterday.bundle master~10..master~5
+fatal: Refusing to create empty bundle.
+----------------
+
+OBJEKT-FÖRUTSÄTTNINGAR
+----------------------
+
+När man skapar buntar är det möjligt att skapa en fristående bunt som kan delas upp i ett kodförråd utan gemensam historik, samt att tillhandahålla negativa revisioner för att exkludera objekt som behövs i de tidigare delarna av historiken.
+
+Att mata en revision som `ny` till `git bundle create` skapar en bunt-fil som innehåller alla objekt som kan nås från revisionen `ny`. Den bunten kan packas upp i vilket kodförråd som helst för att få en fullständig historik som leder till revisionen `ny`:
+
+----------------
+$ git bundle create full.bundle ny
+----------------
+
+Ett revisions-intervall som `gammal..ny` kommer att producera en bunt-fil som kräver att revisionen `old` (och alla objekt som kan nås från den) finns för att paketet ska kunna "avbuntas":
+
+----------------
+$ git bundle create full.bundle gammal..ny
+----------------
+
+En fristående bunt utan några förkrav kan extraheras var som helst, även till ett tomt kodförråd, eller klonas från (d.v.s. `nytt`, men inte `gammalt..ny`).
+
+Det är okej att vara på den försiktiga sidan, och orsaka att bunt-filen innehåller objekt som redan finns i destinationen, eftersom dessa ignoreras vid uppackning i destinationen.
+
+Om du vill tillhandahålla samma uppsättning referenser som en klon direkt från källkodförrådet skulle få, använd `--branches --tags` för `<git-rev-list-args>`.
+
+Kommandot 'git bundle verify' kan användas för att kontrollera om ditt mottagarkodförråd har de nödvändiga incheckningarna för en bunt.
+
+EXEMPEL
+-------
+
+Vi kommer att diskutera två fall:
+
+1. Att ta en fullständig säkerhetskopia av ett kodförråd
+2. Överföra historiken för ett kodförråd till en annan maskin när de två maskinerna inte har någon direkt anslutning
+
+Låt oss först överväga en fullständig säkerhetskopia av förvar. Följande kommando kommer att göra en fullständig säkerhetskopia av förvaret i den meningen att alla referenser ingår i bunten:
+
+----------------
+$ git bundle create backup.bundle --all
+----------------
+
+Men observera återigen att detta endast gäller för referenserna, d.v.s. du kommer endast att inkludera referenser och incheckningar som är åtkomliga från dessa referenser. Du kommer inte att inkludera andra lokala tillstånd, såsom innehållet i indexet, arbetsträdet, gömman, konfiguration per kodförråd, krokar, etc.
+
+Du kan senare återställa det kodförrådet genom att till exempel använda linkgit:git-clone[1]:
+
+----------------
+$ git clone backup.bundle <new directory>
+----------------
+
+I nästa exempel, anta att du vill överföra historiken från ett kodförråd R1 på maskin A till ett annat kodförråd R2 på maskin B. Av någon anledning är direkt anslutning mellan A och B inte tillåten, men vi kan flytta data från A till B via någon mekanism (CD, e-post, etc.). Vi vill uppdatera R2 med utveckling gjord på grenen master i R1.
+
+För att starta upp processen, kan du först skapa en bunt som inte har några förutsättningar. Du kan använda en tagg för att komma ihåg fram till vilken incheckning du senast bearbetade, för att göra det enkelt att senare uppdatera det andra kodförrådet med ett inkrementellt paket:
+
+----------------
+maskinA$ cd R1
+maskinA$ git bundle create fil.bundle master
+maskinA$ git tag -f senasteR2bunt master
+----------------
+
+Sedan överför du fil.bundle till målmaskin B. Eftersom detta bunt inte kräver att något befintligt objekt extraheras, kan du skapa ett nytt kodförråd på maskin B genom att klona från det:
+
+----------------
+maskinB$ git clone -b master /home/mej/tmp/fil.bundle R2
+----------------
+
+Det här kommer att definiera en fjärr som heter "origin" i det resulterande kodförrådet som låter dig uppdatera och hämta från paketet. Filen $GIT_DIR/config i R2 kommer att ha en post som denna:
+
+------------------------
+[remote "origin"]
+    url = /home/mej/tmp/fil.bundle
+    fetch = refs/heads/*:refs/remotes/origin/*
+------------------------
+
+För att uppdatera det resulterande kodförrådet mine.git kan du uppdatera efter att ha ersatt bunten som lagras i /home/me/tmp/file.bundle med inkrementella uppdateringar.
+
+Efter att ha arbetat lite mer i det ursprungliga kodförrådet kan du skapa en stegvis bunt för att uppdatera det andra kodförrådet:
+
+----------------
+maskinA$ cd R1
+maskinA$ git bundle create fil.bundle senasteR2bunt..master
+maskinA$ git tag -f senasteR2bunt master
+----------------
+
+Sedan överför du bunten till den andra maskinen för att ersätta /home/mej/tmp/fil.bundle, och hämtar från det.
+
+----------------
+maskinB$ cd R2
+maskinB$ git pull
+----------------
+
+Om du vet upp till vilken incheckning det avsedda mottagar-förvaret ska ha de nödvändiga objekten, kan du använda den kunskapen för att specificera förutsättningarna och ange en gräns för att begränsa revisionerna och objekten som ingår i det resulterande paketet. Det föregående exemplet använde taggen senasteR2bunten för detta ändamål, men du kan använda andra alternativ som du skulle ge till kommandot linkgit:git-log[1]. Här är fler exempel:
+
+Du kan använda en tagg som finns i båda:
+
+----------------
+$ git bundle create minbunt v1.0.0..master
+----------------
+
+Du kan använda en förutsättning baserad på tid:
+
+----------------
+$ git bundle create minbunt --since=10.days master
+----------------
+
+Du kan använda antalet incheckningar:
+
+----------------
+$ git bundle create minbunt -10 master
+----------------
+
+Du kan köra `git-bundle verify` för att se om du kan extrahera från ett paket som skapades med en förutsättning:
+
+----------------
+$ git bundle verify minbunt
+----------------
+
+Det här listar vilka incheckningar du måste ha för att extrahera från bunten och kommer att ge ett felmeddelande om du inte har dem.
+
+En bunt är, ur mottagarkodförrådets synvinkel, precis som ett vanligt kodförråd som det uppdaterar från. Du kan till exempel mappa referenser när du uppdaterar:
+
+----------------
+$ git fetch minbunt master:localRef
+----------------
+
+Du kan också se vilka referenser den erbjuder:
+
+----------------
+$ git ls-remote minbunt
+----------------
+
+DISKUSSION
+----------
+
+Ett naivt sätt att göra en fullständig säkerhetskopia av ett kodförråd är att använda något i stil med `cp -r <repository> <destination>`. Detta avråds eftersom kodförrådet kan skrivas till under kopieringen. I sin tur kan vissa filer på `<destination>` bli skadade.
+
+Det är därför det rekommenderas att använda Git-verktyg för att göra säkerhetskopior av kodförråd, antingen med detta kommando eller med t.ex. linkgit:git-clone[1]. Men kom ihåg att dessa verktyg inte hjälper dig att säkerhetskopiera tillstånd utöver referenser och incheckningar. Med andra ord hjälper de dig inte att säkerhetskopiera innehållet i indexet, arbetsträdet, gömman, kodförrådsspecifik konfiguration, krokar etc.
+
+Se även linkgit:gitfaq[7], avsnittet "ÖVERFÖRINGAR", för en diskussion om problemen vid filsynkronisering mellan system.
+
+FILFORMAT
+---------
+
+Se linkgit:gitformat-bundle[5].
+
+GIT
+---
+En del av linkgit:git[1]-sviten

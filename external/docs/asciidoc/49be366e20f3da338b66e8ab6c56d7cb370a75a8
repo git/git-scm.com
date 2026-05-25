@@ -1,0 +1,619 @@
+git-rev-parse(1)
+================
+
+NAMN
+----
+git-rev-parse - Välj ut och massera parametrar
+
+
+SYNOPSIS
+--------
+[verse]
+'git rev-parse' [<flaggor>] <arg>...
+
+BESKRIVNING
+-----------
+
+Många högnivåkommandon i Git använder en blandning av flaggor (dvs. parametrar som börjar med ett bindestreck '-') och parametrar avsedda för det underliggande 'git rev-list'-kommandot som de använder internt, samt flaggor och parametrar för andra kommandon som de använder efter 'git rev-list'. Det primära syftet med detta kommando är att låta anropande program skilja mellan dem. Det finns några andra operationslägen som inte har något att göra med ovanstående "hjälp med att analysera kommandoradsalternativ".
+
+Om inget annat anges kräver de flesta alternativ och driftlägen att kommandot körs inuti ett Git-kodförråd eller ett arbetsträd som kontrolleras av ett Git-kodförråd; annars ges ett fatalt fel.
+
+
+ALTERNATIV
+----------
+
+Driftslägen
+~~~~~~~~~~~
+
+Var och en av dessa alternativ måste visas först på kommandoraden.
+
+--parseopt::
+	Använd 'git rev-parse' i läget för alternativtolkning (se avsnittet PARSEOPT nedan). Kommandot i detta läge kan användas utanför ett kodförråd eller ett arbetsträd som styrs av ett kodförråd.
+
+--sq-quote::
+	Använd 'git rev-parse' i skalciteringsläge (se avsnittet SQ-QUOTE nedan). Till skillnad från alternativet `--sq` nedan gör läget endast citering. Ingen annan behandling görs av kommandoinmatningen. Kommandot i detta läge kan användas utanför ett kodförråd eller ett arbetsträd som styrs av ett kodförråd.
+
+Alternativ för --parseopt
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--keep-dashdash::
+	Meningsfullt endast i läget `--parseopt`. Säger åt alternativtolken att ekoa ut det första `--` som påträffas i stället för att hoppa över det.
+
+--stop-at-non-option::
+	Meningsfullt endast i läget `--parseopt`. Låter alternativtolken stanna vid det första argumentet som inte är ett alternativ. Detta kan användas för att tolka underkommandon som själva tar alternativ.
+
+--stuck-long::
+	Meningsfullt endast i läget `--parseopt`. Skriv ut alternativen i lång form om sådan finns, och med argumenten ihopskrivna.
+
+Alternativ för filtrering
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--revs-only::
+	Skriv inte ut flaggor och parametrar som inte är avsedda för kommandot 'git rev-list'.
+
+--no-revs::
+	Skriv inte ut flaggor och parametrar som är avsedda för kommandot 'git rev-list'.
+
+--flags::
+	Skriv inte ut parametrar som inte är flaggor.
+
+--no-flags::
+	Skriv inte ut flaggparametrar.
+
+Alternativ för utdata
+~~~~~~~~~~~~~~~~~~~~~
+
+--default <arg>::
+	Om användaren inte angav någon parameter, använd `<arg>` i stället.
+
+--prefix <arg>::
+	Agera som om 'git rev-parse' hade anropats från underkatalogen `<arg>` i arbetsträdet. Alla relativa filnamn löses upp som om de hade prefixet `<arg>` och skrivs ut i den formen.
++
+Det kan användas för att konvertera argument till ett kommando som körs i en underkatalog så att de fortfarande kan användas efter att man har flyttat till kodförrådets toppnivå. Till exempel:
++
+----
+prefix=$(git rev-parse --show-prefix)
+cd "$(git rev-parse --show-toplevel)"
+# rev-parse provides the -- needed for 'set'
+eval "set $(git rev-parse --sq --prefix "$prefix" -- "$@")"
+----
+
+--verify::
+	Verifiera att exakt en parameter har angetts och att den kan omvandlas till en rå 20-bytes SHA-1 som kan användas för att komma åt objektdatabasen. Om så är fallet, skriv ut den till standardutdata; annars ge fel.
++
+För att säkerställa att utdata verkligen namnger ett objekt i objektdatabasen och/eller kan användas som en specifik objekttyp, kan lägga till avskalningsoperatorn `^{type}` till parametern. Till exempel säkerställer `git rev-parse "$VAR^{commit}"` att `$VAR` namnger ett befintligt objekt som är incheckningslikt (dvs. en incheckning eller en kommenterad tagg som pekar på en incheckning). För att säkerställa att `$VAR` namnger ett befintligt objekt av valfri typ kan `git rev-parse "$VAR^{object}"` användas.
++
+Observera att vid verifiering av ett namn från en opålitlig källa är det klokt att använda `--end-of-options` så att namnargumentet inte misstolkas som ett annat alternativ.
+
+-q::
+--quiet::
+	Meningsfullt endast i läget `--verify`. Skriv inte ut något felmeddelande om det första argumentet inte är ett giltigt objektnamn; avsluta i stället tyst med en status som inte är noll. SHA-1 för giltiga objektnamn skrivs ut till stdout vid lyckat resultat.
+
+--sq::
+	Normalt görs utdatan en rad per flagga och parameter. Alternativet gör utdatan till en enda rad, korrekt citerad för användning i skal. Nyttigt när parametern förväntas innehålla blanksteg eller radbrytningar (t.ex. vid användning av pickaxe `-S` med 'git diff-{asterisk}'). Till skillnad från alternativet `--sq-quote` tolkas kommandoinmatningen fortfarande som vanligt.
+
+--short[=<length>]::
+	Samma som `--verify` men förkortar objektnamnet till ett unikt prefix med minst `length` tecken. Minsta längd är 4, standard är det effektiva värdet av konfigurationsvariabeln `core.abbrev` (se linkgit:git-config[1]).
+
+--not::
+	När objektnamn visas, prefixera dem med '{caret}' och ta bort '{caret}'-prefix från objektnamn som redan har ett sådant.
+
+--abbrev-ref[=(strict|loose)]::
+	Ett entydigt kortnamn för objektets namn. Alternativet core.warnAmbiguousRefs används för att välja strikt förkortningsläge.
+
+--symbolic::
+	Normalt skrivs objektnamn ut i SHA-1-form (med möjligt '{caret}'-prefix); alternativet gör att de skrivs ut i en form så nära den ursprungliga inmatningen som möjligt.
+
+--symbolic-full-name::
+	Det liknar --symbolic, men utelämnar indata som inte är referenser (d.v.s. gren- eller taggnamn; eller den mer explicit avtvetydigade formen "heads/master" när grenen "master" ska anges och det samtidigt finns en olyckligt namngiven tagg "master"), och visar dem som fullständiga referensnamn (t.ex. "refs/heads/master").
+
+--output-object-format=(sha1|sha256|storage)::
+
+	Tillåt att oid:er matas in från alla objektformat som det aktuella kodförrådet stöder.
++
+Att ange "sha1" översätter vid behov och returnerar en sha1-oid.
++
+Att ange "sha256" översätter vid behov och returnerar en sha256-oid.
++
+Att ange "storage" översätter vid behov och returnerar en oid kodad enligt lagringsformatets hashalgoritm.
+
+Alternativ för objekt
+~~~~~~~~~~~~~~~~~~~~~
+
+--all::
+	Visa alla referenser som hittas i `refs/`.
+
+--branches[=<pattern>]::
+--tags[=<pattern>]::
+--remotes[=<pattern>]::
+	Visa alla grenar, taggar respektive fjärrspårade grenar (dvs. referenser i `refs/heads`, `refs/tags` respektive `refs/remotes`).
++
+Om ett `pattern` anges visas endast referenser som matchar det angivna shell-globmönstret. Om mönstret inte innehåller ett globtecken (`?`, `*` eller `[`), görs det om till en prefixmatchning genom att lägga till `/*`.
+
+--glob=<pattern>::
+	Visa alla referenser som matchar shell-globmönstret `pattern`. Om mönstret inte börjar med `refs/` läggs det till automatiskt i början. Om mönstret inte innehåller ett globtecken (`?`, `*` eller `[`), görs det om till en prefixmatchning genom att lägga till `/*`.
+
+--exclude=<glob-pattern>::
+	Ta inte med referenser som matchar '<glob-pattern>' som nästa `--all`, `--branches`, `--tags`, `--remotes` eller `--glob` annars skulle beakta. Upprepningar av detta alternativ ackumulerar exkluderingsmönster fram till nästa `--all`, `--branches`, `--tags`, `--remotes` eller `--glob` (andra alternativ eller argument rensar inte ackumulerade mönster).
++
+Mönstren som anges ska inte börja med `refs/heads`, `refs/tags` eller `refs/remotes` när de tillämpas på `--branches`, `--tags` respektive `--remotes`, och de måste börja med `refs/` när de tillämpas på `--glob` eller `--all`. Om ett efterföljande '/{asterisk}' är avsett måste det anges explicit.
+
+--exclude-hidden=(fetch|receive|uploadpack)::
+	Inkludera inte referenser som skulle döljas av `git-fetch`, `git-receive-pack` eller `git-upload-pack` enligt konfigurationen `fetch.hideRefs`, `receive.hideRefs` eller `uploadpack.hideRefs` tillsammans med `transfer.hideRefs` (se linkgit:git-config[1]). Detta alternativ påverkar nästa pseudo-ref-alternativ `--all` eller `--glob` och nollställs efter att de har behandlats.
+
+--disambiguate=<prefix>::
+	Visa varje objekt vars namn börjar med det angivna prefixet. <prefix> måste vara minst 4 hexadecimala siffror långt för att undvika att av misstag lista vartenda objekt i kodförrådet.
+
+Alternativ för filer
+~~~~~~~~~~~~~~~~~~~~
+
+--local-env-vars::
+	Lista GIT_*-miljövariabler som är lokala för kodförrådet (t.ex. GIT_DIR eller GIT_WORK_TREE, men inte GIT_EDITOR). Endast variabelnamnen listas, inte deras värden, även om de är satta.
+
+--path-format=(absolute|relative)::
+	Styr beteendet för vissa andra alternativ. Om det anges som absolute blir sökvägarna som skrivs ut av alternativen absoluta och kanoniska. Om det anges som relative blir sökvägarna relativa till den aktuella arbetskatalogen, om det är möjligt. Standardvärdet beror på alternativet.
++
+Alternativet kan anges flera gånger och påverkar endast argumenten som följer efter det på kommandoraden, antingen till slutet av kommandoraden eller till nästa förekomst av samma alternativ.
+
+Följande alternativ påverkas av `--path-format`:
+
+--git-dir::
+	Visa `$GIT_DIR` om det är definierat. Annars visas sökvägen till .git-katalogen. Den visade sökvägen är, när den är relativ, relativ till den aktuella arbetskatalogen.
++
+Om `$GIT_DIR` inte är definierat och den aktuella katalogen inte identifieras som liggande i ett Git-kodförråd eller arbetsträd, skriv ett meddelande till stderr och avsluta med status som inte är noll.
+
+--git-common-dir::
+	Visa `$GIT_COMMON_DIR` om det är definierat, annars `$GIT_DIR`.
+
+--resolve-git-dir <path>::
+	Kontrollera om <path> är ett giltigt kodförråd eller en gitfile som pekar på ett giltigt kodförråd, och skriv ut kodförrådets plats. Om <path> är en gitfile skrivs den upplösta sökvägen till det verkliga kodförrådet ut.
+
+--git-path <path>::
+	Lös upp "$GIT_DIR/<path>" och ta hänsyn till andra variabler för omlokalisering av sökvägar, såsom $GIT_OBJECT_DIRECTORY och $GIT_INDEX_FILE. Till exempel: om $GIT_OBJECT_DIRECTORY är satt till /foo/bar så returnerar "git rev-parse --git-path objects/abc" /foo/bar/abc.
+
+--show-toplevel::
+	Visa sökvägen (som standard absolut) till arbetsträdets toppnivåkatalog. Om inget arbetsträd finns, rapportera fel.
+
+--show-superproject-working-tree::
+	Visa den absoluta sökvägen till roten för superprojektets arbetsträd (om det finns) som använder det aktuella kodförrådet som undermodul. Skriver inte ut något om det aktuella kodförrådet inte används som undermodul av något projekt.
+
+--shared-index-path::
+	Visa sökvägen till den delade indexfilen i split-index-läge, eller tomt om split-index-läge inte används.
+
+Följande alternativ påverkas inte av `--path-format`:
+
+--absolute-git-dir::
+	Som `--git-dir`, men utdatan är alltid den kanoniserade absoluta sökvägen.
+
+--is-inside-git-dir::
+	När den aktuella arbetskatalogen ligger under kodförrådskatalogen, skriv "true", annars "false".
+
+--is-inside-work-tree::
+	När den aktuella arbetskatalogen ligger i kodförrådets arbetsträd, skriv "true", annars "false".
+
+--is-bare-repository::
+	När kodförrådet är bart, skriv "true", annars "false".
+
+--is-shallow-repository::
+	När kodförrådet är grunt, skriv "true", annars "false".
+
+--show-cdup::
+	När kommandot anropas från en underkatalog, visa sökvägen till toppnivåkatalogen relativt den aktuella katalogen (vanligen en följd av "../", eller en tom sträng).
+
+--show-prefix::
+	När kommandot anropas från en underkatalog, visa sökvägen för den aktuella katalogen relativt toppnivåkatalogen.
+
+--show-object-format[=(storage|input|output|compat)]::
+	Visa objektformatet (hashalgoritmen) som används i kodförrådet för lagring i `.git`-katalogen, indata, utdata eller kompatibilitet. För indata kan flera algoritmer skrivas ut, separerade med blanksteg. Om `compat` begärs och ingen kompatibilitetsalgoritm är aktiverad skrivs en tom rad ut. Om inget anges är standard "storage".
+
+--show-ref-format::
+	Visa lagringsformatet för referenser som används i kodförrådet.
+
+
+Övriga alternativ
+~~~~~~~~~~~~~~~~~
+
+--since=<datestring>::
+--after=<datestring>::
+	Tolka datumsträngen och skriv ut motsvarande parameter `--max-age=` för 'git rev-list'.
+
+--until=<datestring>::
+--before=<datestring>::
+	Tolka datumsträngen och skriv ut motsvarande parameter `--min-age=` för 'git rev-list'.
+
+<arg>...::
+	Flaggor och parametrar som ska tolkas.
+
+
+SPECIFICERING AV REVIDERINGAR
+-----------------------------
+
+En revisionsparameter '<rev>' namnger vanligtvis, men inte nödvändigtvis, ett incheckningsobjekt. Den använder det som kallas en 'utökad SHA-1'-syntax. Här är olika sätt att stava objektnamn. De som listas nära slutet av den här listan namnger träd och blobbar som finns i en incheckning.
+
+NOTE: Det här dokumentet visar den "råa" syntaxen så som den visas i git. Skalet och andra användargränssnitt kan kräva ytterligare citatering för att skydda specialtecken och undvika orddelning.
+
+'<sha1>', t.ex. 'dae86e1950b1277e545cee180551750029cfe735', 'dae86e'::
+  Det fullständiga SHA-1-objektnamnet (en hexadecimal sträng på 40 byte), eller en inledande delsträng som är unik inom kodförrådet. T.ex. dae86e1950b1277e545cee180551750029cfe735 och dae86e namnger båda samma incheckningsobjekt om det inte finns något annat objekt i ditt kodförråd vars objektnamn börjar med dae86e.
+
+'<beskrivUtdata>', t.ex. 'v1.7.4.2-679-g3bee7fb'::
+  Utdata från `git describe`; d.v.s. en närmaste tagg, valfritt följt av ett bindestreck och ett antal incheckningar, följt av ett bindestreck, ett 'g' och ett förkortat objektnamn.
+
+'<refnamn>', t.ex. 'master', 'heads/master', 'refs/heads/master'::
+  Ett symboliskt referensnamn. T.ex. 'master' betyder vanligtvis det incheckningsobjekt som refereras av 'refs/heads/master'. Om du råkar ha både 'heads/master' och 'tags/master' kan du uttryckligen säga 'heads/master' för att tala om för Git vilket du menar. När det är tvetydigt, defineras ett '<refnamn>' genom att ta den första matchningen i följande regler:
++
+  . Om '$GIT_DIR/<refnamn>' existerar, är det vad du menar (detta är vanligtvis bara användbart för `HEAD`, `FETCH_HEAD`, `ORIG_HEAD`, `MERGE_HEAD`, `REBASE_HEAD`, `REVERT_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_HEAD` och `AUTO_MERGE`);
+
+  . annars, 'refs/<refnamn>' om det finns;
+
+  . annars, 'refs/tags/<refnamn>' om det finns;
+
+  . annars, 'refs/heads/<refnamn>' om det finns;
+
+  . annars, 'refs/remotes/<refnamn>' om det finns;
+
+  . annars, 'refs/remotes/<refnamn>/HEAD' om det finns.
+
++
+  `HEAD`:::
+    namnger den incheckning som du baserade ändringarna i arbetsträdet på.
+  `FETCH_HEAD`:::
+    registrerar grenen som du hämtade från ett fjärrkodförråd med
+    din senaste `git fetch`-invokering.
+  `ORIG_HEAD`:::
+    skapas av kommandon som flyttar din `HEAD` på ett drastiskt sätt (`git
+    am`, `git merge`, `git rebase`, `git reset`), för att registrera positionen
+    för `HEAD` innan de körs, så att du enkelt kan ändra
+    grenens top tillbaka till tillståndet innan du körde dem.
+  `MERGE_HEAD`:::
+    registrerar den/de incheckning(er) som du sammanslår i din gren när du
+    kör `git merge`.
+  `REBASE_HEAD`:::
+    under en rebase, registrerar den incheckningen där operationen för
+    närvarande stoppas, antingen på grund av konflikter eller ett 
+    `edit`-kommando i en interaktiv rebase.
+  `REVERT_HEAD`:::
+    registrerar den incheckning som du återställer när du kör `git revert`.
+  `CHERRY_PICK_HEAD`:::
+    registrerar den incheckning som du plockar som ett russin i kakan 
+    är du kör `git cherry-pick`.
+  `BISECT_HEAD`:::
+    registrerar den aktuella incheckning som ska testas när du kör `git bisect
+    --no-checkout`.
+  `AUTO_MERGE`:::
+    registrerar ett trädobjekt som motsvarar det tillstånd som 
+    'ort'-sammanslagningsstrategin skrev till arbetsträdet när en 
+    sammanslagningsoperation resulterade i konflikter.
+
++
+Observera att alla 'refs/*'-fall ovan kan komma antingen från katalogen `$GIT_DIR/refs` eller från filen `$GIT_DIR/packed-refs`. Även om referensnamnskodningen inte är angiven, föredras UTF-8 eftersom viss utdatabehandling kan anta referensnamn i UTF-8.
+
+'@'::
+  '@' ensamt är en genväg för `HEAD`.
+
+'[<refnamn>]@{<datum>}', t.ex. 'master@\{yesterday\}', 'HEAD@{5 minutes ago}'::
+  En referens följt av suffixet '@' med en datumspecifikation inom ett par klammerpar (t.ex. '\{yesterday\}', '{1 month 2 weeks 3 days 1 hour 1 second ago}' eller '{1979-02-26 18:30:00}') anger värdet för referensen vid en tidigare tidpunkt. Detta suffix får endast användas omedelbart efter ett referensnamn och referensen måste ha en befintlig logg ('$GIT_DIR/logs/<ref>'). Observera att detta söker upp tillståndet för din *lokala* referens vid en given tidpunkt; t.ex. vad som fanns i din lokala 'master'-gren förra veckan. Om du vill titta på incheckningar som gjordes under vissa tidpunkter, se `--since` och `--until`.
+
+'<refnamn>@{<n>}', t.ex. 'master@\{1\}'::
+  En referens följt av suffixet '@' med en ordinalspecifikation inom ett par klammerpar (t.ex. '\{1\}', '\{15\}') anger det n:te föregående värdet för den referensen. Till exempel är 'master@\{1\}' det omedelbart föregående värdet för 'master' medan 'master@\{5\}' är det femte föregående värdet för 'master'. Detta suffix får endast användas omedelbart efter ett referensnamn och referensen måste ha en befintlig logg ('$GIT_DIR/logs/<refnamn>').
+
+'@{<n>}', t.ex. '@\{1\}'::
+  Du kan använda '@'-konstruktionen med en tom ref-del för att komma till en reflog-post för den aktuella grenen. Om du till exempel är på grenen 'blabla' betyder '@\{1\}' samma sak som 'blabla@\{1\}'.
+
+'@{-<n>}', t.ex. '@{-1}'::
+  Konstruktionen '@{-<n>}' betyder den <n>:e gren/incheckning som checkats ut före den nuvarande.
+
+'[<branchname>]@\{upstream\}', e.g. 'master@\{upstream\}', '@\{u\}'::
+  En gren B kan konfigureras för att bygga ovanpå en gren X (konfigurerad med `branch.<namn>.merge`) på en fjärr R (konfigurerad med `branch.<namn>.remote`). B@{u} refererar till den fjärrspårande grenen för gren X som tas från fjärr R, vanligtvis hittad på `refs/remotes/R/X`.
+
+'[<branchname>]@\{push\}', e.g. 'master@\{push\}', '@\{push\}'::
+  Suffixet '@\{push}' rapporterar grenen "dit vi skulle skicka till" om `git push` kördes medan `grennamn` checkades ut (eller den aktuella `HEAD` om inget grennamn anges). Precis som för '@\{upstream\}' rapporterar vi den fjärrspårande grenen som motsvarar den grenen på fjärrdatorn.
++
+Här är ett exempel för att göra det tydligare:
++
+------------------------------
+$ git config push.default current
+$ git config remote.pushdefault mingren
+$ git switch -c mybranch origin/master
+
+$ git rev-parse --symbolic-full-name @{upstream}
+refs/remotes/origin/master
+
+$ git rev-parse --symbolic-full-name @{push}
+refs/remotes/mingren/mybranch
+------------------------------
++
+Observera i exemplet att vi skapar ett triangulärt arbetsflöde, där vi hämtar från en plats och skickar till en annan. I ett icke-triangulärt arbetsflöde är '@\{push}' detsamma som '@\{upstream}', och det finns inget behov av det.
++
+Det här suffixet accepteras även när det stavas med versaler och betyder samma sak oavsett skiftläge.
+
+'<rev>{caret}[<n>]', t.ex. 'HEAD{caret}, v1.5.1{caret}0'::
+  Ett suffix '{caret}' till en revisionsparameter avser den första föräldern till det incheckningsobjektet. '{caret}<n>' avser den <n>:te föräldern (dvs. '<rev>{caret}' är ekvivalent med '<rev>{caret}1'). Som en specialregel avser '<rev>{caret}0' själva incheckningsobjektet och används när '<rev>' är objektnamnet på ett taggobjekt som refererar till ett incheckningsobjekt.
+
+'<rev>{tilde}[<n>]', t.ex. 'HEAD{tilde}, master{tilde}3'::
+  Ett suffix '{tilde}' till en revisionsparameter avser den första föräldern till det incheckningsobjektet. Ett suffix '{tilde}<n>' till en revisionsparameter avser det incheckningsobjekt som är den <n>:e generationens förfader till det namngivna incheckningsobjektet, efter endast de första föräldrarna. Dvs. '<rev>{tilde}3' är ekvivalent med '<rev>{caret}{caret}{caret}' vilket är ekvivalent med '<rev>{caret}1{caret}1{caret}1'. Se nedan för en illustration av användningen av denna form.
+
+'<rev>{caret}{<type>}', t.ex. 'v0.99.8{caret}\{commit\}'::
+  Ett suffix '{caret}' följt av ett objekttypnamn inom klammerpar betyder att objektet vid '<rev>' avrefereras rekursivt tills ett objekt av typen '<type>' hittas eller objektet inte längre kan avrefereras (i vilket fall ett fel uppstår). Till exempel, om '<rev>' är ett incheckningslikt objekt, beskriver '<rev>{caret}\{commit\}' motsvarande incheckningsobjekt. På liknande sätt, om '<rev>' är ett trädlikt objekt, beskriver '<rev>{caret}\{tree\}' motsvarande trädobjekt. '<rev>{caret}0' är en förkortning för '<rev>{caret}\{commit\}'.
++
+'<rev>{caret}\{object\}' kan användas för att säkerställa att '<rev>' namnger ett objekt som existerar, utan att '<rev>' behöver vara en tagg, och utan att avreferensera '<rev>'; eftersom en tagg redan är ett objekt behöver den inte avreferenseras ens en gång för att komma till ett objekt.
++
+'<rev>{caret}\{tag\}' kan användas för att säkerställa att '<rev>' identifierar ett befintligt taggobjekt.
+
+'<rev>{caret}{}', t.ex. 'v0.99.8{caret}{}'::
+  Ett suffix '{caret}' följt av ett tomt parenteser betyder att objektet kan vara en tagg och avreferera rekursivt tills ett objekt som inte är en tagg hittas.
+
+'<rev>{caret}{/<text>}', t.ex. 'HEAD^{/fixa otäck programfel}'::
+  Ett suffix '{caret}' till en revisionsparameter, följt av ett par klammerpar som innehåller en text inledd av ett snedstreck, är samma som syntaxen ':/fix nasty bug' nedan förutom att den returnerar den yngsta matchande incheckningen som är nåbar från '<rev>' före '{caret}'.
+
+':/<text>', t.ex. ':/fixa otäck programfel'::
+  Ett kolon, följt av ett snedstreck, följt av en text, namnger en incheckning vars incheckningsmeddelande matchar det angivna reguljära uttrycket. Detta namn returnerar den yngsta matchande incheckningen som är nåbar från vilken referens som helst, inklusive HEAD. Det reguljära uttrycket kan matcha vilken del som helst av incheckningsmeddelandet. För att matcha meddelanden som börjar med en sträng kan man använda t.ex. ':/^foo'. Den speciella sekvensen ':/!' är reserverad för modifierare av det som matchas. ':/!-foo' utför en negativ matchning, medan ':/!!foo' matchar ett bokstavligt '!'-tecken, följt av 'foo'. Alla andra sekvenser som börjar med ':/!' är reserverade för tillfället. Beroende på den givna texten kan skalets orddelningsregler kräva ytterligare citering.
+
+'<rev>:<sökväg>', t.ex. 'HEAD:README', 'master:./README'::
+  Ett suffix ':' följt av en sökväg namnger blobben eller trädet vid den givna sökvägen i det trädlika objekt som namnges av delen före kolon. En sökväg som börjar med './' eller '../' är relativ till den aktuella arbetskatalogen. Den givna sökvägen kommer att konverteras till att vara relativ till arbetskatalogens rotkatalog. Detta är mest användbart för att adressera en blob eller ett träd från en incheckning eller ett träd som har samma trädstruktur som arbetskatalogen.
+
+':[<n>:]<sökväg>', t.ex. ':0:README', ':README'::
+  Ett kolon, valfritt följt av ett stegnummer (0 till 3) och ett kolon, följt av en sökväg, namnger ett blobobjekt i indexet vid den angivna sökvägen. Ett saknat stegnummer (och kolonet som följer det) namnger en steg 0-post. Under en sammanslagning är steg 1 den gemensamma förfadern, steg 2 är målgrenens version (vanligtvis den aktuella grenen) och steg 3 är versionen från grenen som sammanfogas.
+
+Här är en illustration av Jon Loeliger. Både incheckningsnoderna B och C är föräldrar till incheckningsnod A. Föräldraincheckningar är ordnade från vänster till höger.
+
+........................................
+G   H   I   J
+ \ /     \ /
+  D   E   F
+   \  |  / \
+    \ | /   |
+     \|/    |
+      B     C
+       \   /
+        \ /
+         A
+........................................
+
+    A =      = A^0
+    B = A^   = A^1     = A~1
+    C =      = A^2
+    D = A^^  = A^1^1   = A~2
+    E = B^2  = A^^2
+    F = B^3  = A^^3
+    G = A^^^ = A^1^1^1 = A~3
+    H = D^2  = B^^2    = A^^^2  = A~2^2
+    I = F^   = B^3^    = A^^3^
+    J = F^2  = B^3^2   = A^^3^2
+
+
+ANGE INTERVALL
+--------------
+
+Kommandon för historikgenomgång som `git log` fungerar på en uppsättning incheckningar, inte bara en enda incheckning.
+
+För dessa kommandon innebär angivandet av en enda revision, med hjälp av notationen som beskrivs i föregående avsnitt, att uppsättningen incheckningar är "nåbara" från den givna incheckningen.
+
+Att ange flera revisioner innebär den uppsättning incheckningar som kan nås från vilken som helst av de givna incheckningarna.
+
+En inchecknings nåbara uppsättning är själva incheckningen och incheckningar i dess förfäders-kedja.
+
+Det finns flera notationer för att specificera en uppsättning sammankopplade incheckningar (kallat ett "revisionsintervall"), illustrerade nedan.
+
+
+Inchecknings Exlcuderingar
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+'{caret}<rev>' (caret) Notation::
+ För att exkludera incheckningar som kan nås från en incheckning, används en prefix '{caret}' notation. T.ex. betyder '{caret}r1 r2' incheckningar som kan nås från 'r2' men exkluderar de som kan nås från 'r1' (dvs. 'r1' och dess föregångare).
+
+Dotted Range Notations
+~~~~~~~~~~~~~~~~~~~~~~
+
+'..' (två punkter) Avståndsnotationen::
+ Set-operationen '{caret}r1 r2' förekommer så ofta att det finns en förkortning för den. När du har två incheckningar 'r1' och 'r2' (namngivna enligt syntaxen som förklaras i SPECIFIKERA REVISIONER ovan), kan du fråga efter incheckningar som är nåbara från r2 exklusive de som är nåbara från r1 med '{caret}r1 r2' och det kan skrivas som 'r1..r2'.
+
+'\...' (tre punkter) Symmetrisk differensnotationen::
+ En liknande notation 'r1\...r2' kallas symmetrisk skillnad mellan 'r1' och 'r2' och definieras som 'r1 r2 --not $(git merge-base --all r1 r2)'. Det är den mängd incheckningar som kan nås från antingen 'r1' (vänster sida) eller 'r2' (höger sida) men inte från båda.
+
+I dessa två förkortningsnotationer, kan du utelämna en ände och låta den vara standardvärdet HEAD. Till exempel är 'origin..' en förkortning för 'origin..HEAD' och frågar "Vad gjorde jag sedan jag förgrenads från origin-grenen?". På liknande sätt är '..origin' en förkortning för 'HEAD..origin' och frågar "Vad gjorde origo sedan jag förgrenads från dem?". Observera att '..' skulle betyda 'HEAD..HEAD' vilket är ett tomt intervall som både kan nås och inte kan nås från HEAD.
+
+Kommandon som är specifikt utformade för att ta två distinkta intervall (t.ex. "git range-diff R1 R2" för att jämföra två intervall) existerar, men de är undantag. Om inget annat anges, arbetar alla "git"-kommandon som arbetar på en uppsättning incheckningar på ett enda revisionsområde. Med andra ord, att skriva två "tvåpunktsintervallnotationer" bredvid varandra, t.ex.
+
+    $ git log A..B C..D
+
+anger *inte* två revisionsintervall för de flesta kommandon. I stället kommer den att namnge en enda sammankopplad uppsättning incheckningar, d.v.s. de som är nåbara från antingen B eller D men inte kan nås från varken A eller C. I en linjär historik som denna:
+
+    ---A---B---o---o---C---D
+
+eftersom A och B kan nås från C, är revisionsintervallet som anges av dessa två prickade intervall en enda incheckning D.
+
+
+Other <rev>{caret} Parent Shorthand Notations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tre andra förkortningar finns, särskilt användbara för sammanslagningsincheckningar, för att namnge en uppsättning som bildas av en incheckning och dess föräldraincheckningar.
+
+Notationen 'r1{caret}@' betyder alla föräldrar till 'r1'.
+
+Notationen 'r1{caret}!' inkluderar incheckning 'r1' men exkluderar alla dess föräldrar. Denna notation betecknar i sig den enskilda incheckningen 'r1'.
+
+Notationen '<rev>{caret}-[<n>]' inkluderar '<rev>' men exkluderar den <n>:te föräldern (dvs. en förkortning för '<rev>{caret}<n>..<rev>'), med '<n>' = 1 om den inte anges. Detta är vanligtvis användbart för sammanslagningsincheckningar där du bara kan skicka '<incheckning>{caret}-' för att hämta alla incheckningar i grenen som slogs samman i sammanslagningsincheckningen '<incheckning>' (inklusive '<incheckningen>' själv).
+
+Medan '<rev>{caret}<n>' handlade om att ange en enda incheckningsförälder, tar dessa tre notationer även hänsyn till dess föräldrar. Till exempel kan du säga 'HEAD{caret}2{caret}@', men du kan inte säga 'HEAD{caret}@{caret}2'.
+
+Revision Range Summary
+----------------------
+
+'<rev>'::
+	Inkludera incheckningar som är nåbara från <rev> (dvs. <rev> och dess föregångare).
+
+'{caret}<rev>'::
+	Exkludera incheckningar som är nåbara från <rev> (dvs. <rev> och dess förfäder).
+
+'<rev1>..<rev2>'::
+	Inkludera incheckningar som kan nås från <rev2> men exkludera de som kan nås från <rev1>. När antingen <rev1> eller <rev2> utelämnas, används `HEAD` som standard.
+
+'<rev1>\...<rev2>'::
+	Inkludera incheckningar som kan nås från antingen <rev1> eller <rev2> men exkludera de som kan nås från båda. När antingen <rev1> eller <rev2> utelämnas, används `HEAD` som standard.
+
+'<rev>{caret}@', t.ex. 'HEAD{caret}@'::
+  Ett suffix '{caret}' följt av ett at-tecken är detsamma som att lista alla föräldrar till '<rev>' (vilket betyder, att inkludera allt som kan nås från dess föräldrar, men inte själva incheckningen).
+
+'<rev>{caret}!', t.ex. 'HEAD{caret}!'::
+  Ett suffix '{caret}' följt av ett utropstecken är detsamma som att ge incheckning '<rev>' och alla dess föräldrar prefixet '{caret}' för att exkludera dem (och deras förfäder).
+
+'<rev>{caret}-<n>', t.ex. 'HEAD{caret}-, HEAD{caret}-2'::
+	Motsvarande '<rev>{caret}<n>..<rev>', med '<n>' = 1 om inte angiven.
+
+Här är ett antal exempel som använder Loeliger-illustrationen ovan, där varje steg i notationens expansion och val noggrant anges:
+
+....
+   Args   Utökade argument    Valda incheckningar
+   D                            G H D
+   D F                          G H I J D F
+   ^G D                         H D
+   ^D B                         E I J F B
+   ^D B C                       E I J F B C
+   C                            I J F C
+   B..C   = ^B C                C
+   B...C  = B ^F C              G H D E B C
+   B^-    = B^..B
+	  = ^B^1 B              E I J F B
+   C^@    = C^1
+	  = F                   I J F
+   B^@    = B^1 B^2 B^3
+	  = D E F               D G H E F I J
+   C^!    = C ^C^@
+	  = C ^C^1
+	  = C ^F                C
+   B^!    = B ^B^@
+	  = B ^B^1 ^B^2 ^B^3
+	  = B ^D ^E ^F          B
+   F^! D  = F ^I ^J D           G H D F
+....
+[]
+
+PARSEOPT
+--------
+
+I läget `--parseopt` hjälper 'git rev-parse' till att bearbeta alternativ så att skalskript får samma möjligheter som inbyggda C-kommandon. Det fungerar som en normaliserare av alternativ (t.ex. delar upp sammanslagna kortflaggor), ungefär som `getopt(1)`.
+
+Det tar emot specifikationen av de alternativ som ska tolkas via standardinmatning och ekar via standardutmatning en sträng som lämpar sig för `sh(1)` `eval` för att ersätta argumenten med normaliserade sådana. Vid fel skrivs användningstext till standardfelströmmen och kommandot avslutas med kod 129.
+
+Obs: Resultatet bör citeras när det skickas till `eval`. Se exempel nedan.
+
+Inmatningsformat
+~~~~~~~~~~~~~~~~
+
+Inmatningsformatet för 'git rev-parse --parseopt' är helt textbaserat. Det har två delar, åtskilda av en rad som endast innehåller `--`. Raderna före avskiljaren (ska vara en eller flera) används för användningstexten. Raderna efter avskiljaren beskriver alternativen.
+
+Varje alternativrad har följande format:
+
+------------
+<opt-spec><flags>*<arg-hint>? SP+ help LF
+------------
+
+`<opt-spec>`::
+	Formatet är den korta alternativbokstaven följd av det långa alternativnamnet, separerade med kommatecken. Båda delarna krävs inte, men minst en krävs. Får inte innehålla något av tecknen i `<flags>`. `h,help`, `dry-run` och `f` är exempel på korrekta `<opt-spec>`.
+
+`<flags>`::
+	`<flags>` är `*`, `=`, `?` eller `!`.
+	* Använd `=` om alternativet tar ett argument.
+
+	* Använd `?` för att ange att alternativet tar ett valfritt argument. Läget `--stuck-long` är troligen det som bör användas för att kunna tolka det valfria argumentet entydigt.
+
+	* Använd `*` för att ange att detta alternativ inte ska listas i användningstexten som genereras för argumentet `-h`. Det visas för `--help-all` enligt dokumentationen i linkgit:gitcli[7].
+
+	* Använd `!` för att inte göra det motsvarande negerade långa alternativet tillgängligt.
+
+`<arg-hint>`::
+	`<arg-hint>`, om det anges, används som namn på argumentet i hjälputmatningen för alternativ som tar argument. `<arg-hint>` avslutas vid första blanktecknet. Det är brukligt att använda bindestreck för att separera ord i argumenttips med flera ord.
+
+Resterande del av raden, efter att blanksteg tagits bort, används som hjälptext kopplad till alternativet.
+
+Tomma rader ignoreras, och rader som inte matchar denna specifikation används som huvuden för alternativgrupper (börja raden med ett mellanslag för att skapa sådana rader med flit).
+
+Exempel
+~~~~~~~
+
+------------
+OPTS_SPEC="\
+some-command [<options>] <args>...
+
+some-command does foo and bar!
+--
+h,help! visa hjälpen
+
+foo some nifty option --foo bar= some cool option --bar with an argument baz=arg another cool option --baz with a named argument qux?path qux may take a path argument but has meaning by itself
+
+  En alternativgruppsrubrik
+C?        alternativ C med ett valfritt argument"
+
+eval "$(echo "$OPTS_SPEC" | git rev-parse --parseopt -- "$@" || echo exit $?)"
+------------
+
+
+Användningstext
+~~~~~~~~~~~~~~~
+
+När `"$@"` är `-h` eller `--help` i exemplet ovan visas följande användningstext:
+
+------------
+usage: some-command [<options>] <args>...
+
+    some-command does foo and bar!
+
+    -h, --help            show the help
+    --[no-]foo            some nifty option --foo
+    --[no-]bar ...        some cool option --bar with an argument
+    --[no-]baz <arg>      another cool option --baz with a named argument
+    --[no-]qux[=<path>]   qux may take a path argument but has meaning by itself
+
+En rubrik för en alternativgrupp
+    -C[...]               alternativ C med ett valfritt argument
+------------
+
+SQ-QUOTE
+--------
+
+I läget `--sq-quote` ekar 'git rev-parse' en enda rad till standardutdata som lämpar sig för `sh(1)` `eval`. Raden skapas genom att normalisera argumenten efter `--sq-quote`. Ingen annan behandling än citering av argumenten görs.
+
+Om kommandoinmatningen fortfarande ska tolkas som vanligt av 'git rev-parse' innan utdatan skalciteras, se alternativet `--sq`.
+
+Exempel
+~~~~~~~
+
+------------
+$ cat >your-git-script.sh <<\EOF
+#!/bin/sh
+args=$(git rev-parse --sq-quote "$@")   # quote user-supplied arguments
+command="git frotz -n24 $args"          # and use it inside a handcrafted
+					# command line
+eval "$command"
+EOF
+
+$ sh your-git-script.sh "a b'c"
+------------
+
+EXEMPEL
+-------
+
+* Skriv ut objektnamnet för den aktuella incheckningen:
++
+------------
+$ git rev-parse --verify HEAD
+------------
+
+* Skriv ut objektnamnet för incheckningen från revisionen i skalvariabeln $REV:
++
+------------
+$ git rev-parse --verify --end-of-options $REV^{commit}
+------------
++
+Det ger fel om $REV är tom eller inte en giltig revision.
+
+* Liknande som ovan:
++
+------------
+$ git rev-parse --default master --verify --end-of-options $REV
+------------
++
+men om $REV är tom skrivs incheckningens objektnamn från master ut.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

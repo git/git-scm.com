@@ -1,0 +1,360 @@
+git-fsck(1)
+===========
+
+名称
+--
+git-fsck - 验证数据库中对象的连接性和有效性
+
+
+概述
+--
+[verse]
+'git fsck' [--tags] [--root] [--unreachable] [--cache] [--no-reflogs]
+	 [--[no-]full] [--strict] [--verbose] [--lost-found]
+	 [--[no-]dangling] [--[no-]progress] [--connectivity-only]
+	 [--[no-]name-objects] [<对象>*]
+
+描述
+--
+验证数据库中的对象的连接性和有效性。
+
+选项
+--
+<对象>::
+	一个要作为不可及性追踪的头的对象。
++
+如果没有给出对象，'git fsck' 默认使用索引文件、`refs` 命名空间中的所有 SHA-1 引用，以及所有引用日志（除非 --no-reflogs 选项被给出）作为头。
+
+--unreachable::
+	打印出存在但不能从任何参考节点到达的对象。
+
+--dangling::
+--no-dangling::
+	打印存在但从未 'directly ' 使用的对象（默认）。 `--no-dangling` 可以用来从输出中省略这一信息。
+
+--root::
+	报告根节点。
+
+--tags::
+	报告标签。
+
+--cache::
+	考虑将索引中记录的任何对象也作为不可达性追踪的头节点。
+
+--no-reflogs::
+	不认为那些只被引用日志中的条目引用的提交是可以达到的。 这个选项只是为了搜索那些曾经在引用中，但现在不在了，但仍在那个相应引用日志中的提交。
+
+--full::
+	不仅检查 GIT_OBJECT_DIRECTORY ($GIT_DIR/objects) 中的对象，还检查 GIT_ALTERNATE_OBJECT_DIRECTORIES 或 $GIT_DIR/objects/info/alternates 中列出的备用对象库中的对象，以及 $GIT_DIR/objects/pack 和备用对象库中相应 pack 子目录中的打包 Git 档案。 这现在是默认的；你可以用 --no-full 关闭它。
+
+--connectivity-only::
+	只检查可达对象的连接性，确保可达标签、提交或目录树所引用的任何对象都存在。这样可以完全避免读取 blobs，从而加快操作速度（尽管它仍然会检查被引用的 blobs 是否存在）。这将检测提交和树的损坏，但不做任何语义检查（例如，格式错误）。blob 对象中的损坏将完全不会被检测到。
++
+无法到达的标签、提交和树也会被访问，以找到历史的悬空部分的提示。如果你不关心这个输出并想进一步加快它的速度，请使用 `--no-dangling`。
+
+--strict::
+	启用更严格的检查，即获取记录有 g+w 位的文件模式，这是由旧版本的 Git 创建的。 现有的仓库，包括 Linux 内核、Git 本身和稀疏仓库都有旧的对象，会触发这个检查，但建议用这个标志检查新项目。
+
+--verbose::
+	要健谈。
+
+--lost-found::
+	将悬空的对象写入 .git/lost-found/commit/ 或 .git/lost-found/other/，具体取决于类型。 如果对象是一个 blob，其内容将被写入文件，而不是其对象名称。
+
+--name-objects::
+	当显示可达对象的名称时，除了 SHA-1外，还显示描述 *如何* 可达的名称，与 linkgit:git-rev-parse[1] 兼容，例如，`HEAD@{1234567890}~25^2:src/`。
+
+--progress::
+--no-progress::
+	除非指定 --no-progress 或 --verbose，否则当标准错误流连接到终端时，默认情况下会报告进度状态。--progress 即使标准错误流没有指向终端，也会强制显示进度状态。
+
+--references::
+--no-references::
+	控制是否通过 'git refs verify' 检查引用数据库的一致性。详见 linkgit:git-refs[1]。默认会检查引用数据库。
+
+配置
+--
+
+本节中这一行以下的内容都是从 linkgit:git-config[1] 文档中摘录的。其内容与那里的内容相同：
+[]
+
+
+
+[WARNING]
+====
+Missing `zh_HANS-CN/config/fsck.adoc`
+
+See original version for this content.
+====
+
+[]
+
+讨论
+--
+
+git-fsck 测试 SHA-1和一般对象的正确性，并对结果的可及性和其他一切进行全面跟踪。它打印出它发现的任何损坏（缺失或坏的对象），如果你使用 `--unreachable` 标志，它也会打印出存在但从任何指定的头部节点（或默认集，如上所述）无法到达的对象。
+
+任何损坏的对象，你将不得不在备份或其他档案中找到（也就是说，你可以直接删除它们，并与其他网站做一个 'rsync'，希望别人拥有你损坏的对象）。
+
+如果 core.commitGraph 为真，提交的图形文件也将用 'git commit-graph verify' 来检查。见 linkgit:git-commit-graph[1]。
+
+提取的诊断方法
+-------
+
+无法到达 <类型> <对象> 的问题::
+	<类型> 对象 <对象>，实际上在看到的任何树或提交中都没有直接或间接地提到过。这可能意味着还有一个根节点没有被你指定，或者目录树被破坏了。如果你没有漏掉一个根节点，那么你不妨删除不可达的节点，因为它们不能被使用。
+
+缺少 <类型> <对象>::
+	<类型> 对象 <object>，被提及但不存在于数据库中。
+
+悬空的 <类型> <对象>::
+	<类型> 对象 <object>，存在于数据库中，但从未 'directly' 使用。一个悬空的提交可能是一个根节点。
+
+哈希值不匹配 <对象>::
+	数据库中有一个对象的哈希值与对象数据库的值不一致。 这表明一个严重的数据完整性问题。
+
+
+FSCK 信息
+-------
+
+下面列出了 `git fsck` 检测的错误类型和每个错误的含义，以及它们的默认严重程度。 除了那些被标记为 "(FATAL)" 的错误，其他错误的严重程度可以通过设置相应的 `fsck.<msg-id>` 配置变量来调整。
+
+`badDate`::
+	(ERROR) 作者/提交者行中的日期格式无效。
+
+`badDateOverflow`::
+	(ERROR) 作者/提交者行中的日期值无效。
+
+`badEmail`::
+	(ERROR) 作者/提交者行中的电子邮件格式无效。
+
+`badFilemode`::
+	(INFO) 树对象包含一个错误的文件模式条目。
+
+`badGpgsig`::
+	(ERROR) 标签包含一个错误的（被截断的）签名头（例如 `gpgsig`）。
+
+`badHeaderContinuation`::
+	(ERROR) 延续头（例如 `gpgsig` 的延续行）被意外截断。
+
+`badName`::
+	(ERROR) 作者/提交者名称为空。
+
+`badObjectSha1`::
+	(ERROR) 对象包含错误的 sha1。
+
+`badPackedRefEntry`::
+	(ERROR) “packed-refs” 文件包含无效条目。
+
+`badPackedRefHeader`::
+	(ERROR) “packed-refs” 文件包含无效头。
+
+`badParentSha1`::
+	(ERROR) 提交对象包含错误的父 sha1。
+
+`badRefContent`::
+	(ERROR) ref 的内容有误。
+
+`badRefFiletype`::
+	(ERROR) ref 的文件类型错误。
+
+`badRefName`::
+	(ERROR) ref 的格式无效。
+
+`badReferentName`::
+	(ERROR) 符号引用所指向的引用名称无效。
+
+`badReftableTableName`::
+	(WARN) reftable 表的名称无效。
+
+`badTagName`::
+	(INFO) 标签的格式无效。
+
+`badTimezone`::
+	(ERROR) 在作者/提交者行中发现无效时区。
+
+`badTree`::
+	(ERROR) 树对象无法解析。
+
+`badTreeSha1`::
+	(ERROR) 树对象的格式无效。
+
+`badType`::
+	(ERROR) 发现无效的对象类型。
+
+`duplicateEntries`::
+	(ERROR) 树对象包含重复的文件条目。
+
+`emptyName`::
+	(WARN) 路径包含空名称。
+
+`emptyPackedRefsFile`::
+	(INFO) “packed-refs” 文件为空。如果你看到此错误，请向 git@vger.kernel.org 邮件列表报告。由于只有非常早期的 Git 版本才会创建这样的空 “packed_refs” 文件，我们未来可能会收紧此规则。
+
+`extraHeaderEntry`::
+	(IGNORE) 在 `tagger` 之后发现额外头信息。
+
+`fullPathname`::
+	(WARN) 路径包含以 "/" 开头的完整路径。
+
+`gitattributesBlob`::
+	(ERROR) 在 `.gitattributes` 位置发现了非 blob 对象。
+
+`gitattributesLarge`::
+	(ERROR) `.gitattributes` blob 过大。
+
+`gitattributesLineLength`::
+	(ERROR) `.gitattributes` blob 包含过长的行。
+
+`gitattributesMissing`::
+	(ERROR) 无法读取 `.gitattributes` blob。
+
+`gitattributesSymlink`::
+	(INFO) `.gitattributes` 是一个符号链接。
+
+`gitignoreSymlink`::
+	(INFO) `.gitignore` 是一个符号链接。
+
+`gitmodulesBlob`::
+	(ERROR) 在 `.gitmodules` 位置发现了非 blob 对象。
+
+`gitmodulesLarge`::
+	(ERROR) `.gitmodules` 文件过大，无法解析。
+
+`gitmodulesMissing`::
+	(ERROR) 无法读取 `.gitmodules` blob。
+
+`gitmodulesName`::
+	(ERROR) 子模块名称无效。
+
+`gitmodulesParse`::
+	(INFO) 无法解析 `.gitmodules` blob。
+
+`gitmodulesPath`::
+	(ERROR) `.gitmodules` 路径无效。
+
+`gitmodulesSymlink`::
+	(ERROR) `.gitmodules` 是一个符号链接。
+
+`gitmodulesUpdate`::
+	(ERROR) 发现无效的子模块更新设置。
+
+`gitmodulesUrl`::
+	(ERROR) 发现无效的子模块 URL。
+
+`hasDot`::
+	(WARN) 树对象包含名为 `.` 的条目。
+
+`hasDotdot`::
+	(WARN) 树对象包含名为 `..` 的条目。
+
+`hasDotgit`::
+	(WARN) 树对象包含名为 `.git` 的条目。
+
+`largePathname`::
+	(WARN) 树对象包含路径名非常长的条目。如果 `fsck.largePathname` 的值包含冒号，则会将该值用作允许的最大长度（例如，"warn:10" 会对任何长度为 11 字节或以上的路径组件发出警告）。默认值为 4096。
+
+`mailmapSymlink`::
+	(INFO) `.mailmap` 是一个符号链接。
+
+`missingAuthor`::
+	(ERROR) 缺少作者。
+
+`missingCommitter`::
+	(ERROR) 缺少提交者。
+
+`missingEmail`::
+	(ERROR) 作者/提交者行中缺少电子邮件地址。
+
+`missingNameBeforeEmail`::
+	(ERROR) 作者/提交者行中在电子邮件地址前缺少名称。
+
+`missingObject`::
+	(ERROR) 标签对象中缺少 `object` 行。
+
+`missingSpaceBeforeDate`::
+	(ERROR) 作者/提交者行中在日期前缺少空格。
+
+`missingSpaceBeforeEmail`::
+	(ERROR) 作者/提交者行中在电子邮件地址前缺少空格。
+
+`missingTag`::
+	(ERROR) 标签对象在 `type` 行之后意外结束。
+
+`missingTagEntry`::
+	(ERROR) 标签对象中缺少 `tag` 行。
+
+`missingTaggerEntry`::
+	(INFO) 标签对象中缺少 `tagger` 行。
+
+`missingTree`::
+	(ERROR) 提交对象中缺少 `tree` 行。
+
+`missingType`::
+	(ERROR) 标签对象的 `type` 行上的类型值无效。
+
+`missingTypeEntry`::
+	(ERROR) 标签对象中缺少 `type` 行。
+
+`multipleAuthors`::
+	(ERROR) 在提交中发现多条作者行。
+
+`nulInCommit`::
+	(WARN) 在提交对象正文中发现 NUL 字节。
+
+`nulInHeader`::
+	(FATAL) 对象头中存在 NUL 字节。
+
+`nullSha1`::
+	(WARN) 树对象包含指向空 sha1 的条目。
+
+`packedRefEntryNotTerminated`::
+	(ERROR) “packed-refs” 文件包含未以换行符结尾的条目。
+
+`packedRefUnsorted`::
+	(ERROR) “packed-refs” 文件未排序。
+
+`refMissingNewline`::
+	(INFO) 存在一个不以换行符（LF）结尾的松散 ref。由于有效的 Git 实现从不会创建这样的松散 ref 文件，它未来可能会变成错误。如果你看到此错误，请向 git@vger.kernel.org 邮件列表报告，因为我们需要知道是哪些工具创建了这种文件。
+
+`symlinkRef`::
+	(INFO) 使用了符号链接作为 symref。如果你看到此错误，请向 git@vger.kernel.org 邮件列表报告，因为我们正在评估停止支持将符号链接创建为 symref 的可行性。
+
+`symrefTargetIsNotARef`::
+	(INFO) 符号引用的目标既不指向根引用，也不指向以 “refs/” 开头的引用。尽管我们允许使用 `git symbolic-ref` 创建一个指向 “ref” 之外目标的 symref，但未来可能会收紧此规则。如果你看到此错误，请向 git@vger.kernel.org 邮件列表报告，因为我们需要知道哪些工具创建了这样的文件。
+
+`trailingRefContent`::
+	(INFO) 一个松散 ref 含有尾随内容。由于有效的 Git 实现从不会创建这样的松散 ref 文件，它未来可能会变成错误。如果你看到此错误，请向 git@vger.kernel.org 邮件列表报告，因为我们需要知道哪些工具创建了这样的文件。
+
+`treeNotSorted`::
+	(ERROR) 树对象未正确排序。
+
+`unknownType`::
+	(ERROR) 发现未知对象类型。
+
+`unterminatedHeader`::
+	(FATAL) 对象头缺少行结束符。
+
+`zeroPaddedDate`::
+	(ERROR) 在作者/提交者行中发现了带前导零填充的日期。
+
+`zeroPaddedFilemode`::
+	(WARN) 在树对象中发现了带前导零填充的文件模式。
+[]
+
+
+环境变量
+----
+
+GIT_OBJECT_DIRECTORY::
+	用来指定对象数据库的根（通常是 $GIT_DIR/objects）
+
+GIT_INDEX_FILE::
+	用来指定索引的索引文件
+
+GIT_ALTERNATE_OBJECT_DIRECTORIES::
+	用来指定额外的对象数据库根（通常不设置）
+
+GIT
+---
+属于 linkgit:git[1] 文档

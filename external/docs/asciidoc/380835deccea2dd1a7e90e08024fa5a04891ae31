@@ -1,0 +1,243 @@
+git-pack-objects(1)
+===================
+
+NAMN
+----
+git-pack-objects - Skapa ett packat arkiv av objekt
+
+
+SYNOPSIS
+--------
+[verse]
+'git pack-objects' [-q | --progress | --all-progress] [--all-progress-implied]
+		   [--no-reuse-delta] [--delta-base-offset] [--non-empty]
+		   [--local] [--incremental] [--window=<n>] [--depth=<n>]
+		   [--revs [--unpacked | --all]] [--keep-pack=<paketnamn>]
+		   [--cruft] [--cruft-expiration=<tid>]
+		   [--stdout [--filter=<filterspec>] | <basnamn>]
+		   [--shallow] [--keep-true-parents] [--[no-]sparse]
+		   [--name-hash-version=<n>] [--path-walk] < <objektlista>
+
+
+BESKRIVNING
+-----------
+Läser en lista med objekt från standardinmatningen och skriver antingen ett eller flera packade arkiv med det angivna basnamnet till disk, eller ett packat arkiv till standardutdata.
+
+Ett packat arkiv är ett effektivt sätt att överföra en uppsättning objekt mellan två kodförråd och samtidigt ett åtkomsteffektivt arkivformat. I ett packat arkiv lagras ett objekt antingen som en komprimerad helhet eller som en skillnad mot ett annat objekt. Det senare kallas ofta delta.
+
+Det packade arkivformatet (.pack) är utformat för att vara självständigt så att det kan packas upp utan ytterligare information. Därför måste varje objekt som ett delta är beroende av finnas i paketet.
+
+En packindexfil (.idx) skapas för snabb slumpvis åtkomst till objekten i paketet. Om både indexfilen (.idx) och det packade arkivet (.pack) placeras i underkatalogen pack/ i $GIT_OBJECT_DIRECTORY (eller någon av katalogerna i $GIT_ALTERNATE_OBJECT_DIRECTORIES) kan Git läsa från det packade arkivet.
+
+The 'git unpack-objects' command can read the packed archive and expand the objects contained in the pack into "one-file one-object" format; this is typically done by the smart-pull commands when a pack is created on-the-fly for efficient network transport by their peers.
+
+
+ALTERNATIV
+----------
+basnamn::
+	Skriv till filpar (.pack och .idx), där <basnamn> används för att bestämma namnet på filerna som skapas. När detta alternativ används skrivs de två filerna i ett par som <basnamn>-<SHA-1>.{pack,idx}. <SHA-1> är en hash baserad på paketinnehållet och skrivs till kommandots standardutdata.
+
+--stdout::
+	Skriv paketinnehållet (det som annars skulle ha skrivits till .pack-filen) till standardutdata.
+
+--revs::
+	Läs revisionsargument från standardinmatningen i stället för enskilda objektnamn. Revisionsargumenten bearbetas på samma sätt som i 'git rev-list' med flaggan `--objects`, där `commit`-argumenten bygger listan över objekt som skrivs ut. Objekten i den resulterande listan packas. Förutom revisioner accepteras även rader med `--not` eller `--shallow <SHA-1>`.
+
+--unpacked::
+	Det här implicerar `--revs`. När listan med revisionsargument från standardinmatningen bearbetas begränsas de packade objekten till sådana som inte redan är packade.
+
+--all::
+	Det här implicerar `--revs`. Utöver listan med revisionsargument från standardinmatningen behandlas det som om alla referenser under `refs/` har angetts för inkludering.
+
+--include-tag::
+	Inkludera annoterade taggar som inte uttryckligen efterfrågats om objektet de pekar på ingår i den resulterande packfilen. Detta kan vara användbart för att skicka nya taggar till inhemska Git-klienter.
+
+--stdin-packs[=<läge>]::
+	Läs basnamn för packfiler (t.ex. `pack-1234abcd.pack`) från standardinmatningen i stället för objektnamn eller revisionsargument. Det resulterande paketet innehåller alla objekt som listas i inkluderade paket (de som inte börjar med `^`), med undantag för objekt som listas i exkluderade paket (de som börjar med `^`).
++
+När `mode` är "follow" får objekt från paket som inte listas på stdin specialbehandling. Objekt i olistade paket inkluderas om de (1) är nåbara från inkluderade paket och (2) inte finns i några exkluderade paket. Detta läge är t.ex. användbart för att återuppliva tidigare oåtkomliga objekt i cruft-paket för att skapa paket som är slutna under nåbarhet fram till den gräns som satts av exkluderade paket.
++
+Inkompatibel med `--revs`, eller flaggor som antyder `--revs` (som `--all`), med undantag för `--unpacked`, som är kompatibel.
+
+--cruft::
+	Packar oåtkomliga objekt i ett separat "cruft"-paket, markerat av att en `.mtimes`-fil finns. Används vanligtvis av `git repack --cruft`. Anroparen anger en lista med paketnamn och markerar vilka paket som ska vara kvar i kodförrådet samt vilka som ska raderas (markerade med prefixet `-`). Innehållet i cruft-paketet är alla objekt som inte finns i de överlevande paketen och som inte har passerat respitperioden (se `--cruft-expiration` nedan), eller som har passerat respitperioden men är nåbara från ett annat objekt som inte har gjort det.
++
+När inmatningen listar ett paket som innehåller alla nåbara objekt (och listar alla andra paket för borttagning), kommer motsvarande cruft-paket att innehålla alla oåtkomliga objekt (med mtime nyare än `--cruft-expiration`) samt alla oåtkomliga objekt vars mtime är äldre än `--cruft-expiration`, men som är nåbara från ett oåtkomligt objekt vars mtime är nyare än `--cruft-expiration`.
++
+Inkompatibelt med `--unpack-unreachable`, `--keep-unreachable`, `--pack-loose-unreachable`, `--stdin-packs`, samt med alla andra alternativ som implicerar `--revs`.
+
+--cruft-expiration=<approxidatum>::
+	Om detta anges tas objekt bort från cruft-paketet om de har en mtime äldre än `<approxidate>`. Om det inte anges (och `--cruft` används) tas inga objekt bort.
+
+--window=<n>::
+--depth=<n>::
+	Dessa två alternativ påverkar hur objekten i paketet lagras med deltakomprimering. Objekten sorteras först internt efter typ, storlek och valfritt namn, och jämförs mot andra objekt inom `--window` för att se om deltakomprimering sparar utrymme. `--depth` begränsar maximalt deltadjup; om djupet blir för stort påverkas prestandan vid uppackning, eftersom deltadata måste appliceras så många gånger för att nå det nödvändiga objektet.
++
+Standardvärdet för --window är 10 och --depth är 50. Det maximala djupet är 4095.
+
+--window-memory=<n>::
+	Det här alternativet lägger till en extra gräns ovanpå `--window`; fönsterstorleken skalas dynamiskt ned så att den inte tar mer än '<n>' byte i minne. Det är användbart i kodförråd med både stora och små objekt för att undvika minnesbrist med stort fönster, men ändå kunna dra nytta av stort fönster för mindre objekt. Storleken kan ha suffixet "k", "m" eller "g". `--window-memory=0` gör minnesanvändningen obegränsad. Standardvärdet hämtas från konfigurationsvariabeln `pack.windowMemory`.
+
+--max-pack-size=<n>::
+	I ovanliga fall kanske ditt filsystem inte kan skapa filer större än en viss storlek. Då kan detta alternativ användas för att låta kommandot dela upp utdata-packfilen i flera oberoende packfiler, där varje fil är högst den angivna storleken. Storleken kan ha suffixet "k", "m" eller "g". Minsta tillåtna storlek är 1 MiB. Standard är obegränsat, om inte konfigurationsvariabeln `pack.packSizeLimit` är satt. Observera att alternativet kan ge ett större och långsammare kodförråd; se diskussionen i `pack.packSizeLimit`.
+
+--honor-pack-keep::
+	Den här flaggan gör att ett objekt som redan finns i ett lokalt paket med en .keep-fil ignoreras, även om det annars skulle ha packats.
+
+--keep-pack=<pack-namn>::
+	Den här flaggan gör att ett objekt som redan finns i det angivna paketet ignoreras, även om det annars skulle ha packats. `<pack-name>` är packfilens namn utan inledande katalog (t.ex. `pack-123.pack`). Alternativet kan anges flera gånger för att behålla flera paket.
+
+--incremental::
+	Den här flaggan gör att ett objekt som redan finns i ett paket ignoreras även om det annars skulle ha packats.
+
+--local::
+	Den här flaggan gör att ett objekt som lånats från en alternativ objektlagring ignoreras även om det annars skulle ha packats.
+
+--non-empty::
+        Skapa bara ett packat arkiv om det skulle innehålla minst ett objekt.
+
+--progress::
+	Förloppsstatus rapporteras som standard i standardfelströmmen när den är kopplad till en terminal, såvida inte -q anges. Denna flagga tvingar fram förloppsstatus även om standardfelströmmen inte dirigeras till en terminal.
+
+--all-progress::
+	När --stdout anges visas förloppsrapportering under faserna för objekträkning och komprimering men undertrycks under utskrivningsfasen. Orsaken är att utströmmen i vissa fall är direkt kopplad till ett annat kommando som vill visa egen förloppsstatus medan inkommande packdata behandlas. Den här flaggan är som --progress, men tvingar även fram förloppsrapportering under utskrivningsfasen även när --stdout används.
+
+--all-progress-implied::
+	Det här används för att implicera --all-progress när visning av förlopp aktiveras. Till skillnad från --all-progress tvingar denna flagga inte i sig fram någon förloppsvisning.
+
+-q::
+	Denna flagga gör att kommandot inte rapporterar sina förlopp i standardfelströmmen.
+
+--no-reuse-delta::
+	När ett packat arkiv skapas i ett kodförråd som redan har paket återanvänder kommandot befintliga deltan. Det kan ibland ge ett något suboptimalt paket. Den här flaggan säger åt kommandot att inte återanvända befintliga deltan utan beräkna dem från grunden.
+
+--no-reuse-object::
+	Den här flaggan säger åt kommandot att inte återanvända befintlig objektdata alls, inklusive objekt som inte deltakomprimerats, vilket tvingar omkomprimering av allt. Detta implicerar --no-reuse-delta. Användbart endast i sällsynta fall där man vill tvinga en annan komprimeringsnivå för all packad data.
+
+--compression=<n>::
+	Anger komprimeringsnivå för nyskapad komprimerad data i det genererade paketet. Om den inte anges bestäms nivå först av pack.compression, därefter av core.compression, och blir annars -1 (zlib-standard). Lägg till --no-reuse-object om du vill tvinga en enhetlig komprimeringsnivå för all data oavsett källa.
+
+--sparse::
+--no-sparse::
+	Växla algoritmen "sparse" för att avgöra vilka objekt som ska ingå i paketet när den kombineras med alternativet "--revs". Algoritmen traverserar bara träd som förekommer i sökvägar som introducerar nya objekt. Detta kan ge tydliga prestandavinster när ett paket beräknas för att skicka en liten ändring. Det är dock möjligt att extra objekt läggs till i packfilen om de inkluderade incheckningarna innehåller vissa typer av direkta namnbyten. Om detta alternativ inte anges används värdet i `pack.useSparse`, som är true om inget annat angetts.
+
+--thin::
+	Skapa ett "tunt" paket genom att utelämna gemensamma objekt mellan sändare och mottagare för att minska nätverksöverföring. Alternativet är bara meningsfullt tillsammans med --stdout.
++
+Obs: Ett tunt paket bryter mot formatet för packade arkiv genom att utelämna obligatoriska objekt och är därför oanvändbart för Git tills det görs självförsörjande. Använd `git index-pack --fix-thin` (se linkgit:git-index-pack[1]) för att återställa den egenskapen.
+
+--shallow::
+	Optimera ett paket som ska skickas till en klient med ett grunt kodförråd. Detta alternativ, i kombination med --thin, kan ge ett mindre paket på bekostnad av hastighet.
+
+--delta-base-offset::
+	Ett packat arkiv kan uttrycka basobjektet för ett delta antingen som ett objektnamn på 20 byte eller som en offset i strömmen, men mycket gamla Git-versioner förstår inte det senare. Som standard använder 'git pack-objects' bara det förra formatet för bättre kompatibilitet. Detta alternativ tillåter kommandot att använda det senare formatet för bättre kompakthet. Beroende på genomsnittlig längd på deltakedjor minskar alternativet vanligtvis den resulterande packfilen med 3-5 procent.
++
+Obs: Kommandon i användardelen, som `git gc` (se linkgit:git-gc[1]) och `git repack` (se linkgit:git-repack[1]), skickar detta alternativ som standard i modern Git när objekt i kodförrådet läggs i packfiler. Detsamma gör `git bundle` (se linkgit:git-bundle[1]) när en bunt skapas.
+
+--threads=<n>::
+	Anger hur många trådar som ska startas vid sökning efter bästa deltaträffar. Detta kräver att pack-objects är byggt med pthreads, annars ignoreras alternativet med en varning. Syftet är att minska packningstiden på flerprocessormaskiner. Mängden minne som krävs för deltasökfönstret multipliceras dock med antalet trådar. Om 0 anges låter Git automatisk upptäcka antalet CPU:er och sätta trådantalet därefter.
+
+--index-version=<version>[,<offset>]::
+	Detta är endast avsett att användas av testsviten. Det gör det möjligt att tvinga fram versionen för det genererade paketindexet och att tvinga fram 64-bitars indexposter på objekt som finns ovanför den givna offseten.
+
+--keep-true-parents::
+	Med detta alternativ packas föräldrar som döljs av grafts ändå.
+
+--filter=<filter-spec>::
+	Utelämnar vissa objekt (vanligtvis blobbar) från den resulterande packfilen. Se linkgit:git-rev-list[1] för giltiga former av `<filter-spec>`.
+
+--no-filter::
+	Stänger av alla tidigare argument av typen `--filter=`.
+
+--missing=<missing-action>::
+	Ett felsökningsalternativ som hjälper till med framtida utveckling av "partiell klon". Det här alternativet anger hur saknade objekt hanteras.
++
+Formen '--missing=error' begär att pack-objects avbryter med fel om ett saknat objekt påträffas. Om kodförrådet är en partiell klon försöker Git först uppdatera saknade objekt innan de markeras som saknade. Detta är standardbeteendet.
++
+Formen '--missing=allow-any' tillåter att objekttraversering fortsätter om ett saknat objekt påträffas. Ingen hämtning av saknat objekt görs. Saknade objekt utelämnas tyst från resultatet.
++
+Formen '--missing=allow-promisor' är som 'allow-any', men tillåter endast fortsatt objekttraversering för FÖRVÄNTADE saknade promisor-objekt. Ingen hämtning av saknat objekt görs. Ett oväntat saknat objekt ger fel.
+
+--exclude-promisor-objects::
+	Utelämna objekt som är kända för att finnas i promisor-fjärren. (Syftet med alternativet är att bara arbeta på lokalt skapade objekt, så att vi vid ompackning fortfarande behåller skillnaden mellan lokalt skapade objekt [utan .promisor] och objekt från promisor-fjärren [med .promisor].) Detta används med partiell klon.
+
+--keep-unreachable::
+	Objekt som inte kan nås från referenserna i paket namngivna med alternativet --unpacked= läggs till i det resulterande paketet, utöver de nåbara objekt som inte finns i paket markerade med *.keep-filer. Detta implicerar `--revs`.
+
+--pack-loose-unreachable::
+	Packa oåtkomliga lösa objekt (och ta bort deras lösa motsvarigheter). Detta implicerar `--revs`.
+
+--unpack-unreachable::
+	Behåll oåtkomliga objekt i lös form. Detta implicerar `--revs`.
+
+--delta-islands::
+	Begränsa deltaträffar baserat på "öar". Se DELTA ISLANDS nedan.
+
+--name-hash-version=<n>::
+	Under deltakomprimering grupperar Git objekt som kan vara lika, baserat på heuristik som använder objektets sökväg. Att gruppera objekt med exakt sökvägsmatchning är bra för sökvägar med många versioner, men det finns fördelar med att hitta deltapar över olika fullständiga sökvägar. Git samlar objekt efter typ, sedan efter ett "name hash" av sökvägen och därefter efter storlek, i hopp om att gruppera objekt som komprimeras väl tillsammans.
++
+Standardversionen av name hash är `1`, som prioriterar hash-lokalitet genom att låta de sista byten i sökvägen ge störst utslag i hashfunktionen. Denna version är bra på att särskilja korta sökvägar och hitta namnbyten över kataloger. Hashfunktionen beror dock främst på de sista 16 byten i sökvägen. Om många sökvägar i kodförrådet har samma sista 16 byte och bara skiljer sig i föräldrakatalog kan detta name-hash ge för många kollisioner och sämre resultat. För närvarande krävs denna version när nåbarhetsbitmapfiler skrivs med `--write-bitmap-index`.
++
+Name-hash version `2` har liknande lokalitetsegenskaper som version `1`, men behandlar varje sökvägskomponent separat och överlagrar hasharna med en förskjutning. Den prioriterar fortfarande de sista byten i sökvägen, men "saltar" också de lägre bitarna i hashvärdet med namnen på föräldrakatalogerna. Metoden ger vissa lokalitetsfördelar från version `1` samtidigt som den bryter de flesta kollisioner från liknande filnamn i många olika kataloger. För närvarande är denna version inte tillåten när nåbarhetsbitmapfiler skrivs med `--write-bitmap-index`, och den ändras då automatiskt till version `1`.
+
+--path-walk::
+	Utför komprimering genom att först organisera objekt efter sökväg, och därefter köra ett andra pass som komprimerar över sökvägar som vanligt. Detta kan förbättra deltakomprimeringen, särskilt när filnamn orsakar kollisioner i Gits standardalgoritm för name-hash.
++
+Inkompatibelt med `--delta-islands`, `--shallow` eller `--filter`. Alternativet `--use-bitmap-index` ignoreras om `--path-walk` används.
+
+
+DELTAÖAR
+--------
+
+När det är möjligt försöker `pack-objects` återanvända befintliga deltan på disk för att slippa söka nya i farten. Detta är en viktig optimering för att servera uppdateringar, eftersom servern då kan undvika att expandera de flesta objekt och i stället skicka byten direkt från disk. Optimeringen fungerar inte när ett objekt lagras som ett delta mot en bas som mottagaren inte har (och som vi inte redan skickar). I så fall "bryter" servern deltakedjan och måste hitta ett nytt delta, vilket kostar mycket CPU. För prestandan är det därför viktigt att uppsättningen objekt i deltarelationer på disk motsvarar vad en klient skulle uppdatera.
+
+I ett normalt kodförråd fungerar detta oftast automatiskt. Objekten är i huvudsak nåbara från grenar och taggar, och det är det klienter uppdaterar. De deltan vi hittar på servern är därför sannolikt mellan objekt som klienten har eller kommer att ha.
+
+Men i vissa kodförrådsupplägg kan du ha flera relaterade men separata grupper av referensspetsar, där klienter tenderar att uppdatera grupperna var för sig. Föreställ dig till exempel att du driftar flera "forkar" av ett kodförråd i en gemensam objektlagring, och låter klienter se dem som separata kodförråd via `GIT_NAMESPACE` eller via separata kodförråd med alternates-mekanismen. En naiv ompackning kan då hitta att optimalt delta för ett objekt ligger mot en bas som bara finns i en annan fork. Men när en klient uppdaterar saknar den basobjektet, och vi måste hitta ett nytt delta i farten.
+
+En liknande situation kan uppstå om du har många referenser utanför `refs/heads/` och `refs/tags/` som pekar på relaterade objekt (t.ex. `refs/pull` eller `refs/changes` som används av vissa värdtjänster). Som standard uppdaterar klienter bara grenhuvuden och taggar, och deltan mot objekt som bara finns i de andra grupperna kan då inte skickas oförändrade.
+
+Deltaöar löser problemet genom att låta dig gruppera referenser i separata "öar". Pack-objects beräknar vilka objekt som är nåbara från vilka öar, och vägrar skapa ett delta från ett objekt `A` mot en bas som inte finns i alla `A`:s öar. Detta ger något större paket (eftersom vissa deltamöjligheter missas), men garanterar att en hämtning av en ö inte behöver räkna om deltan i farten på grund av korsade ögränser.
+
+Vid ompackning med deltaöar tenderar deltafönstret att fyllas med kandidater som förbjuds av konfigurationen. Ompackning med stort --window hjälper (och tar inte så lång tid som annars, eftersom vissa objektpar kan avvisas utifrån öindelning innan någon innehållsberäkning görs).
+
+Öar konfigureras via alternativet `pack.island`, som kan anges flera gånger. Varje värde är ett vänsterförankrat reguljärt uttryck som matchar refnamn. Till exempel:
+
+-------------------------------------------
+[pack]
+island = refs/heads/
+island = refs/tags/
+-------------------------------------------
+
+puts heads and tags into an island (whose name is the empty string; see below for more on naming). Any refs which do not match those regular expressions (e.g., `refs/pull/123`) is not in any island. Any object which is reachable only from `refs/pull/` (but not heads or tags) is therefore not a candidate to be used as a base for `refs/heads/`.
+
+Referenser grupperas i öar baserat på sina "namn", och två regex som ger samma namn anses ligga i samma ö. Namnen beräknas från regexen genom att sammanfoga eventuella fångstgrupper med ett '-' emellan. (Om det inte finns några fångstgrupper blir namnet den tomma strängen, som i exemplet ovan.) Detta gör att du kan skapa godtyckligt många öar. Endast upp till 14 sådana fångstgrupper stöds dock.
+
+Anta till exempel att du lagrar referenserna för varje fork i `refs/virtual/ID`, där `ID` är en numerisk identifierare. Du kan då konfigurera:
+
+-------------------------------------------
+[pack]
+island = refs/virtual/([0-9]+)/heads/
+island = refs/virtual/([0-9]+)/tags/
+island = refs/virtual/([0-9]+)/(pull)/
+-------------------------------------------
+
+Det placerar grenhuvuden och taggar för varje fork i sin egen ö (med namn som "1234" eller liknande), och pull-referenserna för varje fork hamnar i sin egen "1234-pull".
+
+Observera att vi väljer en enda ö för varje regex enligt ordningen "sist vinner" (vilket gör att kodförrådsspecifik konfiguration kan ta företräde över användaromfattande konfiguration, och så vidare).
+
+
+KONFIGURATION
+-------------
+
+Olika konfigurationsvariabler påverkar packning, se linkgit:git-config[1] (sök efter "pack" och "delta").
+
+Särskilt gäller att deltakomprimering inte används för objekt större än värdet i konfigurationsvariabeln `core.bigFileThreshold` och inte heller för filer där attributet `delta` är satt till false.
+
+SE ÄVEN
+-------
+linkgit:git-rev-list[1] linkgit:git-repack[1] linkgit:git-prune-packed[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

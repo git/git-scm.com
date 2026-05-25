@@ -1,0 +1,964 @@
+git-rebase(1)
+=============
+
+NAMN
+----
+git-rebase - Applicera incheckningar på nytt ovanpå en annan bastopp
+
+SYNOPSIS
+--------
+[verse]
+'git rebase' [-i | --interactive] [<flaggor>] [--exec <cmd>]
+	[--onto <nybas> | --keep-base] [<upstream> [<gren>]]
+'git rebase' [-i | --interactive] [<flaggor>] [--exec <cmd>] [--onto <nybas>]
+	--root [<gren>]
+'git rebase' (--continue|--skip|--abort|--quit|--edit-todo|--show-current-patch)
+
+BESKRIVNING
+-----------
+Överför en serie incheckningar till en annan startpunkt. Du kan också använda `git rebase` för att ändra ordning på eller kombinera incheckningar: se INTERAKTIVT LÄGE nedan för hur du gör det.
+
+Till exempel, tänk dig att du har arbetat med grenen `ämne` i den här historiken, och vill "komma ikapp" det arbete som gjorts på grenen `master`.
+
+------------
+          A---B---C ämne
+         /
+    D---E---F---G master
+------------
+
+Du vill transplantera de incheckningar du gjorde på `ämne` eftersom det avvek från `master` (dvs. A, B och C), ovanpå den nuvarande `master`. Du kan göra detta genom att köra `git rebase master` medan `ämne`-grenen är utcheckad. Om du vill om basera `ämne` medan du är på en annan gren, är `git rebase master ämne` en genväg för `git checkout ämne && git rebase master`.
+
+------------
+                  A'--B'--C' ämne
+                 /
+    D---E---F---G master
+------------
+
+
+Om det uppstår en sammanslagningskonflikt under den här processen kommer `git rebase` att stanna vid den första problematiska incheckningen och lämna konfliktmarkörer. Om detta händer kan du göra något av följande:
+
+1. Lös konflikten. Du kan använda `git diff` för att hitta markörerna (<<<<<<) och göra redigeringar för att lösa konflikten. För varje fil du redigerar måste du meddela Git att konflikten har lösts. Du kan markera konflikten som löst med `git add <filnamn>`. Efter att ha löst alla konflikter kan du fortsätta ombaseringsprocessen med
+
+   git rebase --continue
+
+2. Stoppa `git rebase` och återställ din gren till sitt ursprungliga tillstånd med
+
+   git rebase --abort
+
+3. Hoppa över incheckningen som orsakade sammanslagningskonflikten med
+
+   git rebase --skip
+
+Om du inte anger en `<uppström>` att ombasera på, kommer den uppström som konfigurerats i alternativen `branch.<namn>.remote` och `branch.<namn>.merge` att användas (se linkgit:git-config[1] för detaljer) och alternativet `--fork-point` antas. Om du för närvarande inte är på någon gren eller om den aktuella grenen inte har en konfigurerad uppström, kommer rebase att avbrytas.
+
+Här är en förenklad beskrivning av vad `git rebase <uppström>` gör:
+
+1. Gör en lista över alla incheckningar på din nuvarande gren sedan den avgrenades från `<uppström>` som inte har en motsvarande incheckning i `<uppström>`.
+2. Kolla ut `<uppström>` med motsvarigheten till `git checkout --detach <uppström>`.
+3. Spela upp incheckningarna, en efter en, i ordning. Detta liknar att köra `git cherry-pick <incheckning>` för varje commit. Se OMBASERING AV SAMMANSLAGNINGAR för hur sammanslagningar hanteras.
+4. Uppdatera din gren så att den pekar på den slutliga incheckning en med motsvarigheten till `git checkout -B <gren>`.
+
+[NOTE]
+När ombaseringen startas är `ORIG_HEAD` inställd på att peka på incheckningen i toppen av grenen som ska ombaseras. Det är dock inte garanterat att `ORIG_HEAD` fortfarande pekar på den incheckningen i slutet av ombaseringen om andra kommandon som ändrar `ORIG_HEAD` (som `git reset`) används under ombaseringen. Den föregående grentopen är dock tillgänglig med hjälp av refloggen för den aktuella grenen (dvs. `@{1}`, se linkgit:gitrevisions[7]).
+
+TRANSPLANTERING AV EN ÄMNESGREN MED --ONTO
+------------------------------------------
+
+Så här skulle du omplantera en ämnesgren baserad på en gren till en annan, för att låtsas att du har förgrenat ämnesgrenen från den senare grenen, med hjälp av `rebase --onto`.
+
+Låt oss först anta att ditt 'ämne' är baserat på grenen 'next'. Till exempel är en funktion som utvecklats i 'ämne' beroende av någon funktionalitet som finns i 'next'.
+
+------------
+    o---o---o---o---o  master
+         \
+          o---o---o---o---o  next
+                           \
+                            o---o---o  ämne
+------------
+
+Vi vill att 'ämne' ska avgrenades från grenen 'master'; till exempel eftersom funktionaliteten som 'ämne' är beroende av har sammanfogats med den mer stabila grenen 'master'. Vi vill att vårt träd ska se ut så här:
+
+------------
+    o---o---o---o---o  master
+        |            \
+        |             o'--o'--o'  ämne
+         \
+          o---o---o---o---o  next
+------------
+
+Vi kan få detta med hjälp av följande kommando:
+
+    git rebase --onto master next ämne
+
+
+Ett annat exempel på alternativet --onto är att ombasera en del av en gren. Om vi har följande situation:
+
+------------
+                            H---I---J ämneB
+                           /
+                  E---F---G  ämneA
+                 /
+    A---B---C---D  master
+------------
+
+sedan kommandot
+
+    git rebase --onto master ämneA ämneB
+
+skulle resultera i:
+
+------------
+                 H'--I'--J'  ämneB
+                /
+                | E---F---G  ämneA
+                |/
+    A---B---C---D  master
+------------
+
+Detta är användbart när ämneB inte är beroende av ämneA.
+
+En rad incheckningar kan också tas bort med ombasering. Om vi har följande situation:
+
+------------
+    E---F---G---H---I---J  ämneA
+------------
+
+sedan kommandot
+
+    git rebase --onto ämneA~5 ämneA~3 ämneA
+
+skulle resultera i att incheckningar F och G tas bort:
+
+------------
+    E---H'---I'---J'  ämneA
+------------
+
+Detta är användbart om F och G var felaktiga på något sätt, eller inte borde vara en del av ämneA. Observera att argumentet till `--onto` och parametern `<uppström>` kan vara vilken giltig inchecknings-liknande parameter som helst.
+
+LÄGESALTERNATIV
+---------------
+
+Alternativen i det här avsnittet kan inte användas med något annat alternativ, inklusive inte med varandra:
+
+--continue::
+	Starta om ombaseringsprocessen efter att en sammanslagningskonflikt har lösts.
+
+--skip::
+	Starta om ombaseringsprocessen genom att hoppa över den aktuella patchen.
+
+--abort::
+	Avbryt rebase-operationen och återställ HEAD till den ursprungliga grenen. Om `<gren>` angavs när ombaserings-operationen startades, kommer `HEAD` att återställas till `<gren>`. Annars kommer `HEAD` att återställas till var den var när ombaserings-operationen startades.
+
+--quit::
+	Avbryter ombasnings-operationen men `HEAD` återställs inte till den ursprungliga grenen. Indexet och arbetskatalogen lämnas också oförändrade som ett resultat. Om en tillfällig gömma-post skapades med `--autostash` kommer den att sparas i gömma-listan.
+
+--edit-todo::
+	Edit the todo list during an interactive rebase.
+
+--show-current-patch::
+	Visa den aktuella patchen i en interaktiv ombasering eller när ombaseringen stoppas på grund av konflikter. Detta motsvarar `git show REBASE_HEAD`.
+
+ALTERNATIV
+----------
+--onto <nybas>::
+	Startpunkt för att skapa de nya incheckningarna. Om alternativet `--onto` inte anges är startpunkten `<uppström>`. Kan vara vilken giltig incheckning som helst, och inte bara ett befintligt grennamn.
++
+Som ett specialfall kan du använda "A\...B" som en genväg för sammanslagningsbasen för A och B om det finns exakt en sammanslagningsbas. Du kan utelämna högst en av A och B, i vilket fall standardvärdet är HEAD.
+
+Se TRANSPLANTERING AV EN ÄMNESGREN MED --ONTO ovan för exempel.
+
+--keep-base::
+	Ange startpunkten för att skapa de nya incheckningar till sammanslagingsbasen för `<uppström>` och `<gren>`. Att köra `git rebase --keep-base <uppström> <gren>` motsvarar att köra `git rebase --reapply-cherry-picks --no-fork-point --onto <uppström>...<gren> <uppström> <gren>`.
++
+Det här alternativet är användbart om man utvecklar en funktion ovanpå en uppströmsgren. Medan funktionen arbetas med kan uppströmsgrenen avancera och det kanske inte är den bästa idén att fortsätta att ombasera ovanpå uppströmsgrenen utan att behålla basincheckningen som den är. Eftersom basincheckningen är oförändrad innebär det här alternativet `--reapply-cherry-picks` för att undvika att förlora incheckningar.
++
+Även om både det här alternativet och `--fork-point` hittar sammanslagningsbasen mellan `<uppström>` och `<gren>`, använder det här alternativet sammanslagninsbasen som _startpunkt_ på vilken nya incheckningar kommer att skapas, medan `--fork-point` använder sammanslagnigsbasen för att bestämma _uppsättningen av incheckningar_ som kommer att ombaseras.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+<uppströms>::
+	Uppströmsgren att jämföra mot. Kan vara vilken giltig incheckning som helst, inte bara ett befintligt grennamn. Standardinställningen är den konfigurerade uppströmsgrenen för den aktuella grenen.
+
+<gren>::
+	Arbetande gren; standardinställningen är `HEAD`.
+
+--apply::
+	Använd applicerings-strategier för att ombasera (anropa `git-am` internt). Det här alternativet kan bli utan funktion i framtiden när 'merge'-bakändan hanterar allt som applicera-funktionen gör.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--empty=(drop|keep|stop)::
+	Hur man hanterar incheckningar som inte är tomma till att börja med och inte är rena plockningar från någon uppströms incheckning, men som blir tomma efter ombasering (eftersom de innehåller en delmängd av redan uppströms ändringar):
++
+--
+`drop`;;
+	Incheckningen kommer att tas bort. Detta är standardbeteendet.
+`keep`;;
+	Incheckningen kommer att behållas. Detta alternativ är underförstått när `--exec` anges om inte `-i`/`--interactive` också anges.
+`stop`;;
+`ask`;;
+	Obaseringen stoppas när incheckningen tillämpas, vilket gör att du kan välja om du vill ta bort den, redigera fler filer eller bara checka-in de tomma ändringarna. Detta alternativ är underförstått när `-i`/`--interactive` är specificerat. `ask` är en föråldrad synonym till `stop`.
+--
++
+Observera att incheckningar som börjar tomma behålls (såvida inte `--no-keep-empty` anges), och incheckningar som är rena plockningar (enligt `git log --cherry-mark ...`) detekteras och tas bort som ett preliminärt steg (såvida inte `--reapply-cherry-picks` eller `--keep-base` skickas).
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--no-keep-empty::
+--keep-empty::
+	Behåll inte incheckningar som börjar tomma före ombaseringen (dvs. som inte ändrar något från sin överordnade) i resultatet. Standardinställningen är att behålla incheckningar som börjar tomma, eftersom skapandet av sådana incheckningar kräver att flaggan `--allow-empty` skickas till `git commit`, vilket indikerar att en användare mycket avsiktligt skapar en sådan incheckning och därför vill behålla den.
++
+Användning av denna flagga kommer förmodligen att vara sällsynt, eftersom du kan bli av med incheckningar som börjar tomma genom att bara starta en interaktiv rebase och ta bort raderna som motsvarar de incheckningar du inte vill ha. Denna flagga finns som en bekväm genväg, till exempel i fall där externa verktyg genererar många tomma incheckningar och du vill att alla ska tas bort.
++
+För incheckningar som inte börjar tomma men blir tomma efter ombasering, se flaggan `--empty`.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--reapply-cherry-picks::
+--no-reapply-cherry-picks::
+	Återanvänd alla rena urval av alla uppströms-incheckningar istället för att i förväg ta bort dem. (Om dessa incheckningar sedan blir tomma efter ombasering, eftersom de innehåller en delmängd av redan uppströms-ändringar, styrs beteendet gentemot dem av flaggan `--empty`.)
++
+I avsaknad av `--keep-base` (eller om `--no-reapply-cherry-picks` anges) kommer dessa incheckningar att tas bort automatiskt. Eftersom detta kräver att alla uppströms incheckningar läses kan detta vara dyrt i kodförråd med ett stort antal uppströms incheckningar som behöver läsas. När man använder 'merge'-bakändan kommer varningar att utfärdas för varje borttagen incheckning (såvida inte `--quiet` anges). Råd kommer också att utfärdas om inte `advice.skippedCherryPicks` är satt till falskt (se linkgit:git-config[1]).
++
+`--reapply-cherry-picks` tillåter rebase att avstå från att läsa alla uppströms incheckningar, vilket potentiellt förbättrar prestandan.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--allow-empty-message::
+	Utan funktion. Ombasering av incheckningar med ett tomt meddelande misslyckades tidigare och det här alternativet åsidosatte det beteendet, vilket gjorde att incheckningar med tomma meddelanden kunde ombaseras. Nu orsakar inte incheckningar med ett tomt meddelande att ombaseringen stoppas.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+-m::
+--merge::
+	Använda sammanslagningsstrategier för att återbasera (standard).
++
+Observera att en ombaserings-sammanslagning fungerar genom att spela upp varje incheckning från arbetsgrenen ovanpå `<uppströms>`-grenen. På grund av detta, när en sammanslagningskonflikt inträffar, är sidan som rapporteras som 'ours' den hittills rebaserade serien, med början på `<uppströms>`, och 'theirs' är arbetsgrenen. Med andra ord, sidorna är utbytta.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+-s <strategi>::
+--strategy=<strategi>::
+	Använd den givna sammanslagningsstrategin istället för standardmetoden `ort`. Detta innebär `--merge`.
++
+Eftersom `git rebase` spelar upp varje incheckning från den fungerande grenen ovanpå `<uppströms>`-grenen med den givna strategin, tömmer `ours`-strategin helt enkelt alla patchar från `<gren>`, vilket är föga logiskt.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+-X <strategi-alternativ>::
+--strategy-option=<strategi-alternativ>::
+	Skicka <strategi-alternativ> vidare till sammanslagnings-strategin. Detta innebär `--merge` och, om ingen strategi har specificerats, `-s ort`. Observera omkastningen av 'ours' och 'theirs' som nämnts ovan för `-m`-alternativet.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+`--rerere-autoupdate`::
+`--no-rerere-autoupdate`::
+	Efter att rerere-mekanismen återanvänder en inspelad lösning på den aktuella konflikten för att uppdatera filerna i arbetskatalogen, tillåt den även att uppdatera indexet med resultatet av lösningen. `--no-rerere-autoupdate` är ett bra sätt att dubbelkolla vad `rerere` gjorde och upptäcka potentiella felaktiga sammanslagningar, innan resultatet sparas i indexet med ett separat `git add`.
+[]
+
+-S[<nyckeld>]::
+--gpg-sign[=<nyckelid>]::
+--no-gpg-sign::
+	GPG-signera incheckningar. Argumentet `nyckelid` är valfritt och används som standard för incheckaridentiteten; om det anges måste det fästas vid alternativet utan mellanslag. `--no-gpg-sign` är användbart för att åsidosätta både konfigurationsvariabeln `commit.gpgSign` och tidigare `--gpg-sign`.
+
+-q::
+--quiet::
+	Var tyst. implicerar `--no-stat`.
+
+-v::
+--verbose::
+	Var utförlig. Innebär `--stat`.
+
+--stat::
+	Visa en diffstat över vad som har ändrats uppströms sedan den senaste ombaseringen. Diffstat styrs också av konfigurationsalternativet rebase.stat.
+
+-n::
+--no-stat::
+	Visa inte en diffstat som en del av rebase-processen.
+
+--no-verify::
+	Det här alternativet kringgår pre-rebase-kroken. Se även linkgit:githooks[5].
+
+--verify::
+	Tillåter att pre-rebase-kroken körs, vilket är standardinställningen. Det här alternativet kan användas för att åsidosätta `--no-verify`. Se även linkgit:githooks[5].
+
+-C<n>::
+	Se till att minst `<n>` rader med omgivande kontext matchar före och efter varje ändring. När det finns färre rader med omgivande kontext måste alla matcha. Som standard ignoreras inget kontext någonsin. Innebär `--apply`.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--no-ff::
+--force-rebase::
+-f::
+	Spela upp alla ombaserade incheckningar individuellt istället för att spola framåt över de oförändrade. Detta säkerställer att hela historiken för den ombaserade grenen består av nya incheckningar.
++
+Du kan tycka att detta är användbart efter att du har återställt en sammanslagning av ämnesgrenar, eftersom det här alternativet återskapar ämnesgrenen med nya incheckningar så att den kan sammanfogas igen utan att behöva "återställa återställningen" (se link:/docs/howto/revert-a-faulty-merge/sv[revert-a-faulty-merge How-To] för mer information).
+
+--fork-point::
+--no-fork-point::
+	Använd reflog för att hitta en bättre gemensam förfader mellan `<uppströms>` och `<gren>` när du beräknar vilka incheckningar som har introducerats av `<gren>`.
++
+När `--fork-point` är aktivt kommer 'fork_point' att användas istället för `<uppströms>` för att beräkna mängden incheckningar som ska ombaseras, där 'fork_point' är resultatet av kommandot `git merge-base --fork-point <uppströms> <gren>` (se linkgit:git-merge-base[1]). Om 'fork_point' blir tomt kommer `<uppströms>` att användas som reserv.
++
+Om `<uppströms>` eller `--keep-base` anges på kommandoraden, är standardvärdet `--no-fork-point`, annars är standardvärdet `--fork-point`. Se även `rebase.forkpoint` i linkgit:git-config[1].
++
+Om din gren var baserad på `<uppströms>` men `<uppströms>` spolades om och din gren innehåller incheckningar som togs bort, kan den här väljaren användas med `--keep-base` för att ta bort dessa incheckningar från din gren.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--ignore-whitespace::
+	Ignorera skillnader i blanksteg när du försöker jämka skillnaderna. För närvarande implementerar varje bakända en approximation av detta beteende:
++
+tillämpa bakända;;
+	När du tillämpar en patch, ignorera ändringar i blanktecken i kontextrader. Tyvärr innebär detta att om de "gamla" raderna som ersätts av patchen bara skiljer sig i blanktecken från den befintliga filen, kommer du att få en sammanslagningskonflikt istället för en lyckad patch-applikation.
++
+merge bakända;;
+	Behandla rader med endast ändringar i blanktecken som oförändrade vid sammanslagning. Tyvärr, innebär detta att alla patch-bitar som var avsedda att modifiera blanktecken och inget annat kommer att tas bort, även om den andra sidan inte hade några ändringar som skapade konflikt.
+
+--whitespace=<alternativ>::
+	Denna flaggan skickas till `git apply`-programmet (se linkgit:git-apply[1]) som tillämpar patchen. Implicerar `--apply`.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--committer-date-is-author-date::
+	Istället för att använda aktuell tid som inchecknings-datum, använd författar-datumet för den incheckning som ska ombaseras som incheckare-datum. Detta alternativ innebär `--force-rebase`.
++
+WARNING: Historikvandringsmaskineriet antar att incheckningar har icke-minskande inchecknings-tidsstämplar. Du bör överväga om du verkligen behöver använda det här alternativet. Då bör du bara använda det här alternativet för att åsidosätta incheckare-datumet när du baserar om incheckningar ovanpå en bas vars incheckning är äldre (vad gäller inchecknings-datum) än den äldsta incheckning du tillämpar (vad gäller författardatum).
+
+--ignore-date::
+--reset-author-date::
+	Istället för att använda författar-datumet för den ursprungliga incheckningen, använd aktuell tid som författardatum för den ombaserade incheckningen. Detta alternativ innebär `--force-rebase`.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--signoff::
+	Lägg till en `Signed-off-by`-slutrad till alla ombaserade incheckningar. Observera att om `--interactive` anges så kommer endast incheckningar som markerats för att plockas, redigeras eller omformuleras att få slutrad tillagd.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+-i::
+--interactive::
+	Gör en lista över de incheckningar som ska ombaseras. Låt användaren redigera listan innan ombaseringen. Det här läget kan också användas för att dela incheckningar (se DELA INCHEKNINGAR nedan).
++
+Inchecknings-listans format kan ändras genom att ställa in konfigurationsalternativet rebase.instructionFormat. Ett anpassat instruktionsformat kommer automatiskt att lägga till inchecknings-hashen före formatet.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+-r::
+--rebase-merges[=(rebase-cousins|no-rebase-cousins)]::
+--no-rebase-merges::
+	Som standard, kommer en rebase helt enkelt att ta bort sammanslagnings-incheckningar från att-göra-listan, och placera de ombaserade incheckningarna i en enda, linjär gren. Med `--rebase-merges` kommer ombaseringen istället att försöka bevara förgreningsstrukturen inom de incheckningar som ska ombaseras, genom att återskapa sammanslagnings-incheckningar. Eventuella lösta sammanslagnings-konflikter eller manuella ändringar i dessa sammanslagnings-incheckningar måste lösas/återanvändas manuellt. `--no-rebase-merges` kan användas för att upphäva både konfigurationsalternativet `rebase.rebaseMerges` och ett tidigare `--rebase-merges`.
++
+När ombaserings-sammanslagningar görs finns det två lägen: `rebase-cousins` och `no-rebase-cousins`. Om läget inte anges används `no-rebase-cousins` som standard. I `no-rebase-cousins`-läget kommer incheckningar som inte har `<uppströms>` som direkt förfader att behålla sin ursprungliga förgreningspunkt, d.v.s. incheckningar som skulle exkluderas av linkgit:git-log[1]'s `--ancestry-path`-alternativ kommer att behålla sina ursprungliga förfäders som standard. I `rebase-cousins`-läget ombaseras sådana incheckningar istället på `<uppströms>` (eller `<onto>`, om angivet).
++
+Det är för närvarande bara möjligt att återskapa sammanslagnings-incheckningar med hjälp av sammanslagings-strategin `ort`; olika sammanslagings-strategier kan bara användas via explicita `exec git merge -s <strategi> [...]`-kommandon.
++
+See also REBASING MERGES and INCOMPATIBLE OPTIONS below.
+
+-x <cmd>::
+--exec <cmd>::
+	Lägg till "exec <cmd>" efter varje rad som skapar en incheckning i den slutliga historiken. `<cmd>` kommer att tolkas som ett eller flera shell-kommandon. Alla kommandon som misslyckas kommer att avbryta rebase, med avslutningskod 1.
++
+Du kan köra flera kommandon genom att antingen använda en instans av `--exec` med flera kommandon:
++
+	git rebase -i --exec "cmd1 && cmd2 && ..."
++
+eller genom att ange mer än en `--exec`:
++
+	git rebase -i --exec "cmd1" --exec "cmd2" --exec ...
++
+Om `--autosquash` används kommer `exec`-rader inte att läggas till för mellanliggande incheckningar, och kommer bara att visas i slutet av varje squash/fixup-serie (hopslagning/inbakning).
++
+Detta använder `--interactive`-maskineriet internt, men det kan köras utan en explicit `--interactive`.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--root::
+	Ombasera alla incheckningar som är åtkomliga från `<gren>`, istället för att begränsa dem med en `<uppströms>`. Detta låter dig ombasera rot-incheckning(ar) på en gren.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--autosquash::
+--no-autosquash::
+	Automatiskt slå ihop incheckningar med specialformaterade meddelanden till tidigare incheckningar som ombaseras. Om ett incheckning-meddelande börjar med "squash!", "fixup!" eller "amend!", tas resten av titeln som en inchecknings-specifikation, som matchar en tidigare incheckning om den matchar titeln eller hashen för den incheckningen. Om ingen incheckning matchar helt, beaktas matchningar av specifikationen med början av inchecknings-titlarna.
++
+I den ombaserade att-göra-listan ändras åtgärderna för squash-, fixup- och amend-incheckningar från `pick` till `squash`, `fixup` respektive `fixup -C`, och de flyttas direkt efter den incheckning de ändrar. Alternativet `--interactive` kan användas för att granska och redigera att-göra-listan innan man fortsätter.
++
+Det rekommenderade sättet att skapa incheckningar med ihopslagnings-markörer är att använda alternativen `--squash`, `--fixup`, `--fixup=amend:` eller `--fixup=reword:` i linkgit:git-commit[1], vilka tar målincheckningen som ett argument och automatiskt fyller i titeln på den nya incheckningen utifrån den.
++
+Om konfigurationsvariabeln `rebase.autoSquash` sätts till true aktiveras automatisk mosning som standard för interaktiv rebase. Alternativet `--no-autosquash` kan användas för att åsidosätta den inställningen.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+--autostash::
+--no-autostash::
+	Skapa automatiskt en tillfällig gömma-post innan operationen påbörjas och tillämpa den efter att operationen är avslutad. Det betyder att du kan köra rebase på ett smutsigt arbetsträd. Var dock försiktig: den slutliga gömma-applikationen efter en lyckad rebase kan resultera i icke-triviala konflikter.
+
+--reschedule-failed-exec::
+--no-reschedule-failed-exec::
+	Planera automatiskt om `exec`-kommandon som misslyckades. Detta är bara logiskt i interaktivt läge (eller när ett `--exec`-alternativ tillhandahölls).
++
+Det här alternativet gäller när en ombasering har startats. Det bevaras för hela ombaseringen baserat på, i ordning, kommandoradsalternativet som anges till den initiala `git rebase`, `rebase.rescheduleFailedExec`-konfigurationen (se linkgit:git-config[1] eller "KONFIGURATION" nedan), eller så har det standardvärdet falskt.
++
+Att registrera det här alternativet för hela ombaseringen är en bekvämlighetsfunktion. Annars skulle en explicit `--no-reschedule-failed-exec` i början åsidosättas av närvaron av en `rebase.rescheduleFailedExec=true`-konfiguration när `git rebase --continue` anropas. För närvarande kan du inte skicka `--[no-]reschedule-failed-exec` till `git rebase --continue`.
+
+--update-refs::
+--no-update-refs::
+	Tvångsuppdatera automatiskt alla grenar som pekar på incheckningar som ombaseras. Grenar som är utcheckade i ett arbetsträd uppdateras inte på detta sätt.
++
+Om konfigurationsvariabeln `rebase.updateRefs` är angiven kan det här alternativet användas för att åsidosätta och inaktivera inställningen.
++
+Se även INKOMPATIBLA ALTERNATIV nedan.
+
+INKOMPATIBLA ALTERNATIV
+-----------------------
+
+Följande alternativ:
+
+ * --apply
+ * --whitespace
+ * -C
+
+är inte kompatibla med följande alternativ:
+
+ * --merge
+ * --strategy
+ * --strategy-option
+ * --autosquash
+ * --rebase-merges
+ * --interactive
+ * --exec
+ * --no-keep-empty
+ * --empty=
+ * --[no-]reapply-cherry-picks när det används utan --keep-base
+ * --update-refs
+ * --root när det används utan --onto
+
+Dessutom är följande par av alternativ inkompatibla:
+
+ * --keep-base och --onto
+ * --keep-base och --root
+ * --fork-point och --root
+
+BETEENDESKILLNADER
+------------------
+
+`git rebase` har två primära bakändor: 'apply' och 'merge'. ('Apply'-bakändan brukade vara känt som 'am'-bakändan, men namnet ledde till förvirring eftersom det ser ut som ett verb istället för ett substantiv. Även 'merge'-bakändan brukade vara känt som den interaktiva bakändan, men den används nu även för icke-interaktiva fall. Båda döptes om baserat på funktionalitet på lägre nivå som låg till grund för varje.) Det finns några subtila skillnader i hur dessa två bakändor beter sig:
+
+Tomma incheckningar
+~~~~~~~~~~~~~~~~~~~
+
+'Apply'-bakändan tar tyvärr bort avsiktligt tomma incheckningar, dvs. incheckningar som började tomma, även om dessa är sällsynta i praktiken. Det tar också bort incheckningar som blir tomma och har inget alternativ för att kontrollera detta beteende.
+
+Bakändan 'merge' behåller avsiktligt tomma incheckningar som standard (men med `-i` markeras de som tomma i att-göra-listeredigeraren, eller så kan de tas bort automatiskt med `--no-keep-empty`).
+
+I likhet med apply-bakändan tar merge-bakändan som standard bort incheckningar som blir tomma om inte `-i`/`--interactive` anges (i vilket fall den stoppar och frågar användaren vad den ska göra). Merge-backend har också ett `--empty=(drop|keep|stop)`-alternativ för att ändra beteendet för hantering av incheckningar som blir tomma.
+
+Detektering av katalog-omdöpning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+På grund av bristen på korrekt trädinformation (som uppstår genom att falska förfäder konstrueras med den begränsade information som finns tillgänglig i patchar) är detektering av katalognamnsbyten inaktiverat i 'apply'-backend. Inaktiverad detektering av katalognamnsbyten innebär att om ena sidan av historiken byter namn på en katalog och den andra lägger till nya filer i den gamla katalogen, så kommer de nya filerna att lämnas kvar i den gamla katalogen utan någon varning vid tidpunkten för ombasering om att du kanske vill flytta dessa filer till den nya katalogen.
+
+Katalog omdöpnings detektering fungerar med 'merge'-bakändan för att ge dig varningar i sådana fall.
+
+Kontext
+~~~~~~~
+
+Bakändan 'apply' fungerar genom att skapa en sekvens av patchar (genom att anropa 'format-patch' internt) och sedan tillämpa patcharna i sekvens (genom att anropa 'am' internt). Patchar består av flera bitar, var och en med radnummer, en kontextregion och de faktiska ändringarna. Radnumren måste tas med viss förskjutning, eftersom den andra sidan sannolikt har infogat eller tagit bort rader tidigare i filen. Kontextregionen är avsedd att hjälpa till att hitta hur man justerar radnumren för att tillämpa ändringarna på rätt rader. Men om flera områden i koden har samma omgivande kontextrader kan fel rad väljas. Det finns verkliga fall där detta har orsakat att incheckningar har tillämpats felaktigt utan att några konflikter har rapporterats. Att sätta 'diff.context' till ett högre värde kan förhindra sådana typer av problem, men ökar risken för falska konflikter (eftersom det kommer att kräva fler rader med matchande kontext för att tillämpas).
+
+Bakändan 'merge' arbetar med en fullständig kopia av varje relevant fil, vilket isolerar den från den här typen av problem.
+
+Märkning av konfliktmarkörer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+När det finns innehållskonflikter försöker sammanslagningsmaskineriet att annotera varje sidas konfliktmarkörer med de incheckningar som innehållet kommer ifrån. Eftersom 'apply'-bakändan tar bort den ursprungliga informationen om de ombaserade incheckningarna och deras föräldrar (och istället genererar nya falska incheckningar baserat på begränsad information i de genererade patcharna), kan dessa incheckningar inte identifieras; istället måste man återgå till en inchecknings-sammanfattning. När 'merge.conflictStyle' är satt till 'diff3' eller 'zdiff3' kommer 'apply'-bakändan också att använda "konstruerad sammanslagningsbas" för att märka innehållet från sammanslagnings basen, och därmed inte ge någon information om sammanslagnings bas incheckningen alls.
+
+Bakändan 'merge' fungerar med fullständiga incheckningar på båda sidor av historiken och har således inga sådana begränsningar.
+
+Krokar
+~~~~~~
+
+Bakändan 'apply' har traditionellt sett inte anropat post-inchecknings-kroken, medan bakändan 'merge' har gjort det. Båda har anropat post-utchecknings-kroken, även om 'merge'-bakändan har kvävt dess utdata. Dessutom anropar båda bakändorna bara post-utcheckning-kroken med startpunkts-incheckningen för ombaseringen, inte de mellanliggande incheckningen eller den slutliga incheckningen. I båda fallen var anropet av dessa krokar ett misstag i implementeringen snarare än av design (båda bakändorna implementerades ursprungligen som shell-skript och råkade anropa andra kommandon som 'git checkout' eller 'git commit' som skulle anropa krokarna). Båda bakändorna bör ha samma beteende, även om det inte är helt klart vilket, om något, som är korrekt. Vi kommer sannolikt att få ombaseringen att sluta anropa någon av dessa krokar i framtiden.
+
+Avbrytbarhet
+~~~~~~~~~~~~
+
+Bakändan 'apply' har säkerhetsproblem med ett feltajmat avbrott; om användaren trycker Ctrl-C vid fel tidpunkt för att försöka avbryta ombaseringen, kan ombaseringen gå in i ett tillstånd där den inte kan avbrytas med en efterföljande `git rebase --abort`. Bakändan 'merge' verkar inte lida av samma brist. (Se https://lore.kernel.org/git/20200207132152.GC2868@szeder.dev/ för mer information.)
+
+Omformulering av ändringar
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+När en konflikt uppstår under ombasering, stoppas rebase och ber användaren att lösa problemet. Eftersom användaren kan behöva göra viktiga ändringar när konflikter löses, efter att konflikterna är lösta och användaren har kört `git rebase --continue`, bör rebase öppna en editor och be användaren att uppdatera inchecknings-meddelandet. Bakändan 'merge' gör detta, medan bakändan 'apply' blint tillämpar det ursprungliga inchecknings-meddelandet.
+
+Diverse skillnader
+~~~~~~~~~~~~~~~~~~
+
+Det finns några fler beteendemässiga skillnader som de flesta förmodligen skulle anse vara obetydliga men som nämns för fullständighetens skull:
+
+* Reflog: De två bakändorna kommer att använda olika formuleringar när de beskriver ändringarna som gjorts i refloggen, även om båda kommer att använda ordet "rebase".
+
+* Förlopps-, informations- och felmeddelanden: De två bakändorna ger något olika förlopps- och informationsmeddelanden. Dessutom skriver apply-bakändan felmeddelanden (till exempel "Dina filer skulle skrivas över...") till stdout, medan merge-bakändan skriver dem till stderr.
+
+* Tillståndskataloger: De två bakändorna behåller sitt tillstånd i olika kataloger under `.git/`
+
+SAMMANSLAGNINGSSTRATEGIER
+-------------------------
+
+Sammanslagningsmekanismen (kommandona `git merge` och `git pull`) gör det möjligt att välja bakända-'sammanslagningsstrategier' med alternativet `-s`. Vissa strategier kan också ta sina egna alternativ, vilka kan skickas genom att ge `-X<alternativ>`-argument till `git merge` och/eller `git pull`.
+
+`ort`::
+	Detta är standardstrategin för sammanslagning när man drar in ("pulla") eller sammanfogar en gren. Denna strategi kan bara lösa två huvuden med hjälp av en 3-vägs sammanslagningsalgoritm. När det finns mer än en gemensam förfader som kan användas för 3-vägs sammanslagning skapas ett sammanslaget träd av de gemensamma förfäderna och används som referensträd för 3-vägs sammanslagningen. Detta har rapporterats resultera i färre sammanslagningskonflikter utan att orsaka felsammanslagningar, enligt tester gjorda på faktiska sammanslagningscommits hämtade från Linux 2.6-kärnans utvecklingshistorik. Dessutom kan denna strategi upptäcka och hantera sammanslagningar som involverar namnbyten. Den använder inte upptäckta kopior. Namnet på denna algoritm är en akronym ("Ostensibly Recursive's Twin") och kommer från det faktum att den skrevs som en ersättning för den tidigare standardalgoritmen, "rekursiv".
++
+I det fall där sökvägen är en undermodul, och undermodul-incheckningen som används på ena sidan av sammanslagnings-sekvensen är en underordnad undermodul-incheckning som används på den andra sidan av merge-sekvensen, försöker Git att snabbspola fram till underordnad. Annars kommer Git att behandla detta fall som en konflikt och föreslå som en lösning en undermodul-incheckningen som är underordnad de konflikterande, om en sådan finns.
++
+`ort`-strategin kan ha följande alternativ:
+
+`ours`;;
+	Det här alternativet tvingar motstridiga stycken att automatiskt lösas upp på ett snyggt sätt genom att favorisera 'vår' version. Ändringar från det andra trädet som inte står i konflikt med vår sida återspeglas i sammanslagningsresultatet. För en binär fil hämtas hela innehållet från vår sida.
++
+Detta bör inte förväxlas med `ours` sammanslagningsstrategi, som inte ens tittar på vad det andra trädet innehåller alls. Den kasserar allt som det andra trädet gjorde och deklarerar att 'vår' historia innehåller allt som hände i det.
+
+`theirs`;;
+	Detta är motsatsen till `ours`; observera att det, till skillnad från `ours`, inte finns någon `theirs`-sammanslagningsstrategi att förväxla detta sammanslagningsalternativ med.
+
+`ignore-space-change`;;
+`ignore-all-space`;;
+`ignore-space-at-eol`;;
+`ignore-cr-at-eol`;;
+	Behandlar rader med den angivna typen av blankteckenändring som oförändrade för en trevägssammanslagning. Ändringar av blanktecken blandade med andra ändringar på en rad ignoreras inte. Se även linkgit:git-diff[1] `-b`, `-w`, `--ignore-space-at-eol` och `--ignore-cr-at-eol`.
++
+* Om 'deras' version bara introducerar ändringar av blanksteg på en rad används 'vår' version;
+* Om 'vår' version introducerar ändringar i blanksteg men 'deras' version inkluderar en väsentlig ändring, används 'deras' version;
+* Annars fortsätter sammanslagningen på vanligt sätt.
+
+`renormalize`;;
+	Detta kör en virtuell utcheckning och incheckning av alla tre stegen i alla filer som behöver en trevägssammanslagning. Det här alternativet är avsett att användas vid sammanslagning av grenar med olika rena filter eller normaliseringsregler för radslut. Se "Sammanfoga grenar med olika inchecknings-/utcheckningsattribut" i linkgit:gitattributes[5] för mer information.
+
+`no-renormalize`;;
+	Inaktiverar alternativet `renormalize`. Detta åsidosätter konfigurationsvariabeln `merge.renormalize`.
+
+`find-renames[=<n>]`;;
+	Aktivera namnbytesdetektering, och ställ in likhetströskeln om du vill. Detta är standardinställningen. Detta åsidosätter konfigurationsvariabeln `merge.renames`. Se även linkgit:git-diff[1] `--find-renames`.
+
+`rename-threshold=<n>`;;
+	Föråldrad synonym för `find-renames=<n>`.
+
+`no-renames`;;
+	Stäng av namnbytesdetektering. Detta åsidosätter konfigurationsvariabeln `merge.renames`. Se även linkgit:git-diff[1] `--no-renames`.
+
+`histogram`;;
+	Föråldrad synonym för `diff-algoritm=histogram`.
+
+`patience`;;
+	Föråldrad synonym för `diff-algoritm=patience`.
+
+`diff-algorithm=(histogram|minimal|myers|patience)`;;
+	Använd en annan diff-algoritm vid sammanslagning, vilket kan bidra till att undvika felsammanslagningar som uppstår på grund av oviktiga matchande rader (som klammerparenteser från olika funktioner). Se även linkgit:git-diff[1] `--diff-algorithm`. Observera att `ort` som standard har `diff-algorithm=histogram`, medan vanliga diffs för närvarande har konfigurationsinställningen `diff.algorithm`.
+
+`subtree[=<sökväg>]`;;
+	Det här alternativet är en mer avancerad form av "underträdsstrategi" ('subtree'), där strategin gissar hur två träd måste flyttas för att matcha varandra vid sammanslagning. Istället prefixeras den angivna sökvägen (eller tas bort från början) för att få formen på de två träden att matcha.
+
+`recursive`::
+	Detta är nu en synonym för `ort`. Det var en alternativ implementering fram till v2.49.0, men omdirigerades till att betyda `ort` i v2.50.0. Den tidigare rekursiva strategin var standardstrategin för att lösa två huvuden från Git v0.99.9k till v2.33.0.
+
+`resolve`::
+	Detta kan bara lösa två huvuden (dvs. den aktuella grenen och en annan gren du hämtade från) med hjälp av en 3-vägs merge-algoritm. Den försöker noggrant upptäcka korsvisa sammanslagings-tvetydigheter. Den hanterar inte namnbyten.
+
+`octopus`::
+	Detta löser fall med fler än två huvuden, men vägrar att göra en komplex sammanslagning som kräver manuell lösning. Det är främst avsett att användas för att paketera ämnesgrenhuvuden. Detta är standardsammanslagningsstrategin när man drar in ("pullar") eller sammanfogar mer än en gren.
+
+`ours`::
+	Detta kan bara lösa två huvuden (dvs. den aktuella grenen och en annan gren du hämtade från) med hjälp av en 3-vägs sammanslagnings-algoritm. Den försöker noggrant upptäcka korsvisa sammanslagnings-tvetydigheter. Den hanterar inte namnbyten.
+
+`subtree`::
+	Detta är en modifierad `ort`-strategi. När träd A och B sammanfogas, och B motsvarar ett underträd till A, justeras B först för att matcha trädstrukturen för A, istället för att läsa träden på samma nivå. Denna justering görs också på det gemensamma förfader-trädet.
+
+Med strategier som använder 3-vägssammanslagning (inklusive standardvärdet `ort`), om en ändring görs på båda grenarna, men senare ångrad på en av grenarna, kommer den ändringen att finnas i det sammanslagna resultatet; vissa personer tycker att detta beteende är förvirrande. Det inträffar eftersom endast huvuden och sammanslagningsbasen beaktas när en sammanslagning utförs, inte de enskilda incheckningarna. Sammanslagningsalgoritmen betraktar därför den ångrade ändringen som ingen ändring alls och ersätter den ändrade versionen istället.
+[]
+
+NOTERINGAR
+----------
+
+Du bör förstå konsekvenserna av att använda `git rebase` på ett kodförråd som du delar. Se även ÅTERSTÄLLA FRÅN UPSTRÖMSOMBASERING nedan.
+
+När ombaseringen körs kommer den först att exekvera en `pre-rebase`-krok om en sådan finns. Du kan använda denna krok för att göra rimlighetskontroller och avvisa ombaseringen om den inte är lämplig. Se mallen `pre-rebase`-hook-skript för ett exempel.
+
+När det är klart, kommer `<gren>` att vara den aktuella grenen.
+
+INTERAKTIVT LÄGE
+----------------
+
+Att ombasera interaktivt innebär att du har möjlighet att redigera de incheckningar som blir ombaserade. Du kan ändra ordningen på incheckningarna och du kan ta bort dem (rensa bort dåliga eller på annat sätt oönskade patchar).
+
+Det interaktiva läget är avsett för den här typen av arbetsflöde:
+
+1. har en underbar idé
+2. hacka koden
+3. förbereda en serie för inlämning
+4. skicka in
+
+där punkt 2 består av flera instanser av
+
+a) vanlig användning
+
+ 1. avsluta något värt en incheckning
+ 2. incheckning
+
+b) oberoende korrigeringar
+
+ 1. inse att något inte fungerar
+ 2. fixa det
+ 3. checka-in det
+
+Ibland kan inte det som fixades i b.2. ändras till den inte helt perfekta incheckning som den fixar, eftersom den incheckningen är djupt begravd i en patchserie. Det är precis vad interaktiv ombasering är till för: använd den efter många "a" och "b", genom att ordna om och redigera incheckningar, och slå ihop flera incheckningar till en.
+
+Börja med den sista incheckningen du vill behålla som den är:
+
+	git rebase -i <efter-denna-incheckning>
+
+En editor kommer att laddas upp med alla incheckningar i din nuvarande branch (ignorerar sammanslagnings-incheckningar), som kommer efter den givna incheckningen. Du kan ändra ordningen på incheckningar i den här listan efter ditt hjärtas belåtenhet, och du kan ta bort dem. Listan ser ungefär ut så här:
+
+-------------------------------------------
+pick deadbee The oneline of this commit
+pick fa1afe1 The oneline of the next commit
+...
+-------------------------------------------
+
+Enrads-beskrivningarna är enbart för ditt nöjes skull; 'git rebase' tittar inte på dem utan på inchecknings-namnen ("deadbee" och "fa1afe1" i det här exemplet), så ta inte bort eller redigera namnen.
+
+Genom att ersätta kommandot "pick" med kommandot "edit" kan du ange att `git rebase` ska stoppa efter att den incheckningen har tillämpats, så att du kan redigera filerna och/eller commit-meddelandet, ändra incheckningen och fortsätta med ombaseringen.
+
+För att avbryta ombaseringen (precis som ett "edit"-kommando skulle göra, men utan att först välja ut någon incheckning), använd "break"-kommandot.
+
+Om du bara vill redigera inchecknings-meddelandet för en incheckning, ersätt kommandot "pick" med kommandot "reword".
+
+För att ta bort en incheckning, ersätt kommandot "pick" med "drop", eller ta bara bort matchande rad.
+
+Om du vill lägga ihop två eller fler incheckningar till en, ersätt kommandot "pick" för den andra och efterföljande incheckningar med "squash" (slå ihop) eller "fixup" (in-bakning). Om incheckningar hade olika författare kommer den vikta incheckningen att tillskrivas författaren till den första incheckningen. Det föreslagna inchecknings-meddelandet för den vikta incheckningen är en sammanslagning av den första incheckningens meddelande med de som identifieras av "squash"-kommandon, med utelämnande av meddelandena från incheckningar som identifieras av "fixup"-kommandon, såvida inte "fixup -c" används. I så fall är det föreslagna inchecknings-meddelandet endast meddelandet från "fixup -c"-incheckningen, och en editor öppnas som låter dig redigera meddelandet. Innehållet (patch) i "fixup -c"-incheckningen införlivas fortfarande i den vikta incheckningen. Om det finns mer än en "fixup -c"-incheckning används meddelandet från den sista. Du kan också använda "fixup -C" för att få samma beteende som "fixup -c" förutom utan att öppna en editor.
+
+`git rebase` stoppas när "pick" har ersatts med "edit" eller när ett kommando misslyckas på grund av sammanslagningsfel. När du är klar med att redigera och/eller lösa konflikter kan du fortsätta med `git rebase --continue`.
+
+Till exempel , om du vill ändra ordningen på de senaste 5 incheckningarna, så att det som var `HEAD~4` blir det nya `HEAD`. För att uppnå det skulle du anropa `git rebase` så här:
+
+----------------------
+$ git rebase -i HEAD~5
+----------------------
+
+Och flytta den första patchen till slutet av listan.
+
+Du kanske vill återskapa sammanslagnings-incheckningar, t.ex. om du har en historik som denna:
+
+------------------
+           X
+            \
+         A---M---B
+        /
+---o---O---P---Q
+------------------
+
+Anta att du vill ombasera sidogrenen från "A" till "Q". Se till att den aktuella `HEAD` är "B" och anropa
+
+-----------------------------
+$ git rebase -i -r --onto Q O
+-----------------------------
+
+Att ändra ordning och redigera incheckningar skapar vanligtvis otestade mellansteg. Du kanske vill kontrollera att din historikredigering inte orsakade några problem genom att köra ett test, eller åtminstone kompilera om vid mellanliggande punkter i historiken med hjälp av kommandot "exec" (genvägen "x"). Du kan göra det genom att skapa en att-göra-lista som den här:
+
+-------------------------------------------
+pick deadbee Implementera funktion XXX
+fixup f1a5c00 Fixa till funktion XXX
+exec make
+pick c0ffeee Enrad i nästa incheckning
+edit deadbab Enrad i incheckningefter
+exec cd subdir; make test
+...
+-------------------------------------------
+
+Den interaktiva ombaseringen stoppas när ett kommando misslyckas (dvs. avslutas med status som inte är 0) för att ge dig en möjlighet att åtgärda problemet. Du kan fortsätta med `git rebase --continue`.
+
+Kommandot "exec" startar kommandot i ett skal (standardgränssnittet, vanligtvis /bin/sh), så att du kan använda skalfunktioner (som "cd", ">", ";" ...). Kommandot körs från roten av arbetskatalogen.
+
+----------------------------------
+$ git rebase -i --exec "make test"
+----------------------------------
+
+Det här kommandot låter dig kontrollera att mellanliggande incheckningar kompileras. Att-göra-listan blir så här:
+
+--------------------
+pick 5928aea ett
+exec make test
+pick 04d0fda två
+exec make test
+pick ba46169 tre
+exec make test
+pick f4593f9 fyra
+exec make test
+--------------------
+
+ATT DELA INCHECKNINGAR
+----------------------
+
+I interaktivt läge, kan du markera incheckningar med åtgärden "edit". Detta betyder dock inte nödvändigtvis att `git rebase` förväntar sig att resultatet av denna redigering ska vara exakt en incheckning. Du kan ångra incheckningen, eller så kan du lägga till andra incheckningar. Detta kan användas för att dela upp en incheckning i två:
+
+- Starta en interaktiv ombasering med `git rebase -i <commit>^`, där `<incheckning>` är den incheckning du vill dela. Faktum är att vilket incheckning-intervall som helst fungerar, så länge det innehåller den incheckningen.
+
+- Markera den incheckning du vill dela med åtgärden "edit".
+
+- När det gäller att redigera den incheckningen, kör `git reset HEAD^`. Effekten blir att `HEAD` spolas tillbaka ett steg, och indexet följer efter. arbetskatalogenförblir dock detsamma.
+
+- Lägg nu till de ändringar i indexet som du vill ha i den första incheckningen. Du kan använda `git add` (möjligen interaktivt) eller `git gui` (eller båda) för att göra det.
+
+- Checka-in det nu aktuella indexet med det inchecknings-meddelande som är lämpligt nu.
+
+- Upprepa de två sista stegen tills ditt arbetskatalogen är ren.
+
+- Fortsätt ombaseringen med `git rebase --continue`.
+
+Om du inte är helt säker på att de mellanliggande revisionerna är konsekventa (de kompilerar, klarar testsviten, etc.) bör du använda `git stash` för att gömma undan de ännu inte incheckade ändringarna efter varje incheckning, test och ändra incheckningen om korrigeringar är nödvändiga.
+
+
+ÅTERHÄMTNING FRÅN UPPSTÖDSOMBASERING
+------------------------------------
+
+Ombasering (eller någon annan form av omskrivning) av en gren som andra har baserat arbete på är en dålig idé: alla nedströms tvingas manuellt korrigera sin historik. Det här avsnittet förklarar hur man gör korrigeringen ur nedströms synvinkel. Den verkliga lösningen skulle dock vara att undvika att ombasera uppströmen från första början.
+
+För att illustrera, anta att du befinner dig i en situation där någon utvecklar en 'delsystem's-gren, och du arbetar med ett 'ämne' som är beroende av detta 'delsystem'. Du kan få en historik som liknar följande:
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \
+	  o---o---o---o---o  delsystem
+			   \
+			    *---*---*  ämne
+------------
+
+Om 'delsystem' obaseras på nytt mot 'master' händer följande:
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \			 \
+	  o---o---o---o---o	  o'--o'--o'--o'--o'  delsystem
+			   \
+			    *---*---*  ämne
+------------
+
+Om du nu fortsätter utvecklingen som vanligt, och så småningom sammanfogar 'ämne' med 'delsystem', kommer incheckningar från 'delsystem' att förbli duplicerade för alltid:
+
+------------
+    o---o---o---o---o---o---o---o  master
+	 \			 \
+	  o---o---o---o---o	  o'--o'--o'--o'--o'--M	 delsystem
+			   \			     /
+			    *---*---*-..........-*--*  ämne
+------------
+
+Sådana dubbletter är generellt ogillade eftersom de skräpar upp historiken och gör det svårt att följa. För att rensa upp saker måste du omplacera incheckningar på 'ämne' till den nya 'delsystem'-topen, dvs. ombasera 'ämne'. Detta blir en dominoeffekt: alla nedströms från 'ämne'n tvingas också ombasera, och så vidare!
+
+Det finns två typer av korrigeringar, som diskuteras i följande underavsnitt:
+
+Enkelt fall: Förändringarna är bokstavligen desamma.::
+
+	Detta händer om 'delsystem'-ombaseringen var en enkel ombasering och inte hade några konflikter.
+
+Svårt fall: Förändringarna är inte desamma.::
+
+	Detta händer om 'subsystem'-ombaseringen hade konflikter, eller använde `--interactive` för att utelämna, redigera, slå ihop eller fixa incheckningar; eller om uppströmskommandot använde ett av `commit --amend`, `reset` eller ett kommando för fullständig historikomskrivning som https://github.com/newren/git-filter-repo[`filter-repo`].
+
+
+Det enkla fallet
+~~~~~~~~~~~~~~~~
+
+Fungerar bara om ändringarna (patch-ID:n baserade på skillnadsinnehållet) på 'subsystem' är bokstavligen desamma före och efter att ombaseringen 'subsystem' gjordes.
+
+I så fall är lösningen enkel eftersom 'git rebase' vet att hoppa över ändringar som redan finns i den nya uppströmmen (såvida inte `--reapply-cherry-picks` anges). Så om du säger (förutsatt att du är på 'ämnet')
+
+------------
+    $ git rebase subsystem
+------------
+du kommer att få den rättade historiken
+
+------------
+    o---o---o---o---o---o---o---o  master
+				 \
+				  o'--o'--o'--o'--o'  subsystem
+						   \
+						    *---*---*  ämne
+------------
+
+
+Det svåra fallet
+~~~~~~~~~~~~~~~~
+
+Det blir mer komplicerat om ändringarna i "delsystemet" inte exakt motsvarar de som före ombaseringen.
+
+NOTE: Även om en "enkelt fall av återställning" ibland verkar vara framgångsrik
+      även i svåra fall, kan den få oavsiktliga konsekvenser. Till
+      exempel, en incheckning som togs bort via `git rebase
+      --interactive` kommer att **återupplivas**!
+
+Tanken är att manuellt ange för `git rebase` "var det gamla 'subsystemet' slutade och ditt 'ämne' började", det vill säga vad den gamla sammanslagnings-basen mellan dem var. Du måste hitta ett sätt att namnge den sista incheckningen för det gamla 'subsystemet', till exempel:
+
+* Med refloggen 'subsystem': efter `git fetch` är det gamla tipset för 'subsystem' vid `subsystem@{1}`. Efterföljande hämtningar kommer att öka antalet. (Se linkgit:git-reflog[1].)
+
+* Angående toppen för 'ämne': med tanke på att ditt 'ämne' har tre incheckningar, måste det gamla toppen för 'subsystem' vara `topic~3`.
+
+Du kan sedan överföra det gamla `subsystem..ämne` till det nya toppen genom att säga (för reflog-fallet, och förutsatt att du redan är på 'ämne'):
+
+------------
+    $ git rebase --onto subsystem subsystem@{1}
+------------
+
+Ringeffekten av en återställning i "svårt fall" är särskilt dålig: "alla" nedströms från "ämnet" kommer nu också att behöva utföra en "svårt fall" återställning!
+
+OMBASERA SAMMANSLAGNINGAR
+-------------------------
+
+Kommandot interaktiv ombasering var ursprungligen utformat för att hantera individuella patch-serier. Därför är det klokt att exkludera sammanslagnings-incheckningar från att-göra-listan, eftersom utvecklaren kan ha sammanslagit den dåvarande `master` medan han arbetade på grenen, bara för att så småningom återbasera alla incheckningar till `master` (och hoppa över sammanslagnings-incheckningar).
+
+Det finns dock legitima skäl till varför en utvecklare kan vilja återskapa sammanslagnings-incheckningar: för att behålla grenstrukturen (eller "inchecknings-topologin") när man arbetar med flera, sammankopplade grenar.
+
+I följande exempel, arbetar utvecklaren på en ämnesgren som omstrukturerar hur knappar definieras, och på en annan ämnesgren som använder den omstruktureringen för att implementera en "Rapportera ett fel"-knapp. Utdata från `git log --graph --format=%s -5` kan se ut så här:
+
+------------
+* Sammanfoga grenen 'rapportera-en-bugg'
+|\
+| * Lägg till feedback-knappen
+* | Sammanfoga grenen 'refactor-button'
+|\ \
+| |/
+| * Använd Button-klassen för alla knappar
+| * Extrahera en generisk Button-klass från DownloadButton-klassen
+------------
+
+Utvecklaren kanske vill ombasera dessa incheckningar till en nyare `master` samtidigt som grentopologin behålls, till exempel när den första ämnesgrenen förväntas integreras i `master` mycket tidigare än den andra, till exempel för att lösa sammanslagningskonflikter med ändringar i DownloadButton-klassen som gjorde den till `master`.
+
+Denna ombasering kan utföras med hjälp av alternativet `--rebase-merges`. Det kommer att generera en att-göra-lista som ser ut så här:
+
+------------
+etikett på
+
+# Branch: refactor-button
+reset onto
+pick 123456 Extrahera en generisk Button-klass från DownloadButton-klassen
+pick 654321 Använd Button-klassen för alla knappar
+label refactor-button
+
+# Branch: rapportera-en-bugg
+reset refactor-button # Använd Button-klassen för alla knappar
+pick abcdef Lägg till feedback-knappen
+label rapportera-en-bugg
+
+reset onto
+merge -C a1b2c3 refactor-button # Merge 'refactor-button'
+merge -C 6f5e4d rapportera-en-bugg # Merge 'rapportera-en-bugg'
+------------
+
+Till skillnad från en vanlig interaktiv rebase finns det kommandon som `label`, `reset` och `merge` utöver `pick`.
+
+Kommandot `label` associerar en etikett med den aktuella HEAD-filen när kommandot körs. Dessa etiketter skapas som lokala arbetsträds-referenser (`refs/rewritten/<etikett>`) som kommer att raderas när ombaseringen är klar. På så sätt stör inte ombaserings-operationer i flera arbetsträd som är länkade till samma förvar varandra. Om `label`-kommandot misslyckas omplaneras det omedelbart, med ett användbart meddelande om hur man går vidare.
+
+Kommandot `reset` återställer HEAD, index och arbetsträd till den angivna versionen. Det liknar ett `exec git reset --hard <etikett>`, men vägrar att skriva över ospårade filer. Om `reset`-kommandot misslyckas omplaneras det omedelbart, med ett användbart meddelande om hur man redigerar att-göra-listan (detta händer vanligtvis när ett `reset`-kommando har infogats manuellt i att-göra-listan och innehåller ett stavfel).
+
+Kommandot `merge` sammanfogar den/de angivna versionen/versionerna till det som är HEAD vid den tidpunkten. Med `-C <ursprunglig-incheckning>` används inchecknings-meddelandet för den angivna sammanslagnings-incheckningen. När `-C` ändras till ett gement `-c` öppnas meddelandet i en editor efter en lyckad sammanslagning så att användaren kan redigera meddelandet.
+
+Om ett `merge`-kommando misslyckas av någon annan anledning än sammanslagningskonflikter (dvs. när sammanslagningsåtgärden inte ens startade), omplaneras det omedelbart.
+
+Som standard, använder kommandot `merge` sammanslagningsstrategin `ort` för vanliga sammanslagningar och `octopus` för bläckfisk-sammanslagningar. Man kan ange en standardstrategi för alla sammanslagningar med hjälp av argumentet `--strategy` när rebase anropas, eller åsidosätta specifika sammanslagningar i den interaktiva listan med kommandon genom att använda ett `exec`-kommando för att anropa `git merge` explicit med ett `--strategy`-argument. Observera att när man anropar `git merge` explicit på detta sätt kan man utnyttja det faktum att etiketterna är arbetsträdslokala referenser (referensen `refs/rewritten/onto` skulle motsvara etiketten `onto`, till exempel) för att referera till de grenar du vill sammanfoga.
+
+Obs: det första kommandot (`label onto`) märker den revision som incheckningar ombaseras på; Namnet `onto` är bara en konvention, som en anspelning på `--onto`-flaggan.
+
+Det är också möjligt att introducera helt nya sammanslagnings-incheckningar från grunden genom att lägga till ett kommando av formen `merge <sammanslagings-huvud>`. Detta formulär genererar ett preliminärt inchecknings-meddelande och öppnar alltid en editor så att användaren kan redigera det. Detta kan vara användbart t.ex. när en ämnesgren visar sig ta itu med mer än ett enda problem och vill delas upp i två eller till och med fler ämnesgrenar. Tänk på denna att-göra-lista:
+
+------------
+pick 192837 Växla från GNU Makefiles till CMake
+pick 5a6c7e Dokumentera bytet till CMake
+pick 918273 Åtgärda detektering av OpenSSL i CMake
+pick afbecd http: lägg till stöd för TLS v1.3
+pick fdbaec Åtgärda detektering av cURL i CMake på Windows
+------------
+
+Den enda incheckningen i den här listan som inte är relaterad till CMake kan mycket väl ha motiverats av att arbeta med att fixa alla de buggar som introducerades genom att byta till CMake, men den tar itu med ett annat problem. För att dela upp den här grenen i två ämnesgrenar kan att-göra-listan redigeras så här:
+
+------------
+etikett på
+
+pick afbecd http: lägg till stöd för TLS v1.3
+label tlsv1.3
+
+reset onto
+pick 192837 Växla från GNU Makefiles till CMake
+pick 918273 Åtgärda detektering av OpenSSL i CMake
+pick fdbaec Åtgärda detektering av cURL i CMake på Windows
+pick 5a6c7e Dokumentera bytet till CMake
+label cmake
+
+reset onto
+merge tlsv1.3
+merge cmake
+------------
+
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+rebase.backend::
+	Standard-bakända att använda för ombasering. Möjliga val är 'apply' (tillämpa) eller 'merge' (sammanslå). Om sammanfognings-bakändan i framtiden får alla återstående funktioner från tillämpa-bakändan , kan den här inställningen bli oanvänd.
+
+rebase.stat::
+	Whether to show a diffstat of what changed upstream since the last rebase. False by default.
+
+rebase.autoSquash::
+	Om satt till sant, aktivera alternativet `--autosquash` i linkgit:git-rebase[1] som standard för interaktivt läge. Detta kan åsidosättas med alternativet `--no-autosquash`.
+
+rebase.autoStash::
+	När den är satt till sant, skapas automatiskt en tillfällig gömma-post innan operationen börjar, och tillämpas efter att operationen är avslutad. Detta innebär att du kan köra rebase på ett smutsigt arbetsträd. Använd dock försiktigt: den slutliga gömma-applikationen efter en lyckad ombasering kan resultera i icke-triviala konflikter. Detta alternativ kan åsidosättas av alternativen `--no-autostash` och `--autostash` i linkgit:git-rebase[1]. Standardvärdet är falskt.
+
+rebase.updateRefs::
+	Om satt till sant aktiveras alternativet `--update-refs` som standard.
+
+rebase.missingCommitsCheck::
+	Om satt till "warn" (varna), kommer git rebase -i att skriva ut en varning om vissa incheckningar tas bort (t.ex. om en rad raderades), men ombaseringen kommer fortfarande att fortsätta. Om satt till "error" kommer den att skriva ut den föregående varningen och stoppa ombaseringen. 'git rebase --edit-todo' kan sedan användas för att korrigera felet. Om satt till "ignore" görs ingen kontroll. För att ta bort en incheckning utan varning eller fel, använd kommandot `drop` i att-göra-listan. Standardinställningen är "ignore".
+
+rebase.instructionFormat::
+	En formatsträng, som specificerad i linkgit:git-log[1], som ska användas för att-göra-listan under en interaktiv ombasering. Formatet kommer automatiskt att ha inchecknings-hashen till formatet.
+
+rebase.abbreviateCommands::
+	Om satt till sant, kommer `git rebase` att använda förkortade kommandonamn i att-göra-listan vilket resulterar i något liknande:
++
+-------------------------------------------
+	p deadbee The oneline of the commit
+	p fa1afe1 The oneline of the next commit
+	...
+-------------------------------------------
++
+i stället för:
++
+-------------------------------------------
+	pick deadbee The oneline of the commit
+	pick fa1afe1 The oneline of the next commit
+	...
+-------------------------------------------
++
+Standardvärdet är falskt.
+
+rebase.rescheduleFailedExec::
+	Schemalägg automatiskt `exec`-kommandon som misslyckades. Detta är bara logiskt i interaktivt läge (eller när ett `--exec`-alternativ angavs). Detta är samma sak som att ange `--reschedule-failed-exec`-alternativet.
+
+rebase.forkPoint::
+	Om den är satt till falskt, sätt alternativet `--no-fork-point` som standard.
+
+rebase.rebaseMerges::
+	Om och hur alternativet `--rebase-merges` ska ställas in som standard. Kan vara `rebase-cousins`, `no-rebase-cousins` eller ett booleskt värde. Att sätta till true eller `no-rebase-cousins` motsvarar `--rebase-merges=no-rebase-cousins`, att sätta till `rebase-cousins` motsvarar `--rebase-merges=rebase-cousins`, och att sätta till `false`(falsk) motsvarar `--no-rebase-merges`. Att skicka `--rebase-merges` på kommandoraden, med eller utan ett argument, åsidosätter alla `rebase.rebaseMerges`-konfigurationer.
+
+rebase.maxLabelLength::
+	Vid generering av etikettnamn från inlämningsrubriker, korta av namnen till denna längd. Som standard kortas namnen av till något mindre än `NAME_MAX` (för att tillåta att exempelvis .lock-filer kan skrivas för motsvarande lösa referenser).
+[]
+sequence.editor::
+	Textredigerare som används av `git rebase -i` för att redigera instruktionsfilen för ombasering. Värdet är avsett att tolkas av skalet när det används. Det kan åsidosättas av miljövariabeln `GIT_SEQUENCE_EDITOR`. När den inte är konfigurerad, används standardredigeraren för inchecknings-meddelanden istället.
+[]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

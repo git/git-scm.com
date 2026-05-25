@@ -1,0 +1,305 @@
+git-interpret-trailers(1)
+=========================
+
+NAMN
+----
+git-interpret-trailers - Lägg till eller analysera strukturerad information i inchecknings-meddelanden
+
+SYNOPSIS
+--------
+[verse]
+'git interpret-trailers' [--in-place] [--trim-empty]
+			[(--trailer (<nyckel>|<nyckel-alias>)[(=|:)<värde>])...]
+			[--parse] [<fil>...]
+
+BESKRIVNING
+-----------
+Lägg till eller analysera 'släp'-rader som liknar RFC 822-epost-huvuden, i slutet av den annars fria delen av ett inchecknings-meddelande. Till exempel, i följande inchecknings-meddelande
+
+------------------------------------------------
+subject
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+Signed-off-by: Alice <alice@example.com>
+Signed-off-by: Bob <bob@example.com>
+------------------------------------------------
+
+De två sista raderna som börjar med "Signed-off-by" är släprader.
+
+Det här kommandot läser inchecknings-meddelanden från antingen <fil>-argumenten eller standardindata om ingen <fil> anges. Om `--parse` anges består utdata av de parsade släpraderna som kommer från indata, utan att påverka dem med några kommandoradsalternativ eller konfigurationsvariabler.
+
+Annars, tillämpar detta kommando konfigurationsvariabler som `trailer.*` (som potentiellt kan lägga till nya släprader, samt flytta dem), såväl som eventuella kommandoradsargument som kan åsidosätta konfigurationsvariabler (som `--trailer=...` som också kan lägga till nya släprader), på varje indatafil. Resultatet genereras på standardutdata.
+
+Detta kommando kan också fungera på utdata från linkgit:git-format-patch[1], vilket är mer omfattande än ett vanligt inchecknings-meddelande. Sådan utdata inkluderar nämligen ett inchecknings-meddelande (som ovan), en "---"-avdelarrad och en patch-del. För dessa indata modifieras inte avdelar- och patch-delarna av detta kommando och skickas som de är på utdata, såvida inte `--no-divider` anges.
+
+Vissa konfigurationsvariabler styr hur `--trailer`-argumenten tillämpas på varje indata och hur eventuella befintliga släprader i indata ändras. De gör det också möjligt att automatiskt lägga till vissa släprader.
+
+Som standard, läggs argumentet '<nyckel>=<värde>' eller '<nyckel>:<värde>' som anges med `--trailer` till efter de befintliga släprader endast om den sista släpraden har ett annat (<nyckel>, <värde>) par (eller om det inte finns någon befintlig släprad). Delarna <nyckel> och <värde> trimmas för att ta bort inledande- och efterföljande blanksteg, och de resulterande trimmade <nyckel> och <värde> kommer att visas i utdata så här:
+
+------------------------------------------------
+nyckel: värde
+------------------------------------------------
+
+Det här betyder att de trimmade <nyckel> och <värde> kommer att separeras med `': '` (ett kolon följt av ett mellanslag).
+
+För enkelhetens skull kan en <nyckel-alias> konfigureras för att göra det kortare att skriva på kommandoraden med `--trailer`. Detta kan konfigureras med konfigurationsvariabeln 'trailer.<nyckel-alias>.key'. <nyckelAlias> måste vara ett prefix för hela <nyckel>-strängen, även om skiftlägeskänsligheten inte spelar någon roll. Om du till exempel har
+
+------------------------------------------------
+trailer.sign.key "Signed-off-by: "
+------------------------------------------------
+
+I din konfiguration behöver du bara ange `--trailer="sign: foo"` på kommandoraden istället för `--trailer="Signed-off-by: foo"`.
+
+Som standard visas den nya släpraden i slutet av alla befintliga släprader. Om det inte finns någon befintlig släprad visas den nya släpraden i slutet av inmatningen. En tom rad läggs till före den nya släpraden om det inte redan finns en.
+
+Befintliga släprader extraheras från indata genom att söka efter en grupp med en eller flera rader som (i) alla är släprader, eller (ii) innehåller minst en Git-genererad eller användarkonfigurerad släprad och består av minst 25 % släprader. Gruppen måste föregås av en eller flera tomma (eller endast blanksteg) rader. Gruppen måste antingen finnas i slutet av indata eller vara de sista raderna utan blanksteg före en rad som börjar med '---' (följt av ett mellanslag eller slutet av raden).
+
+När man läser släprader får det inte finnas något mellanslag före eller innanför <nyckel>, men ett valfritt antal vanliga mellanslag och tabbtecken är tillåtna mellan <nyckel> och avgränsaren. Det kan finnas mellanslag före, innanför eller efter <värde>. <värde> kan delas upp över flera rader där varje efterföljande rad börjar med minst ett mellanslag, som "fällbar" i RFC 822. Exempel:
+
+------------------------------------------------
+nyckel: Detta är ett mycket långt värde, med mellanslag och
+  nyradsskift i det.
+------------------------------------------------
+
+Observera att släprader inte följer (och inte heller är avsedda att följa) många av reglerna för RFC 822-huvuden. Till exempel följer de inte kodningsregeln.
+
+ALTERNATIV
+----------
+--in-place::
+	Redigera filer på plats.
+
+--trim-empty::
+	Om <värde>-delen av en släprad endast innehåller blanktecken, kommer hela släpraden att tas bort från utdata. Detta gäller både befintliga släprader och nya släprader.
+
+--trailer <nyckel>[(=|:)<värde>]::
+	Ange ett (<nyckel>, <värde>)-par som ska tillämpas som en trailer för indata. Se beskrivningen av detta kommando.
+
+--where <placering>::
+--no-where::
+	Ange var alla nya släprader ska läggas till. En inställning som anges med '--where' åsidosätter `trailer.where` och alla tillämpliga konfigurationsvariabler `trailer.<nyckelAlias>.where` och gäller för alla '--trailer'-alternativ tills nästa förekomst av '--where' eller '--no-where'. När '--no-where' påträffas, avmarkera effekten av tidigare användning av '--where', så att de relevanta konfigurationsvariablerna inte längre åsidosätts. Möjliga placeringar är `after`, `before`, `end` eller `start`.
+
+--if-exists <handling>::
+--no-if-exists::
+	Ange vilken åtgärd som ska utföras när det redan finns minst en trailer med samma <nyckel> i indata. En inställning som anges med '--if-exists' åsidosätter `trailer.ifExists` och alla tillämpliga konfigurationsvariabler `trailer.<nyckelAlias>.ifExists` och gäller för alla '--trailer'-alternativ tills nästa förekomst av '--if-exists' eller '--no-if-exists'. Vid påträffande av '--no-if-exists', rensas effekten av tidigare användning av '--if-exists', så att de relevanta konfigurationsvariablerna inte längre åsidosätts. Möjliga åtgärder är `addIfDifferent`, `addIfDifferentNeighbor`, `add`, `replace` och `doNothing`.
+
+--if-missing <handling>::
+--no-if-missing::
+	Ange vilken åtgärd som ska utföras när det inte finns någon annan släprad med samma <nyckel> i indatafältet. En inställning som anges med '--if-missing' åsidosätter `trailer.ifMissing` och alla tillämpliga konfigurationsvariabler `trailer.<nyckelAlias>.ifMissing` och gäller för alla '--trailer'-alternativ tills nästa förekomst av '--if-missing' eller '--no-if-missing'. Vid påträffande av '--no-if-missing', rensas effekten av tidigare användning av '--if-missing', så att de relevanta konfigurationsvariablerna inte längre åsidosätts. Möjliga åtgärder är `doNothing` eller `add`.
+
+--only-trailers::
+	Endast utmating ut släprader, inte några andra delar av indata.
+
+--only-input::
+	Skriv endast ut släprader som finns i indata; lägg inte till några från kommandoraden eller genom att använda konfigurationsvariabler som `trailer.*`.
+
+--unfold::
+	Om en släprad har ett värde som löper över flera rader (även kallat "radbruten"), formatera om värdet till en enda rad.
+
+--parse::
+	Ett bekvämt alias för `--only-trailers --only-input --unfold`. Detta gör det enklare att bara se släprader som kommer från indata utan att påverka dem med några kommandoradsalternativ eller konfigurationsvariabler, samtidigt som det gör utdata maskinvänligt med --unfold.
+
+--no-divider::
+	Behandla inte `---` som slutet på inchecknings-meddelandet. Använd detta när du vet att din inmatning bara innehåller själva inchecknings-meddelandet (och inte ett e-postmeddelande eller utdata från `git format-patch`).
+
+KONFIGURATIONSVARIABLER
+-----------------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/trailer.adoc`
+
+See original version for this content.
+====
+
+[]
+
+EXEMPEL
+-------
+
+* Konfigurera en 'sign'-släpraden med en 'Signed-off-by'-nyckel och lägg sedan till två av dessa släprader i en inchecknings-meddelandefil:
++
+------------
+$ git config trailer.sign.key "Signed-off-by"
+$ cat msg.txt
+ämne
+
+brödtext
+$ git interpret-trailers --trailer 'sign: Alice <alice@example.com>' --trailer 'sign: Bob <bob@example.com>' <msg.txt
+ämne
+
+brödtext
+
+Signed-off-by: Alice <alice@example.com>
+Signed-off-by: Bob <bob@example.com>
+------------
+
+* Använd alternativet `--in-place` för att redigera en inchecknings-meddelandefil på plats:
++
+------------
+$ cat msg.txt
+ämne
+
+brödtext
+
+Signed-off-by: Bob <bob@example.com>
+$ git interpret-trailers --trailer 'Acked-by: Alice <alice@example.com>' --in-place msg.txt
+$ cat msg.txt
+ämne
+
+brödtext
+
+Signed-off-by: Bob <bob@example.com>
+Acked-by: Alice <alice@example.com>
+------------
+
+* Extrahera den sista incheckningen som en patch och lägg till en 'Cc' och en 'Reviewed-by'-trailer till den:
++
+------------
+$ git format-patch -1
+0001-foo.patch
+$ git interpret-trailers --trailer 'Cc: Alice <alice@example.com>' --trailer 'Reviewed-by: Bob <bob@example.com>' 0001-foo.patch >0001-bar.patch
+------------
+
+* Konfigurera en 'sign'-släprad med ett kommando för att automatiskt lägga till en 'Signed-off-by: ' med författar-informationen endast om det inte redan finns någon 'Signed-off-by: ', och visa hur det fungerar:
++
+------------
+$ cat msg1.txt
+ämne
+
+brödtext
+$ git config trailer.sign.key "Signed-off-by: "
+$ git config trailer.sign.ifmissing add
+$ git config trailer.sign.ifexists doNothing
+$ git config trailer.sign.cmd 'echo "$(git config user.name) <$(git config user.email)>"'
+$ git interpret-trailers --trailer sign <msg1.txt
+ämne
+
+brödtext
+
+Signed-off-by: Bob <bob@example.com>
+$ cat msg2.txt
+ämne
+
+brödtext
+
+Signed-off-by: Alice <alice@example.com>
+$ git interpret-trailers --trailer sign <msg2.txt
+ämne
+
+brödtext
+
+Signed-off-by: Alice <alice@example.com>
+------------
+
+* Konfigurera en 'fix'-släprad med en nyckel som innehåller ett '#' och inget mellanslag efter detta tecken, och visa hur det fungerar:
++
+------------
+$ git config trailer.separators ":#"
+$ git config trailer.fix.key "Fix #"
+$ echo "subject" | git interpret-trailers --trailer fix=42
+ämne
+
+Fix #42
+------------
+
+* Konfigurera en 'hjälp'-släprad med ett kommando använd skriptet `glog-find-author` som söker efter specificerad författar-identitet från git log i git förvaret och visar hur det fungerar:
++
+------------
+$ cat ~/bin/glog-find-author
+#!/bin/sh
+test -n "$1" && git log --author="$1" --pretty="%an <%ae>" -1 || true
+$ cat msg.txt
+ämne
+
+brödtext
+$ git config trailer.help.key "Helped-by: "
+$ git config trailer.help.ifExists "addIfDifferentNeighbor"
+$ git config trailer.help.cmd "~/bin/glog-find-author"
+$ git interpret-trailers --trailer="help:Junio" --trailer="help:Couder" <msg.txt
+ämne
+
+brödtext
+
+Helped-by: Junio C Hamano <gitster@pobox.com>
+Helped-by: Christian Couder <christian.couder@gmail.com>
+------------
+
+* Konfigurera en 'ref'-släprad med ett kommando använd skriptet `glog-grep` för att hämta den senaste relevanta incheckningen från git-loggen i git-förvaret och visa hur det fungerar:
++
+------------
+$ cat ~/bin/glog-grep
+#!/bin/sh
+test -n "$1" && git log --grep "$1" --pretty=reference -1 || true
+$ cat msg.txt
+ämne
+
+brödtext
+$ git config trailer.ref.key "Reference-to: "
+$ git config trailer.ref.ifExists "replace"
+$ git config trailer.ref.cmd "~/bin/glog-grep"
+$ git interpret-trailers --trailer="ref:Add copyright notices." <msg.txt
+ämne
+
+brödtext
+
+Reference-to: 8bc9a0c769 (Lägg till upphovsrättsmeddelanden., 2005-04-07)
+------------
+
+* Konfigurera en 'see'-släprad med ett kommando för att visa ämnet för en relaterad incheckning, och visa hur det fungerar:
++
+------------
+$ cat msg.txt
+ämne
+
+brödtext
+
+see: HEAD~2
+$ cat ~/bin/glog-ref
+#!/bin/sh
+git log -1 --oneline --format="%h (%s)" --abbrev-commit --abbrev=14
+$ git config trailer.see.key "See-also: "
+$ git config trailer.see.ifExists "replace"
+$ git config trailer.see.ifMissing "doNothing"
+$ git config trailer.see.cmd "glog-ref"
+$ git interpret-trailers --trailer=see <msg.txt
+ämne
+
+brödtext
+
+See-also: fe3187489d69c4 (ämne för relaterad incheckning)
+------------
+
+* Konfigurera en inchecknings-mall med några släprader med tomma värden (använd sed för att visa och behålla de efterföljande mellanslagen i slutet av släprader), konfigurera sedan en inchecknings-medd-krok som använder 'git interpret-trailers' för att ta bort släprader med tomma värden och för att lägga till en 'git-version'-släprad:
++
+------------
+$ cat temp.txt
+***subject***
+
+***message***
+
+Fixes: Z
+Cc: Z
+Reviewed-by: Z
+Signed-off-by: Z
+$ sed -e 's/ Z$/ /' temp.txt > commit_template.txt
+$ git config commit.template commit_template.txt
+$ cat .git/hooks/commit-msg
+#!/bin/sh
+git interpret-trailers --trim-empty --trailer "git-version: \$(git describe)" "\$1" > "\$1.new"
+mv "\$1.new" "\$1"
+$ chmod +x .git/hooks/commit-msg
+------------
+
+SE ÄVEN
+-------
+linkgit:git-commit[1], linkgit:git-format-patch[1], linkgit:git-config[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

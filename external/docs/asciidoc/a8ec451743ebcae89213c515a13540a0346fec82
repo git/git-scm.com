@@ -1,0 +1,552 @@
+git-p4(1)
+=========
+
+NAMN
+----
+git-p4 - Importera från och sänd till Perforce-kodförråd
+
+
+SYNOPSIS
+--------
+[verse]
+'git p4 clone' [<synk-flaggor>] [<clone-flaggor>] <p4-depå-sökväg>...
+'git p4 sync' [<synk-flaggor>] [<p4-depå-sökväg>...]
+'git p4 rebase'
+'git p4 submit' [<incheckings-flaggor>] [<master-gren-namn>]
+
+
+BESKRIVNING
+-----------
+Det här kommandot ger ett sätt att interagera med p4-förvar med hjälp av Git.
+
+Skapa ett nytt Git-förvar från ett befintligt p4-förvar med hjälp av 'git p4 clone', och ge det en eller flera p4-depåsökvägar. Inkorporera nya incheckningar från p4-ändringar med 'git p4 sync'. Kommandot 'sync' används också för att inkludera nya grenar från andra p4-depåsökvägar. Skicka tillbaka Git-ändringar till p4 med hjälp av 'git p4 submit'. Kommandot 'git p4 rebase' gör en synkronisering och ombaserar den aktuella grenen till den uppdaterade p4-fjärrgrenen.
+
+
+EXEMPEL
+-------
+* Klona ett förvar:
++
+------------
+$ git p4 clone //depot/sökväg/projekt
+------------
+
+* Gör lite arbete i det nyskapade Git-förvaret:
++
+------------
+$ cd project
+$ vi foo.h
+$ git commit -a -m "redigerade foo.h"
+------------
+
+* Uppdatera Git-förvaret med de senaste ändringarna från p4, och lägg till det ovanpå:
++
+------------
+$ git p4 rebase
+------------
+
+* Skicka in dina incheckningar tillbaka till p4:
++
+------------
+$ git p4 submit
+------------
+
+
+KOMMANDON
+---------
+
+Klona
+~~~~~
+Generellt används 'git p4 clone' för att skapa en ny Git-katalog från ett befintligt p4-förvar:
+
+------------
+$ git p4 clone //depot/sökväg/projekt
+------------
+Detta:
+
+1. Skapar ett tomt Git-förvar i en underkatalog som heter 'projekt'.
++
+2. Importerar hela innehållet i head-revisionen från den givna p4-depåsökvägen till en enda incheckning i Git-grenen 'refs/remotes/p4/master'.
++
+3. Skapar en lokal gren, 'master' från denna fjärr och checkar-ut den.
+
+För att reproducera hela p4-historiken i Git, använd modifieraren '@all' på depåsökvägen:
+
+------------
+$ git p4 clone //depot/sökväg/projekt@all
+------------
+
+
+Synk
+~~~~
+Allt eftersom utvecklingen fortsätter i p4-förvaret kan dessa ändringar inkluderas i Git-förvaret med hjälp av:
+
+------------
+$ git p4 sync
+------------
+
+Det här kommandot hittar nya ändringar i p4 och importerar dem allt eftersom som Git incheckningar.
+
+P4-förvar kan också läggas till i ett befintligt Git-förvar med hjälp av 'git p4 sync':
+
+------------
+$ mkdir repo-git
+$ cd repo-git
+$ git init
+$ git p4 sync //sökväg/i/din/perforce/depå
+------------
+
+Detta importerar den angivna depån till 'refs/remotes/p4/master' i ett befintligt Git-förvar. Alternativet `--branch` kan användas för att ange en annan gren som ska användas för p4-innehållet.
+
+Om ett Git-kodförråd innehåller grenarna 'refs/remotes/origin/p4', kommer dessa att hämtas och konsulteras först under en 'git p4-synkronisering'. Eftersom det är betydligt långsammare att importera direkt från p4 än att dra in ("pulla") ändringar från en Git-fjärr, kan detta vara användbart i en miljö med flera utvecklare.
+
+Om det finns flera grenar, kommer "git p4 sync" automatiskt att använda "GREN-DETEKTERING"s algoritmen för att försöka partitionera nya ändringar till rätt gren. Detta kan åsidosättas med alternativet `--branch` för att ange att bara en enda gren ska uppdateras.
+
+
+Rebase
+~~~~~~
+Ett vanligt arbetsmönster är att hämta de senaste ändringarna från p4-depån och sammanslå dem med lokala oincheckade ändringar. Ofta är p4-förvaret den ultimata platsen för all kod, så ett ombaserings-arbetsflöde är vettigt. Detta kommando utför 'git p4 sync' följt av 'git rebase' för att flytta lokala incheckningar ovanpå uppdaterade p4-ändringar.
+
+------------
+$ git p4 rebase
+------------
+
+
+Skicka in
+~~~~~~~~~
+Att skicka ändringar från ett Git-förvar tillbaka till p4-förvaret kräver en separat p4-klient-arbetsyta. Denna bör anges med hjälp av miljövariabeln `P4CLIENT` eller Git-konfigurationsvariabeln 'git-p4.client'. p4-klienten måste finnas, men klientroten kommer att skapas och fyllas i om den inte redan finns.
+
+För att skicka in alla ändringar som finns i den aktuella Git-grenen men inte i grenen 'p4/master', använd:
+
+------------
+$ git p4 submit
+------------
+
+För att ange en annan gren än den aktuella, använd:
+
+------------
+$ git p4 submit ämnesgren
+------------
+
+För att ange en enskild incheckning eller ett intervall av incheckningar, använd:
+
+------------
+$ git p4 submit --commit <sha1>
+$ git p4 submit --commit <sha1..sha1>
+------------
+
+Uppströmsreferensen är vanligtvis 'refs/remotes/p4/master', men kan åsidosättas med kommandoradsalternativet `--origin=`.
+
+P4-ändringarna kommer att skapas när användaren anropar 'git p4 submit'. Alternativet `--preserve-user` kommer att ändra ägarskap enligt författaren till Git-incheckningen. Detta alternativ kräver administratörsbehörighet i p4, vilka kan beviljas med 'p4 protect'.
+
+För att lägga ändringar på is istället för att skicka in dem, använd `--shelve` och `--update-shelve`:
+
+----
+$ git p4 submit --shelve
+$ git p4 submit --update-shelve 1234 --update-shelve 2345
+----
+
+
+Oupplagd
+~~~~~~~~
+Att avhämta från hyllan tar en frånlagd P4-ändringslista och producerar motsvarande git-incheckning i grenen refs/remotes/p4-unshelved/<ändringslista>.
+
+Git-incheckningen skapas relativt till den aktuella ursprungsrevisionen (HEAD som standard). En föräldraincheckningen skapas baserat på ursprunget (origin), och sedan skapas unshelve-incheckningen baserat på den.
+
+Ursprungsrevisionen kan ändras med alternativet "--origin".
+
+Om målgrenen i refs/remotes/p4-unshelved redan finns, kommer den gamla att byta namn.
+
+----
+$ git p4 sync
+$ git p4 unshelve 12345
+$ git show p4-unshelved/12345
+<skicka fler ändringar via p4 till samma filer>
+$ git p4 unshelve 12345
+<vägrar att ta bort hyllan förrän git är synkroniserat med p4 igen>
+
+----
+
+ALTERNATIV
+----------
+
+Allmänna flaggor
+~~~~~~~~~~~~~~~~
+Alla kommandon utom klon accepterar dessa alternativ.
+
+--git-dir <kat>::
+	Ställ in miljövariabeln `GIT_DIR`. Se linkgit:git[1].
+
+-v::
+--verbose::
+	Tillhandahåll mer framstegs-information.
+
+Synkroniseringsalternativ
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Dessa alternativ kan användas i den initiala 'kloningen' såväl som i efterföljande 'synkroniserings'-åtgärder.
+
+--branch <ref>::
+	Importera ändringar till <ref> istället för refs/remotes/p4/master. Om <ref> börjar med refs/, används det som det är. Annars, om det inte börjar med p4/, läggs det prefixet till.
++
+Som standard behandlas en <ref> som inte börjar med refs/ som namnet på en fjärrspårningsgren (under refs/remotes/). Detta beteende kan ändras med hjälp av alternativet --import-local.
++
+Standard <ref> är "master".
++
+Det här exemplet importerar en ny fjärr "p4/proj2" till ett befintligt Git-förvar:
++
+----
+    $ git init
+    $ git p4 sync --branch=refs/remotes/p4/proj2 //deplå/proj2
+----
+
+--detect-branches::
+	Använd grendetekterings-algoritmen för att hitta nya sökvägar i p4. Det dokumenteras nedan i "GREN-DETEKTERING".
+
+--changesfile <fil>::
+	Importera exakt de p4-ändringsnummer som anges i 'fil', ett per rad. Normalt sett inspekterar 'git p4' det aktuella p4-förvaret och identifierar de ändringar som ska importeras.
+
+--silent::
+	Skriv inte ut någon förloppsinformation.
+
+--detect-labels::
+	Fråga p4 efter etiketter associerade med depåsökvägarna och lägg till dem som taggar i Git. Begränsad användbarhet eftersom endast importerar etiketter associerade med nya ändringslistor. Föråldrad.
+
+--import-labels::
+	Importera etiketter från p4 till Git.
+
+--import-local::
+	Som standard, lagras p4-grenar i 'refs/remotes/p4/', där de kommer att behandlas som fjärrspårningsgrenar av linkgit:git-branch[1] och andra kommandon. Det här alternativet placerar istället p4-grenar i 'refs/heads/p4/'. Observera att framtida synkroniseringsåtgärder också måste ange `--import-local` så att de kan hitta p4-grenarna i refs/heads.
+
+--max-changes <n>::
+	Importera högst 'n' ändringar, snarare än hela intervallet av ändringar som ingår i den givna revisionsspecifikationen. En typisk användning skulle vara att använda '@all' som revisionsspecifikation, men sedan använda '--max-changes 1000' för att importera endast de senaste 1000 revisionerna snarare än hela revisionshistoriken.
+
+--changes-block-size <n>::
+	Den interna blockstorleken som ska användas vid konvertering av en revisionsspecifikation, till exempel '@all', till en lista med specifika ändringsnummer. Istället för att använda ett enda anrop till 'p4 changes' för att hitta hela listan över ändringar för konverteringen, finns det en sekvens av anrop till 'p4 changes -m', som vart och ett begär ett block med ändringar av den angivna storleken. Standardblockstorleken är 500, vilket vanligtvis borde vara lämpligt.
+
+--keep-path::
+	Mappningen av filnamn från p4-depåns sökväg till Git innebär som standard att hela depåns sökväg tas bort. Med det här alternativet behålls hela p4-depåns sökväg i Git. Till exempel blir sökvägen '//depot/main/foo/bar.c', när den importeras från '//depot/main/', 'foo/bar.c'. Med `--keep-path` är Git-sökvägen istället 'depot/main/foo/bar.c'.
+
+--use-client-spec::
+	Använd en klientspecifikation för att hitta listan över intressanta filer i p4. Se avsnittet "KLIENT-SPECIFIKATION" nedan.
+
+-/ <sökväg>::
+	Exkludera valda depåsökvägar vid kloning eller synkronisering.
+
+Klon-alternativ
+~~~~~~~~~~~~~~~
+Dessa alternativ kan användas i en initial 'clone' (kloning), tillsammans med 'sync' synkroniserings-alternativen som beskrivs ovan.
+
+--destination <katalog>::
+	Var Git-förvaret ska skapas. Om inget anges används den sista komponenten i p4-depåns sökväg för att skapa en ny katalog.
+
+--bare::
+	Utför en bar kloning. Se linkgit:git-clone[1].
+
+Skicka alternativ
+~~~~~~~~~~~~~~~~~
+Dessa alternativ kan användas för att modifiera beteendet för 'git p4 submit'.
+
+--origin <incheckning>::
+	Uppströms plats från vilken incheckningar identifieras för att skickas till p4. Som standard är detta den senaste p4-incheckning som kan nås från `HEAD`.
+
+-M::
+	Identifiera namnbyten. Se linkgit:git-diff[1]. Namnbyten kommer att representeras i p4 med hjälp av explicita 'flytta'-operationer. Det finns inget motsvarande alternativ för att upptäcka kopior, men det finns variabler för både flyttningar och kopior.
+
+--preserve-user::
+	Om-författa p4-ändringar innan du skickar till p4. Det här alternativet kräver administratörs-behörighet för p4.
+
+--export-labels::
+	Exportera taggar från Git som p4-etiketter. Taggar som finns i Git tillämpas på perforce-arbetskatalogen.
+
+-n::
+--dry-run::
+	Visa exakt vilka incheckningar som skulle skickas till p4; ändra inte tillstånd i Git eller p4.
+
+--prepare-p4-only::
+	Tillämpa en incheckning på p4-arbetsytan, öppna, lägg till och ta bort filer i p4 som för en vanlig sändningsoperation (submit). Utfärda inte den sista "p4 submit", utan skriv istället ut ett meddelande om hur man skickar manuellt eller återställer. Det här alternativet stannar alltid efter den första (äldsta) incheckningen. Git-taggar exporteras inte till p4.
+
+--shelve::
+	Istället för att skicka in, skapa en serie lagrade ändringslistor. Efter att varje lagrad fil skapats återställs/tas de relevanta filerna bort. Om du har flera väntande incheckningar kommer flera lagrade filer att skapas.
+
+--update-shelve ÄNDRINGSLISTA::
+	Uppdatera en befintlig ändringslista från hyllan med denna incheckning. Innebär --shelve. Upprepa för flera ändringslistor från hyllan.
+
+--conflict=(ask|skip|quit)::
+	Konflikter kan uppstå när man tillämpar en incheckning på p4. När detta händer är standardbeteendet ("fråga") att fråga om man ska hoppa över denna incheckning och fortsätta, eller avsluta. Det här alternativet kan användas för att kringgå frågan, vilket gör att motstridiga incheckningar hoppas över automatiskt, eller för att avsluta försöken att tillämpa incheckningar utan att fråga.
+
+--branch <gren>::
+	Efter inskicka, synkronisera den här namngivna grenen istället för standard p4/master. Se avsnittet "Synkroniseringsalternativ" ovan för mer information.
+
+--commit (<sha1>|<sha1>..<sha1>)::
+    Skicka endast in den angivna incheckningen eller intervallet av incheckningar, istället för den fullständiga listan över ändringar som finns i den aktuella Git-grenen.
+
+--disable-rebase::
+    Inaktivera den automatiska ombasringen efter att alla incheckningar har skickats in. Kan också ställas in med git-p4.disableRebase.
+
+--disable-p4sync::
+    Inaktivera automatisk synkronisering av p4/master från Perforce efter att incheckningar har skickats. Innebär --disable-rebase. Kan också ställas in med git-p4.disableP4Sync. Synkroniseringen med origin/master fortsätter fortfarande om möjligt.
+
+Krokar för inskick
+------------------
+
+p4-pre-submit
+~~~~~~~~~~~~~
+
+Kroken `p4-pre-submit` körs om den existerar och är körbar. Kroken tar inga parametrar och ingenting från standardindata. Avslutning med status som inte är noll från detta skript förhindrar att `git-p4 submit` startas. Den kan kringgås med kommandoradsalternativet `--no-verify`.
+
+Ett användningsscenario är att köra enhetstester i kroken.
+
+p4-prepare-changelist
+~~~~~~~~~~~~~~~~~~~~~
+
+Kroken `p4-prepare-changelist` körs direkt efter att standardmeddelandet för ändringslistan har förberetts och innan editorn startas. Den tar en parameter, namnet på filen som innehåller ändringslistan. Om skriptet avslutas med en status som inte är noll avbryts processen.
+
+Syftet med kroken är att redigera meddelandefilen på plats, och den undertrycks inte av alternativet `--no-verify`. Denna krok anropas även om `--prepare-p4-only` är satt.
+
+p4-changelist
+~~~~~~~~~~~~~
+
+Kroken `p4-changelist` exekveras efter att ändringslistmeddelandet har redigerats av användaren. Den kan kringgås med alternativet `--no-verify`. Den tar en enda parameter, namnet på filen som innehåller den föreslagna ändringslisttexten. Om kommandot avslutas med en status som inte är noll avbryts det.
+
+Kroken har tillåtelse att redigera ändringslistfilen och kan användas för att normalisera texten till något projektstandardformat. Den kan också användas för att neka inskickningen efter att ha granskat meddelandefilen.
+
+p4-post-changelist
+~~~~~~~~~~~~~~~~~~
+
+Kroken`p4-post-changelist` anropas efter att inlämningsåtgärden har genomförts i P4. Den tar inga parametrar och är främst avsedd för aviseringar och kan inte påverka resultatet av inlämningsåtgärden i git p4.
+
+
+
+Ombaserings-alternativ
+~~~~~~~~~~~~~~~~~~~~~~
+Dessa alternativ kan användas för att modifiera beteendet för 'git p4 rebase'.
+
+--import-labels::
+	Importera p4-etiketter.
+
+Ta bort från hyllan alternativ
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--origin::
+    Ställer in git refspec:n mot vilken den lagrade P4-ändringslistan jämförs. Standardinställningen är p4/master.
+
+SYNTAX FÖR DEPÅ-SÖKVÄG
+----------------------
+Argumentet p4-depåsökväg till 'git p4 sync' och 'git p4 clone' kan vara en eller flera mellanslagseparerade p4-depåsökvägar, med en valfri p4-revisionsspecifikation i slutet:
+
+"//depot/mitt/projekt"::
+    Importera en incheckning med alla filer i '#head'-ändringen under det trädet.
+
+"//depot/mitt/projekt@all"::
+    Importera en incheckning för varje ändring i historiken för den depåsökvägen.
+
+"//depot/mitt/projekt@1,6"::
+    Importera endast ändringarna 1 till 6.
+
+"//depot/proj1@all //depot/proj2@all"::
+    Importera alla ändringar från båda namngivna depåsökvägarna till ett enda förvar. Endast filer under dessa kataloger inkluderas. Det finns ingen underkatalog i Git för varje "proj1" och "proj2". Du måste använda alternativet `--destination` när du anger mer än en depåsökväg. Revisionsspecifikationen måste anges identiskt för varje depåsökväg. Om det finns filer i depåsökvägarna med samma namn, är sökvägen med den senast uppdaterade versionen av filen den som visas i Git.
+
+Se 'p4 hjälprevisioner' för den fullständiga syntaxen för p4-revisionsspecifikationer.
+
+
+KLIENT-SPECIFIKATION
+--------------------
+P4-klientspecifikationen underhålls med kommandot 'p4 client' och innehåller bland annat en vy som anger hur depån mappas till klient-förvaret. Kommandona 'clone' och 'sync' kan konsultera klientspecifikationen när alternativet `--use-client-spec` ges eller när variabeln useClientSpec är sann. Efter 'git p4 clone' ställs variabeln useClientSpec automatiskt in i förvarets konfigurationsfil. Detta gör att framtida 'git p4 submit'-kommandon fungerar korrekt; submit-kommandot tittar bara på variabeln och har inget kommandoradsalternativ.
+
+Den fullständiga syntaxen för en p4-vy finns dokumenterad i 'p4 help views'. 'git p4' känner bara till en delmängd av vysyntaxen. Den förstår flerradiga mappningar, överlägg med '+', undantag med '-' och dubbla citattecken runt mellanslag. Av de möjliga jokertecknen hanterar 'git p4' bara '...', och bara när det är i slutet av sökvägen. 'git p4' kommer att klaga om den stöter på ett ohanterat jokertecken.
+
+Det finns buggar i implementeringen av överlappningsmappningar. Om flera depåsökvägar mappas genom överlägg till samma plats i förvaret kan 'git p4' välja fel sökväg. Detta är svårt att lösa utan att dedikera en klientspecifikation bara för 'git p4'.
+
+Klientnamnet kan ges till 'git p4' på flera sätt. Variabeln 'git-p4.client' har företräde om den existerar. Annars används vanliga p4-mekanismer för att bestämma klienten: miljövariabeln `P4CLIENT`, en fil som refereras av `P4CONFIG`, eller det lokala värdnamnet.
+
+
+GREN-DETEKTERING
+----------------
+P4 har inte samma koncept för en gren som Git. Istället organiserar p4 sitt innehåll som ett katalogträd, där olika logiska grenar enligt konvention finns på olika platser i trädet. Kommandot 'p4 branch' används för att underhålla mappningar mellan olika områden i trädet och indikera relaterat innehåll. 'git p4' kan använda dessa mappningar för att bestämma grenrelationer.
+
+Om du har ett förvar där alla grenar av intresse finns som underkataloger till en enda depåsökväg kan du använda `--detect-branches` vid kloning eller synkronisering för att få 'git p4' att automatiskt hitta underkataloger i p4, och för att generera dessa som grenar i Git.
+
+Till exempel, om P4-förvarsstrukturen är:
+
+----
+//depot/main/...
+//depot/gren1/...
+----
+
+Och "p4 branch -o branch1" visar en View-rad som ser ut så här:
+
+----
+//depot/main/... //depot/gren1/...
+----
+
+Sedan detta "git p4 clone"-kommando:
+
+----
+git p4 clone --detect-branches //depot@all
+----
+
+producerar en separat gren i 'refs/remotes/p4/' för //depot/main, kallad 'master', och en för //depot/gren1 kallad 'depot/gren1'.
+
+Det är dock inte nödvändigt att skapa grenar i p4 för att kunna använda dem som grenar. Eftersom det är svårt att automatiskt härleda grenrelationer kan en Git-konfigurationsinställning 'git-p4.branchList' användas för att explicit identifiera grenrelationer. Det är en lista med "källa:mål"-par, som en enkel p4-grenspecifikation, där "källa" och "mål" är sökvägselementen i p4-arkivet. Exemplet ovan förlitade sig på närvaron av p4-grenen. Utan p4-grenar kommer samma resultat att uppstå med:
+
+----
+git init depot
+cd depot
+git config git-p4.branchList main:gren1
+git p4 clone --detect-branches //depot@all .
+----
+
+
+PRESTANDA
+---------
+Snabbimportmekanismen som används av 'git p4' skapar en packfil för varje anrop av 'git p4 sync'. Normalt komprimerar Git skräp-komprimering (linkgit:git-gc[1]) automatiskt dessa till färre packfiler, men ett explicit anrop av 'git repack -adf' kan förbättra prestandan.
+
+
+KONFIGURATIONSVARIABLER
+-----------------------
+Följande konfigurationsinställningar kan användas för att modifiera beteendet för 'git p4'. De finns alla i avsnittet 'git-p4'.
+
+Allmänna variabler
+~~~~~~~~~~~~~~~~~~
+git-p4.user::
+	Användare specificerad som ett alternativ för alla p4-kommandon, med '-u <användare>'. Miljövariabeln `P4USER` kan användas istället.
+
+git-p4.password::
+	Lösenord anges som ett alternativ för alla p4-kommandon, med '-P <lösenord>'. Miljövariabeln `P4PASS` kan användas istället.
+
+git-p4.port::
+	Port anges som ett alternativ för alla p4-kommandon, med '-p <port>'. Miljövariabeln `P4PORT` kan användas istället.
+
+git-p4.host::
+	Värd anges som ett alternativ för alla p4-kommandon, med '-h <värd>'. Miljövariabeln `P4HOST` kan användas istället.
+
+git-p4.client::
+	Klient specificerad som ett alternativ för alla p4-kommandon, med '-c <klient>', inklusive klientspecifikationen.
+
+git-p4.retries::
+	Anger hur många gånger ett p4-kommando (särskilt 'p4 sync') ska försökas igen om nätverket får timeout. Standardvärdet är 3. Ställ in värdet till 0 för att inaktivera återförsök eller om din p4-version inte stöder återförsök (före 2012.2).
+
+Klona och synkronisera variabler
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+git-p4.syncFromOrigin::
+	Eftersom det går mycket snabbare att importera incheckningar från andra Git-förvar än att importera dem från p4, finns det en mekanism för att hitta p4-ändringar först i Git fjärrar. Om det finns grenar under 'refs/remote/origin/p4' kommer dessa att hämtas och användas vid synkronisering från p4. Denna variabel kan sättas till 'false' för att inaktivera detta beteende.
+
+git-p4.branchUser::
+	En fas i grendetektering innebär att man tittar på p4-grenar för att hitta nya att importera. Som standard inspekteras alla grenar. Det här alternativet begränsar sökningen till endast de som ägs av den enskilda användare som namnges i variabeln.
+
+git-p4.branchList::
+	Lista över grenar som ska importeras när grenidentifiering är aktiverad. Varje post ska vara ett par grennamn separerade med ett kolon (:). Detta exempel deklarerar att både grenA och grenB skapades från main:
++
+-------------
+git config       git-p4.branchList main:grenA
+git config --add git-p4.branchList main:grenB
+-------------
+
+git-p4.ignoredP4Labels::
+	Lista över p4-etiketter att ignorera. Denna skapas automatiskt när etiketter som inte kan importeras upptäcks.
+
+git-p4.importLabels::
+	Importera p4-etiketter till git, enligt --import-labels.
+
+git-p4.labelImportRegexp::
+	Endast p4-etiketter som matchar detta reguljära uttryck kommer att importeras. Standardvärdet är '[a-zA-Z0-9_\-.]+$'.
+
+git-p4.useClientSpec::
+	Ange att p4-klientspecifikationen ska användas för att identifiera intressanta p4-depåsökvägar. Detta motsvarar att ange alternativet `--use-client-spec`. Se avsnittet "KLIENTSPEC" ovan. Denna variabel är en booleskt värde, inte namnet på en p4-klient.
+
+git-p4.pathEncoding::
+	Perforce behåller kodningen av en sökväg som den ges av det ursprungliga operativsystemet. Git förväntar sig sökvägar kodade som UTF-8. Använd den här konfigurationen för att tala om för git-p4 vilken kodning Perforce använde för sökvägarna. Denna kodning används för att omkoda sökvägarna till UTF-8. Som ett exempel använder Perforce i Windows ofta "cp1252" för att koda sökvägsnamn. Om det här alternativet skickas till en p4-klonförfrågan, sparas det i det resulterande nya git-förvaret.
+
+git-p4.metadataDecodingStrategy::
+	Perforce behåller kodningen av ändringslistbeskrivningar och användarnamn som lagras av klienten på ett givet operativsystem. p4v-klienten använder den lokala operativsystemkodningen, och därför kan olika användare lagra olika ändringslistbeskrivningar eller användarnamn i olika kodningar, i samma depå. Git tolererar inkonsekventa/felaktiga kodningar i inchecknings-meddelanden och författarnamn, men förväntar sig att de anges i utf-8. git-p4 kan använda tre olika avkodningsstrategier för att hantera kodningsosäkerheten i Perforce: 'passthrough' skickar helt enkelt de ursprungliga bytena från Perforce till git, vilket skapar användbar men felaktigt kodad data när Perforce-datan är kodad som något annat än utf-8. 'strict' förväntar sig att Perforce-datan ska kodas som utf-8 och misslyckas med att importera när detta inte är sant. 'fallback' försöker tolka data som utf-8 och återgår annars till att använda en sekundär kodning - som standard den vanliga Windows-kodningen 'cp-1252' - med byte i övre intervallet escaped om avkodning med fallback-kodningen också misslyckas. Under python2 är standardstrategin "passthrough" av historiska skäl, och under python3 är standarden "fallback". När "strict" är valt och avkodningen misslyckas, kommer felmeddelandet att föreslå att denna konfigurationsparameter ändras som en lösning. Om detta alternativ skickas till en p4-klonförfrågan, sparas det i det resulterande nya git-repot.
+
+git-p4.metadataFallbackEncoding::
+	Ange den reservkodning som ska användas vid avkodning av Perforce-författarnamn och beskrivningar av ändringslistor med hjälp av strategin 'fallback' (se git-p4.metadataDecodingStrategy). Reservkodningen kommer endast att användas vid avkodning då utf-8 misslyckas. Standardinställningen är cp1252, en vanlig Windows-kodning. Om den här inställningen skickas till en p4-klonförfrågan sparas den i det resulterande nya git-förvaret.
+
+git-p4.largeFileSystem::
+	Ange det system som används för stora (binära) filer. Observera att stora filsystem inte stöder kommandot 'git p4 submit'. Endast Git LFS är implementerat just nu (se https://git-lfs.github.com/ för mer information). Ladda ner och installera kommandoradstillägget Git LFS för att använda det här alternativet och konfigurera det så här:
++
+-------------
+git config       git-p4.largeFileSystem GitLFS
+-------------
+
+git-p4.largeFileExtensions::
+	Alla filer som matchar en filändelse i listan kommer att bearbetas av det stora filsystemet. Använd inte prefixet '.' för filändelserna.
+
+git-p4.largeFileThreshold::
+	Alla filer med en okomprimerad storlek som överstiger tröskelvärdet kommer att bearbetas av det stora filsystemet. Som standard definieras tröskelvärdet i byte. Lägg till suffixet k, m eller g för att ändra enheten.
+
+git-p4.largeFileCompressedThreshold::
+	Alla filer med en komprimerad storlek som överstiger tröskelvärdet kommer att bearbetas av det stora filsystemet. Det här alternativet kan göra klonings-/synkroniseringsprocessen långsammare. Som standard definieras tröskelvärdet i byte. Lägg till suffixet k, m eller g för att ändra enheten.
+
+git-p4.largeFilePush::
+	Boolesk variabel som definierar om stora filer automatiskt skickas till en server.
+
+git-p4.keepEmptyCommits::
+	En ändringslista som endast innehåller exkluderade filer kommer att importeras som en tom incheckning om det här booleska alternativet är satt till sant.
+
+git-p4.mapUser::
+	Mappa en P4-användare till ett namn och en e-postadress i Git. Använd en sträng med följande format för att skapa en mappning:
++
+-------------
+git config --add git-p4.mapUser "p4user = First Last <mail@address.com>"
+-------------
++
+En mappning åsidosätter all användarinformation från P4. Mappningar för flera P4-användare kan definieras.
+
+Skicka in variabler
+~~~~~~~~~~~~~~~~~~~
+git-p4.detectRenames::
+	Identifiera namnbyten. Se linkgit:git-diff[1]. Detta kan vara sant, falskt eller en poäng som förväntas av 'git diff -M'.
+
+git-p4.detectCopies::
+	Identifiera kopior. Se linkgit:git-diff[1]. Detta kan vara sant, falskt eller en poäng som förväntas av 'git diff -C'.
+
+git-p4.detectCopiesHarder::
+	Upptäck kopior hårdare. Se linkgit:git-diff[1]. En booleskt värde.
+
+git-p4.preserveUser::
+	Vid inskick, omredigera ändringarna så att de återspeglar Git-författaren, oavsett vem som anropar 'git p4 submit'.
+
+git-p4.allowMissingP4Users::
+	När 'preserveUser' är sant, dör 'git p4' normalt om den inte hittar en författare i p4:s användarkarta. Den här inställningen skickar ändringen oavsett.
+
+git-p4.skipSubmitEdit::
+	Skickaprocessen anropar redigeraren innan varje p4-ändring skickas. Om den här inställningen är sann hoppas dock redigeringssteget över.
+
+git-p4.skipSubmitEditCheck::
+	Efter att ha redigerat p4-ändringsmeddelandet, kontrollerar 'git p4' att beskrivningen verkligen ändrades genom att titta på filändringstidpunkten. Det här alternativet inaktiverar det testet.
+
+git-p4.allowSubmit::
+	Som standard, kan vilken gren som helst användas som källa för en 'git p4 submit'-operation. Om denna konfigurationsvariabel är inställd, tillåter den endast att de namngivna grenarna används som inskicknings-källor. Grennamn måste vara korta namn (inga "refs/heads/") och ska separeras med kommatecken (",") utan mellanslag.
+
+git-p4.skipUserNameCheck::
+	Om användaren som kör 'git p4 submit' inte finns i p4-användarkartan avslutas 'git p4'. Det här alternativet kan användas för att tvinga fram inlämning oavsett.
+
+git-p4.attemptRCSCleanup::
+	Om aktiverat, kommer 'git p4 submit' att försöka rensa RCS-nyckelord ($Header$, etc). Annars skulle dessa orsaka sammanslagningskonflikter och förhindra att inskickningen fortsätter. Det här alternativet bör för närvarande betraktas som experimentellt.
+
+git-p4.exportLabels::
+	Exportera Git-taggar till p4-etiketter, enligt --export-labels.
+
+git-p4.labelExportRegexp::
+	Endast p4-etiketter som matchar detta reguljära uttryck kommer att exporteras. Standardvärdet är '[a-zA-Z0-9_\-.]+$'.
+
+git-p4.conflict::
+	Ange skicka in beteende när en konflikt med p4 hittas, enligt --conflict. Standardbeteendet är 'ask'.
+
+git-p4.disableRebase::
+    Använd inte en ny bas för trädet mot p4/master efter en inskickning.
+
+git-p4.disableP4Sync::
+    Synkronisera inte p4/master med Perforce efter en inskickning. Innebär git-p4.disableRebase.
+
+IMPLEMENTERINGS-DETALJER
+------------------------
+* Ändringsuppsättningar från p4 importeras med Git fast-import.
+* Kloning eller synkronisering kräver inte en p4-klient; filinnehållet samlas in med hjälp av 'p4 print'.
+* Inskickning kräver en p4-klient, som inte finns på samma plats som Git-förvaret. Patchar installeras, en i taget, på denna p4-klient och skickas in därifrån.
+* Varje incheckning som importeras av 'git p4' har en rad i slutet av loggmeddelandet som anger p4-depåns plats och ändringsnummer. Denna rad används av senare 'git p4 sync'-operationer för att veta vilka p4-ändringar som är nya.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

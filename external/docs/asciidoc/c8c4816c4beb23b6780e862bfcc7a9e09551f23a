@@ -1,0 +1,402 @@
+git-bisect(1)
+=============
+
+NAMN
+----
+git-bisect - Använd binärsökning för att hitta ändringen som introducerade ett fel
+
+
+SYNOPSIS
+--------
+[verse]
+'git bisect' start [--term-(bad|new)=<term-ny> --term-(good|old)=<term-gammal>]
+		   [--no-checkout] [--first-parent] [<bad> [<good>...]] [--] [<sökvägsmönster>...]
+'git bisect' (bad|new|<term-new>) [<rev>]
+'git bisect' (good|old|<term-old>) [<rev>...]
+'git bisect' terms [--term-(good|old) | --term-(bad|new)]
+'git bisect' skip [(<rev>|<range>)...]
+'git bisect' next
+'git bisect' reset [<incheckning>]
+'git bisect' (visualize|view)
+'git bisect' replay <loggfile>
+'git bisect' log
+'git bisect' run <cmd> [<arg>...]
+'git bisect' help
+
+BESKRIVNING
+-----------
+Det här kommandot använder en binär sökalgoritm för att hitta vilken incheckningi projektets historik som introducerade ett programfel. Du använder den genom att först ange en "dålig" incheckning som är känd för att innehålla programfelet, och en "bra" incheckning som är känd för att finnas innan programfelet introducerades. Sedan väljer `git bisect` en incheckning mellan dessa två slutpunkter och frågar dig om den valda incheckning är "bra" eller "dålig". Den fortsätter att begränsa intervallet tills den hittar exakt den incheckning som introducerade ändringen.
+
+Faktum är, att `git bisect` kan användas för att hitta den incheckning som ändrade *någon* egenskap i ditt projekt; t.ex. den incheckning som fixade ett fel, eller den incheckning som fick ett benchmarks prestanda att förbättras. För att stödja denna mer allmänna användning kan termerna "gammal" och "ny" användas istället för "bra" och "dålig", eller så kan du välja dina egna termer. Se avsnittet "Alternativa termer" nedan för mer information.
+
+Grundläggande binärsökningskommandon: start, dålig, bra
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Anta som exempel, att du försöker hitta den incheckningsom bröt en funktion som var känd för att fungera i version `v2.6.13-rc2` av ditt projekt. Du startar en binärsöknings-session enligt följande:
+
+------------------------------------------------
+$ git bisect start
+$ git bisect bad                 # Nuvarande version är dålig
+$ git bisect good v2.6.13-rc2    # v2.6.13-rc2 är känd för att vara bra
+------------------------------------------------
+
+När du har angett minst en dålig och en bra incheckning, väljer `git bisect` en incheckningmitt i det historikintervallet, kontrollerar den och matar ut något liknande följande:
+
+------------------------------------------------
+Bisect: 675 revisioner kvar att testa efter detta (ungefär 10 steg)
+------------------------------------------------
+
+Du bör nu kompilera den utcheckade versionen och testa den. Om den versionen fungerar korrekt skriver du
+
+------------------------------------------------
+$ git bisect good
+------------------------------------------------
+
+Om den versionen är trasig, skriv
+
+------------------------------------------------
+$ git bisect bad
+------------------------------------------------
+
+Då kommer `git bisect` att svara med något i stil med
+
+------------------------------------------------
+Bisect: 337 revisioner kvar att testa efter detta (ungefär 9 steg)
+------------------------------------------------
+
+Fortsätt upprepa processen: kompilera trädet, testa det och beroende på om det är bra eller dåligt, kör `git bisect good` eller `git bisect bad` för att fråga efter nästa incheckning som behöver testas.
+
+Så småningom kommer det inte finnas några fler revisioner kvar att inspektera, och kommandot kommer att skriva ut en beskrivning av den första felaktiga incheckning. Referensen `refs/bisect/bad` kommer att lämnas kvar och peka på den incheckningen.
+
+
+Återställning av binärsökning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Efter en binärsökningssession, för att rensa binärsökningstillståndet och återgå till det ursprungliga HEAD, kör följande kommando:
+
+------------------------------------------------
+$ git bisect reset
+------------------------------------------------
+
+Som standard kommer detta att returnera ditt träd till den incheckning som checkades ut före `git bisect start`. (En ny `git bisect start` kommer också att göra det, eftersom den rensar upp det gamla binärsöknings-tillståndet.)
+
+Med ett valfritt argument, kan du återgå till en annan incheckning istället:
+
+------------------------------------------------
+$ git bisect reset [<incheckning>]
+------------------------------------------------
+
+Till exempel, `git bisect reset bisect/bad` kommer att kontrollera den första dåliga revisionen, medan `git bisect reset HEAD` kommer att lämna dig på den nuvarande binärsöknings-incheckning och undvika att byta incheckningar alls.
+
+
+Alternativa termer
+~~~~~~~~~~~~~~~~~~
+
+Ibland letar man inte efter den incheckning som introducerade ett fel, utan snarare efter en incheckning som orsakade en förändring mellan ett annat "gammalt" tillstånd och ett "nytt" tillstånd. Till exempel kanske man letar efter den incheckning som introducerade en viss korrigering. Eller så kanske man letar efter den första incheckning där källkodsfilnamnen slutligen konverterades till företagets namngivningsstandard. Eller vad det nu var.
+
+I sådana fall kan det vara mycket förvirrande att använda termerna "bra" och "dåligt" för att hänvisa till "tillståndet före förändringen" och "tillståndet efter förändringen". Så istället kan du använda termerna "gammalt" respektive "nytt" istället för "bra" och "dåligt". (Men observera att du inte kan blanda "bra" och "dåligt" med "gammalt" och "nytt" i en enda session.)
+
+I denna mer generella användning förser du `git bisect` med en "ny" incheckning som har en viss egenskap och en "gammal" incheckning som inte har den egenskapen. Varje gång `git bisect` checkar ut en incheckning testar du om den incheckning har egenskapen. Om den har det, markera incheckning som "ny"; annars markera den som "gammal". När binärsökningen är klar kommer `git bisect` att rapportera vilken incheckning som introducerade egenskapen.
+
+För att använda "old" och "new" istället för "good" och bad, måste du köra `git bisect start` utan incheckningar som argument och sedan köra följande kommandon för att lägga till incheckningar:
+
+------------------------------------------------
+git bisect old [<rev>]
+------------------------------------------------
+
+för att indikera att en incheckning skedde före den sökta ändringen, eller
+
+------------------------------------------------
+git bisect new [<rev>...]
+------------------------------------------------
+
+för att indikera att det var efter.
+
+För att få en påminnelse om de termer som används just nu, använd
+
+------------------------------------------------
+git bisect terms
+------------------------------------------------
+
+Du kan bara få den gamla termen med `git bisect terms --term-old` eller `git bisect terms --term-good`; `git bisect terms --term-new` och `git bisect terms --term-bad` kan användas för att lära sig hur man anropar incheckningar som är nyare än den sökta ändringen.
+
+Om du vill använda dina egna termer istället för "dålig"/"bra" eller "nytt"/"gammalt", kan du välja vilka namn du vill (förutom befintliga bisect-underkommandon som `reset`, `start`, ...) genom att starta bisektionen med
+
+------------------------------------------------
+git bisect start --term-old <term-gammal> --term-new <term-ny>
+------------------------------------------------
+
+Om du till exempel, letar efter en incheckning som introducerade en prestandaregression kan du använda
+
+------------------------------------------------
+git bisect start --term-old snabb --term-new långsam
+------------------------------------------------
+
+Eller om du letar efter incheckning som fixade ett fel kan du använda
+
+------------------------------------------------
+git bisect start --term-new rättad --term-old trasig
+------------------------------------------------
+
+Använd sedan `git bisect <term-gammal>` och `git bisect <term-ny>` istället för `git bisect good` och `git bisect bad` för att markera incheckningar.
+
+Binärsökning visualisera/visa
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+För att se de för närvarande återstående misstänkta i 'gitk', kör följande kommando under binärsökningsprocessen (underkommandot 'view' kan användas som ett alternativ till 'visualize'):
+
+------------
+$ git bisect visualize
+------------
+
+Git detekterar en grafisk miljö genom olika miljövariabler: `DISPLAY`, som anges i X Window System-miljöer på Unix-system. `SESSIONNAME`, som anges under Cygwin i interaktiva skrivbordssessioner. `MSYSTEM`, som anges under Msys2 och Git för Windows. `SECURITYSESSIONID`, som kan anges på macOS i interaktiva skrivbordssessioner.
+
+Om ingen av dessa miljövariabler är satta används 'git log' istället. Du kan också ange kommandoradsalternativ som `-p` och `--stat`.
+
+------------
+$ git bisect visualize --stat
+------------
+
+Binärsöknings-logg och Binärsöknings-uppspelning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Efter att ha markerat revisionerna som bra eller dåliga, kör följande kommando för att visa vad som har gjorts hittills:
+
+------------
+$ git bisect log
+------------
+
+Om du upptäcker att du har gjort ett misstag när du angav statusen för en revision kan du spara resultatet av kommandot till en fil, redigera det för att ta bort de felaktiga posterna och sedan köra följande kommandon för att återställa det till ett korrigerat tillstånd:
+
+------------
+$ git bisect reset
+$ git bisect replay that-file
+------------
+
+Undvik att testa en incheckning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Om, du mitt i en bisect-session vet att den föreslagna revisionen inte är bra att testa (t.ex. att den misslyckas med att bygga och du vet att felet inte har något att göra med dett programfel du jagar), kan du manuellt välja en närliggande incheckning och testa den istället.
+
+Till exempel:
+
+------------
+$ git bisect good/bad			# föregående omgång var bra eller dålig.
+Bisecting: 337 revisioner kvar att testa efter detta (ungefär 9 steg)
+$ git bisect visualize			# hoppsan, det är ointressant.
+$ git reset --hard HEAD~3		# prova 3 revisioner innan vad
+					# föreslogs
+------------
+
+Kompilera och testa sedan den valda revisionen, och markera därefter revisionen som bra eller dålig på vanligt sätt.
+
+Binärsökning hoppaöver
+~~~~~~~~~~~~~~~~~~~~~~
+
+Istället för att själv välja en närliggande incheckning, kan du be Git att göra det åt dig genom att köra kommandot:
+
+------------
+$ git bisect skip                 # Nuvarande version kan inte testas
+------------
+
+Men om du hoppar över en incheckning intill den du letar efter, kommer Git inte att kunna avgöra exakt vilken av dessa incheckning som var den första dåliga.
+
+Du kan också hoppa över ett intervall av incheckningar, istället för bara ett incheckning, med hjälp av intervallnotation. Till exempel:
+
+------------
+$ git bisect skip v2.5..v2.6
+------------
+
+Detta talar om för binärsöknings-processen att ingen incheckning efter `v2.5`, upp till och inklusive `v2.6`, ska testas.
+
+Observera att om du också vill hoppa över den första inchecknings-funktionen i intervallet skulle du köra kommandot:
+
+------------
+$ git bisect skip v2.5 v2.5..v2.6
+------------
+
+Detta talar om för binärsöknings-processen att incheckningar mellan `v2.5` och `v2.6` (inklusive) ska hoppas över.
+
+Binärsökning nästa
+~~~~~~~~~~~~~~~~~~
+
+Normalt sett, efter att en revision markerats som bra eller dålig, beräknar och kontrollerar Git automatiskt nästa revision att testa. Men om du uttryckligen behöver begära nästa binärsökningssteg kan du använda:
+
+------------
+$ git bisect next
+------------
+
+Du kan använda detta för att återuppta binärsökningsprocessen efter att ha avbrutit den genom att checka ut en annan revision.
+
+Minska binärsökningen genom att ge fler parametrar för att börja binärsökningen
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Du kan ytterligare minska antalet försök, om du vet vilken del av trädet som är involverad i problemet du spårar, genom att ange sökvägsmönster-parametrar när du kör kommandot `bisect start`:
+
+------------
+$ git bisect start -- arch/i386 include/asm-i386
+------------
+
+Om du i förväg vet mer än en bra incheckning kan du begränsa binärsöknings-utrymmet genom att ange alla bra incheckningar omedelbart efter den dåliga incheckningen när du kör kommandot `bisect start`:
+
+------------
+$ git bisect start v2.6.20-rc6 v2.6.20-rc4 v2.6.20-rc1 --
+                   # v2.6.20-rc6 är dålig
+                   # v2.6.20-rc4 and v2.6.20-rc1 är bra
+------------
+
+Binärsökning körning
+~~~~~~~~~~~~~~~~~~~~
+
+Om du har ett skript som kan avgöra om den aktuella källkoden är bra eller dålig, kan du dela den genom att köra kommandot:
+
+------------
+$ git bisect run my_script arguments
+------------
+
+Observera att skriptet (`my_script` i exemplet ovan) ska avslutas med kod 0 om den nuvarande källkoden är bra/gammal, och avslutas med en kod mellan 1 och 127 (inklusive), förutom 125, om den nuvarande källkoden är dålig/ny.
+
+Annan avslutningskod kommer att avbryta binärsöknings-processen. Det bör noteras att ett program som avslutas via `exit(-1)` lämnar $? = 255, (se manualsidan för exit(3)), eftersom värdet hackas med `& 0377`.
+
+Den speciella avslutningskoden 125 bör användas när den aktuella källkoden inte kan testas. Om skriptet avslutas med denna kod kommer den aktuella versionen att hoppas över (se `git bisect skip` ovan). 125 valdes som det högsta rimliga värdet att använda för detta ändamål, eftersom 126 och 127 används av POSIX-shell för att signalera specifik felstatus (127 är för kommandot hittades inte, 126 är för kommandot hittades men inte körbart – dessa detaljer spelar ingen roll, eftersom de är normala fel i skriptet, vad gäller `bisect run`).
+
+Du kan ofta upptäcka att du under en binärsöknings-session vill ha tillfälliga modifieringar (t.ex. s/#define DEBUG 0/#define DEBUG 1/ i en header-fil, eller "revision som inte har denna incheckning behöver denna patch tillämpad för att lösa ett annat problem som denna binärsökning inte är intresserad av") tillämpade på den revision som testas.
+
+För att hantera en sådan situation, efter att den inre 'git bisect' hittat nästa revision att testa, kan skriptet tillämpa patchen innan kompilering, köra det riktiga testet och därefter avgöra om revisionen (eventuellt med den nödvändiga patchen) klarade testet och sedan spola tillbaka trädet till det ursprungliga tillståndet. Slutligen bör skriptet avslutas med statusen för det riktiga testet för att låta `git bisect run`-kommandoslingan avgöra det slutliga resultatet av binärsökning-sessionen.
+
+ALTERNATIV
+----------
+--no-checkout::
++
+Checka inte ut det nya arbetskatalogen vid varje iteration av binärsökningsprocessen. Uppdatera istället bara referensen med namnet `BISECT_HEAD` så att den pekar på den incheckning som ska testas.
++
+Det här alternativet kan vara användbart när testet du skulle utföra i varje steg inte kräver ett utcheckat träd.
++
+Om kodförrådet är tomt antas `--no-checkout`.
+
+--first-parent::
++
+Följ endast den första överordnade incheckning när du ser en sammanslagnings-incheckning.
++
+Vid detektering av regressioner som introduceras genom sammanslagningen av en gren kommer sammanslagnigs-incheckning att identifieras som introduktionen av programfelet och dess föregångare kommer att ignoreras.
++
+Det här alternativet är särskilt användbart för att undvika falska positiva resultat när en sammanfogad gren innehöll trasiga eller icke-byggbara incheckningar, men själva sammanslagningen var OK.
+
+EXEMPEL
+-------
+
+* Automatiskt binärsökninga en trasig version mellan v1.2 och HEAD:
++
+------------
+$ git bisect start HEAD v1.2 --      # HEAD är dålig, v1.2 är bra
+$ git bisect run make                # "make" bygger appen
+$ git bisect reset                   # avsluta binärsöknings-sessionen
+------------
+
+* Automatiskt binärsökninga ett testfel mellan origo och HEAD:
++
+------------
+$ git bisect start HEAD origin --    # HEAD är dåligt, ursprunget är bra
+$ git bisect run make test           # "Gör test"-byggen och tester
+$ git bisect reset                   # avsluta binärsöknings-sessionen
+------------
+
+* Automatiskt binärsök ett trasigt testfall:
++
+------------
+$ cat ~/test.sh
+#!/bin/sh
+make || exit 125                     # detta hoppar över trasiga byggen
+~/check_test_case.sh                 #klarar testfallet det?
+$ git bisect start HEAD HEAD~10 --   # boven i dramat är bland de sista 10
+$ git bisect run ~/test.sh
+$ git bisect reset                   # avsluta binärsöknings-sessionen
+------------
++
+Här använder vi ett anpassat skript av typen `test.sh`. I det här skriptet hoppar vi över den aktuella inchecknings-processen om `make` misslyckas. `check_test_case.sh` ska `exit 0` om testfallet godkänns, och `exit 1` annars.
++
+Det är säkrare om både `test.sh` och `check_test_case.sh` finns utanför arkivet för att förhindra interaktioner mellan bisect-, make- och test-processerna och skripten.
+
+* Automatisk binärsökning med tillfälliga ändringar (snabbkorrigering):
++
+------------
+$ cat ~/test.sh
+#!/bin/sh
+
+# justera arbetsträdet genom att sammanfoga snabbkorrigeringsgrenen
+# och försök sedan bygga
+if	git merge --no-commit --no-ff hot-fix &&
+	make
+then
+	# kör projektspecifikt test och rapportera dess status 
+	~/check_test_case.sh
+	status=$?
+else
+	# berätta för anroparen att detta inte är testbart
+	status=125
+fi
+
+# ångra justeringen för att tillåta ren vändning till nästa incheckning
+git reset --hard
+
+# returnera kontrollen
+exit $status
+------------
++
+Detta tillämpar modifieringar från en hot-fix-gren före varje testkörning, t.ex. om din bygg- eller testmiljö har ändrats så att äldre versioner kan behöva en fix som nyare redan har. (Se till att hot-fix-grenen är baserad på en incheckning som finns i alla versioner som du binärsöker, så att sammanslagings-funktionen inte drar in för mycket, eller använd `git cherry-pick` istället för `git merge`.)
+
+* Automatiskt binärsök ett trasigt testfall:
++
+------------
+$ git bisect start HEAD HEAD~10 --   # syndaren är bland de senaste 10
+$ git bisect run sh -c "make || exit 125; ~/check_test_case.sh"
+$ git bisect reset                   # avsluta binärsöknings-sessionen
+------------
++
+Detta visar att du kan klara dig utan ett körskript om du skriver testet på en enda rad.
+
+* Lokalisera en bra region av objektgrafen i ett skadat arkiv
++
+------------
+$ git bisect start HEAD <känd-bra-incheckning> [ <gräns-incheckning> ... ] --no-checkout
+$ git bisect run sh -c '
+	GOOD=$(git for-each-ref "--format=%(objectname)" refs/bisect/good-*) &&
+	git rev-list --objects BISECT_HEAD --not $GOOD >tmp.$$ &&
+	git pack-objects --stdout >/dev/null <tmp.$$
+	rc=$?
+	rm -f tmp.$$
+	test $rc = 0'
+
+$ git bisect reset                   # avsluta binärsöknings-sessionen
+------------
++
+I det här fallet, när 'git bisect run' är klar, kommer bisect/bad att referera till en incheckning som har minst en förälder vars nåbara graf är fullt genomfarbar i den mening som krävs av 'git pack objects'.
+
+* Leta efter en lösning istället för en regression i koden
++
+------------
+$ git bisect start
+$ git bisect new HEAD    # aktuell commit är markerad som ny
+$ git bisect old HEAD~10 # Den tionde incheckningen från och med nu är markerad som gammal
+------------
++
+eller:
++
+------------
+$ git bisect start --term-old broken --term-new fixed
+$ git bisect fixed
+$ git bisect broken HEAD~10
+------------
+
+Få hjälp
+~~~~~~~~
+
+Använd `git bisect` för att få en kort användningsbeskrivning, och `git bisect help` eller `git bisect -h` för att få en lång användningsbeskrivning.
+
+SE ÄVEN
+-------
+link:/docs/git-bisect-lk2009/sv[Bekämpa regressioner med git bisect], linkgit:git-blame[1].
+
+GIT
+---
+En del av linkgit:git[1]-sviten

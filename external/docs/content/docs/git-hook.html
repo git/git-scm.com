@@ -6,7 +6,7 @@ section: documentation
 subsection: manual
 title: Git - git-hook Documentation
 docname: git-hook
-version: 2.43.0
+version: 2.54.0
 headings:
 - text: NAME
   id: _name
@@ -18,11 +18,15 @@ headings:
   id: _subcommands
 - text: OPTIONS
   id: _options
+- text: WRAPPERS
+  id: _wrappers
+- text: CONFIGURATION
+  id: _configuration
 - text: SEE ALSO
   id: _see_also
 - text: GIT
   id: _git
-latest-changes: 2.43.0
+latest-changes: 2.54.0
 aliases:
 - "/docs/git-hook/index.html"
 ---
@@ -38,7 +42,8 @@ aliases:
 <h2 id="_synopsis"><a class="anchor" href="#_synopsis"></a>SYNOPSIS</h2>
 <div class="sectionbody">
 <div class="verseblock">
-<pre class="content"><em>git hook</em> run [--ignore-missing] [--to-stdin=&lt;path&gt;] &lt;hook-name&gt; [-- &lt;hook-args&gt;]</pre>
+<pre class="content"><em>git hook</em> run [--allow-unknown-hook-name] [--ignore-missing] [--to-stdin=&lt;path&gt;] &lt;hook-name&gt; [-- &lt;hook-args&gt;]
+<em>git hook</em> list [--allow-unknown-hook-name] [-z] [--show-scope] &lt;hook-name&gt;</pre>
 </div>
 </div>
 </div>
@@ -49,6 +54,117 @@ aliases:
 <p>A command interface for running git hooks (see <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a>),
 for use by other scripted git commands.</p>
 </div>
+<div class="paragraph">
+<p>This command parses the default configuration files for sets of configs like
+so:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>[hook "linter"]
+  event = pre-commit
+  command = ~/bin/linter --cpp20</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this example, <span class='synopsis'>[<code>hook</code> <code>"linter"</code>]</span> represents one script - <span class='synopsis'><code>~/bin/linter</code>
+
+<code>--cpp20</code></span> - which can be shared by many repos, and even by many hook events, if
+appropriate.</p>
+</div>
+<div class="paragraph">
+<p>To add an unrelated hook which runs on a different event, for example a
+spell-checker for your commit messages, you would write a configuration like so:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>[hook "linter"]
+  event = pre-commit
+  command = ~/bin/linter --cpp20
+[hook "spellcheck"]
+  event = commit-msg
+  command = ~/bin/spellchecker</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With this config, when you run <em>git commit</em>, first <span class='synopsis'><code>~/bin/linter</code> <code>--cpp20</code></span> will
+have a chance to check your files to be committed (during the <span class='synopsis'><code>pre-commit</code></span> hook
+event`), and then <span class='synopsis'><code>~/bin/spellchecker</code></span> will have a chance to check your commit
+message (during the <span class='synopsis'><code>commit-msg</code></span> hook event).</p>
+</div>
+<div class="paragraph">
+<p>Commands are run in the order Git encounters their associated
+<span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em><code>.event</code></span> configs during the configuration parse (see
+<a href='{{< relurl "docs/git-config" >}}'>git-config[1]</a>). Although multiple <span class='synopsis'><code>hook.linter.event</code></span> configs can be
+added, only one <span class='synopsis'><code>hook.linter.command</code></span> event is valid - Git uses "last-one-wins"
+to determine which command to run.</p>
+</div>
+<div class="paragraph">
+<p>So if you wanted your linter to run when you commit as well as when you push,
+you would configure it like so:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>[hook "linter"]
+  event = pre-commit
+  event = pre-push
+  command = ~/bin/linter --cpp20</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With this config, <span class='synopsis'><code>~/bin/linter</code> <code>--cpp20</code></span> would be run by Git before a commit is
+generated (during <span class='synopsis'><code>pre-commit</code></span>) as well as before a push is performed (during
+<span class='synopsis'><code>pre-push</code></span>).</p>
+</div>
+<div class="paragraph">
+<p>And if you wanted to run your linter as well as a secret-leak detector during
+only the "pre-commit" hook event, you would configure it instead like so:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>[hook "linter"]
+  event = pre-commit
+  command = ~/bin/linter --cpp20
+[hook "no-leaks"]
+  event = pre-commit
+  command = ~/bin/leak-detector</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With this config, before a commit is generated (during <span class='synopsis'><code>pre-commit</code></span>), Git would
+first start <span class='synopsis'><code>~/bin/linter</code> <code>--cpp20</code></span> and second start <span class='synopsis'><code>~/bin/leak-detector</code></span>. It
+would evaluate the output of each when deciding whether to proceed with the
+commit.</p>
+</div>
+<div class="paragraph">
+<p>For a full list of hook events which you can set your <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em><code>.event</code></span> to,
+and how hooks are invoked during those events, see <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a>.</p>
+</div>
+<div class="paragraph">
+<p>Git will ignore any <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em><code>.event</code></span> that specifies an event it doesn&#8217;t
+recognize. This is intended so that tools which wrap Git can use the hook
+infrastructure to run their own hooks; see "WRAPPERS" for more guidance.</p>
+</div>
+<div class="paragraph">
+<p>In general, when instructions suggest adding a script to
+<span class='synopsis'><code>.git/hooks/</code><em>&lt;hook-event&gt;</em></span>, you can specify it in the config instead by running:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git config set hook.&lt;some-name&gt;.command &lt;path-to-script&gt;
+git config set --append hook.&lt;some-name&gt;.event &lt;hook-event&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This way you can share the script between multiple repos. That is, <span class='synopsis'><code>cp</code>
+
+<code>~/my-script.sh</code> <code>~/project/.git/hooks/pre-commit</code></span> would become:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git config set hook.my-script.command ~/my-script.sh
+git config set --append hook.my-script.event pre-commit</pre>
+</div>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -58,13 +174,21 @@ for use by other scripted git commands.</p>
 <dl>
 <dt class="hdlist1" id="Documentation/git-hook.txt-run"><a class="anchor" href="#Documentation/git-hook.txt-run"></a>run </dt>
 <dd>
-<p>Run the <span class='synopsis'><em>&lt;hook-name&gt;</em></span> hook. See <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a> for
-supported hook names.</p>
+<p>Runs hooks configured for <span class='synopsis'><em>&lt;hook-name&gt;</em></span>, in the order they are
+discovered during the config parse. The default <span class='synopsis'><em>&lt;hook-name&gt;</em></span> from
+the hookdir is run last. See <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a> for supported
+hook names.</p>
 <div class="paragraph">
 <p>Any positional arguments to the hook should be passed after a
 mandatory <span class='synopsis'><code>--</code></span> (or <span class='synopsis'><code>--end-of-options</code></span>, see <a href='{{< relurl "docs/gitcli" >}}'>gitcli[7]</a>). See
 <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a> for arguments hooks might expect (if any).</p>
 </div>
+</dd>
+<dt class="hdlist1" id="Documentation/git-hook.txt-list-z--show-scope"><a class="anchor" href="#Documentation/git-hook.txt-list-z--show-scope"></a>list [-z] [--show-scope] </dt>
+<dd>
+<p>Print a list of hooks which will be run on <span class='synopsis'><em>&lt;hook-name&gt;</em></span> event. If no
+hooks are configured for that event, print a warning and return 1.
+Use <span class='synopsis'><code>-z</code></span> to terminate output lines with NUL instead of newlines.</p>
 </dd>
 </dl>
 </div>
@@ -75,6 +199,14 @@ mandatory <span class='synopsis'><code>--</code></span> (or <span class='synopsi
 <div class="sectionbody">
 <div class="dlist">
 <dl>
+<dt class="hdlist1" id="Documentation/git-hook.txt---allow-unknown-hook-name"><a class="anchor" href="#Documentation/git-hook.txt---allow-unknown-hook-name"></a>--allow-unknown-hook-name </dt>
+<dd>
+<p>By default <span class='synopsis'><code>git</code> <code>hook</code> <code>run</code></span> and <span class='synopsis'><code>git</code> <code>hook</code> <code>list</code></span> will bail out when
+<span class='synopsis'><em>&lt;hook-name&gt;</em></span> is not a hook event known to Git (see <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a>
+for the list of known hooks). This is meant to help catch typos
+such as <span class='synopsis'><code>prereceive</code></span> when <span class='synopsis'><code>pre-receive</code></span> was intended. Pass this
+flag to allow unknown hook names.</p>
+</dd>
 <dt class="hdlist1" id="Documentation/git-hook.txt---to-stdin"><a class="anchor" href="#Documentation/git-hook.txt---to-stdin"></a>--to-stdin </dt>
 <dd>
 <p>For "run"; specify a file which will be streamed into the
@@ -86,6 +218,100 @@ beginning to EOF.</p>
 <p>Ignore any missing hook by quietly returning zero. Used for
 tools that want to do a blind one-shot run of a hook that may
 or may not be present.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-hook.txt--z"><a class="anchor" href="#Documentation/git-hook.txt--z"></a>-z </dt>
+<dd>
+<p>Terminate "list" output lines with NUL instead of newlines.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-hook.txt---show-scope"><a class="anchor" href="#Documentation/git-hook.txt---show-scope"></a>--show-scope </dt>
+<dd>
+<p>For "list"; prefix each configured hook&#8217;s friendly name with a
+tab-separated config scope (e.g. <span class='synopsis'><code>local</code></span>, <span class='synopsis'><code>global</code></span>, <span class='synopsis'><code>system</code></span>),
+mirroring the output style of <span class='synopsis'><code>git</code> <code>config</code> <code>--show-scope</code></span>. Traditional
+hooks from the hookdir are unaffected.</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_wrappers"><a class="anchor" href="#_wrappers"></a>WRAPPERS</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><span class='synopsis'><code>git</code> <code>hook</code> <code>run</code></span> has been designed to make it easy for tools which wrap Git to
+configure and execute hooks using the Git hook infrastructure. It is possible to
+provide arguments and stdin via the command line, as well as specifying parallel
+or series execution if the user has provided multiple hooks.</p>
+</div>
+<div class="paragraph">
+<p>Assuming your wrapper wants to support a hook named "mywrapper-start-tests", you
+can have your users specify their hooks like so:</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>[hook "setup-test-dashboard"]
+  event = mywrapper-start-tests
+  command = ~/mywrapper/setup-dashboard.py --tap</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then, in your <em>mywrapper</em> tool, you can invoke any users' configured hooks by
+running:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>git hook run --allow-unknown-hook-name mywrapper-start-tests \
+  # providing something to stdin
+  --stdin some-tempfile-123 \
+  # execute hooks in serial
+  # plus some arguments of your own...
+  -- \
+  --testname bar \
+  baz</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Take care to name your wrapper&#8217;s hook events in a way which is unlikely to
+overlap with Git&#8217;s native hooks (see <a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a>) - a hook event named
+<span class='synopsis'><code>mywrappertool-validate-commit</code></span> is much less likely to be added to native Git
+than a hook event named <span class='synopsis'><code>validate-commit</code></span>. If Git begins to use a hook event
+named the same thing as your wrapper hook, it may invoke your users' hooks in
+unintended and unsupported ways.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>CONFIGURATION</h2>
+<div class="sectionbody">
+<div class="dlist">
+<dl>
+<dt class="hdlist1" id="Documentation/git-hook.txt-hookltfriendly-namegtcommand"><a id="Documentation/git-hook.txt-hookfriendly-namecommand" class="anchor" href="#Documentation/git-hook.txt-hookfriendly-namecommand"></a>hook.&lt;friendly-name&gt;.command </dt>
+<dd>
+<p>The command to execute for <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em></span>. <span class='synopsis'><em>&lt;friendly-name&gt;</em></span>
+is a unique name that identifies this hook. The hook events that
+trigger the command are configured with <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em><code>.event</code></span>.
+The value can be an executable path or a shell oneliner. If more than
+one value is specified for the same <span class='synopsis'><em>&lt;friendly-name&gt;</em></span>, only the last
+value parsed is used. See <a href='{{< relurl "docs/git-hook" >}}'>git-hook[1]</a>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-hook.txt-hookltfriendly-namegtevent"><a id="Documentation/git-hook.txt-hookfriendly-nameevent" class="anchor" href="#Documentation/git-hook.txt-hookfriendly-nameevent"></a>hook.&lt;friendly-name&gt;.event </dt>
+<dd>
+<p>The hook events that trigger <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em></span>. The value is the
+name of a hook event, like "pre-commit" or "update". (See
+<a href='{{< relurl "docs/githooks" >}}'>githooks[5]</a> for a complete list of hook events.) On the
+specified event, the associated <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em><code>.command</code></span> is executed.
+This is a multi-valued key. To run <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em></span> on multiple
+events, specify the key more than once. An empty value resets
+the list of events, clearing any previously defined events for
+<span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em></span>. See <a href='{{< relurl "docs/git-hook" >}}'>git-hook[1]</a>.</p>
+</dd>
+<dt class="hdlist1" id="Documentation/git-hook.txt-hookltfriendly-namegtenabled"><a id="Documentation/git-hook.txt-hookfriendly-nameenabled" class="anchor" href="#Documentation/git-hook.txt-hookfriendly-nameenabled"></a>hook.&lt;friendly-name&gt;.enabled </dt>
+<dd>
+<p>Whether the hook <span class='synopsis'><code>hook.</code><em>&lt;friendly-name&gt;</em></span> is enabled. Defaults to <span class='synopsis'><code>true</code></span>.
+Set to <span class='synopsis'><code>false</code></span> to disable the hook without removing its
+configuration. This is particularly useful when a hook is defined
+in a system or global config file and needs to be disabled for a
+specific repository. See <a href='{{< relurl "docs/git-hook" >}}'>git-hook[1]</a>.</p>
 </dd>
 </dl>
 </div>

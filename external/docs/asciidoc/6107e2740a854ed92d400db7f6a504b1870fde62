@@ -1,0 +1,448 @@
+git-checkout(1)
+===============
+
+NAMN
+----
+git-checkout - Byt gren eller återställ filer i arbetskatalogen
+
+SYNOPSIS
+--------
+[synopsis]
+git checkout [-q] [-f] [-m] [<gren>]
+git checkout [-q] [-f] [-m] --detach [<gren>]
+git checkout [-q] [-f] [-m] [--detach] <incheckning>
+git checkout [-q] [-f] [-m] [[-b|-B|--orphan] <ny-grel>] [<start-punkt>]
+git checkout <tree-ish> [--] <sökvägsspec>...
+git checkout <tree-ish> --pathspec-from-file=<fil> [--pathspec-file-nul]
+git checkout [-f|--ours|--theirs|-m|--conflict=<stil>] [--] <sökvägsmönster>...
+git checkout [-f|--ours|--theirs|-m|--conflict=<stil>] --pathspec-from-file=<file> [--pathspec-file-nul]
+git checkout (-p|--patch) [<trädlikt>] [--] [<sökvägsspec>...]
+
+BESKRIVNING
+-----------
+
+`git checkout` har två huvudlägen:
+
+1. **Byt grenar**, med `git checkout <gren>`
+2. **Återställ en annan version av en fil**, till exempel med `git checkout <incheckning> <filnamn>` eller `git checkout <filnamn>`
+
+Se ARGUMENT SÄRSKILJNING nedan för hur Git bestämmer vilken som ska göras.
+
+`git checkout [<gren>]`::
+	Växla till _<gren>_. Detta ställer in den aktuella grenen till _<gren>_ och uppdaterar filerna i din arbetskatalog. Utcheckningen kommer att misslyckas om det finns oincheckade ändringar i filer där _<gren>_ och din nuvarande incheckning har olika innehåll. Oincheckade ändringar kommer annars att behållas.
++
+Om _<gren>_ inte hittas men det finns en spårningsgren i exakt en fjärr (kalla den _<fjärr >_) med ett matchande namn och `--no-guess` inte är specificerad, behandla den som likvärdig med
++
+------------
+$ git checkout -b <gren> --track <fjärr>/<gren>
+------------
++
+Att köra `git checkout` utan att ange en gren har ingen effekt förutom att skriva ut spårningsinformationen för den aktuella grenen.
+
+`git checkout -b <ny-gren> [<start-punkt>]`::
+
+	Skapa en ny gren med namnet _<ny-gren>_, starta den vid _<start-punkt>_ (standardinställningen är den nuvarande incheckning) och kolla in den nya grenen. Du kan använda alternativen `--track` eller `--no-track` för att ställa in grenens uppströms spårningsinformation.
++
+Detta kommer att misslyckas om det uppstår ett fel vid utcheckning av _<ny-gren>_, till exempel om utcheckning av `<start-punkt>`-incheckningen skulle skriva över dina oincheckade ändringar.
+
+`git checkout -B <gren> [<start-punkt>]`::
+
+	Samma som `-b`, förutom att om grenen redan finns återställer den _<gren>_ till startpunkten istället för att misslyckas.
+
+`git checkout --detach [<gren>]`::
+`git checkout [--detach] <incheckning>`::
+
+	Samma som `git checkout <gren>`, förutom att istället för att peka `HEAD` mot branchen, pekar den `HEAD` mot inchecknings-ID:t. Se avsnittet "FRÅNKOPPLAT HEAD" nedan för mer information.
++
+Om man utelämnar _<gren>_ lossnar `HEAD` i toppen av den aktuella grenen.
+
+`git checkout <trädlikt> [--] <sökvägsmönster>...`::
+`git checkout <trädlikt> --pathspec-from-file=<fil> [--pathspec-file-nul]`::
+
+	Ersätt de angivna filerna och/eller katalogerna med versionen från den givna incheckningen eller trädet och lägg till dem i indexet (även känt som "prepareringsytan").
++
+Till exempel, kommer `git checkout main file.txt` att ersätta `file.txt` med versionen från `main`.
+
+`git checkout [-f|--ours|--theirs|-m|--conflict=<style>] [--] <sökvägsmönster>...`::
+`git checkout [-f|--ours|--theirs|-m|--conflict=<stil>] --pathspec-from-file=<file> [--pathspec-file-nul]`::
+
+	Ersätt de angivna filerna och/eller katalogerna med versionen från indexet.
++
+Om du till exempel checkar ut en incheckning, redigerar `file.txt` och sedan bestämmer dig för att ändringarna var ett misstag, kommer `git checkout file.txt` att ignorera alla ej köade ändringar av `file.txt`.
++
+Detta kommer att misslyckas om filen har en sammanslagningskonflikt och du ännu inte har kört `git add file.txt` (eller något motsvarande) för att markera den som löst. Du kan använda `-f` för att ignorera de icke-sammanslagna filerna istället för att misslyckas, använda `--ours` eller `--theirs` för att ersätta dem med versionen från en specifik sida av sammanslagningen, eller använda `-m` för att ersätta dem med det ursprungliga konfliktfyllda sammanslagningsresultatet.
+
+`git checkout (-p|--patch) [<träd-igt>] [--] [<sökvägsmönster>...]`::
+	Detta liknar de två föregående lägena, men låter dig använda det interaktiva gränssnittet för att visa "diff"-utdata och välja vilka stycken som ska användas i resultatet. Se nedan för beskrivningen av alternativet `--patch`.
+
+ALTERNATIV
+----------
+`-q`::
+`--quiet`::
+	Tyst, undertryck feedbackmeddelanden.
+
+`--progress`::
+`--no-progress`::
+	Förloppsstatus rapporteras som standard i standardfelströmmen när den är ansluten till en terminal, såvida inte `--quiet` anges. Denna flagga aktiverar förloppsrapportering även om den inte är ansluten till en terminal, oavsett `--quiet`.
+
+`-f`::
+`--force`::
+	När du byter gren, fortsätt även om indexet eller arbetskatalogen skiljer sig från `HEAD`, och även om det finns ospårade filer i vägen. Detta används för att ta bort lokala ändringar och eventuella ospårade filer eller kataloger som är i vägen.
++
+När du checkar ut sökvägar från indexet, misslyckas inte med ej sammanslagna poster; istället ignoreras ej sammanslagna poster.
+
+`--ours`::
+`--theirs`::
+	When checking out paths from the index, check out stage #2 (`ours`) or #3 (`theirs`) for unmerged paths.
++
+Observera att under `git rebase` och `git pull --rebase` kan `vår` och `deras` verka omväxlande; `--ours` anger versionen från grenen som ändringarna ombaseras på, medan `--theirs` anger versionen från grenen som innehåller ditt arbete som ombaseras.
++
+Detta beror på att `rebase` används i ett arbetsflöde som behandlar historiken på fjärren som den delade kanoniska, och behandlar arbetet som utförs på grenen du ombaserar som tredjepartsarbete som ska integreras, och du tar tillfälligt rollen som behållare av den kanoniska historiken under ombaseringen. Som behållare av den kanoniska historiken måste du se historiken från fjärren som `vår` (dvs. "vår delade kanoniska historik"), medan det du gjorde på din sidogren som `deras` (dvs. "en bidragsgivares arbete ovanpå den").
+
+`-b <ny-gren>`::
+	Skapa en ny gren med namnet _<my-gren>_, starta den vid _<start-punkt>_ och kontrollera den resulterande utgreningen; se linkgit:git-branch[1] för mer information.
+
+`-B <ny-gren>`::
+	Samma som `-b`, förutom att om grenen redan finns återställer den _<gren>_ till startpunkten istället för att misslyckas.
+
+`-t`::
+`--track[=(direct|inherit)]`::
+	När du skapar en ny gren, konfigurera "uppström". Se `--track` i linkgit:git-branch[1] för mer information. För enkelhetens skull innebär --track utan -b att man skapar en gren.
++
+Om inget `-b`-alternativ anges, kommer namnet på den nya grenen att härledas från fjärrspårnings-grenen, genom att titta på den lokala delen av referensspecifikationen som är konfigurerad för motsvarande fjärr, och sedan ta bot den initiala delen upp till "*". Detta skulle ange att vi ska använda `hack` som lokal gren när vi förgrenar oss från `origin/hack` (eller `remotes/origin/hack`, eller till och med `refs/remotes/origin/hack`). Om det angivna namnet inte har något snedstreck, eller om ovanstående gissning resulterar i ett tomt namn, avbryts gissningen. Du kan explicit ange ett namn med `-b` i ett sådant fall.
+
+`--no-track`::
+	Skapa inte en "uppströms"-konfiguration, även om konfigurationsvariabeln `branch.autoSetupMerge` är sann.
+
+`--guess`::
+`--no-guess`::
+	Om _<gren>_ inte hittas men det finns en spårningsgren i exakt en fjärr (kalla den _<fjärr>_) med ett matchande namn, behandla den som likvärdig med
++
+------------
+$ git checkout -b <gren> --track <fjärr>/<gren>
+------------
++
+Om grenen finns i flera fjärrer och en av dem namnges av konfigurationsvariabeln `checkout.defaultRemote`, kommer vi att använda den för att göra det tydligare, även om _<gren>_ inte är unik för alla fjärrer. Ställ in den till t.ex. `checkout.defaultRemote=origin` för att alltid checka ut fjärrgrenar därifrån om _<gren>_ är tvetydig men finns på fjärren 'origin'. Se även `checkout.defaultRemote` i linkgit:git-config[1].
++
+`--guess` är standardbeteendet. Använd `--no-guess` för att inaktivera det.
++
+Standardbeteendet kan ställas in via konfigurationsvariabeln `checkout.guess`.
+
+`-l`::
+	Skapa den nya grenens reflog; se linkgit:git-branch[1] för mer information.
+
+`-d`::
+`--detach`::
+	Istället för att checka ut en gren för att arbeta med den, checka ut en incheckning för inspektion och kasserbara experiment. Detta är standardbeteendet för `git checkout <incheckning>` när _<incheckning>_ inte är ett branchnamn. Se avsnittet "FRÅNKOPPLAT HUVUD (HEAD)" nedan för mer information.
+
+`--orphan <ny-gren>`::
+	Skapa en ny ofödd gren, med namnet _<ny-gren>_, startad från _<start-punkt>_ och byt till den. Den första incheckning som görs på den här nya grenen kommer inte att ha några föräldrar och den kommer att vara roten till en ny historik som är helt frikopplad från alla andra grenar och incheckningar.
++
+Indexet och arbetskatalogen justeras som om du tidigare hade kört `git checkout <start-punkt>`. Detta låter dig starta en ny historik som registrerar en uppsättning sökvägar liknande _<start-punkt>_ genom att enkelt köra `git commit -a` för att göra root-incheckningen.
++
+Detta kan vara användbart när du vill publicera trädet från en incheckning utan att exponera dess fullständiga historik. Du kanske vill göra detta för att publicera en öppen källkods-gren av ett projekt vars nuvarande träd är "rent", men vars fullständiga historik innehåller proprietära eller på annat sätt begränsade kodbitar.
++
+Om du vill starta en frånkopplad historik som registrerar en uppsättning sökvägar som är helt annorlunda än den för _<startpunkt>_, bör du rensa indexet och arbetskatalogen direkt efter att du skapat den föräldralösa grenen genom att köra `git rm -rf .` från den översta nivån i arbetskatalogen. Efteråt är du redo att förbereda dina nya filer, fylla i arbetsträdet igen, kopiera dem från någon annanstans, extrahera en tar-fil, etc.
+
+`--ignore-skip-worktree-bits`::
+	I glest utchecknings-läge skulle `git checkout -- <sökväg>...` endast uppdatera poster som matchas av _<sökväg>_ och sparse-mönster i `$GIT_DIR/info/sparse-checkout`. Det här alternativet ignorerar de sparse-mönstren och lägger tillbaka alla filer i `<sökväg>...`.
+
+`-m`::
+`--merge`::
+	Vid byte av grenar, om du har lokala ändringar i en eller flera filer som skiljer sig från den aktuella grenen och den gren du växlar till, vägrar kommandot att byta gren för att bevara dina ändringar i kontext. Men, med det här alternativet, sker dock en trevägssammanslagning mellan den aktuella grenen, innehållet i din arbetskatalog och den nya grenen är klar, och du kommer att vara på den nya grenen.
++
+När en sammanslagningskonflikt inträffar, lämnas indexposterna för motstridiga sökvägar ej sammanslagna, och du måste lösa konflikterna och markera de lösta sökvägarna med `git add` (eller `git rm` om sammanslagningen ska resultera i borttagning av sökvägen).
++
+När du checkar ut sökvägar från indexet, låter det här alternativet dig återskapa den konfliktfyllda sammanslagningen i de angivna sökvägarna. Det här alternativet kan inte användas när du checkar ut sökvägar från en trädliknande källa.
++
+När man byter grenar med `--merge` kan ändringar i etapper gå förlorade.
+
+`--conflict=<stil>`::
+	Samma som alternativet `--merge` ovan, men ändrar hur de motstridiga styckenerna presenteras och åsidosätter konfigurationsvariabeln `merge.conflictStyle`. Möjliga värden är `merge` (standard), `diff3` och `zdiff3`.
+
+`-p`::
+`--patch`::
+	Välj interaktivt bitar i skillnaden mellan _<trädlikt>_ (eller indexet, om ospecificerat) och arbetsträdet. De valda bitarna tillämpas sedan i omvänd ordning på arbetsträdet (och om ett _<trädlikt>_ specificerades, indexet).
++
+Det här betyder att du kan använda `git checkout -p` för att selektivt ignorera redigeringar från din nuvarande arbetskatalog. Se avsnittet "Interaktivt läge" i linkgit:git-add[1] för att lära dig hur du använder `--patch`-läget.
++
+Observera att det här alternativet använder inte överläggsläget som standard (se även `--overlay`), och för närvarande stödes inte överläggsläget.
+
+`-U<n>`::
+`--unified=<n>`::
+	Generate diffs with _<n>_ lines of context. Defaults to `diff.context` or 3 if the config option is unset.
+
+`--inter-hunk-context=<n>`::
+	Visar sammanhanget mellan olika stycken, upp till det angivna _<antal>_ rader, och sammanfogar därmed stycken som ligger nära varandra. Standardvärdet är `diff.interHunkContext` eller 0 om konfigurationsalternativet inte är inställt.
+[]
+
+`--ignore-other-worktrees`::
+	`git checkout` vägrar när den önskade grenen redan är utcheckad eller på annat sätt används av ett annat arbetsträd. Den här inställningen gör att den ändå checkar ut grenen. Med andra ord kan grenen användas av mer än ett arbetsträd.
+
+`--overwrite-ignore`::
+`--no-overwrite-ignore`::
+	Skriv tyst över ignorerade filer vid byte av gren. Detta är standardbeteendet. Använd `--no-overwrite-ignore` för att avbryta operationen när den nya grenen innehåller ignorerade filer.
+
+`--recurse-submodules`::
+`--no-recurse-submodules`::
+	Genom att använda `--recurse-submodules` uppdateras innehållet i alla aktiva undermoduler enligt den incheckningen som registrerats i superprojektet. Om lokala modifieringar i en undermodul skulle skrivas över kommer utcheckningen att misslyckas om inte `-f` används. Om ingenting (eller `--no-recurse-submodules`) används kommer undermodulernas arbetskataloger inte att uppdateras. Precis som med linkgit:git-submodule[1] kommer detta att koppla bort `HEAD` från undermodulen.
+
+`--overlay`::
+`--no-overlay`::
+	I standard överläggsläget, tar `git checkout` aldrig bort filer från indexet eller arbetskatalogen. När `--no-overlay` anges, tas filer som finnsi indexet och arbetskatalogen, men inte i _<trädlikt>_, bort, så att de matchar _<trädlikt>_ exakt.
+
+`--pathspec-from-file=<fil>`::
+	Sökvägsspec skickas i _<fil>_ istället för kommandoradsargument. Om _<fil>_ är exakt `-` används standardindata. Sökvägsmönster-element separeras med _LF_ eller _CR_/_LF_. Sökvägsmönster-element kan citeras enligt beskrivningen för konfigurationsvariabeln `core.quotePath` (se linkgit:git-config[1]). Se även `--pathspec-file-nul` och global `--literal-pathspecs`.
+
+`--pathspec-file-nul`::
+	Endast meningsfullt med `--pathspec-from-file`. Sökvägsmönsterposter separeras med tecknet _NUL_ och alla andra tecken tolkas bokstavligt (inklusive radbrytningar och citattecken).
+
+`<gren>`::
+	Gren till utcheckning; om den refererar till en gren (dvs. ett namn som, när det inleds med "refs/heads/", är en giltig referens), så är den grenen utcheckad. Annars, om den refererar till en giltig incheckning, blir din `HEAD` "frånkopplad" och du är inte längre på någon gren (se nedan för detaljer).
++
+Du kan använda syntaxen `@{-N}` för att referera till den N:te sista grenen/incheckningen som checkats ut med hjälp av operationen "git checkout". Du kan också ange `-` vilket är synonymt med `@{-1}`.
++
+Som ett specialfall kan du använda `<rev-a>...<rev-b>` som en genväg för sammanslagningsbasen för _<rev-a>_ och _<rev-b>_ om det finns exakt en sammanslagningsbas. Du kan utelämna högst en av _<rev-a>_ och _<rev-b>_, i vilket fall standardvärdet är `HEAD`.
+
+_<ny-gren>_::
+	Namn på den nya grenen.
+
+_<start-punkt>_::
+	Namnet på en incheckning där den nya grenen ska startas; se linkgit:git-branch[1] för mer information. Standardvärdet är `HEAD`.
++
+Som ett specialfall kan du använda `<rev-a>...<rev-b>` som en genväg för sammanslagningsbasen för _<rev-a>_ och _<rev-b>_ om det finns exakt en sammanslagningsbas. Du kan utelämna högst en av _<rev-a>_ och _<rev-b>_, i vilket fall standardvärdet är `HEAD`.
+
+_<trädlikt>_::
+	Träd att checka ut från (när sökvägar anges). Om inget anges kommer indexet att användas.
++
+Som ett specialfall kan du använda `<rev-a>...<rev-b>` som en genväg för sammanslagningsbasen för _<rev-a>_ och _<rev-b>_ om det finns exakt en sammanslagningsbas. Du kan utelämna högst en av _<rev-a>_ och _<rev-b>_, i vilket fall standardvärdet är `HEAD`.
+
+`--`::
+	Tolka inte fler argument som alternativ.
+
+`<sökvägsmönster>...`::
+	Begränsar de sökvägar som påverkas av operationen.
++
+För mer information, se posten 'sökvägsmönster' i linkgit:gitglossary[7].
+
+FRÅNKOPPLAT HEAD
+----------------
+`HEAD` refererar normalt till en namngiven gren (t.ex. `master`). Varje gren refererar däremot till en specifik incheckning. Låt oss titta på ett kodförråd med tre incheckningar, varav en är taggad, och med grenen `master` utcheckad:
+
+------------
+           HEAD (hänvisar till gren 'master')
+            |
+            v
+a---b---c  gren 'master' (rhänvisar to incheckning 'c')
+    ^
+    |
+  tagg 'v2.0' (hänvisar till incheckning 'b')
+------------
+
+När en incheckning skapas i detta tillstånd uppdateras grenen för att referera till den nya incheckningen. Mer specifikt skapar `git commit` en ny incheckning `d`, vars förälder är incheckning `c`, och uppdaterar sedan grenen `master` för att referera till den nya incheckningen `d`. `HEAD` refererar fortfarande till grenen `master` och refererar därför nu indirekt till incheckning `d`:
+
+------------
+$ edit; git add; git commit
+
+               HEAD (hänvisar till gren 'master')
+                |
+                v
+a---b---c---d  gren 'master' (hänvisar till incheckning 'd')
+    ^
+    |
+  tagg 'v2.0' (hänvisar till incheckning 'b')
+------------
+
+Det är ibland användbart att kunna checka ut en incheckning som inte finns i toppen av någon namngiven gren, eller till och med att skapa en ny incheckning som inte refereras av en namngiven gren. Låt oss titta på vad som händer när vi checkar ut incheckning `b` (här visar vi två sätt detta kan göras):
+
+------------
+$ git checkout v2.0  # eller
+$ git checkout master^^
+
+   HEAD (hänvisar till incheckning 'b')
+    |
+    v
+a---b---c---d  gren 'master' (hänvisar till incheckning 'd')
+    ^
+    |
+  tagg 'v2.0' (hänvisar till incheckning 'b')
+------------
+
+Observera att oavsett vilket checkout-kommando vi använder, refererar `HEAD` nu direkt till incheckning `b`. Detta kallas att vara i frånkopplat `HEAD`-tillstånd. Det betyder helt enkelt att `HEAD` refererar till en specifik incheckning, i motsats till att referera till en namngiven gren. Låt oss se vad som händer när vi skapar en incheckning:
+
+------------
+$ edit; git add; git commit
+
+     HEAD (hänvisar till incheckning 'e')
+      |
+      v
+      e
+     /
+a---b---c---d  gren 'master' (hänvisar till incheckning 'd')
+    ^
+    |
+  tagg 'v2.0' (hänvisar till incheckning 'b')
+------------
+
+Det finns nu en ny incheckning `e`, men den refereras endast av `HEAD`. Vi kan naturligtvis lägga till ytterligare en incheckning i detta tillstånd:
+
+------------
+$ edit; git add; git commit
+
+	 HEAD (hänvisar till incheckning 'f')
+	  |
+	  v
+      e---f
+     /
+a---b---c---d  gren 'master' (hänvisar till incheckning 'd')
+    ^
+    |
+  tagg 'v2.0' (hänvisar till incheckning 'b')
+------------
+
+Faktum är att vi kan utföra alla vanliga Git-operationer. Men låt oss titta på vad som händer när vi sedan checkar ut `master`:
+
+------------
+$ git checkout master
+
+               HEAD (hänvisar till gren 'master')
+      e---f     |
+     /          v
+a---b---c---d  gren 'master' (refers to incheckning 'd')
+    ^
+    |
+  tag 'v2.0' (hänvisar till incheckning 'b')
+------------
+
+Det är viktigt att inse att ingenting i nuläget refererar till incheckning `f`. Så småningom kommer incheckning `f` (och i förlängningen commit `e`) att raderas av Gits rutinmässiga skräpinsamlingsprocess, såvida vi inte skapar en referens innan det händer. Om vi inte ännu har gått ifrån incheckning `f` kommer någon av dessa att skapa en referens till den:
+
+------------
+$ git checkout -b foo  # eller "git switch -c foo"  <1>
+$ git branch foo                                 <2>
+$ git tag foo                                    <3>
+------------
+<1> skapar en ny gren `foo`, som refererar till incheckning `f`, och uppdaterar sedan `HEAD` för att referera till grenen `foo`. Med andra ord, vi kommer inte längre att vara i frånkopplat-`HEAD` läge efter detta kommando.
+<2> på liknande sätt skapar man en ny gren `foo`, som refererar till incheckning `f`, men lämnar `HEAD` fristående.
+<3> skapar en ny tagg `foo`, som refererar till incheckning `f`, och lämnar `HEAD` frånkopplat.
+
+Om vi har gått ifrån incheckning `f` måste vi först återställa dess objektnamn (vanligtvis med hjälp av git reflog), och sedan kan vi skapa en referens till det. För att till exempel se de två sista incheckningarna som `HEAD` refererade till kan vi använda något av dessa kommandon:
+
+------------
+$ git reflog -2 HEAD # eller
+$ git log -g -2 HEAD
+------------
+
+ARGUMENT SÄRSKILJNING
+---------------------
+
+När du kör `git checkout <något>` försöker Git gissa om _<något>_ är avsedd att vara en gren, en incheckning eller en uppsättning filer, och växlar sedan antingen till den grenen eller incheckningen, eller återställer de angivna filerna.
+
+Om det finns någon tvetydighet kommer Git att behandla `<något>` som en gren eller incheckning, men du kan använda det dubbla bindestrecket `--` för att tvinga Git att behandla parametern som en lista med filer och/eller kataloger, så här:
+
+----------
+git checkout -- fil.txt
+----------
+
+EXEMPEL
+-------
+
+=== 1. Sökvägar
+
+Följande sekvens kontrollerar grenen `master`, återställer `Makefile` till två versioner bakåt, tar bort `hello.c` av misstag och hämtar tillbaka den från indexet.
+
+------------
+$ git checkout master             <1>
+$ git checkout master~2 Makefile  <2>
+$ rm -f hello.c
+$ git checkout hello.c            <3>
+------------
+<1> byt gren
+<2> ta en fil från en annan incheckning
+<3> återställ `hello.c` från indexet
+
+Om du vill checka ut _alla_ C-källkods-filer från indexet kan du säga
+
+------------
+$ git checkout -- '*.c'
+------------
+
+Observera citattecknen runt `*.c`. Filen `hello.c` kommer också att checkas ut, även om den inte längre finns i arbetskatalogen, eftersom filglobbing används för att matcha poster i indexet (inte i arbetskatalogen av skalet).
+
+Om du har en olycklig gren som heter `hello.c`, skulle detta steg förväxlas med en instruktion för att byta till den grenen. Du bör istället skriva:
+
+------------
+$ git checkout -- hello.c
+------------
+
+=== 2. Sammanslagning
+
+Efter att ha arbetat i fel gren, skulle byte till rätt gren göras med hjälp av:
+
+------------
+$ git checkout mittämne
+------------
+
+Din "felaktiga" gren och korrekta `mittämne`-gren kan dock skilja sig åt i filer som du har modifierat lokalt, i vilket fall utcheckningen ovan skulle misslyckas så här:
+
+------------
+$ git checkout mytopic
+error: You have local changes to 'frotz'; not switching branches.
+------------
+
+Du kan ge flaggan `-m` till kommandot, vilket skulle försöka en trevägssammanslagning:
+
+------------
+$ git checkout -m mytopic
+Auto-merging frotz
+------------
+
+Efter denna trevägssammanslagning registreras de lokala modifieringarna _inte_ i din indexfil, så `git diff` skulle visa dig vilka ändringar du gjort sedan starten av den nya grenen.
+
+=== 3. Sammanslagningskonflikt
+
+När en sammanslagningskonflikt uppstår vid byte av grenar med alternativet `-m`, skulle du se något liknande:
+
+------------
+$ git checkout -m mytopic
+Auto-merging frotz
+ERROR: Merge conflict in frotz
+fatal: merge program failed
+------------
+
+Vid det här laget, visar `git diff` ändringarna tydligt sammanfogade som i föregående exempel, såväl som ändringarna i de konfliktfyllda filerna. Redigera och lös konflikten och markera den som löst med `git add` som vanligt:
+
+------------
+$ edit frotz
+$ git add frotz
+------------
+
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+`checkout.defaultRemote`::
+	När du kör `git checkout <något>` eller `git switch <något>` och bara har en fjärr, kan den implicit återgå till att checka ut och spåra, t.ex. `origin/<något>`. Detta slutar fungera så fort du har mer än en fjärr med en _<något>_-referens. Den här inställningen gör det möjligt att ställa in namnet på en föredragen fjärr som alltid ska vinna vid särskiljning. Det typiska användningsfallet är att ställa in detta till `origin`.
++
+För närvarande används detta av linkgit:git-switch[1] och linkgit:git-checkout[1] när `git checkout <något>` eller `git switch <något>` checkar ut grenen _<något>_ på en annan fjärr, och av linkgit:git-worktree[1] när `git worktree add` refererar till en fjärrgren. Denna inställning kan komma att användas för andra checkout-liknande kommandon eller funktioner i framtiden.
+
+`checkout.guess`::
+	Anger standardvärdet för alternativen `--guess` eller `--no-guess` i `git checkout` och `git switch`. Se linkgit:git-switch[1] och linkgit:git-checkout[1].
+
+`checkout.workers`::
+	Antalet parallella arbetare som ska användas vid uppdatering av arbetskatalogen. Standardvärdet är ett, dvs. sekventiell exekvering. Om det sätts till ett värde mindre än ett, kommer Git att använda lika många arbetare som antalet tillgängliga logiska kärnor. Denna inställning och `checkout.thresholdForParallelism` påverkar alla kommandon som utför utcheckning. T.ex. checkout, clone, reset, sparse-checkout, etc.
++
+NOTE: Parallell utcheckning ger vanligtvis bättre prestanda för förvar som finns på SSD-diskar eller över NFS. För förvar på roterande diskar och/eller maskiner med ett litet antal kärnor fungerar standard sekventiell utcheckning ofta bättre. Storleken och komprimeringsnivån för ett förvaret kan också påverka hur bra den parallella versionen presterar.
+
+`checkout.thresholdForParallelism`::
+	När man kör parallell utcheckning med ett litet antal filer kan kostnaden för att skapa underprocesser och kommunikation mellan processer överväga vinsterna med parallellisering. Den här inställningen låter dig definiera det minsta antalet filer som parallell utcheckning ska försökas för. Standardinställningen är 100.
+[]
+
+SE ÄVEN
+-------
+linkgit:git-switch[1], linkgit:git-restore[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

@@ -1,0 +1,117 @@
+git-gc(1)
+=========
+
+NAMN
+----
+git-gc -Städa onödiga filer och optimera det lokala kodförrådet
+
+
+SYNOPSIS
+--------
+[verse]
+'git gc' [--aggressive] [--auto] [--[no-]detach] [--quiet] [--prune=<datum> | --no-prune] [--force] [--keep-largest-pack]
+
+BESKRIVNING
+-----------
+Kör ett antal hushållnings-uppgifter inom det aktuella kodförrådet, såsom att komprimera filrevisioner (för att minska diskutrymme och öka prestanda), ta bort oåtkomliga objekt som kan ha skapats från tidigare anrop av 'git add', packa referenser, trimma reflog, återställa metadata eller inaktuella fungerande träd. Kan också uppdatera hjälpindex såsom incheckning-grafen.
+
+När vanliga porslinsoperationer som skapar objekt körs, kontrollerar de om kodförrådet har vuxit avsevärt sedan det senaste underhållet, och i så fall kör de `git gc` automatiskt. Se `gc.auto` nedan för hur du inaktiverar detta beteende.
+
+Att köra `git gc` manuellt borde bara behövas när man lägger till objekt i ett kodförråd utan att regelbundet köra sådana porslins-kommandon, för att göra en engångsoptimering av kodförrådet, eller t.ex. för att rensa upp en suboptimal massimport. Se avsnittet "PAKETFILs-optimering" i linkgit:git-fast-import[1] för mer information om importfallet.
+
+ALTERNATIV
+----------
+
+--aggressive::
+	Vanligtvis körs 'git gc' mycket snabbt samtidigt som det ger bra diskutrymmes-utnyttjande och prestanda. Det här alternativet gör att 'git gc' optimerar arkivet mer aggressivt, vilket i sin tur tar mycket mer tid. Effekterna av denna optimering är oftast ihållande. Se avsnittet "AGGRESSIV" nedan för mer information.
+
+--auto::
+	Med det här alternativet kontrollerar 'git gc' om någon städning krävs; om inte avslutas den utan att utföra något arbete.
++
+Se alternativet `gc.auto` i avsnittet "KONFIGURATION" nedan för hur denna heuristik fungerar.
++
+När hushållningsåtgärder utlöses genom att gränserna för konfigurationsalternativ som `gc.auto` och `gc.autoPackLimit` överskrids, kommer alla andra hushållsuppgifter (t.ex. rerere, arbetskataloger, reflog...) också att utföras.
+
+--detach::
+--no-detach::
+	Kör i bakgrunden om systemet stöder det. Det här alternativet åsidosätter konfigurationen `gc.autoDetach`.
+
+--cruft::
+--no-cruft::
+	När objekt som inte kan nås löper ut, packas separat i ett cruft-paket istället för att lagra dem som lösa objekt. `--cruft` är aktiverat som standard.
+
+--max-cruft-size=<n>::
+	När du packar oåtkomliga objekt i ett cruft-paket, begränsa storleken på nya cruft-paket till högst `<n>` byte. Åsidosätter alla värden som anges via `gc.maxCruftSize`-konfigurationen. Se alternativet `--max-cruft-size` i linkgit:git-repack[1] för mer information.
+
+--expire-to=<kat>::
+	När du packar oåtkomliga objekt i ett cruft-paket, skriv ett cruft-paket som innehåller beskurna objekt (om några) till katalogen `<kat>`. Det här alternativet har bara effekt när det används tillsammans med `--cruft`. Se alternativet `--expire-to` i linkgit:git-repack[1] för mer information.
+
+--prune=<datum>::
+	Rensa lösa objekt äldre än datum (standard är 2 veckor sedan, åsidosättbart av konfigurationsvariabeln `gc.pruneExpire`). --prune=rensar nu lösa objekt oavsett deras ålder och ökar risken för korruption om en annan process skriver till kodförrådet samtidigt; se "ANTECKNINGAR" nedan. --prune är aktiverat som standard.
+
+--no-prune::
+	Rensa inte några lösa föremål.
+
+--quiet::
+	Undertryck alla lägesrapporter.
+
+--force::
+	Tvinga `git gc` att köras även om det kan finnas en annan `git gc`-instans som körs på detta kodförråd.
+
+--keep-largest-pack::
+	Alla paket utom det största icke-cruft-paketet, alla paket markerade med en `.keep`-fil och alla cruft-paket konsolideras till ett enda paket. När det här alternativet används ignoreras `gc.bigPackThreshold`.
+
+AGGRESSIV
+---------
+
+När alternativet `--aggressive` anges, kommer linkgit:git-repack[1] att anropas med flaggan `-f`, som i sin tur skickar `--no-reuse-delta` till linkgit:git-pack-objects[1]. Detta kommer att kasta bort alla befintliga deltan och beräkna dem om, vilket i sin tur leder till att mycket mer tid spenderas på ompackningen.
+
+Effekterna av detta är mestadels ihållande, t.ex. när paket och lösa föremål slås samman till ett annat paket kan de befintliga deltana i det paketet återanvändas, men det finns också olika fall där vi istället kan välja ett suboptimalt delta från ett nyare paket.
+
+Dessutom, om man anger `--aggressive`, justeras alternativen `--depth` och `--window` som skickas till linkgit:git-repack[1]. Se inställningarna för `gc.aggressiveDepth` och `gc.aggressiveWindow` nedan. Genom att använda en större fönsterstorlek är det mer troligt att vi hittar mer optimala deltan.
+
+Det är förmodligen inte värt att använda det här alternativet på ett givet kodförråd utan att köra skräddarsydda prestanda-tester på det. Det tar mycket mer tid, och den resulterande utrymmes-/delta-optimeringen kan vara värd det, men kanske inte. Att inte använda detta alls är rätt avvägning för de flesta användare och deras fövar.
+
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/gc.adoc`
+
+See original version for this content.
+====
+
+[]
+
+NOTERINGAR
+----------
+
+'git gc' försöker verkligen att inte ta bort objekt som refereras någonstans i ditt kodförråd. I synnerhet kommer det inte bara att behålla objekt som refereras av din nuvarande uppsättning grenar och taggar, utan även objekt som refereras av indexet, fjärrspårningsgrenar, reflogs (som kan referera till incheckningar i grenar som senare ändrades eller omspunnas) och allt annat i namnrymden refs/*. Observera att en anteckning (av den typ som skapas av 'git notes') som är kopplad till ett objekt inte bidrar till att hålla objektet vid liv. Om du förväntar dig att vissa objekt ska tas bort och de inte gör det, kontrollera alla dessa platser och avgör om det är vettigt i ditt fall att ta bort dessa referenser.
+
+Å andra sidan, när 'git gc' körs samtidigt med en annan process, finns det en risk att den tar bort ett objekt som den andra processen använder men inte har skapat en referens till. Detta kan bara orsaka att den andra processen misslyckas eller skada kodförrådet om den andra processen senare lägger till en referens till det borttagna objektet. Git har två funktioner som avsevärt minskar detta problem:
+
+. Alla objekt med en modifieringstid som är nyare än `--prune`-datumet behålls, tillsammans med allt som är åtkomligt från det.
+
+. De flesta operationer som lägger till ett objekt i databasen uppdaterar objektets modifieringstid om det redan finns så att #1 gäller.
+
+Dessa funktioner utgör dock inte en komplett lösning, så användare som kör kommandon samtidigt måste leva med en viss risk för korruption (vilket verkar vara låg i praktiken).
+
+KROKAR
+------
+
+Kommandot 'git gc --auto' kör kroken 'pre-auto-gc'. Se linkgit:githooks[5] för mer information.
+
+
+SE ÄVEN
+-------
+linkgit:git-prune[1] linkgit:git-reflog[1] linkgit:git-repack[1] linkgit:git-rerere[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

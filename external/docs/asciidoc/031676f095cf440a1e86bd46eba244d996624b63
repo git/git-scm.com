@@ -1,0 +1,262 @@
+git-read-tree(1)
+================
+
+NAMN
+----
+git-read-tree - Läser trädinformation in i indexet
+
+
+SYNOPSIS
+--------
+[verse]
+git read-tree [(-m [--trivial] [--aggressive] | --reset | --prefix=<prefix>)
+		[-u | -i]] [--index-output=<fil>] [--no-sparse-checkout]
+		(--empty | <trädlikt1> [<trädlikt2> [<trädlikt3>]])
+
+
+BESKRIVNING
+-----------
+Läser trädinformationen som ges av <trädlikt> in i indexet, men *uppdaterar* inte faktiskt några av filerna som "cachelagras". (se: linkgit:git-checkout-index[1])
+
+Valfritt kan kommandot sammanfoga ett träd i indexet, utföra en snabbspolning (d.v.s. tvåvägssammanslagning) eller en trevägssammanslagning med flaggan `-m`. När `-m` används gör flaggan `-u` att filerna i arbetsträdet också uppdateras med resultatet av sammanslagningen.
+
+Endast triviala sammanslagningar görs av 'git read-tree' självt. Endast motstridiga sökvägar kommer att vara i ett icke-sammanslaget tillstånd när 'git read-tree' returnerar.
+
+ALTERNATIV
+----------
+-m::
+	Utför en sammanslagning, inte bara en läsning. Kommandot kommer att vägra köras om din indexfil innehåller ej sammanslagna poster, vilket indikerar att du inte har slutfört en tidigare sammanslagning som du påbörjat.
+
+--reset::
+	Samma som `-m`, utom att ej sammanslagna poster kastas i stället för att ge fel. När det används med `-u` avbryter inte uppdateringar operationen även om de skulle leda till förlust av ändringar i arbetsträdet eller av ospårade filer eller kataloger.
+
+-u::
+	Efter en lyckad sammanslagning, uppdatera filerna i arbetsträdet med resultatet av sammanslagningen.
+
+-i::
+	Vanligtvis kräver en sammanslagning att både indexfilen och filerna i arbetsträdet är uppdaterade mot den aktuella HEAD-incheckningen, så att lokala ändringar inte förloras. Den här flaggan stänger av kontrollen mot arbetsträdet och är avsedd för fall där man skapar en sammanslagning av träd som inte är direkt relaterade till den aktuella arbetsträdets status, till en tillfällig indexfil.
+
+-n::
+--dry-run::
+	Kontrollera om kommandot skulle ge fel, utan att faktiskt uppdatera indexet eller filerna i arbetsträdet.
+
+-v::
+	Visa förloppet av att checka ut filer.
+
+--trivial::
+	Begränsa trevägssammanslagning med 'git read-tree' till att endast ske om ingen sammanslagning på filnivå krävs, i stället för att lösa sammanslagningar för triviala fall och lämna konfliktfyllda filer olösta i indexet.
+
+--aggressive::
+	Vanligtvis löser en trevägssammanslagning med 'git read-tree' bara riktigt triviala fall och lämnar andra fall olösta i indexet, så att användardelen kan implementera olika sammanslagningspolicyer. Den här flaggan gör att kommandot löser några fler fall internt:
++
+* när den ena sidan tar bort en sökväg och den andra sidan lämnar sökvägen oförändrad. Lösningen är att ta bort den sökvägen.
+* när båda sidor tar bort en sökväg. Lösningen är att ta bort den sökvägen.
+* när båda sidor lägger till en sökväg identiskt. Lösningen är att lägga till den sökvägen.
+
+--prefix=<prefix>::
+	Behåll det aktuella indexinnehållet och läs innehållet i det namngivna trädet under katalogen `<prefix>`. Kommandot kommer att vägra att skriva över poster som redan fanns i den ursprungliga indexfilen.
+
+--index-output=<fil>::
+	I stället för att skriva ut resultaten till `$GIT_INDEX_FILE`, skriv det resulterande indexet i den namngivna filen. Medan kommandot körs är den ursprungliga indexfilen låst med samma mekanism som vanligt. Filen måste tillåta att rename(2):as (omdöpas) från en temporär fil som skapas bredvid den vanliga indexfilen; vanligtvis betyder det att den måste finnas på samma filsystem som själva indexfilen, och du behöver skrivbehörighet till de kataloger där indexfilen och indexutdatafilen finns.
+
+--recurse-submodules::
+--no-recurse-submodules::
+	Genom att använda --recurse-submodules uppdateras innehållet i alla aktiva undermoduler enligt den incheckning som registrerats i superprojektet genom att anropa read-tree rekursivt, och undermodulernas HEAD ställs även in så att den frikopplas vid den incheckningen.
+
+--no-sparse-checkout::
+	Inaktivera stöd för gles utcheckning även om `core.sparseCheckout` är sant.
+
+--empty::
+	I stället för att läsa trädobjekt(et) i indexet, töm det bara.
+
+-q::
+--quiet::
+	Tyst, undertryck feedbackmeddelanden.
+
+<trädlikt#>::
+	Id:t för det/de trädobjekt som ska läsas/sammanslås.
+
+
+SAMMANSLAGNING
+--------------
+Om `-m` anges kan 'git read-tree' utföra tre typer av sammanslagningar: en en-trädssammanslagning om endast ett träd anges, en snabbspolningssammanslagning med två träd eller en trevägssammanslagning om tre eller fler träd anges.
+
+
+En-trädssammanslagning
+~~~~~~~~~~~~~~~~~~~~~~
+Om endast ett träd anges fungerar 'git read-tree' som om användaren inte hade angett `-m`, utom att om det ursprungliga indexet har en post för ett visst sökvägsnamn och innehållet i sökvägen matchar trädet som läses, används stat-informationen från indexet. (Med andra ord har indexets stat() företräde framför de sammanslagna trädens.)
+
+That means that if you do a `git read-tree -m <newtree>` followed by a `git checkout-index -f -u -a`, the 'git checkout-index' only checks out the stuff that really changed.
+
+Det här används för att undvika onödiga falska träffar när 'git diff-files' körs efter 'git read-tree'.
+
+
+Två-trädssammanslagning
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Vanligtvis anropas detta som `git read-tree -m $H $M`, där $H är HEAD-incheckningen för det aktuella kodförrådet och $M är spetsen för ett främmande träd, som helt enkelt ligger före $H (d.v.s. vi är i en snabbspolningssituation).
+
+När två träd anges, säger användaren följande till 'git read-tree':
+
+     1. Det aktuella indexet och arbetsträdet är härlett från $H, men
+	användaren kan ha lokala ändringar i dem sedan $H.
+
+     2. Användaren vill spola fram till $M.
+
+I det här fallet säkerställer kommandot `git read-tree -m $H $M` att inga lokala ändringar går förlorade som resultat av den här "sammanslagningen". Här är reglerna för att föra vidare ändringar, där "I" betecknar indexet, "clean" betyder att index och arbetsträd sammanfaller, och "exists"/"nothing" hänvisar till om en sökväg finns i den angivna incheckningen:
+
+....
+	I                    H          M          Resultat
+       ----------------------------------------------------------
+     0  ingenting            ingenting  ingenting  (händer inte)
+     1  ingenting            ingenting  existerar  använd M
+     2  ingenting            existerar  ingenting  ta bort sökväg från index
+     3  ingenting            existerar  existerar, använd M om "initial utcheckning",
+				     H == M   behåll index annars 
+				     annars existerar, misslyckas
+				     H != M
+
+        rent I==H  I==M
+       ------------------
+     4  ja    N/A   N/A     ingenting    ingenting  behåll index
+     5  nej   N/A   N/A     ingenting    ingenting  behåll index
+
+     6  ja    N/A   ja      ingenting   existerar  behåll index
+     7  nej   N/A   ja      ingenting   existerar  behåll index
+     8  ja    N/A   nej     ingenting   existerar  misslyckas
+     9  nej   N/A   nej     ingenting   existerar  misslyckas
+
+     10 ja    ja    N/A     existerar   ingenting  ta bort sökväg från index
+     11 nej   ja    N/A     existerar   ingenting  misslyckas
+     12 ja    nej   N/A     existerar   ingenting  misslyckas
+     13 nej   nej   N/A     existerar   ingenting  misslyckas
+
+	rent (H==M)
+       ------
+     14 ja                  existerar   existerar  behåll index
+     15 nej                 existerar   existerar  behåll index
+
+        rent I==H  I==M (H!=M)
+       ------------------
+     16 ja    nej   nej     existerar   existerar misslyckas
+     17 nej   nej   nej     existerar   existerar misslyckas
+     18 ja    nej   ja      existerar   existerar behåll index
+     19 nej   nej   ja      existerar   existerar behåll index
+     20 ja    ja    nej     existerar   existerar använd M
+     21 nej   ja    nej     existerar   existerar misslyckas
+....
+
+I alla fall med "behåll index" lämnas indexposten som i den ursprungliga indexfilen. Om posten inte är uppdaterad behåller 'git read-tree' kopian i arbetsträdet intakt när kommandot körs med `-u`.
+
+När denna form av 'git read-tree' returnerar korrekt kan du se vilka av de "lokala ändringarna" som du gjorde som överfördes genom att köra `git diff-index --cached $M`. Observera att detta inte nödvändigtvis matchar vad `git diff-index --cached $H` skulle ha producerat före en sådan tvåträdssammanslagning. Detta beror på fallen 18 och 19 -- om du redan hade ändringarna i $M (t.ex. kanske du hämtade dem via e-post i en patchform), skulle `git diff-index --cached $H` ha berättat om ändringen före denna sammanslagning, men den skulle inte visas i `git diff-index --cached $M`-utdata efter tvåträdssammanslagningen.
+
+Fall 3 är lite knepigt och behöver förklaras. Resultatet av denna regel borde logiskt sett vara att ta bort sökvägen om användaren stegvis tog bort sökvägen och sedan bytte till en ny gren. Detta kommer dock att förhindra att den initiala utcheckningen sker, så regeln modifieras för att endast använda M (nytt träd) när innehållet i indexet är tomt. Annars bibehålls borttagningen av sökvägen så länge $H och $M är desamma.
+
+3-vägs sammanslagning
+~~~~~~~~~~~~~~~~~~~~~
+Varje "index"-post har två bitar av "steg"-tillstånd. Steg 0 är det normala, och är det enda du skulle se vid någon form av normal användning.
+
+Men när du kör 'git read-tree' med tre träd börjar "steg" på 1.
+
+Det här betyder att du kan göra
+
+----------------
+$ git read-tree -m <träd1> <träd2> <träd3>
+----------------
+
+och du får ett index med alla <träd1>-poster i "steg1", alla <träd2>-poster i "steg2" och alla <träd3>-poster i "steg3". När vi sammanfogar en annan gren in i den aktuella grenen använder vi det gemensamma förfaderträdet som <träd1>, den aktuella grenens spets som <träd2> och den andra grenens spets som <träd3>.
+
+Dessutom har 'git read-tree' specialfallslogik som säger: om du ser en fil som matchar i alla avseenden i följande tillstånd, "kollapsar" den tillbaka till "stage0":
+
+   - Steg 2 och 3 är desamma; ta det ena eller det andra (det spelar ingen roll - samma arbete har utförts på vår gren i steg 2 och deras gren i steg 3)
+
+   - steg 1 och steg 2 är desamma och steg 3 är annorlunda; ta steg 3 (vår gren i steg 2 gjorde ingenting sedan förfadern i steg 1 medan deras gren i steg 3 arbetade med den)
+
+   - steg 1 och steg 3 är desamma och steg 2 är annorlunda; ta steg 2 (vi gjorde något medan de inte gjorde någonting)
+
+Kommandot 'git write-tree' vägrar att skriva ett meningslöst träd, och det kommer att klaga på ej sammanslagna poster om det ser en enskild post som inte är steg 0.
+
+Okej, allt detta låter som en samling totalt meningslösa regler, men det är faktiskt precis vad du vill ha för att göra en snabb sammanslagning. De olika stegen representerar "resultatträdet" (steg 0, även kallat "sammanslaget"), det ursprungliga trädet (steg 1, även kallat "orig") och de två träden du försöker sammanfoga (steg 2 respektive 3).
+
+Ordningen på steg 1, 2 och 3 (därav ordningen med tre kommandoradsargument av typen <trädlikt>) är viktig när du startar en trevägssammanslagning med en indexfil som redan är ifylld. Här är en översikt över hur algoritmen fungerar:
+
+- om en fil finns i identiskt format i alla tre träden, kommer den automatiskt att kollapsa till "sammanslaget" tillstånd av 'git read-tree'.
+
+- En fil som har _någon_ skillnad alls mellan de tre träden blir kvar som separata poster i indexet. Det är upp till användardelens policy att avgöra hur stegen som inte är 0 ska tas bort och en sammanslagen version infogas.
+
+- Indexfilen sparar och återläser all denna information, så du kan sammanfoga stegvis, men så länge den har poster i steg 1/2/3 (d.v.s. "ej sammanslagna poster") kan du inte skriva resultatet. Därför blir sammanslagningsalgoritmen i praktiken ganska enkel:
+
+  * du går igenom indexet i ordning och ignorerar alla poster från steg 0, eftersom de redan är klara.
+
+  * om du hittar ett "steg1", men ingen matchande "steg2" eller "steg3", vet du att den har tagits bort från båda träden (den fanns bara i det ursprungliga trädet), och du tar bort den posten.
+
+  * om du hittar ett matchande träd för "steg2" och "steg3", tar du bort ett av dem och gör det andra till en "steg0"-post. Ta också bort en matchande "steg1"-post om den finns ... alla vanliga triviala regler ...
+
+Normalt använder du 'git merge-index' med 'git merge-one-file' för att göra det sista steget. Skriptet uppdaterar filerna i arbetsträdet allt eftersom varje sökväg sammanfogas, och vid slutet av en lyckad sammanslagning.
+
+När du startar en 3-vägssammanslagning med en indexfil som redan är ifylld, antas det att den representerar filernas tillstånd i ditt arbetsträd, och du kan till och med ha filer med ändringar som inte registrerats i indexfilen. Det antas vidare att detta tillstånd "härleds" från steg 2-trädet. 3-vägssammanslagningen vägrar att köras om den hittar en post i den ursprungliga indexfilen som inte matchar steg 2.
+
+Det här görs för att hindra att du förlorar dina pågående ändringar och blandar in slumpmässiga ändringar i en orelaterad sammanslagningsincheckning. För att illustrera: anta att du börjar från det som senast checkades in i ditt kodförråd:
+
+----------------
+$ JC=`git rev-parse --verify "HEAD^0"`
+$ git checkout-index -f -u -a $JC
+----------------
+
+Du gör slumpmässiga redigeringar utan att köra 'git update-index'. Och sedan märker du att toppen på ditt "uppströms"-träd har avancerat sedan du hämtade från honom:
+
+----------------
+$ git fetch git://.... linus
+$ LT=`git rev-parse FETCH_HEAD`
+----------------
+
+Ditt arbetsträd är fortfarande baserat på din HEAD ($JC), men du har gjort några ändringar sedan dess. Trevägssammanslagning säkerställer att du inte har lagt till eller ändrat indexposter sedan $JC, och om du inte har det, gör du rätt sak. Så med följande sekvens:
+
+----------------
+$ git read-tree -m -u `git merge-base $JC $LT` $JC $LT
+$ git merge-index git-merge-one-file -a
+$ echo "Sammanslå med Linus" | \
+  git commit-tree `git write-tree` -p $JC -p $LT
+----------------
+
+Det du då checkar in är en ren sammanslagning mellan $JC och $LT utan dina pågående ändringar, och ditt arbetsträd uppdateras till sammanslagningens resultat.
+
+Om du däremot har lokala ändringar i arbetsträdet som skulle skrivas över av den här sammanslagningen vägrar 'git read-tree' att köras för att förhindra att ändringarna går förlorade.
+
+Med andra ord finns ingen anledning att oroa sig för sådant som bara finns i arbetsträdet. Har du lokala ändringar i en del av projektet som inte berörs av sammanslagningen stör de inte sammanslagningen och behålls intakta. När de *gör* det startar sammanslagningen inte ens ("git read-tree" klagar tydligt och misslyckas utan att ändra något). I ett sådant fall kan du fortsätta med det du höll på med och försöka sammanslagningen igen när arbetsträdet är klart (d.v.s. när det pågående arbetet är färdigt).
+
+
+GLESA UTCKECKNINGAR
+-------------------
+
+Note: The skip-worktree capabilities in linkgit:git-update-index[1] and `read-tree` predated the introduction of linkgit:git-sparse-checkout[1]. Users are encouraged to use the `sparse-checkout` command in preference to these plumbing commands for sparse-checkout/skip-worktree related needs. However, the information below might be useful to users trying to understand the pattern style used in non-cone mode of the `sparse-checkout` command.
+
+"Gles utcheckning" tillåter gles ifyllnad av arbetskatalogen. Den använder hoppa-över-arbetsträds-biten (se linkgit:git-update-index[1]) för att tala om för Git om en fil i arbetskatalogen är värd att titta på.
+
+'git read-tree' och andra sammanslagningsbaserade kommandon ('git merge', 'git checkout'...) kan hjälpa till att upprätthålla uppdateringen av hoppa-över-arbetsträds-bitmappen och arbetskatalogen. `$GIT_DIR/info/sparse-checkout` används för att definiera hoppa-över-arbetsträds-referensbitmappen. När 'git read-tree' behöver uppdatera arbetskatalogen återställer den hoppa-över-arbetsträds-biten i indexet baserat på denna fil, som använder samma syntax som .gitignore-filer. Om en post matchar ett mönster i denna fil, eller om posten motsvarar en fil som finns i arbetsträdet, kommer hoppa-över-arbetsträd inte att ställas in för den posten. Annars kommer hoppa-över-arbetsträd att ställas in.
+
+Sedan jämför den det nya värdet för hoppa-över-arbetsträd med det föregående. Om hoppa-över-arbetsträd ändras från satt till osatt, kommer motsvarande fil att läggas till igen. Om den ändras från osatt till satt, kommer den filen att tas bort.
+
+Medan `$GIT_DIR/info/sparse-checkout` vanligtvis används för att ange vilka filer som finns i, kan du också ange vilka filer som _inte_ finns i, med hjälp av negativa mönster. Till exempel för att ta bort filen `oönskad`:
+
+----------------
+/*
+!oönskad
+----------------
+
+En annan knepig sak är att helt fylla i arbetskatalogen igen när du inte längre vill ha gles utcheckning. Du kan inte bara inaktivera "gles utcheckning" eftersom hoppa-över-arbetsträd-bitarna fortfarande finns i indexet och din arbetskatalog fortfarande är glest befolkad. Du bör fylla i arbetskatalogen igen med innehållet i `$GIT_DIR/info/sparse-checkout`-filen enligt följande:
+
+----------------
+/*
+----------------
+
+Sedan kan du inaktivera gles utcheckning. Stöd för gles utcheckning i 'git read-tree' och liknande kommandon är inaktiverat som standard. Du måste aktivera `core.sparseCheckout` för att få stöd för gles utcheckning.
+
+
+SE ÄVEN
+-------
+linkgit:git-write-tree[1], linkgit:git-ls-files[1], linkgit:gitignore[5], linkgit:git-sparse-checkout[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

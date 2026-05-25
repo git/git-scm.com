@@ -1,0 +1,975 @@
+git-fast-import(1)
+==================
+
+NAMN
+----
+git-fast-import - Bakände för snabba Git-dataimportverktyg
+
+
+SYNOPSIS
+--------
+[verse]
+frontänd | 'git fast-import' [<flaggor>]
+
+BESKRIVNING
+-----------
+Programmet är vanligtvis inte vad slutanvändaren vill köra direkt. De flesta slutanvändare vill använda ett av de befintliga frontändsprogrammen, som analyserar en viss typ av främmande källa och matar innehållet till 'git fast-import'.
+
+fast-import läser en blandad kommando-/dataström från standardindata och skriver en eller flera packfiler direkt till det aktuella kodförrådet. När EOF tas emot på standardindata skriver fast import ut uppdaterade gren- och taggreferenser, vilket uppdaterar det aktuella kodförrådet helt med den nyligen importerade datan.
+
+Själva fast-import kan importera till ett tomt kodförråd (ett som redan har initialiserats av 'git init') eller stegvis uppdatera ett befintligt kodförråd med innehåll. Om stegvisa importer stöds från en viss främmande källa beror på vilket frontändsprogram som används.
+
+
+ALTERNATIV
+----------
+
+--force::
+	Tvinga fram uppdatering av modifierade befintliga grenar, även om det skulle leda till att incheckningar går förlorade (eftersom den nya incheckningen inte innehåller den gamla incheckningen).
+
+--quiet::
+	Inaktivera utdata som visas av --stats, vilket gör att fast-import vanligtvis är tyst när den lyckas. Men om importströmmen har direktiv avsedda att visa användarutdata (t.ex. `progress`-direktiv) kommer motsvarande meddelanden fortfarande att visas.
+
+--stats::
+	Visa grundläggande statistik om de objekt som fast-import har skapat, de packfiler de lagrades i och minnet som fast-import använder under körningen. Att visa utdatan är för närvarande standard, men kan inaktiveras med --quiet.
+
+--allow-unsafe-features::
+	Många kommandoradsalternativ kan anges i själva fast-import-strömmen med kommandona `feature` eller `option`. Vissa av alternativen är dock osäkra (t.ex. att tillåta fast-import att komma åt filsystemet utanför kodförrådet). De är inaktiverade som standard, men kan tillåtas genom detta alternativ på kommandoraden. Detta påverkar för närvarande endast funktionskommandona `export-marks`, `import-marks` och `import-marks-if-exists`.
++
+Aktivera bara flaggan om du litar på programmet som genererar fast-import-strömmen! Flaggan aktiveras automatiskt för fjärrhjälpprogram som använder `import`-funktionen, eftersom de redan är betrodda att köra sin egen kod.
+
+`--signed-tags=(verbatim|warn-verbatim|warn-strip|strip|abort)`::
+	Ange hur signerade taggar ska hanteras. Fungerar på samma sätt som `--signed-commits=<läge>` nedan, förutom att läget `strip-if-invalid` ännu inte stöds. Precis som för signerade incheckningar är standardläget `verbatim`.
+
+`--signed-commits=<läge>`::
+	Ange hur signerade incheckningar ska hanteras. Följande <läge>n stöds:
++
+* `verbatim`, som är standardinställningen, importerar incheckningssignaturer i tysthet.
+* `warn-verbatim` importerar dem, men visar en varning.
+* `abort` kommer att få det här programmet att dö när det stöter på en signerad incheckning.
+* `strip` kommer tyst att göra incheckningar osignerade.
+* `warn-strip` gör dem osignerade, men visar en varning.
+* `strip-if-invalid` kontrollerar signaturer och, om de är ogiltiga, raderar dem och visar en varning. Valideringen utförs på samma sätt som linkgit:git-verify-commit[1] gör det.
+* `sign-if-invalid[=<keyid>]`, similar to `strip-if-invalid`, verifies commit signatures and replaces invalid signatures with newly created ones. Valid signatures are left unchanged. If `<keyid>` is provided, that key is used for signing; otherwise the configured default signing key is used.
+
+Alternativ för frontänder
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--cat-blob-fd=<fd>::
+	Skriv svar på frågorna `get-mark`, `cat-blob` och `ls` till fildeskriptorn <fd> i stället för `stdout`. Detta gör att `progress`-utdata för slutanvändaren kan separeras från annan utdata.
+
+--date-format=<fmt>::
+	Ange vilken typ av datum som frontänden ska tillhandahålla till fast-import i kommandona `author`, `committer` och `tagger`. Se ``Datumformat'' nedan för vilka format som stöds och deras syntax.
+
+--done::
+	Avsluta med fel om det inte finns något `done`-kommando i slutet av strömmen. Flaggan kan vara användbar för att upptäcka fel som gör att frontänden avslutas innan den har börjat skriva en ström.
+
+Platser för markeringsfiler
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--export-marks=<fil>::
+	Dumpar den interna markeringstabellen till <fil> när den är klar. Markeringar skrivs en per rad som `:markid SHA-1`. Importverktyg kan använda filen för att validera importer efter slutförande, eller för att spara markeringstabellen mellan stegvisa körningar. Eftersom <fil> bara öppnas och avkortas vid kontrollpunkt (eller slutförande) kan samma sökväg säkert anges till --import-marks.
+
+--import-marks=<fil>::
+	Innan indata bearbetas läses markeringarna som anges i <fil> in. Indatafilen måste finnas, vara läsbar och använda samma format som produceras av --export-marks. Flera alternativ kan anges för att importera mer än en uppsättning markeringar. Om en markering är definierad till olika värden vinner den sista filen.
+
+--import-marks-if-exists=<fil>::
+	Liksom --import-marks men i stället för att ge fel, hoppar filen tyst över om den inte finns.
+
+--relative-marks::
+--no-relative-marks::
+	Efter att ha angett --relative-marks är sökvägarna som anges med --import-marks= och --export-marks= relativa till en intern katalog i det aktuella kodförrådet. I git-fast-import betyder detta att sökvägarna är relativa till katalogen .git/info/fast-import. Andra importörer kan dock använda en annan plats.
++
+Relativa och icke-relativa markeringar kan kombineras genom att varva --(no-)-relative-marks med alternativen --(import|export)-marks=.
+
+Omskrivning av undermoduler
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--rewrite-submodules-from=<namn>:<fil>::
+--rewrite-submodules-to=<namn>:<fil>::
+Skriv om objekt-ID:n för undermodulen som anges av <namn> från värdena som används i från <fil> till de som används i till <fil>. Från-markeringarna ska ha skapats av `git fast-export`, och till-markeringarna ska ha skapats av `git fast-import` när samma undermodul importerades.
++
+<namn> kan vara en godtycklig sträng som inte innehåller ett kolon, men samma värde måste användas med båda alternativen när motsvarande märken anges. Flera undermoduler kan anges med olika värden för <namn>. Det är ett fel att inte använda dessa alternativ i motsvarande par.
++
+Alternativen är främst användbara vid konvertering av ett kodförråd från en hashalgoritm till en annan; utan dem kommer fast-import att misslyckas om den stöter på en undermodul eftersom den inte har något sätt att skriva objekt-ID:t till den nya hash-algoritmen.
+
+Prestanda- och Kompressions Optimering
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--active-branches=<n>::
+	Maximalt antal grenar som ska hållas aktiva samtidigt. Se "Minnesutnyttjande" nedan för mer information. Standardvärdet är 5.
+
+--big-file-threshold=<n>::
+	Maximal storlek på en blob som fast-import försöker skapa ett delta för, uttryckt i byte. Standardvärdet är 512 m (512 MiB). Vissa importörer kanske vill sänka detta på system med begränsat minne.
+
+--depth=<n>::
+	Maximalt deltadjup för blob- och träddeltifiering. Standardvärdet är 50.
+
+--export-pack-edges=<fil>::
+	Efter att du skapat en packfile, skriv ut en datarad till <fil> som listar filnamnet på packfilen och den senaste incheckningen på varje gren som skrevs till den packfilen. Denna information kan vara användbar efter att du har importerat projekt vars totala objektuppsättning överstiger packfilsgränsen på 4 GiB, eftersom dessa incheckningar kan användas som kantpunkter under anrop till 'git pack-objects'.
+
+--max-pack-size=<n>::
+	Maximal storlek för varje utdatapaketfil. Standardinställningen är obegränsad.
+
+fastimport.unpackLimit::
+	Se linkgit:git-config[1]
+
+PRESTANDA
+---------
+Utformningen av fast-import gör det möjligt att importera stora projekt med minimal minnesanvändning och bearbetningstid. Förutsatt att frontänden kan hålla jämna steg med fast-import och mata den med en konstant dataström, slutförs importer för projekt med 10+ års historik och 100 000+ individuella incheckningar i allmänhet på bara 1-2 timmar på ganska blygsam hårdvara (~2 000 USD år 2007).
+
+De flesta flaskhalsar verkar finnas i åtkomst till främmande källdata (källan kan helt enkelt inte extrahera revisioner tillräckligt snabbt) eller disk-IO (fast-import skriver lika snabbt som disken tar emot data). Importer går snabbare om källdata lagras på en annan enhet än mål-Git-kodförrådet (på grund av mindre IO-konflikt).
+
+
+UTVECKLINGSKOSTNAD
+------------------
+Ett typiskt frontändsprogram för fast-import brukar landa på cirka 200 rader Perl/Python/Ruby-kod. De flesta utvecklare har kunnat skapa fungerande frontänder på bara ett par timmar, trots att det är deras första kontakt med fast-import, och ibland till och med med Git. Det är en idealisk situation, eftersom de flesta konverteringsverktyg är engångsverktyg (använd en gång och gå vidare).
+
+
+PARALLELL DRIFT
+---------------
+Precis som 'git push' eller 'git fetch' är importer som hanteras av fast-import säkra att köra tillsammans med parallella `git repack -a -d` eller `git gc` anrop, eller någon annan Git-operation (inklusive 'git prune', eftersom lösa objekt aldrig används av fast-import).
+
+fast-import låser inte gren- eller taggreferenserna som den aktivt importerar. Efter importen, under dess referensuppdateringsfas, testar Fast-import varje befintlig grenreferens för att verifiera att uppdateringen kommer att vara en snabbuppdatering framåt (incheckningen som lagras i referensen finns i den nya historiken för incheckningen som ska skrivas). Om uppdateringen inte är en snabbuppdatering framåt kommer Fast-import att hoppa över uppdateringen av den referensen och i stället skriva ut ett varningsmeddelande. Fast-import kommer alltid att försöka uppdatera alla grenreferenser, och stoppar inte vid det första felet.
+
+Grenuppdateringar kan tvingas fram med --force, men det rekommenderas att detta endast används på ett annars tyst kodförråd. Att använda --force är inte nödvändigt för en initial import till ett tomt kodförråd.
+
+
+TEKNISK DISKUSSION
+------------------
+fast-import spårar en uppsättning grenar i minnet. Vilken gren som helst kan skapas eller ändras när som helst under importprocessen genom att skicka ett `commit`-kommando på indataströmmen. Designen gör det möjligt för ett frontändsprogram att bearbeta ett obegränsat antal grenar samtidigt och generera incheckningar i den ordning de blir tillgängliga från källdata. Det förenklar också frontändsprogrammen avsevärt.
+
+Fast-import varken använder eller ändrar den aktuella arbetskatalogen eller någon fil i den. (Den uppdaterar dock det aktuella Git-kodförrådet, vilket refereras av `GIT_DIR`.) Därför kan ett importgränssnitt använda arbetskatalogen för sina egna syften, till exempel att extrahera filrevisioner från den främmande källan. Denna okunskap om arbetskatalogen gör det också möjligt för fast-import att köras mycket snabbt, eftersom den inte behöver utföra några kostsamma filuppdateringsoperationer vid växling mellan grenar.
+
+INMATNINGSFORMAT
+----------------
+Med undantag för råfildata (som Git inte tolkar) är fast-import-formatet textbaserat (ASCII). Detta textbaserade format förenklar utveckling och felsökning av frontändsprogram, särskilt när ett högnivåspråk som Perl, Python eller Ruby används.
+
+Fast-import är mycket strikt med sin inmatning. Där vi säger SP nedan menar vi *exakt* ett mellanslag. På samma sätt betyder LF en (och endast en) radmatning och HT en (och endast en) horisontell tabb. Att ange ytterligare blanksteg kommer att orsaka oväntade resultat, såsom grennamn eller filnamn med inledande eller efterföljande mellanslag i namnet, eller tidig avslutning av fast-import när den stöter på oväntad inmatning.
+
+Strömma Kommentarer
+~~~~~~~~~~~~~~~~~~~
+För att underlätta felsökning av frontänder ignorerar fast-import alla rader som börjar med `#` (ASCII-pund/hash) upp till och inklusive raden som slutar `LF`. En kommentarsrad kan innehålla vilken bytesekvens som helst som inte innehåller en LF och kan därför användas för att inkludera detaljerad felsökningsinformation som kan vara specifik för frontänden och användbar vid inspektion av en fast-importdataström.
+
+Datumformat
+~~~~~~~~~~~
+Följande datumformat stöds. Ett gränssnitt bör välja det format som ska användas för denna import genom att skicka formatnamnet i kommandoradsalternativet --date-format=<fmt>.
+
+`raw`::
+	Det är Gits ursprungliga format och är `<tid> SP <offutc>`. Det är också standardformatet för fast-import, om --date-format inte angavs.
++
+Tidpunkten för händelsen anges med `<tid>` som antalet sekunder sedan UNIX-epoken (midnatt, 1 januari 1970, UTC) och skrivs som ett ASCII-decimaltal.
++
+Den lokala förskjutningen anges av `<offutc>` som en positiv eller negativ förskjutning från UTC. Till exempel skulle EST (som är 5 timmar efter UTC) uttryckas i `<tz>` av ``-0500'' medan UTC är ``+0000''. Den lokala förskjutningen påverkar inte `<tid>`; den används endast som ett råd för att hjälpa formateringsrutiner att visa tidsstämpeln.
++
+Om den lokala offseten inte är tillgänglig i källmaterialet, använd ``+0000'', eller den vanligaste lokala offseten. Till exempel har många organisationer ett CVS-kodförråd som endast någonsin har åtkommits av användare som befinner sig på samma plats och i samma tidszon. I det här fallet kan en rimlig offset från UTC antas.
++
+Till skillnad från formatet `rfc2822` är detta format mycket strikt. Alla variationer i formateringen kommer att göra att fast-importen avvisar värdet, och vissa sanitetskontroller av de numeriska värdena kan också utföras.
+
+`raw-permissive`::
+	Det är samma sak som `raw` förutom att inga sanitetskontroller av den numeriska epoken och den lokala offseten utförs. Detta kan vara användbart när man försöker filtrera eller importera en befintlig historik med t.ex. falska tidszonsvärden.
+
+`rfc2822`::
+	Det är standarddatumformatet som beskrivs i RFC 2822.
++
+Ett exempelvärde är ``Tue Feb 6 11:22:18 2007 -0500''. Git-parsern är korrekt, men lite förenklad. Det är samma parser som används av 'git am' när den tillämpar patchar som tas emot via e-post.
++
+Vissa felaktigt utformade strängar kan accepteras som giltiga datum. I vissa av dessa fall kommer Git fortfarande att kunna hämta rätt datum från den felaktigt utformade strängen. Det finns också vissa typer av felaktigt utformade strängar som Git kommer att tolka fel, men ändå anse vara giltiga. Allvarligt felaktigt utformade strängar kommer att avvisas.
++
+Till skillnad från `raw`-formatet ovan används tidszons-/UTC-offsetinformationen i en RFC 2822-datumsträng för att justera datumvärdet till UTC före lagring. Därför är det viktigt att denna information är så korrekt som möjligt.
++
+Om källmaterialet använder datum i RFC 2822-stil bör gränssnittet låta fast-import hantera parsningen och konverteringen (snarare än att försöka göra det själv) eftersom Git-parsern har testats väl i praktiken.
++
+Framänds-gränssnitt bör föredra `raw`-formatet om källmaterialet redan använder UNIX-epoch-format, kan övertalas att ange datum i det formatet, eller om dess format enkelt kan konverteras till det, eftersom det inte finns någon tvetydighet vid parsning.
+
+`now`::
+	Använd alltid aktuell tid och tidszon. Bokstavliga `now` (nu) måste alltid anges för `<när>`.
++
+Det är ett leksaksformat. Systemets aktuella tid och tidszon kopieras alltid till identitetssträngen när den skapas med fast-import. Det finns inget sätt att ange en annan tid eller tidszon.
++
+Det här specifika formatet tillhandahålls eftersom det är kort att implementera och kan vara användbart för en process som vill skapa en ny incheckning just nu, utan att behöva använda en arbetskatalog eller 'git update-index'.
++
+Om separata `author`- och `committer`-kommandon används i en `commit` kanske tidsstämplarna inte matchar, eftersom systemklockan kommer att avfrågas två gånger (en gång för varje kommando). Det enda sättet att säkerställa att både författar- och incheckare-identitetsinformationen har samma tidsstämpel är att utelämna `author` (och därmed kopiera från `committer`) eller att använda ett annat datumformat än `now`.
+
+Kommandon
+~~~~~~~~~
+fast-import accepterar flera kommandon för att uppdatera det aktuella kodförrådet och kontrollera den aktuella importprocessen. Mer detaljerad diskussion (med exempel) av varje kommando följer senare.
+
+`commit`::
+	Skapar en ny gren eller uppdaterar en befintlig gren genom att skapa en ny incheckning och uppdatera grenen så att den pekar på den nyskapade incheckningen.
+
+`tag`::
+	Skapar ett annoterat taggobjekt från en befintlig incheckning eller gren. Lättviktiga taggar stöds inte av kommandot, eftersom de inte rekommenderas för att markera meningsfulla tidpunkter.
+
+`reset`::
+	Återställ en befintlig gren (eller en ny gren) till en specifik revision. Detta kommando måste användas för att ändra en gren till en specifik revision utan att göra en incheckning på den.
+
+`blob`::
+	Konvertera rådata från filen till en blob för framtida användning i ett `commit`-kommando. Detta kommando är valfritt och behövs inte för att utföra en import.
+
+`alias`::
+	Registrera att ett märke refererar till ett givet objekt utan att först skapa något nytt objekt. Att använda --import-marks och referera till saknade märken kommer att orsaka att fast-importen misslyckas, så alias kan ge ett sätt att ställa in annars beskurna incheckningar till ett giltigt värde (t.ex. den närmaste icke-beskurna förfadern).
+
+`checkpoint`::
+	Tvingar fram fast-import för att stänga den aktuella paketfilen, generera dess unika SHA-1-kontrollsumma och index, och starta en ny paketfil. Detta kommando är valfritt och behövs inte för att utföra en import.
+
+`progress`::
+	Gör att fast-importen kopierar hela raden till sin egen standardutdata. Detta kommando är valfritt och behövs inte för att utföra en import.
+
+`done`::
+	Markerar slutet på strömmen. Detta kommando är valfritt om inte funktionen `done` begärdes med kommandoradsalternativet `--done` eller kommandot `feature done`.
+
+`get-mark`::
+	Gör att fast-importen skriver ut SHA-1 som motsvarar ett märke till filbeskrivningen som är satt med `--cat-blob-fd`, eller `stdout` om det inte är angivet.
+
+`cat-blob`::
+	Orsakar att fast-import skriver ut en blob i formatet 'cat-file --batch' till filbeskrivningen som är inställd med `--cat-blob-fd` eller `stdout` om det inte är angivet.
+
+`ls`::
+	Gör att fast-import skriver ut en rad som beskriver en katalogpost i 'ls-tree'-format till filbeskrivningen som är satt med `--cat-blob-fd` eller `stdout` om det inte är angivet.
+
+`feature`::
+	Aktivera den angivna funktionen. Detta kräver att fast-importen stöder den angivna funktionen och avbryts om den inte gör det.
+
+`option`::
+	Ange alla alternativ som listas under ALTERNATIV som inte ändrar strömmens semantik för att passa frontändens behov. Detta kommando är valfritt och behövs inte för att utföra en import.
+
+`commit`
+~~~~~~~~
+Skapa eller uppdatera en gren med en ny incheckning, och registrera en logisk ändring i projektet.
+
+////
+Yes, it's intentional that the 'gpgsig' line doesn't have a trailing
+`LF`; the definition of `data` has a byte-count prefix, so it
+doesn't need an `LF` to act as a terminator (and `data` also already
+includes an optional trailing `LF?` just in case you want to include
+one).
+////
+
+....
+	'commit' SP <ref> LF
+	mark?
+	original-oid?
+	('author' (SP <namn>)? SP LT <e-post> GT SP <när> LF)?
+	'committer' (SP <namn>)? SP LT <e-post> GT SP <när> LF
+	('gpgsig' SP <algo> SP <format> LF data)?
+	('encoding' SP <kodning> LF)?
+	data
+	('from' SP <incheckningslik> LF)?
+	('merge' SP <incheckningslik> LF)*
+	(filemodify | filedelete | filecopy | filerename | filedeleteall | notemodify)*
+	LF?
+....
+
+där `<ref>` är namnet på grenen att göra incheckning på. Vanligtvis har grennamn prefixet `refs/heads/` i Git, så import av CVS-grensymbolen `RELENG-1_0` skulle använda `refs/heads/RELENG-1_0` för värdet för `<ref>`. Värdet för `<ref>` måste vara ett giltigt refnamn i Git. Eftersom `LF` inte är giltigt i ett Git-refnamn, stöds ingen citerings- eller escapesyntax här.
+
+Ett `mark`-kommando kan valfritt visas och begär fast-import för att spara en referens till den nyskapade incheckningen för framtida bruk av frontänden (se nedan för format). Det är mycket vanligt att frontänder markerar varje incheckning de skapar, vilket möjliggör framtida skapande av grenar från alla importerade incheckningar.
+
+Kommandot `data` som följer efter `committer` måste tillhandahålla incheckningsmeddelandet (se nedan för `data`-kommandosyntax). För att importera ett tomt incheckningsmeddelande, använd en data med längden 0. Incheckningsmeddelanden är fritt formaterade och tolkas inte av Git. För närvarande måste de kodas i UTF-8, eftersom fast-import inte tillåter att andra kodningar anges.
+
+Noll eller fler `filemodify`, `filedelete`, `filecopy`, `filerename`, `filedeleteall` och `notemodify`-kommandon kan inkluderas för att uppdatera innehållet i grenen innan incheckning skapas. Dessa kommandon kan anges i valfri ordning. Det rekommenderas dock att ett `filedeleteall`-kommando föregår alla `filemodify`, `filecopy`, `filerename` och `notemodify`-kommandon i samma incheckning, eftersom `filedeleteall` rensar grenen (se nedan).
+
+`LF` efter kommandot är valfritt (det var tidigare obligatoriskt). Observera att av bakåtkompatibilitetsskäl, om commit-kommandot avslutas med ett `data`-kommando (d.v.s. det har inga `from`-, `merge`-, `filemodify`-, `filedelete`-, `filecopy`-, `filerename`-, `filedeleteall`- eller `notemodify`-kommandon) så kan två `LF`-kommandon visas i slutet av kommandot i stället för bara ett.
+
+`author`
+^^^^^^^^
+Ett `author`-kommando kan valfritt visas om författarinformationen kan skilja sig från incheckarinformationen. Om `author` utelämnas kommer fast-import automatiskt att använda incheckarinformationen för författardelen av incheckningen. Se nedan för en beskrivning av fälten i `author`, eftersom de är identiska med `committer`.
+
+`committer`
+^^^^^^^^^^^
+Kommandot `committer` anger vem som gjorde denna incheckning och när de gjorde den.
+
+Här är `<namn>` personens visningsnamn (till exempel ``Com M Itter'') och `<e-post>` är personens e-postadress (``\cm@example.com''). `LT` och `GT` är bokstavliga mindre-än- (\x3c) och större-än- (\x3e) symboler. Dessa krävs för att avgränsa e-postadressen från de andra fälten på raden. Observera att `<namn>` och `<e-post>` är fritt format och kan innehålla vilken bytesekvens som helst, förutom `LT`, `GT` och `LF`. `<namn>` är vanligtvis UTF-8-kodad.
+
+Tidpunkten för ändringen anges med `<när>` med hjälp av datumformatet som valdes av kommandoradsalternativet --date-format=<fmt>. Se ``Datumformat'' ovan för uppsättningen av format som stöds och deras syntax.
+
+`gpgsig`
+^^^^^^^^
+
+Det valfria kommandot `gpgsig` används för att inkludera en PGP/GPG-signatur eller annan kryptografisk signatur som signerar incheckning-data.
+
+....
+	'gpgsig' SP <git-hash-algo> SP <signatur-format> LF data
+....
+
+`gpgsig`-kommandot tar två argument:
+
+* `<git-hash-algo>` anger vilket Git-objektformat denna signatur gäller för, antingen `sha1` eller `sha256`. Detta gör det möjligt att veta vilken representation av incheckningen som signerades (SHA-1- eller SHA-256-versionen) vilket hjälper till med både signaturverifiering och interoperabilitet mellan kodförråd med olika hashfunktioner.
+
+* `<signatur-format>` anger typen av signatur, såsom `openpgp`, `x509`, `ssh` eller `okänd`. Detta är en fördel för verktyg som bearbetar strömmen, så att de inte behöver analysera ASCII-rustningen för att identifiera signaturtypen.
+
+En incheckning får ha högst en signatur för SHA-1-objektformatet (lagrad i huvudet "gpgsig") och en för SHA-256-objektformatet (lagrad i huvudet "gpgsig-sha256").
+
+Se nedan för en detaljerad beskrivning av kommandot `data` som innehåller rå signaturdata.
+
+Signaturer kontrolleras dock ännu inte i den nuvarande implementeringen. (Att redan ställa in konfigurationsalternativet `extensions.compatObjectFormat` kan hjälpa till med att verifiera både SHA-1- och SHA-256-objektformatsignaturer när det implementeras.)
+
+NOTE: Det är mycket experimentellt och formatet för `gpgsig`-kommandot kan komma att ändras i framtiden utan kompatibilitetsgarantier.
+
+`encoding`
+^^^^^^^^^^
+Det valfria kommandot `encoding` anger kodningen av incheckningsmeddelandet. De flesta commits är UTF-8 och kodningen utelämnas, men detta tillåter import av incheckningsmeddelanden till git utan att först koda om dem.
+
+`from`
+^^^^^^
+`from`-kommandot används för att ange vilken incheckning som denna gren ska initieras från. Denna revision kommer att vara den första förfadern till den nya incheckningen. Tillståndet för trädet som byggs vid denna incheckning kommer att börja med tillståndet vid `from`-incheckningen och ändras av innehållsändringarna i denna incheckning.
+
+Att utelämna `from`-kommandot i den första incheckningen för en ny gren kommer att orsaka att fast-import skapar den incheckningen utan någon förfader. Detta är oftast bara önskvärt för den första incheckningen för ett projekt. Om gränssnittet skapar alla filer från grunden när en ny gren skapas, kan ett `merge`-kommando användas i stället för `from` för att starta incheckningen med ett tomt träd. Att utelämna `from`-kommandot på befintliga grenar är vanligtvis önskvärt, eftersom den aktuella incheckningen på den grenen automatiskt antas vara den första förfadern till den nya incheckningen.
+
+Eftersom `LF` inte är giltigt i ett Git refnamn- eller SHA-1-uttryck, stöds ingen citerande eller escapesyntax i `<incheckningslik>`.
+
+Här är `<incheckningslik>` något av följande:
+
+* Namnet på en befintlig gren som redan finns i fast-imports interna grentabell. Om fast-import inte känner till namnet behandlas det som ett SHA-1-uttryck.
+
+* En märkesreferens, `:<idnum>`, där `<idnum>` är märkes-numret.
++
+Anledningen till att fast-import använder `:` för att beteckna en märkes-referens är att detta tecken inte är tillåtet i ett Git-grennamn. Det inledande `:` gör det enkelt att skilja mellan mark 42 (`:42`) och gren 42 (`42` eller `refs/heads/42`), eller en förkortad SHA-1 som råkade bara bestå av bas-10-siffror.
++
+Märken måste deklareras (via `mark`) innan de kan användas.
+
+* En komplett 40 byte eller förkortad incheckning SHA-1 i hex.
+
+* Alla giltiga Git SHA-1-uttryck som omvandlas till en incheckning. Se ``SPECIFICERING AV REVISIONER'' i linkgit:gitrevisions[7] för mer information.
+
+* Den speciella null SHA-1 (40 nollor) anger att grenen ska tas bort.
+
+Specialfallet att starta om en stegvis import från det aktuella grenvärdet bör skrivas som:
+
+----
+	from refs/heads/branch^0
+----
+
+Suffixet `^0` är nödvändigt eftersom fast-import inte tillåter en gren att starta från sig själv, och grenen skapas i minnet innan `from`-kommandot ens läses från indata. Att lägga till `^0` tvingar fast-import att lösa incheckningskommandot via Gits revisionsparsningsbibliotek, snarare än dess interna branch-tabell, och därmed laddar det befintliga värdet för grenen.
+
+`merge`
+^^^^^^^
+Inkluderar en ytterligare förfaderincheckning. Den extra föräldralänken ändrar inte hur trädets tillstånd byggs för incheckningen. Om kommandot `from` utelämnas när en ny gren skapas blir den första `merge`-incheckningen den första förfadern till den aktuella incheckningen, och grenen startar utan filer. Fast-import tillåter ett obegränsat antal `merge`-kommandon per incheckning, vilket etablerar en n-vägssammanslagning.
+
+Här är `<commit-ish>` något av de uttryck för incheckningsspecifikation som också accepteras av `from` (se ovan).
+
+`filemodify`
+^^^^^^^^^^^^
+Ingår i ett `commit`-kommando för att lägga till en ny fil eller ändra innehållet i en befintlig fil. Kommandot har två olika sätt att ange filens innehåll.
+
+Externt dataformat::
+	Filens datainnehåll har redan levererats av ett tidigare `blob`-kommando. Importverktyget behöver bara koppla det.
++
+....
+	'M' SP <mode> SP <dataref> SP <path> LF
+....
++
+Här måste `<dataref>` normalt vara antingen en mark-referens (`:<idnum>`) satt av ett tidigare `blob`-kommando, eller en fullständig 40-byte SHA-1 för ett befintligt Git-blobobjekt. Om `<mode>` är `040000` måste `<dataref>` vara den fullständiga 40-byte SHA-1 för ett befintligt Git-trädobjekt eller en mark-referens satt med `--import-marks`.
+
+Inbyggt dataformat::
+	Filens datainnehåll har ännu inte levererats. Importverktyget vill leverera det som en del av detta ändringskommando.
++
+....
+	'M' SP <mode> SP 'inline' SP <path> LF
+	data
+....
++
+Se nedan för en detaljerad beskrivning av kommandot `data`.
+
+I båda formaten är `<mode>` typen av filpost, angiven i oktal form. Git stöder endast följande lägen:
+
+* `100644` eller `644`: En normal (inte körbar) fil. Majoriteten av filerna i de flesta projekt använder detta läge. Vid osäkerhet är detta normalt rätt val.
+* `100755` eller `755`: En normal, men körbar, fil.
+* `120000`: En symbolisk länk; filens innehåll blir länkens mål.
+* `160000`: En gitlink, där objektets SHA-1 syftar på en incheckning i ett annat kodförråd. Gitlänkar kan endast anges med SHA eller via en incheckningsmarkering. De används för att implementera undermoduler.
+* `040000`: En underkatalog. Underkataloger kan endast anges med SHA eller via en trädmarkering satt med `--import-marks`.
+
+I båda formaten är `<path>` den fullständiga sökvägen till filen som ska läggas till (om den inte redan finns) eller ändras (om den redan finns).
+
+En `<path>` kan skrivas som okvoterade byte eller som en C-liknande citerad sträng.
+
+När en `<sökväg>` inte börjar med ett dubbelt citationstecken (`"`) är det en sträng utan citationstecken och tolkas som litterala bytes utan escapesekvenser. Om filnamnet däremot innehåller `LF` eller börjar med dubbelt citationstecken kan det inte representeras utan citationstecken och måste därför citeras. Dessutom måste källsökvägen `<sökväg>` i `filecopy` eller `filerename` citeras om den innehåller SP.
+
+När en `<path>` börjar med dubbelt citattecken (`"`) är det en C-liknande citerad sträng, där hela filnamnet omsluts av ett par dubbla citattecken och escapesekvenser används. Vissa tecken måste escapas med ett föregående omvänt snedstreck: `LF` skrivs som `\n`, omvänt snedstreck som `\\` och dubbelt citattecken som `\"`. Vissa tecken kan valfritt skrivas med escapesekvenser: `\a` för bell, `\b` för backsteg, `\f` för formulärmatning, `\n` för radmatning, `\r` för vagnretur, `\t` för horisontell tabb och `\v` för vertikal tabb. Varje byte kan skrivas med tresiffriga oktalkoder (t.ex. `\033`). Alla filnamn kan representeras som citerade strängar.
+
+En `<path>` måste använda katalogavgränsare i UNIX-stil (snedstreck `/`) och dess värde måste vara i kanonisk form. Det innebär att den inte får:
+
+* innehålla en tom katalogkomponent (t.ex. är `foo//bar` ogiltig),
+* sluta med en katalogavgränsare (t.ex. är `foo/` ogiltig),
+* börja med en katalogavgränsare (t.ex. är `/foo` ogiltig),
+* innehålla specialkomponenten `.` eller `..` (t.ex. är `foo/./bar` och `foo/../bar` ogiltiga).
+
+Trädets rot kan representeras med en tom sträng som `<path>`.
+
+`<path>` får inte innehålla NUL, varken bokstavligt eller escapad som `\000`. Det rekommenderas att `<path>` alltid kodas med UTF-8.
+
+`filedelete`
+^^^^^^^^^^^^
+Ingår i ett `commit`-kommando för att ta bort en fil eller rekursivt ta bort en hel katalog från grenen. Om borttagningen gör att föräldrakatalogen blir tom tas även den bort automatiskt. Detta fortsätter uppåt i trädet tills den första icke-tomma katalogen eller roten nås.
+
+....
+	'D' SP <path> LF
+....
+
+här är `<path>` den fullständiga sökvägen till filen eller underkatalogen som ska tas bort från grenen. Se `filemodify` ovan för en detaljerad beskrivning av `<path>`.
+
+`filecopy`
+^^^^^^^^^^
+Kopierar rekursivt en befintlig fil eller underkatalog till en annan plats inom grenen. Den befintliga filen eller katalogen måste finnas. Om målet finns ersätts det helt av innehållet som kopieras från källan.
+
+....
+	'C' SP <path> SP <path> LF
+....
+
+här är den första `<path>` källplatsen och den andra `<path>` målet. Se `filemodify` ovan för en detaljerad beskrivning av hur `<path>` kan se ut. För att använda en källsökväg som innehåller SP måste sökvägen citeras.
+
+Ett `filecopy`-kommando träder i kraft omedelbart. När källplatsen har kopierats till målet påverkar framtida kommandon som tillämpas på källplatsen inte kopians mål.
+
+`filerename`
+^^^^^^^^^^^^
+Byter namn på en befintlig fil eller underkatalog till en annan plats inom grenen. Den befintliga filen eller katalogen måste finnas. Om målet finns ersätts det av källkatalogen.
+
+....
+	'R' SP <path> SP <path> LF
+....
+
+här är den första `<path>` källplatsen och den andra `<path>` målet. Se `filemodify` ovan för en detaljerad beskrivning av hur `<path>` kan se ut. För att använda en källsökväg som innehåller SP måste sökvägen citeras.
+
+Ett `filerename`-kommando träder i kraft omedelbart. När källplatsen har bytt namn till destinationen kommer alla framtida kommandon som tillämpas på källplatsen att skapa nya filer där och påverkar inte destinationen för bytet.
+
+Observera att ett `filerename` är detsamma som en `filecopy` följt av en `filedelete` av källkoden. Det finns en liten prestandafördel med att använda `filerename`, men fördelen är så liten att det aldrig är värt att försöka konvertera ett delete/add-par i källmaterialet till ett namnbyte för snabbimport. Detta `filerename`-kommando tillhandahålls endast för att förenkla gränssnitt som redan har namnbytesinformation och inte vill bry sig om att dela upp den till en `filecopy` följt av en `filedelete`.
+
+`filedeleteall`
+^^^^^^^^^^^^^^^
+Ingår i ett `commit`-kommando för att ta bort alla filer (och även alla kataloger) från grenen. Kommandot återställer den interna grenstrukturen så att den inte innehåller några filer, vilket låter frontänden därefter lägga till alla intressanta filer från början.
+
+....
+	'deleteall' LF
+....
+
+Kommandot är mycket användbart om frontänden inte vet (eller inte bryr sig om att veta) vilka filer som för närvarande finns på grenen, och därför inte kan generera korrekta `filedelete`-kommandon för att uppdatera innehållet.
+
+Att utfärda `filedeleteall` följt av de `filemodify`-kommandon som behövs för korrekt innehåll ger samma resultat som att bara skicka nödvändiga `filemodify`- och `filedelete`-kommandon. `filedeleteall`-metoden kan dock kräva att fast-import använder något mer minne per aktiv gren (under 1 MiB även för de flesta stora projekt); frontänder som enkelt kan hämta endast de påverkade sökvägarna för en incheckning uppmuntras därför att göra det.
+
+`notemodify`
+^^^^^^^^^^^^
+Ingår i ett `commit` `<notes-ref>`-kommando för att lägga till en ny anteckning som annoterar en `<commit-ish>` eller ändra innehållet i annoteringen. Internt liknar det `filemodify 100644` på sökvägen `<commit-ish>` (eventuellt uppdelad i underkataloger). Det rekommenderas inte att använda andra kommandon för att skriva till trädet `<notes-ref>` än `filedeleteall` för att ta bort alla befintliga anteckningar i trädet. Kommandot har två olika sätt att ange anteckningens innehåll.
+
+Externt dataformat::
+	Datainnehållet för anteckningen har redan levererats av ett tidigare `blob`-kommando. Frontänden behöver bara koppla det till incheckningen som ska annoteras.
++
+....
+	'N' SP <dataref> SP <commit-ish> LF
+....
++
+Här kan `<dataref>` vara antingen en mark-referens (`:<idnum>`) satt av ett tidigare `blob`-kommando, eller en fullständig 40-byte SHA-1 för ett befintligt Git-blobobjekt.
+
+Inbyggt dataformat::
+	Datainnehållet för anteckningen har ännu inte levererats. Frontänden vill leverera det som en del av detta ändringskommando.
++
+....
+	'N' SP 'inline' SP <commit-ish> LF
+	data
+....
++
+Se nedan för en detaljerad beskrivning av kommandot `data`.
+
+I båda formaten är `<commit-ish>` något av de uttryck för incheckningsspecifikation som också accepteras av `from` (se ovan).
+
+`mark`
+~~~~~~
+Gör så att fast-import sparar en referens till det aktuella objektet, så att frontänden kan återanvända objektet vid ett senare tillfälle utan att känna till dess SHA-1. Här är det aktuella objektet det objektskapande kommando som `mark`-kommandot förekommer i. Detta kan vara `commit`, `tag` eller `blob`, men `commit` är vanligast.
+
+....
+	'mark' SP ':' <idnum> LF
+....
+
+där `<idnum>` är numret som frontänden har tilldelat markeringen. Värdet för `<idnum>` uttrycks som ett decimalt ASCII-heltal. Värdet 0 är reserverat och kan inte användas som markering. Endast värden större än eller lika med 1 får användas som markeringar.
+
+Nya markeringar skapas automatiskt. Befintliga markeringar kan flyttas till ett annat objekt genom att återanvända samma `<idnum>` i ett annat `mark`-kommando.
+
+`original-oid`
+~~~~~~~~~~~~~~
+Tillhandahåller objektets namn i det ursprungliga versionshanteringssystemet. fast-import ignorerar direktivet, men filterprocesser som arbetar på och ändrar strömmen innan den matas till fast-import kan ha nytta av informationen
+
+....
+	'original-oid' SP <object-identifier> LF
+....
+
+där `<object-identifier>` är en valfri sträng som inte innehåller LF.
+
+`tag`
+~~~~~
+Skapar en annoterad tagg som pekar på en specifik incheckning. För att skapa lättviktiga (icke-annoterade) taggar, se kommandot `reset` nedan.
+
+....
+	'tag' SP <name> LF
+	mark?
+	'from' SP <commit-ish> LF
+	original-oid?
+	'tagger' (SP <name>)? SP LT <email> GT SP <when> LF
+	data
+....
+
+där `<name>` är namnet på taggen som ska skapas.
+
+Taggnamn får automatiskt prefixet `refs/tags/` när de lagras i Git, så import av CVS-grensymbolen `RELENG-1_0-FINAL` skulle använda enbart `RELENG-1_0-FINAL` som `<name>`, och fast-import skriver motsvarande referens som `refs/tags/RELENG-1_0-FINAL`.
+
+Värdet för `<name>` måste vara ett giltigt referensnamn i Git och kan därför innehålla snedstreck. Eftersom `LF` inte är giltigt i ett Git-referensnamn stöds ingen citerings- eller escapesyntax här.
+
+Kommandot `from` är samma som i kommandot `commit`; se ovan för detaljer.
+
+Kommandot `tagger` använder samma format som `committer` i `commit`; se återigen ovan för detaljer.
+
+Kommandot `data` efter `tagger` måste leverera det annoterade taggmeddelandet (se nedan för syntaxen för `data`). För att importera ett tomt taggmeddelande används data med längd 0. Taggmeddelanden är fria i formen och tolkas inte av Git. För närvarande måste de kodas i UTF-8, eftersom fast-import inte tillåter att andra kodningar anges.
+
+Signering av annoterade taggar under import inifrån fast-import stöds inte. Att försöka inkludera en egen PGP/GPG-signatur rekommenderas inte, eftersom frontänden inte (enkelt) har tillgång till hela mängden byte som normalt ingår i en sådan signatur. Om signering krävs, skapa lättviktiga taggar i fast-import med `reset` och skapa sedan annoterade versioner av taggarna offline med standardprocessen 'git tag'.
+
+`reset`
+~~~~~~~
+Skapar (eller återskapar) den namngivna grenen, valfritt med start från en specifik revision. Kommandot `reset` låter ett frontändsprogram utfärda ett nytt `from`-kommando för en befintlig gren, eller skapa en ny gren från en befintlig incheckning utan att skapa en ny incheckning.
+
+....
+	'reset' SP <ref> LF
+	('from' SP <commit-ish> LF)?
+	LF?
+....
+
+En detaljerad beskrivning av `<ref>` och `<commit-ish>` finns ovan under `commit` och `from`.
+
+`LF` efter kommandot är valfri (den var tidigare obligatorisk).
+
+Kommandot `reset` kan också användas för att skapa lättviktiga (icke-annoterade) taggar. Till exempel:
+
+====
+	reset refs/tags/938
+	from :938
+====
+
+skulle skapa den lättviktiga taggen `refs/tags/938` som pekar på den incheckning markeringen `:938` refererar till.
+
+`blob`
+~~~~~~
+Begär att en filrevision skrivs till packfilen. Revisionen är inte kopplad till någon incheckning; kopplingen måste skapas i ett efterföljande `commit`-kommando genom att referera till blobben via en tilldelad markering.
+
+....
+	'blob' LF
+	mark?
+	original-oid?
+	data
+....
+
+Kommandot `mark` är valfritt här eftersom vissa frontänder väljer att själva generera Git-SHA-1 för blobben och mata det direkt till `commit`. Det är dock vanligtvis mer arbete än det är värt, eftersom markeringar är billiga att lagra och enkla att använda.
+
+`data`
+~~~~~~
+Levererar rådata (för användning som blob-/filinnehåll, incheckningsmeddelanden eller annoterade taggmeddelanden) till fast-import. Data kan levereras med ett exakt byteantal eller avgränsas med en avslutande rad. Riktiga frontänder för konverteringar i produktionskvalitet bör alltid använda formatet med exakt byteantal, eftersom det är robustare och ger bättre prestanda. Det avgränsade formatet är främst avsett för test av fast-import.
+
+Kommentarrader som förekommer inom `<raw>`-delen av `data`-kommandon betraktas alltid som en del av datakroppen och ignoreras därför aldrig av fast-import. Det gör det säkert att importera fil-/meddelandeinnehåll vars rader kan börja med `#`.
+
+Format med exakt byteantal::
+	Importverktyget måste ange antalet byte data.
++
+....
+	'data' SP <count> LF
+	<raw> LF?
+....
++
+där `<count>` är det exakta antalet byte som förekommer i `<raw>`. Värdet på `<count>` uttrycks som ett decimalt ASCII-heltal. `LF` på vardera sidan om `<raw>` ingår inte i `<count>` och kommer inte att ingå i den importerade datan.
++
+`LF` efter `<raw>` är valfri (den var tidigare obligatorisk) men rekommenderad. Att alltid inkludera den gör felsökning av en fast-import-ström enklare eftersom nästa kommando alltid börjar i kolumn 0 på nästa rad, även om `<raw>` inte slutade med ett `LF`.
+
+Avgränsat format::
+	En avgränsarsträng används för att markera slutet på datan. fast-import beräknar längden genom att söka efter avgränsaren. Detta format är främst användbart för test och rekommenderas inte för verklig data.
++
+....
+	'data' SP '<<' <delim> LF
+	<raw> LF
+	<delim> LF
+	LF?
+....
++
+där `<delim>` är den valda avgränsarsträngen. Strängen `<delim>` får inte förekomma ensam på en rad i `<raw>`, annars tror fast-import att datan slutar tidigare än den gör. `LF` direkt efter `<raw>` är en del av `<raw>`. Detta är en av begränsningarna i det avgränsade formatet: det är omöjligt att leverera ett datafragment som inte har LF som sista byte.
++
+`LF` efter `<delim> LF` är valfri (den var tidigare obligatorisk).
+
+`alias`
+~~~~~~~
+Registrera att en markering refererar till ett givet objekt utan att först skapa något nytt objekt.
+
+....
+	'alias' LF
+	mark
+	'to' SP <commit-ish> LF
+	LF?
+....
+
+En detaljerad beskrivning av `<commit-ish>` finns ovan under `from`.
+
+
+`checkpoint`
+~~~~~~~~~~~~
+Tvingar fast-import att stänga den aktuella packfilen, starta en ny och spara ut alla aktuella grenreferenser, taggar och markeringar.
+
+....
+	'checkpoint' LF
+	LF?
+....
+
+Observera att fast-import automatiskt byter packfil när den aktuella packfilen når --max-pack-size, eller 4 GiB, beroende på vilket gränsvärde som är lägst. Vid ett automatiskt packfilsbyte uppdaterar fast-import inte grenreferenser, taggar eller markeringar.
+
+Eftersom ett `checkpoint` kan kräva betydande mängd CPU-tid och disk-I/O (för att beräkna packfilens övergripande SHA-1-kontrollsumma, generera motsvarande indexfil och uppdatera referenserna) kan ett enskilt `checkpoint`-kommando lätt ta flera minuter att slutföra.
+
+Importverktyg kan välja att utfärda kontrollpunkter under extremt stora och långkörande importer, eller när de behöver ge en annan Git-process åtkomst till en gren. Med tanke på att ett Subversion-kodförråd på 30 GiB kan laddas in i Git via fast-import på omkring 3 timmar kan explicita kontrollpunkter dock vara onödiga.
+
+`LF` efter kommandot är valfri (den var tidigare obligatorisk).
+
+`progress`
+~~~~~~~~~~
+Gör att fast-import skriver ut hela `progress`-raden oförändrad till sin standardutdatakanal (fildeskriptor 1) när kommandot behandlas från inmatningsströmmen. Kommandot påverkar i övrigt varken den aktuella importen eller fast-imports interna tillstånd.
+
+....
+	'progress' SP <any> LF
+	LF?
+....
+
+`<any>`-delen av kommandot kan innehålla valfri bytesekvens som inte innehåller `LF`. `LF` efter kommandot är valfri. Anropare kan vilja bearbeta utdatan med ett verktyg som sed för att ta bort den inledande delen av raden, till exempel:
+
+====
+	frontend | git fast-import | sed 's/^progress //'
+====
+
+Om ett `progress`-kommando placeras direkt efter ett `checkpoint` får läsaren veta när `checkpoint` har slutförts och när det är säkert att komma åt referenserna som fast-import uppdaterade.
+
+`get-mark`
+~~~~~~~~~~
+Gör att fast-import skriver ut SHA-1 som motsvarar en markering till stdout eller till fildeskriptorn som tidigare angivits med argumentet `--cat-blob-fd`. Kommandot påverkar i övrigt inte den aktuella importen; syftet är att hämta SHA-1 som senare incheckningar kan vilja referera till i sina incheckningsmeddelanden.
+
+....
+	'get-mark' SP ':' <idnum> LF
+....
+
+Se ``Responses To Commands'' nedan för detaljer om hur utdatan läses på ett säkert sätt.
+
+`cat-blob`
+~~~~~~~~~~
+Gör att fast-import skriver ut en blob till en fildeskriptor som tidigare angivits med argumentet `--cat-blob-fd`. Kommandot påverkar i övrigt inte den aktuella importen; huvudsyftet är att hämta blobbar som kan finnas i fast-imports minne men inte är åtkomliga från målkodförrådet.
+
+....
+	'cat-blob' SP <dataref> LF
+....
+
+`<dataref>` kan vara antingen en tidigare satt mark-referens (`:<idnum>`) eller en fullständig 40-byte SHA-1 för en Git-blob, redan befintlig eller redo att skrivas.
+
+Utdata använder samma format som `git cat-file --batch`:
+
+====
+	<sha1> SP 'blob' SP <size> LF
+	<contents> LF
+====
+
+Kommandot kan användas där ett `filemodify`-direktiv kan förekomma, vilket gör att det kan användas mitt i en incheckning. För en `filemodify` som använder ett inline-direktiv kan det också förekomma precis före `data`-direktivet.
+
+Se ``Responses To Commands'' nedan för detaljer om hur utdatan läses på ett säkert sätt.
+
+`ls`
+~~~~
+Skriver information om objektet på en sökväg till en fildeskriptor som tidigare angivits med argumentet `--cat-blob-fd`. Detta gör det möjligt att skriva ut en blob från den aktiva incheckningen (med `cat-blob`) eller kopiera en blob eller ett träd från en tidigare incheckning för användning i den aktuella (med `filemodify`).
+
+Kommandot `ls` kan också användas där ett `filemodify`-direktiv kan förekomma, vilket gör att det kan användas mitt i en incheckning.
+
+Läsning från den aktiva incheckningen::
+	Formen kan endast användas mitt i ett `commit`. Sökvägen namnger en katalogpost i fast-imports aktiva incheckning. Sökvägen måste vara citerad i detta fall.
++
+....
+	'ls' SP <path> LF
+....
+
+Läsning från ett namngivet träd::
+	`<dataref>` kan vara en mark-referens (`:<idnum>`) eller den fullständiga 40-byte SHA-1 för en Git-tagg, incheckning eller ett trädobjekt, redan befintligt eller väntande på att skrivas. Sökvägen är relativ till toppnivån i trädet som namnges av `<dataref>`.
++
+....
+	'ls' SP <dataref> SP <path> LF
+....
+
+Se `filemodify` ovan för en detaljerad beskrivning av `<path>`.
+
+Utdata använder samma format som `git ls-tree <tree> -- <path>`:
+
+====
+	<mode> SP ('blob' | 'tree' | 'commit') SP <dataref> HT <path> LF
+====
+
+<dataref> representerar blobben, trädet eller incheckningsobjektet vid <path> och kan användas i senare kommandon 'get-mark', 'cat-blob', 'filemodify' eller 'ls'.
+
+Om det inte finns någon fil eller något underträd på den sökvägen rapporterar 'git fast-import' i stället
+
+====
+	missing SP <path> LF
+====
+
+Se ``Responses To Commands'' nedan för detaljer om hur utdatan läses på ett säkert sätt.
+
+`feature`
+~~~~~~~~~
+Kräv att fast-import stöder den angivna funktionen, eller avbryt om den inte gör det.
+
+....
+	'feature' SP <feature> ('=' <argument>)? LF
+....
+
+<feature>-delen av kommandot kan vara någon av följande:
+
+date-format::
+export-marks::
+relative-marks::
+no-relative-marks::
+tvinga::
+	Agera som om motsvarande kommandoradsalternativ med inledande `--` hade skickats på kommandoraden (se ALTERNATIV ovan).
+
+import-marks::
+import-marks-if-exists::
+	Som --import-marks, men med tre skillnader: för det första tillåts bara ett kommando av typen "feature import-marks" eller "feature import-marks-if-exists" per ström; för det andra åsidosätter kommandoradsalternativen --import-marks= eller --import-marks-if-exists alla sådana "feature"-kommandon i strömmen; för det tredje hoppar "feature import-marks-if-exists", liksom motsvarande kommandoradsalternativ, tyst över filer som inte finns.
+
+get-mark::
+cat-blob::
+ls::
+	Kräv att den underliggande implementationen stöder kommandot 'get-mark', 'cat-blob' respektive 'ls'. Versioner av fast-import som inte stöder det angivna kommandot avslutas med ett meddelande om detta. Det gör att importen kan avbrytas tidigt med ett tydligt fel, i stället för att tid slösas på början av en import innan det icke stödda kommandot upptäcks.
+
+anteckningar::
+	Kräv att den underliggande implementationen stöder underkommandot 'notemodify' (N) till kommandot 'commit'. Versioner av fast-import som inte stöder anteckningar avslutas med ett meddelande om detta.
+
+done::
+	Ge fel om strömmen avslutas utan ett 'done'-kommando. Utan funktionen kan fel som får frontänden att avslutas abrupt på en lämplig punkt i strömmen passera obemärkt. Det kan till exempel hända om ett frontändsprogram dör mitt i en operation utan att skicka SIGTERM eller SIGKILL till sin underordnade git fast-import-instans.
+
+`option`
+~~~~~~~~
+Bearbetar det angivna alternativet så att git fast-import beter sig på ett sätt som passar frontändens behov. Observera att alternativ som anges av frontänden åsidosätts av alternativ som användaren anger till git fast-import självt.
+
+....
+    'option' SP <option> LF
+....
+
+`<option>`-delen av kommandot kan innehålla vilket som helst av alternativen i avsnittet OPTIONS som inte ändrar importsemantiken, utan inledande `--`, och behandlas på samma sätt.
+
+Alternativkommandon måste vara de första kommandona i indata (feature-kommandon räknas inte); att ge ett alternativkommando efter ett icke-alternativkommando är ett fel.
+
+Följande kommandoradsalternativ ändrar importsemantiken och får därför inte skickas som option:
+
+* date-format
+* import-marks
+* export-marks
+* cat-blob-fd
+* tvinga
+
+`done`
+~~~~~~
+Om funktionen `done` inte används behandlas det som om EOF lästes. Detta kan användas för att få fast-import att avsluta tidigare.
+
+Om kommandoradsalternativet `--done` eller kommandot `feature done` används är kommandot `done` obligatoriskt och markerar slutet på strömmen.
+
+SVAR PÅ KOMMANDON
+-----------------
+Nya objekt som skrivs av fast-import blir inte tillgängliga omedelbart. De flesta fast-import-kommandon har ingen synlig effekt förrän vid nästa kontrollpunkt (eller slutförande). Importverktyget kan skicka kommandon för att fylla fast-imports inmatningsrör utan att bekymra sig om hur snabbt de får effekt, vilket förbättrar prestandan genom enklare schemaläggning.
+
+För vissa frontänder är det dock användbart att kunna läsa tillbaka data från det aktuella kodförrådet medan det uppdateras (till exempel när källmaterialet beskriver objekt i form av patchar som ska appliceras på tidigare importerade objekt). Detta kan åstadkommas genom att koppla ihop frontänden och fast-import via dubbelriktade rör:
+
+====
+	mkfifo fast-import-output
+	frontend <fast-import-output |
+	git fast-import >fast-import-output
+====
+
+Ett frontändsprogram som satts upp på detta sätt kan använda kommandona `progress`, `get-mark`, `ls` och `cat-blob` för att läsa information från den pågående importen.
+
+För att undvika låsning måste sådana frontänder helt konsumera all väntande utdata från `progress`, `ls`, `get-mark` och `cat-blob` innan de skriver till fast-import på sätt som kan blockera.
+
+KRASCHRAPPORTER
+---------------
+Om fast-import får ogiltig indata avslutas det med en status som inte är noll och skapar en kraschrapport i toppnivån av Git-kodförrådet som importerades till. Kraschrapporter innehåller en ögonblicksbild av fast-imports interna tillstånd samt de senaste kommandon som ledde fram till kraschen.
+
+Alla nyliga kommandon (inklusive strömkommentarer, filändringar och progress-kommandon) visas i kommandohistoriken i kraschrapporten, men rå fildata och incheckningsmeddelanden utesluts från rapporten. Detta sparar utrymme i rapportfilen och minskar mängden buffring som fast-import måste göra under körning.
+
+Efter att ha skrivit en kraschrapport stänger fast-import den aktuella packfilen och exporterar markeringstabellen. Detta gör att utvecklaren av frontänden kan inspektera kodförrådets tillstånd och återuppta importen från punkten där den kraschade. De ändrade grenarna och taggarna uppdateras inte vid en krasch, eftersom importen inte slutfördes korrekt. Information om grenar och taggar finns i kraschrapporten och måste tillämpas manuellt om uppdateringen behövs.
+
+Ett exempel på en krasch:
+
+====
+	$ cat >in <<END_OF_INPUT
+	# my very first test commit
+	commit refs/heads/master
+	committer Shawn O. Pearce <spearce> 19283 -0400
+	# who is that guy anyway?
+	data <<EOF
+	this is my commit
+	EOF
+	M 644 inline .gitignore
+	data <<EOF
+	.gitignore
+	EOF
+	M 777 inline bob
+	END_OF_INPUT
+
+	$ git fast-import <in
+	fatal: Corrupt mode: M 777 inline bob
+	fast-import: dumping crash report to .git/fast_import_crash_8434
+
+	$ cat .git/fast_import_crash_8434
+	fast-import crash report:
+	    fast-import process: 8434
+	    parent process     : 1391
+	    at Sat Sep 1 00:58:12 2007
+
+	fatal: Corrupt mode: M 777 inline bob
+
+	Most Recent Commands Before Crash
+	---------------------------------
+	  # my very first test commit
+	  commit refs/heads/master
+	  committer Shawn O. Pearce <spearce> 19283 -0400
+	  # who is that guy anyway?
+	  data <<EOF
+	  M 644 inline .gitignore
+	  data <<EOF
+	* M 777 inline bob
+
+Active Branch LRU
+-----------------
+active_branches = 1 cur, 5 max
+
+	  pos clock name ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	   1)      0 refs/heads/master
+
+Inactive Branches
+-----------------
+refs/heads/master:
+status      : active loaded dirty
+tip commit  : 0000000000000000000000000000000000000000
+old tree    : 0000000000000000000000000000000000000000
+cur tree    : 0000000000000000000000000000000000000000
+commit clock: 0
+last pack   :
+
+
+	------------------- END OF CRASH REPORT
+====
+
+TIPS OCH TRICKS
+---------------
+Följande tips och tricks har samlats in från olika användare av fast-import och ges här som förslag.
+
+Använd en markering per incheckning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Vid konvertering av ett kodförråd, använd en unik markering per incheckning (`mark :<n>`) och ange alternativet --export-marks på kommandoraden. fast-import skriver då ut en fil som listar varje markering och motsvarande Git-objekts SHA-1. Om frontänden kan koppla markeringarna tillbaka till källkodförrådet är det enkelt att verifiera importens korrekthet och fullständighet genom att jämföra varje Git-incheckning med motsvarande källrevision.
+
+För den som kommer från ett system som Perforce eller Subversion bör detta vara ganska enkelt, eftersom fast-import-markeringen också kan vara Perforces ändringsmängdsnummer eller Subversions revisionsnummer.
+
+Växla fritt mellan grenar
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Lägg inte kraft på att optimera frontänden för att hålla sig till en gren i taget under en import. Även om det kan vara något snabbare för fast-import tenderar det att öka komplexiteten i frontändens kod avsevärt.
+
+Den inbyggda gren-LRU:n i fast-import fungerar i regel mycket bra, och kostnaden för att aktivera en inaktiv gren är så låg att hopp mellan grenar i praktiken inte påverkar importprestandan.
+
+Hantering av namnbyten
+~~~~~~~~~~~~~~~~~~~~~~
+Vid import av en omdöpt fil eller katalog, ta helt enkelt bort de gamla namnen och ändra de nya namnen i motsvarande incheckning. Git upptäcker namnbyten i efterhand, snarare än explicit under en incheckning.
+
+Använd fixup-grenar för taggar
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Vissa andra SCM-system låter användaren skapa en tagg från flera filer som inte kommer från samma incheckning/ändringsmängd. Eller skapa taggar som bara är en delmängd av filerna i kodförrådet.
+
+Att importera sådana taggar oförändrade i Git är omöjligt utan att göra minst en incheckning som ``fixar upp'' filerna så att de matchar taggens innehåll. Använd fast-imports `reset`-kommando för att nollställa en hjälpgren utanför det normala grenutrymmet till baskommitten för taggen, checka sedan in en eller flera fil-fixup-incheckningar och tagga till sist hjälpgrenen.
+
+Eftersom alla normala grenar till exempel lagras under `refs/heads/` kan tagg-fixup-grenen heta `TAG_FIXUP`. Då kan fixup-grenen som importören använder inte få namnrymdskonflikter med riktiga grenar importerade från källan (namnet `TAG_FIXUP` är inte `refs/heads/TAG_FIXUP`).
+
+Vid fixup-incheckningar kan `merge` användas för att koppla incheckning(ar) som levererar filrevisioner till fixup-grenen. Då kan verktyg som 'git blame' följa den verkliga incheckningshistoriken och annotera källfilerna korrekt.
+
+När fast-import har avslutats behöver frontänden köra `rm .git/TAG_FIXUP` för att ta bort hjälpgrenen.
+
+Importera nu, packa om senare
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Så snart fast-import är klart är Git-kodförrådet helt giltigt och redo att användas. Vanligtvis tar detta bara mycket kort tid, även för stora projekt (100 000+ incheckningar).
+
+Ompackning av kodförrådet behövs dock för att förbättra datalokalitet och åtkomstprestanda. Det kan också ta timmar i extremt stora projekt (särskilt om -f och ett stort värde för --window används). Eftersom ompackning är säker att köra parallellt med läsare och skribenter kan ompackningen köras i bakgrunden och bli klar när den blir klar. Det finns ingen anledning att vänta med att utforska det nya Git-projektet!
+
+Om ompackningen inväntas, försök inte köra prestandatester förrän ompackningen är klar. fast-import producerar mindre optimala packfiler som normalt aldrig ses i verkliga användningsfall.
+
+Ompackning av historisk data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Vid ompackning av mycket gammal importerad data (t.ex. äldre än det senaste året), överväg att använda lite extra CPU-tid och ange --window=50 (eller högre) när 'git repack' körs. Det tar längre tid, men ger också en mindre packfil. Detta behöver bara göras en gång, och alla som använder projektet får nytta av det mindre kodförrådet.
+
+Ta med några progress-meddelanden
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Låt frontänden skicka ett `progress`-meddelande till fast-import då och då. Innehållet i meddelandena är helt fritt, så ett förslag är att skriva ut aktuell månad och år varje gång den aktuella incheckningsdagen går in i nästa månad. Användarna känner sig tryggare när de vet hur stor del av dataströmmen som har behandlats.
+
+
+OPTIMERING AV PACKFIL
+---------------------
+Vid packning av en blob försöker fast-import alltid skapa delta mot den senast skrivna blobben. Om inte frontänden särskilt ordnar detta är det sannolikt inte en tidigare version av samma fil, så det genererade deltats storlek blir inte minsta möjliga. Den resulterande packfilen blir komprimerad men inte optimal.
+
+Frontänder som har effektiv åtkomst till alla revisioner av en enskild fil (till exempel genom att läsa en RCS/CVS-,v-fil) kan välja att leverera alla revisioner av den filen som en följd av efterföljande `blob`-kommandon. Detta gör att fast-import kan skapa delta mellan filrevisionerna och spara utrymme i den slutliga packfilen. Markeringar kan senare användas för att identifiera enskilda filrevisioner under en sekvens av `commit`-kommandon.
+
+Packfilen/-filerna som skapas av fast-import ger inte bra mönster för diskåtkomst. Det beror på att fast-import skriver datan i den ordning den tas emot på standardinmatning, medan Git normalt organiserar data i packfiler så att de senaste (aktuell spets) kommer före historisk data. Git klustrar också incheckningar tillsammans, vilket snabbar upp revisionsvandring genom bättre cachelokalitet.
+
+Av den anledningen rekommenderas det starkt att användare packar om kodförrådet med `git repack -a -d` efter att fast-import har slutförts, så att Git kan omorganisera packfilerna för snabbare dataåtkomst. Om blob-delta är mindre optimala (se ovan) kan tillägg av alternativet `-f` för att tvinga omberäkning av alla delta avsevärt minska slutlig packfilstorlek (30-50 % mindre är inte ovanligt).
+
+I stället för att köra `git repack` kan även `git gc --aggressive` köras, vilket även optimerar andra delar efter en import (t.ex. packar lösa referenser). Som noteras i avsnittet "AGGRESSIVE" i linkgit:git-gc[1] hittar alternativet `--aggressive` nya delta med alternativet `-f` till linkgit:git-repack[1]. Av skälen som förklarats ovan är användning av `--aggressive` efter en fast-import ett av de få fall där det är känt att det lönar sig.
+
+MINNESANVÄNDNING
+----------------
+Det finns flera faktorer som påverkar hur mycket minne fast-import behöver för att utföra en import. Liksom kritiska delar av kärn-Git använder fast-import egna minnesallokerare för att amortera overhead kopplad till malloc. I praktiken tenderar fast-import att amortera malloc-overhead till 0 tack vare användning av stora blockallokeringar.
+
+per objekt
+~~~~~~~~~~
+fast-import upprätthåller en minnesstruktur för varje objekt som skrivs under körningen. På ett 32-bitars system är strukturen 32 byte, på ett 64-bitars system är den 40 byte (på grund av större pekarstorlek). Objekt i tabellen frigörs inte förrän fast-import avslutas. Import av 2 miljoner objekt på ett 32-bitars system kräver ungefär 64 MiB minne.
+
+Objekttabellen är i praktiken en hash-tabell nycklad på objektnamnet (den unika SHA-1). Lagringskonfigurationen gör att fast-import kan återanvända ett befintligt eller redan skrivet objekt och undvika att skriva dubletter till utdata-packfilen. Duplicerade blobbar är förvånansvärt vanliga i en import, ofta på grund av grensammanslagningar i källan.
+
+per markering
+~~~~~~~~~~~~~
+Markeringar lagras i en gles array, med 1 pekare (4 eller 8 byte, beroende på pekarstorlek) per markering. Även om arrayen är gles uppmuntras frontänder starkt att använda markeringar mellan 1 och n, där n är det totala antalet markeringar som krävs för importen.
+
+per gren
+~~~~~~~~
+Grenar klassificeras som aktiva eller inaktiva. Minnesanvändningen för de två klasserna skiljer sig avsevärt.
+
+Inaktiva grenar lagras i en struktur som använder 96 eller 120 byte (32- respektive 64-bitars system), plus längden på grennamnet (vanligen under 200 byte), per gren. fast-import hanterar utan problem så många som 10 000 inaktiva grenar med under 2 MiB minne.
+
+Aktiva grenar har samma overhead som inaktiva grenar, men innehåller också kopior av varje träd som nyligen har ändrats på grenen. Om underträdet `include` inte har ändrats sedan grenen blev aktiv laddas dess innehåll inte in i minnet, men om underträdet `src` har ändrats av en incheckning sedan grenen blev aktiv laddas dess innehåll in i minnet.
+
+Eftersom aktiva grenar lagrar metadata om filerna på grenen kan deras minnesstorlek växa till en betydande nivå (se nedan).
+
+fast-import flyttar automatiskt aktiva grenar till inaktiv status baserat på en enkel least-recently-used-algoritm. LRU-kedjan uppdateras vid varje `commit`-kommando. Maximalt antal aktiva grenar kan ökas eller minskas på kommandoraden med --active-branches=.
+
+per aktivt träd
+~~~~~~~~~~~~~~~
+Träd (d.v.s. kataloger) använder bara 12 byte minne utöver minnet som krävs för deras poster (se ``per active file'' nedan). Kostnaden för ett träd är i praktiken 0, eftersom overheaden amorteras över de enskilda filposterna.
+
+per aktiv filpost
+~~~~~~~~~~~~~~~~~
+Filer (och pekare till underträd) inom aktiva träd kräver 52 eller 64 byte (32/64-bitars plattformar) per post. För att spara utrymme samlas fil- och trädnamn i en gemensam strängtabell, vilket gör att filnamnet "Makefile" bara använder 16 byte (efter att stränghuvudet har inkluderats) oavsett hur många gånger det förekommer inom projektet.
+
+Den aktiva gren-LRU:n, tillsammans med strängpool för filnamn och lat inläsning av underträd, gör att fast-import effektivt kan importera projekt med 2 000+ grenar och 45 114+ filer med mycket begränsat minnesavtryck (mindre än 2,7 MiB per aktiv gren).
+
+SIGNALER
+--------
+Att skicka *SIGUSR1* till processen 'git fast-import' avslutar den aktuella packfilen i förtid, vilket simulerar ett `checkpoint`-kommando. En otålig operatör kan använda detta för att titta på objekt och referenser i en pågående import, till priset av något längre körtid och sämre komprimering.
+
+KONFIGURATION
+-------------
+
+Allt under den här raden i det här avsnittet är selektivt inkluderat från dokumentationen linkgit:git-config[1]. Innehållet är detsamma som det som finns där:
+[]
+
+
+
+[WARNING]
+====
+Missing `sv/config/fastimport.adoc`
+
+See original version for this content.
+====
+
+[]
+
+SE ÄVEN
+-------
+linkgit:git-fast-export[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

@@ -1,0 +1,105 @@
+git-send-pack(1)
+================
+
+NAMN
+----
+git-send-pack - Sänd objekt över Git-protokollet till annat kodförråd
+
+
+SYNOPSIS
+--------
+[verse]
+'git send-pack' [--mirror] [--dry-run] [--force]
+		[--receive-pack=<git-receive-pack>]
+		[--verbose] [--thin] [--atomic]
+		[--[no-]signed | --signed=(true|false|if-asked)]
+		[<värd>:]<katalog> (--all | <ref>...)
+
+BESKRIVNING
+-----------
+Vanligtvis vill du istället använda 'git push', vilket är en högre nivå av omslag för det här kommandot. Se linkgit:git-push[1].
+
+Anropar 'git-receive-pack' på ett eventuellt fjärrkodförråd och uppdaterar det från det aktuella kodförrådet, och skickar namngivna referenser.
+
+
+ALTERNATIV
+----------
+--receive-pack=<git-receive-pack>::
+	Sökväg till programmet 'git-receive-pack' på fjärrsidan. Ibland användbart vid push-överföring till ett fjärrkodförråd via ssh, och du inte har programmet i en katalog på standard $PATH:en.
+
+--exec=<git-receive-pack>::
+	Samma som --receive-pack=<git-receive-pack>.
+
+--all::
+	Istället för att explicit ange vilka referenser som ska uppdateras, uppdatera alla huvuden som finns lokalt.
+
+--stdin::
+	Ta listan med referenser från stdin, en per rad. Om det finns referenser angivna på kommandoraden utöver detta alternativ, bearbetas referenserna från stdin efter de på kommandoraden.
++
+Om `--stateless-rpc` anges tillsammans med detta alternativ måste listan över referenser vara i paketformat (pkt-line). Varje referens måste finnas i ett separat paket, och listan måste avslutas med ett tömningspaket.
+
+--dry-run::
+	Gör allt utom att faktiskt skicka uppdateringarna.
+
+--force::
+	Vanligtvis vägrar kommandot att uppdatera en fjärrreferens som inte är en förfader till den lokala referens som användes för att skriva över den. Denna flagga inaktiverar kontrollen. Det betyder att fjärrkodförrådet kan förlora incheckningar; använd den med försiktighet.
+
+--verbose::
+	Kör utförligt.
+
+--thin::
+	Skicka ett "tunt" paket, som registrerar objekt i deltifierad form baserat på objekt som inte ingår i paketet för att minska nätverkstrafiken.
+
+--atomic::
+	Use an atomic transaction for updating the refs. If any of the refs fails to update then the entire push will fail without changing any refs.
+
+--signed::
+--no-signed::
+--signed=(true|false|if-asked)::
+	GPG-signera push-begäran för att uppdatera referenser på mottagarsidan, så att den kan kontrolleras av krokarna och/eller loggas. Om `false` eller `--no-signed` kommer ingen signeringsförsök att göras. Om `true` eller `--signed` kommer push-begäran att misslyckas om servern inte stöder signerade push-begäran. Om den är satt till `if-asked`, signera om och endast om servern stöder signerade push-begäran. Push-begäran kommer också att misslyckas om det faktiska anropet till `gpg --sign` misslyckas. Se linkgit:git-receive-pack[1] för detaljer på mottagarsidan.
+
+--push-option=<sträng>::
+	Skicka den angivna strängen som ett push-alternativ för konsumtion av krokar på serversidan. Om servern inte stöder push-alternativ, visas ett felmeddelande. Se linkgit:git-push[1] och linkgit:githooks[5] för mer information.
+
+<värd>::
+	En fjärrvärd för att hysa kodförrådet. När denna del anges anropas 'git-receive-pack' via ssh.
+
+<katalog>::
+	Förvaret som ska uppdateras.
+
+<ref>...::
+	Fjärrreferenserna att uppdatera.
+
+
+SPECIFIERING AV REFERENSERNA
+----------------------------
+
+Det finns tre sätt att ange vilka referenser som ska uppdateras på fjärrsidan.
+
+Med flaggan `--all` överförs alla referenser som finns lokalt till fjärrsidan. Du kan inte ange någon '<ref>' om du använder denna flagga.
+
+Utan `--all` och utan någon '<ref>' uppdateras de huvuden som finns både på den lokala sidan och på fjärrsidan.
+
+När ett eller flera '<ref>' anges explicit (antingen på kommandoraden eller via `--stdin`), kan det vara antingen ett enda mönster, eller ett par sådana mönster separerade med ett kolon ":" (detta betyder att ett referensnamn inte kan innehålla ett kolon). Ett enda mönster '<namn>' är bara en förkortning för '<namn>:<namn>'.
+
+Varje mönsterpar består av källsidan (före kolon) och destinationssidan (efter kolon). Vilken referens som ska skickas bestäms genom att hitta en matchning som matchar källsidan, och var den skickas bestäms genom att använda destinationssidan. Reglerna som används för att matcha en referens är samma regler som används av 'git rev-parse' för att matcha ett symboliskt referensnamn. Se linkgit:git-rev-parse[1].
+
+ - Det är ett fel om <src> inte exakt matchar en av de lokala referenserna.
+
+ - Det är ett fel om <dst> matchar mer än en fjärrreferens.
+
+ - Om <dst> inte matchar någon fjärrreferens, antingen
+
+   * den måste börja med "refs/"; <dst> används bokstavligen som destination i det här fallet.
+
+   * <src> == <dst> och referensen som matchade <src> får inte finnas i uppsättningen fjärrreferenser; referensen som matchade <src> lokalt används som namn på destinationen.
+
+Utan `--force` lagras <src>-referensen på fjärren endast om <dst> inte existerar, eller om <dst> är en korrekt delmängd (dvs. en förfader) till <src>. Denna kontroll, känd som "snabbspolningskontroll", utförs för att undvika att av misstag skriva över fjärrreferensen och förlora andra personers incheckningar därifrån.
+
+Med `--force` inaktiveras snabbspolning framåt för alla referenser.
+
+Valfritt, kan en <ref>-parameter prefixas med ett plustecken '+' för att inaktivera snabbspolning framåt endast på den referensen.
+
+GIT
+---
+En del av linkgit:git[1]-sviten

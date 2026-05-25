@@ -1,0 +1,172 @@
+git-cherry-pick(1)
+==================
+
+NAMN
+----
+git-cherry-pick - Tillämpa ändringarna som introducerats av vissa befintliga incheckningar
+
+SYNOPSIS
+--------
+[verse]
+'git cherry-pick' [--edit] [-n] [-m <förälder-nummer>] [-s] [-x] [--ff]
+		  [-S[<nyckelid>]] <incheckning>...
+'git cherry-pick' (--continue | --skip | --abort | --quit)
+
+BESKRIVNING
+-----------
+
+Givet en eller flera befintliga incheckningar, tillämpa ändringen som var och en introducerar och registrera en ny incheckning för varje. Detta kräver att ditt arbetsträd är rent (inga modifieringar från HEAD-incheckningen).
+
+När det inte är uppenbart hur en ändring ska tillämpas, händer följande:
+
+1. Den aktuella grenen och `HEAD`-pekaren stannar vid den senast framgångsrikt genomförda incheckningen.
+2. Referensen `CHERRY_PICK_HEAD` är inställd att peka på den incheckning som introducerade ändringen som är svår att tillämpa.
+3. Sökvägar där ändringen tillämpades korrekt uppdateras både i indexfilen och i ditt arbetsträd.
+4. För motstridiga sökvägar, registrerar indexfilen upp till tre versioner, enligt beskrivningen i avsnittet "SANN SAMMANSLAGNING" i linkgit:git-merge[1]. Arbetskatalogs-filerna kommer att innehålla en beskrivning av konflikten inom av de vanliga konfliktmarkörerna `<<<<<<<` och `>>>>>>>`.
+5. Inga andra ändringar görs.
+
+Se linkgit:git-merge[1] för några tips om hur man löser sådana konflikter.
+
+ALTERNATIV
+----------
+<incheckning>...::
+	Incheckningar som ska plockas som russin ur kakan. För en mer komplett lista över sätt att ange incheckningar, se linkgit:gitrevisions[7]. Uppsättningar av incheckningar kan skickas men ingen genomgång görs som standard, som om alternativet `--no-walk` hade angetts, se linkgit:git-rev-list[1]. Observera att om man anger ett intervall matas alla <inchecknings>...-argument till en enda revisionsgenomgång (se ett senare exempel som använder 'maint master..next').
+
+-e::
+--edit::
+	Med det här alternativet, låter 'git cherry-pick' dig redigera incheckningsmeddelandet innan incheckningen.
+
+--cleanup=<läge>::
+	Det här alternativet avgör hur incheckningsmeddelandet ska rensas innan det skickas vidare till incheckningsmaskineriet. Se linkgit:git-commit[1] för mer information. Om '<läge>' ges värdet `scissors` kommer scissors att läggas till i `MERGE_MSG` innan det skickas vidare i händelse av en konflikt.
+
+-x::
+	När incheckningen registreras, lägg till en rad som säger "(cherry picked from commit ...)" i det ursprungliga incheckningsmeddelandet för att ange från vilken incheckning denna ändring handplockades. Detta görs endast för handplockningar utan konflikter. Använd inte alternativet om du handplockar från en privat gren, eftersom informationen då är värdelös för mottagaren. Om du däremot handplockar mellan två offentligt synliga grenar (t.ex. bakporterar en fix till en underhållsgren för en äldre utgåva från en utvecklingsgren) kan denna information vara användbar.
+
+-r::
+	Tidigare var det så att kommandot som standard gjorde `-x` som beskrivits ovan, och `-r` var för att inaktivera det. Nu är standardinställningen att inte göra `-x` så detta är en verkningslös flagga.
+
+-m <förälder-nummer>::
+--mainline <förälder-nummer>::
+	Vanligtvis kan du inte handplocka en sammanslagning eftersom det inte går att avgöra vilken sida av sammanslagningen som ska betraktas som huvudlinjen. Det här alternativet anger huvudlinjens föräldernummer (med början på 1) och låter handplockning återspela ändringen relativt den angivna föräldern.
+
+-n::
+--no-commit::
+	Vanligtvis skapar kommandot automatiskt en sekvens av incheckningar. Denna flagga tillämpar de ändringar som krävs för att välja ut varje namngiven incheckning till ditt arbetsträd och indexet, utan att göra någon incheckning. Dessutom, när detta alternativ används, behöver ditt index inte matcha HEAD-incheckningen. Urvalet görs mot starttillståndet för ditt index.
++
+Det är användbart när du handplockar effekten av fler än en incheckning till indexet i följd.
+
+-s::
+--signoff::
+	Lägg till en `Signed-off-by`-slutrad i slutet av incheckningsmeddelandet. Se signoff-alternativet i linkgit:git-commit[1] för mer information.
+
+-S[<nyckeld>]::
+--gpg-sign[=<nyckelid>]::
+--no-gpg-sign::
+	GPG-signera incheckningar. Argumentet `nyckelid` är valfritt och används som standard för incheckaridentiteten; om det anges måste det fästas vid alternativet utan mellanslag. `--no-gpg-sign` är användbart för att åsidosätta både konfigurationsvariabeln `commit.gpgSign` och tidigare `--gpg-sign`.
+
+--ff::
+	Om den aktuella HEAD är densamma som föräldern till den cherry-pick:ade incheckningen, kommer en snabbspolning till denna incheckning att utföras.
+
+--allow-empty::
+	Som standard misslyckas handplockning av en tom incheckning, vilket innebär att ett uttryckligt anrop av `git commit --allow-empty` krävs. Det här alternativet åsidosätter det beteendet och gör att tomma incheckningar bevaras automatiskt vid handplockning. Observera att när "--ff" gäller behålls tomma incheckningar som uppfyller kravet för snabbspolning även utan detta alternativ. Observera också att alternativet endast behåller incheckningar som ursprungligen var tomma (d.v.s. incheckningen registrerade samma träd som sin förälder). Incheckningar som blir tomma på grund av en tidigare incheckning gör att handplockningen misslyckas. Använd `--empty=keep` för att tvinga med sådana incheckningar.
+
+--allow-empty-message::
+	Som standard misslyckas handplockning av en incheckning med tomt meddelande. Det här alternativet åsidosätter det beteendet och tillåter att incheckningar med tomma meddelanden handplockas.
+
+--empty=(drop|keep|stop)::
+	Hur incheckningar som handplockas och är redundanta med ändringar som redan finns i den aktuella historiken ska hanteras.
++
+--
+`drop`;;
+	Incheckningen kommer kastas.
+`keep`;;
+	Incheckningen kommer att behållas. Implicerar `--allow-empty`.
+`stop`;;
+	Handplockningen stannar när incheckningen har tillämpats, så att du kan granska den. Detta är standardbeteendet.
+--
++
+Observera att `--empty=drop` och `--empty=stop` endast anger hur en incheckning som inte ursprungligen var tom, men blev tom på grund av en tidigare incheckning, ska hanteras. Incheckningar som ursprungligen var tomma gör fortfarande att handplockningen misslyckas om inte `--empty=keep` eller `--allow-empty` anges.
++
+
+--keep-redundant-commits::
+	Föråldrad synonym för `--empty=keep`.
+
+--strategy=<strategi>::
+	Använd den givna sammanslagningsstrategin. Bör endast användas en gång. Se avsnittet SAMMANSLAGNINGSSTRATEGIER i linkgit:git-merge[1] för mer information.
+
+-X<flaggor>::
+--strategy-option=<flaggor>::
+	Skicka det merge-strategispecifika alternativet vidare till merge-strategin. Se linkgit:git-merge[1] för mer information.
+
+`--rerere-autoupdate`::
+`--no-rerere-autoupdate`::
+	Efter att rerere-mekanismen återanvänder en inspelad lösning på den aktuella konflikten för att uppdatera filerna i arbetskatalogen, tillåt den även att uppdatera indexet med resultatet av lösningen. `--no-rerere-autoupdate` är ett bra sätt att dubbelkolla vad `rerere` gjorde och upptäcka potentiella felaktiga sammanslagningar, innan resultatet sparas i indexet med ett separat `git add`.
+[]
+
+SEKVENSERARE UNDERKOMMANDON
+---------------------------
+--continue::
+	Fortsätt den pågående operationen med informationen i `.git/sequencer`. Kan användas för att fortsätta efter att konflikter i en misslyckad cherry-picking eller ångring har lösts.
+
+--skip::
+	Hoppa över den nuvarande incheckningen och fortsätt med resten av sekvensen.
+
+--quit::
+	Glöm den pågående operationen. Kan användas för att rensa sequencerns tillstånd efter en misslyckad cherry pick eller återställning.
+
+--abort::
+	Avbryt åtgärden och återgå till försekvenstillståndet.
+[]
+
+EXEMPEL
+-------
+`git cherry-pick master`::
+
+	Tillämpa ändringen som introducerades av incheckningen i toppen på master-grenen och skapa en ny incheckning med denna ändring.
+
+`git cherry-pick ..master`::
+`git cherry-pick ^HEAD master`::
+
+	Tillämpa ändringarna som introducerats av alla incheckningar som är föregångare till master men inte till HEAD för att skapa nya incheckningar.
+
+`git cherry-pick maint next ^master`::
+`git cherry-pick maint master..next`::
+
+	Tillämpa ändringarna som introduceras av alla incheckningar som är föregångare till maint eller next, men inte master eller någon av dess föregångare. Observera att det senare inte betyder `maint` och allt mellan `master` och `next`; specifikt kommer `maint` inte att användas om det ingår i `master`.
+
+`git cherry-pick master~4 master~2`::
+
+	Tillämpa ändringarna som introducerades av den femte och tredje sista incheckningarna som master pekar på och skapa 2 nya incheckningar med dessa ändringar.
+
+`git cherry-pick -n master~1 next`::
+
+	Tillämpa på arbetsträdet och indexet de ändringar som introducerades av den näst sista incheckningen som pekas ut av master och av den sista incheckningen som pekas ut av next, men skapa ingen incheckning med dessa ändringar.
+
+`git cherry-pick --ff ..next`::
+
+	Om historiken är linjär och HEAD är en förfader till next, uppdatera arbetsträdet och flytta HEAD-pekaren så att den matchar next. Annars tillämpar du ändringarna som introducerats av de incheckningar som finns i next men inte HEAD på den aktuella grenen, och skapar en ny incheckning för varje ny ändring.
+
+`git rev-list --reverse master -- README | git cherry-pick -n --stdin`::
+
+	Tillämpa ändringarna som introducerats av alla incheckningar på huvudgrenen som berörde README på arbetsträdet och indexet, så att resultatet kan inspekteras och göras om till en enda ny incheckning om det är lämpligt.
+
+Följande sekvens försöker bakporterar en patch, stannar eftersom koden som patchen gäller för har ändrats för mycket, och försöker sedan igen, den här gången med större noggrannhet i att matcha kontextrader.
+
+------------
+$ git cherry-pick topic^             <1>
+$ git diff                           <2>
+$ git cherry-pick --abort            <3>
+$ git cherry-pick -Xpatience topic^  <4>
+------------
+<1> tillämpa ändringen som skulle visas av `git show topic^`. I det här exemplet, tillämpas inte patchen korrekt, så information om konflikten skrivs till indexet och arbetsträdet och ingen nya incheckning-resultat uppstår.
+<2> sammanfatta ändringar som ska försonas
+<3> avbryt urvalet. Med andra ord, återgå till tillståndet före russinen plockades ur kakan och behåll alla lokala ändringar du hade i arbetsträdet.
+<4> försök att tillämpa ändringen som introducerades av `topic^` igen, och lägg extra tid på att undvika misstag baserade på felaktigt matchande kontextrader.
+
+SE ÄVEN
+-------
+linkgit:git-revert[1]
+
+GIT
+---
+En del av linkgit:git[1]-sviten

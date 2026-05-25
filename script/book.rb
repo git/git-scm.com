@@ -29,7 +29,7 @@ class Book
     "sr" => "progit/progit2-sr",
     "tl" => "progit2-tl/progit2",
     "tr" => "progit/progit2-tr",
-    "sv" => "progit2-sv/progit2",
+    "sv" => "progit/progit2-sv",
     "uk" => "progit/progit2-uk",
     "uz" => "progit/progit2-uz",
     "zh" => "progit/progit2-zh",

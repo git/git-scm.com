@@ -1,0 +1,283 @@
+git-notes(1)
+============
+
+NAMN
+----
+git-notes - Lägg till eller inspektera objektanteckningar
+
+SYNOPSIS
+--------
+[synopsis]
+git notes [list [<objekt>]]
+git notes add [-f] [--allow-empty] [--[no-]separator | --separator=<styckebrytning>] [--[no-]stripspace] [-F <file> | -m <medd> | (-c | -C) <objekt>] [-e] [<objekt>]
+git notes copy [-f] ( --stdin | <from-object> [<to-object>] )
+git notes append [--allow-empty] [--[no-]separator | --separator=<styckebrytning>] [--[no-]stripspace] [-F <file> | -m <medd> | (-c | -C) <objekt>] [-e] [<objekt>]
+git notes edit [--allow-empty] [<object>] [--[no-]stripspace]
+git notes show [<objekt>]
+git notes merge [-v | -q] [-s <strategi> ] <antecknings-ref>
+git notes merge --commit [-v | -q]
+git notes merge --abort [-v | -q]
+git notes remove [--ignore-missing] [--stdin] [<objekt>...]
+git notes prune [-n] [-v]
+git notes get-ref
+
+
+BESKRIVNING
+-----------
+Lägger till, tar bort eller läser anteckningar som är kopplade till objekt, utan att röra själva objekten.
+
+Som standard sparas anteckningar till och läses från `refs/notes/commits`, men standardinställningen kan åsidosättas. Se avsnitten ALTERNATIV, KONFIGURATION och MILJÖ nedan. Om referensen inte finns skapas den tyst när den först behövs för att lagra en anteckning.
+
+En typisk användning av anteckningar är att komplettera ett incheckningsmeddelande utan att ändra själva incheckningen. Anteckningar kan visas av `git log` tillsammans med det ursprungliga incheckningsmeddelandet. För att skilja anteckningarna från meddelandet i incheckningsobjektet visas de indragna som meddelandet, efter en oindragen rad som säger "Anteckningar (_<refnamn>_):" (eller "Anteckningar:" för `refs/notes/commits`).
+
+Anteckningar kan också läggas till patchar som förberetts med `git format-patch` genom att använda alternativet `--notes`. Sådana anteckningar läggs till som en patchkommentar efter en separatorrad med tre streck.
+
+För att ändra vilka anteckningar som visas av `git log`, se avsnittet om `notes.displayRef` i <<CONFIGURATION,KONFIGURATION>>.
+
+Se konfigurationen `notes.rewrite.<kommando>` för ett sätt att överföra anteckningar mellan kommandon som skriver om incheckningar.
+
+
+UNDERKOMMANDON
+--------------
+
+`list`::
+	Lista anteckningsobjektet för ett givet objekt. Om inget objekt anges visas en lista över alla anteckningsobjekt och de objekt de annoterar (i formatet "`<anteckningsobjekt> <annoterat-objekt>`"). Detta är standardunderkommandot om inget underkommando anges.
+
+`add`::
+	Lägg till anteckningar för ett givet objekt (standard är `HEAD`). Avbryt om objektet redan har anteckningar (använd `-f` för att skriva över befintliga anteckningar). Om du däremot använder `add` interaktivt (med en redigerare för att ange anteckningens innehåll) öppnas de befintliga anteckningarna i redigeraren (som med underkommandot `edit`). Om du anger flera `-m` och `-F` infogas en tom rad mellan meddelandena. Använd `--separator` för andra avgränsare. Du kan använda `-e` för att redigera och finjustera meddelanden från `-m` och `-F` interaktivt innan anteckningen läggs till.
+
+`copy`::
+	Kopiera anteckningarna från det första objektet till det andra objektet (standard är `HEAD`). Avbryt om det andra objektet redan har anteckningar, eller om det första objektet saknar anteckningar (använd `-f` för att skriva över befintliga anteckningar på det andra objektet). Detta underkommando motsvarar: `git notes add [-f] -C $(git notes list <från-objekt>) <till-objekt>`.
++
+I `--stdin`-läge, ta rader i formatet
++
+----------
+<från-objekt> SP <till-objekt> [ SP <rest> ] LF
+----------
++
+på standardinmatning, och kopiera anteckningarna från varje _<från-objekt>_ till motsvarande _<till-objekt>_. (Valfria _<rest>_ ignoreras så att kommandot kan läsa inmatning som ges till kroken `post-rewrite`.)
++
+`--stdin` kan inte kombineras med objektnamn som anges på kommandoraden.
+
+`append`::
+	Lägg till nya meddelanden som anges med `-m` eller `-F` till en befintlig anteckning, eller lägg till dem som en ny anteckning om ingen finns, för objektet (standard är `HEAD`). När meddelanden läggs till i en befintlig anteckning infogas en tom rad före varje nytt meddelande som avgränsare mellan stycken. Avgränsaren kan anpassas med `--separator`. Redigera anteckningarna som ska läggas till med `-m` och `-F` interaktivt med `-e` innan anteckningen läggs till.
+
+`edit`::
+	Redigera anteckningarna för ett givet objekt (standardinställningen är `HEAD`).
+
+`show`::
+	Visa anteckningarna för ett givet objekt (standardinställningen är `HEAD`).
+
+`merge`::
+	Sammanfoga den angivna anteckningsreferensen med den aktuella anteckningsreferensen. Detta försöker sammanfoga ändringarna som gjorts av den angivna anteckningsreferensen (kallad "fjärr") sedan sammanslagningsbasen (om någon) in i den aktuella anteckningsreferensen (kallad "lokal").
++
+Om konflikter uppstår och ingen strategi för automatisk lösning av motstridiga anteckningar anges (se avsnittet "ANTECKNINGSSAMMANSLAGNINGSSTRATEGIER") används lösaren `manual`. Denna lösare checkar ut de motstridiga anteckningarna i ett särskilt arbetsträd (`.git/NOTES_MERGE_WORKTREE`) och instruerar användaren att lösa konflikterna manuellt där. När det är klart kan användaren antingen slutföra sammanslagningen med `git notes merge --commit` eller avbryta den med `git notes merge --abort`.
+
+`remove`::
+	Ta bort anteckningarna för givna objekt (standardinställningen är `HEAD`). När man anger noll eller ett objekt från kommandoraden motsvarar detta att ange ett tomt anteckningsmeddelande till underkommandot `edit`.
++
+I `--stdin`-läge, ta även bort objektnamnen som anges vid standardinmatning. Med andra ord kan `--stdin` kombineras med objektnamn från kommandoraden.
+
+`prune`::
+	Ta bort alla anteckningar för objekt som inte finns/inte kan nås.
+
+`get-ref`::
+	Skriv ut aktuell anteckningsreferens. Detta ger ett enkelt sätt att hämta aktuell anteckningsreferens (t.ex. från skript).
+
+ALTERNATIV
+----------
+`-f`::
+`--force`::
+	När du lägger till anteckningar till ett objekt som redan har anteckningar, skriv över de befintliga anteckningarna (i stället för att avbryta).
+
+`-m <medd>`::
+`--message=<medd>`::
+	Använd det angivna anteckningsmeddelandet (i stället för att fråga). Om flera `-m`-alternativ anges sammanfogas deras värden som separata stycken.
+
+`-F <fil>`::
+`--file=<fil>`::
+	Hämta anteckningsmeddelandet från den givna filen. Använd `-` för att läsa anteckningsmeddelandet från standardinmatningen.
+
+`-C <objekt>`::
+`--reuse-message=<objekt>`::
+	Använd det angivna blobobjektet (till exempel en annan anteckning) som anteckningsmeddelande. (Använd `git notes copy <object>` i stället för att kopiera anteckningar mellan objekt.) Innebär `--no-stripspace` eftersom standardbeteendet är att kopiera meddelandet ordagrant.
+
+`-c <objekt>`::
+`--reedit-message=<objekt>`::
+	Som `-C`, men med `-c` anropas redigeraren så att användaren kan redigera anteckningsmeddelandet ytterligare.
+
+`--allow-empty`::
+	Tillåt att ett tomt anteckningsobjekt lagras. Standardbeteendet är att tomma anteckningar tas bort automatiskt.
+
+`--separator=<styckebrytning>`::
+`--separator`::
+`--no-separator`::
+	Ange en sträng som används som en anpassad avgränsare mellan stycken (en nyrad läggs till i slutet vid behov). Om `--no-separator` används läggs inga avgränsare till mellan stycken. Standardinställningen är en tom rad.
+
+`--stripspace`::
+`--no-stripspace`::
+	Rensa upp blanktecken. Mer specifikt (se linkgit:git-stripspace[1]):
++
+--
+- ta bort efterföljande blanksteg från alla rader
+- kompaktera flera tomma rader i rad till en tom rad
+- ta bort tomma rader från början och slutet av inmatningen
+- lägg till ett saknat `\n` på sista raden om det behövs.
+--
++
+`--stripspace` är standardvärdet förutom för `-C`/`--reuse-message`. Tänk dock på att detta beror på ordningen på liknande alternativ. Till exempel för `-C <objekt> -m<meddelande>` kommer `--stripspace` att användas eftersom standardvärdet för `-m` åsidosätter det föregående `-C`. Detta är en känd begränsning som kan komma att åtgärdas i framtiden.
+
+`--ref=<ref>`::
+	Manipulera anteckningsträdet i _<ref>_. Detta åsidosätter `GIT_NOTES_REF` och konfigurationen `core.notesRef`. Ref anger det fullständiga referensnamnet när det börjar med `refs/notes/`; när det börjar med `notes/` prefixeras `refs/` och annars `refs/notes/` för att bilda ett fullständigt namn på referensen.
+
+`--ignore-missing`::
+	Betrakta det inte som ett fel att begära borttagning av anteckningar från ett objekt som inte har några anteckningar kopplade till sig.
+
+`--stdin`::
+	Gäller endast för `remove` och `copy`. Se respektive underkommandon.
+
+`-n`::
+`--dry-run`::
+	Ta inte bort något; rapportera bara objektnamnen vars anteckningar skulle tas bort.
+
+`-s <strategi>`::
+`--strategy=<strategi>`::
+	När du sammanfogar anteckningar, lös anteckningskonflikter med den angivna strategin. Följande strategier stöds: `manual` (standard), `ours`, `theirs`, `union` och `cat_sort_uniq`. Detta alternativ åsidosätter konfigurationsinställningen `notes.mergeStrategy`. Se avsnittet "ANTECKNINGSSAMMANSLAGNINGSSTRATEGIER" nedan för mer information om varje strategi.
+
+`--commit`::
+	Slutför en pågående `git notes merge`. Använd det här alternativet när du har löst konflikterna som `git notes merge` lagrade i `.git/NOTES_MERGE_WORKTREE`. Detta uppdaterar den partiella sammanslagningsincheckning som skapades av `git notes merge` (lagrad i `.git/NOTES_MERGE_PARTIAL`) genom att lägga till anteckningarna i `.git/NOTES_MERGE_WORKTREE`. Anteckningsreferensen som lagras i symrefen `.git/NOTES_MERGE_REF` uppdateras till den resulterande incheckningen.
+
+`--abort`::
+	Avbryt/återställ en pågående `git notes merge`, d.v.s. en anteckningssammanslagning med konflikter. Detta tar helt enkelt bort alla filer relaterade till anteckningssammanslagningen.
+
+`-q`::
+`--quiet`::
+	När du sammanslår anteckningar, arbeta tyst.
+
+`-v`::
+`--verbose`::
+	Var mer utförlig när du sammanfogar anteckningar. När du beskär anteckningar, rapportera alla objektnamn vars anteckningar har tagits bort.
+
+
+DISKUSSION
+----------
+
+Incheckningsanteckningar är blobbar som innehåller extra information om ett objekt (vanligtvis information som kompletterar ett incheckningsmeddelande). Dessa blobbar hämtas från anteckningsreferenser. En anteckningsreferens är vanligtvis en gren som innehåller "filer" vars sökvägar är objektnamnen för objekten de beskriver, med vissa katalogavgränsare av prestandaskäl fotnot:[Tillåtna sökvägar har formen 'bf'`/`'fe'`/`'30'`/`'...'`/`'680d5a...': en sekvens av katalognamn med två hexadecimala siffror vardera, följt av ett filnamn med resten av objekt-ID:t.].
+
+Varje anteckningsändring skapar en ny incheckning vid den angivna anteckningsreferensen. Du kan därför granska anteckningarnas historik genom att till exempel köra `git log -p notes/commits`. För närvarande registrerar incheckningsmeddelandet bara vilken operation som utlöste uppdateringen, och incheckningsförfattarskap bestäms enligt de vanliga reglerna (se linkgit:git-commit[1]). Dessa detaljer kan ändras i framtiden.
+
+Det är också tillåtet att en anteckningsreferens pekar direkt på ett trädobjekt, i vilket fall anteckningarnas historik kan läsas med `git log -p -g <refnamn>`.
+
+
+ANTECKNINGSSAMMANSLAGNINGSSTRATEGIER
+------------------------------------
+
+Standardstrategin för anteckningssammanslagning är `manual`, som checkar ut motstridiga anteckningar i ett särskilt arbetsträd för att lösa anteckningskonflikter (`.git/NOTES_MERGE_WORKTREE`) och instruerar användaren att lösa konflikterna där. När det är klart kan användaren antingen slutföra sammanslagningen med `git notes merge --commit`, eller avbryta den med `git notes merge --abort`.
+
+Användare kan välja en automatiserad sammanslagningsstrategi bland följande med hjälp av antingen alternativet `-s`/`--strategy` eller genom att konfigurera `notes.mergeStrategy` i enlighet därmed:
+
+`ours` löser automatiskt motstridiga anteckningar till förmån för den lokala versionen (d.v.s. den aktuella anteckningsreferensen).
+
+`theirs` löser automatiskt anteckningskonflikter till förmån för fjärrversionen (d.v.s. den angivna anteckningsreferensen som sammanfogas in i den aktuella anteckningsreferensen).
+
+`union` automatically resolves notes conflicts by concatenating the local and remote versions.
+
+`cat_sort_uniq` is similar to `union`, but in addition to concatenating the local and remote versions, this strategy also sorts the resulting lines, and removes duplicate lines from the result. This is equivalent to applying the "cat | sort | uniq" shell pipeline to the local and remote versions. This strategy is useful if the notes follow a line-based format where one wants to avoid duplicated lines in the merge result. Note that if either the local or remote version contain duplicate lines prior to the merge, these will also be removed by this notes merge strategy.
+
+
+EXEMPEL
+-------
+
+Du kan använda anteckningar för att lägga till information som inte var tillgänglig när en incheckning skrevs.
+
+------------
+$ git notes add -m 'Tested-by: Johannes Sixt <j6t@kdbg.org>' 72a144e2
+$ git show -s 72a144e
+[...]
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+Notes:
+    Tested-by: Johannes Sixt <j6t@kdbg.org>
+------------
+
+I princip är en anteckning en vanlig Git-blob, och alla slags (icke-)format accepteras. Du kan skapa anteckningar binärsäkert från godtyckliga filer med `git hash-object`:
+
+------------
+$ cc *.c
+$ blob=$(git hash-object -w a.out)
+$ git notes --ref=built add --allow-empty -C "$blob" HEAD
+------------
+
+(Du kan inte bara använda `git notes --ref=built add -F a.out HEAD` eftersom det inte är binärsäkert.) Naturligtvis är det inte särskilt meningsfullt att visa anteckningar som inte är i textformat med `git log`, så om du använder sådana anteckningar behöver du förmodligen skriva några specialverktyg för att göra något användbart med dem.
+
+
+[[CONFIGURATION]]
+KONFIGURATION
+-------------
+
+`core.notesRef`::
+	Anteckningsreferens att läsa och manipulera i stället för `refs/notes/commits`. Måste vara ett oförkortat referensnamn. Den här inställningen kan åsidosättas via miljön och kommandoraden.
+
+Allt ovanför den här raden i det här avsnittet finns inte med i dokumentationen för linkgit:git-config[1]. Innehållet som följer är detsamma som det som finns där:
+[]
+
+`notes.mergeStrategy`::
+	Vilken sammanslagningsstrategi som ska väljas som standard vid lösande av anteckningskonflikter. Måste vara en av `manual`, `ours`, `theirs`, `union` eller `cat_sort_uniq`. Standardinställningen är `manual`. Se avsnittet "ANTECKNINGAR SAMMANSLAGNINGSSTRATEGIER" i linkgit:git-notes[1] för mer information om varje strategi.
++
+Den här inställningen kan åsidosättas genom att skicka `--strategy`-alternativet till linkgit:git-notes[1].
+
+`notes.<name>.mergeStrategy`::
+	Vilken sammanslagningsstrategi man ska välja när man sammanfogar anteckningar med `refs/notes/<namn>`. Detta åsidosätter den mer generella `notes.mergeStrategy`. Se avsnittet "ANTECKNINGAR SAMMANSLAGNINGSSTRATEGIER" i linkgit:git-notes[1] för mer information om tillgängliga strategier.
+
+`notes.displayRef`::
+	Vilken referens (eller referenser, om en glob eller angetts mer än en gång), utöver standardvärdet som anges av `core.notesRef` eller `GIT_NOTES_REF`, som anteckningar ska läsas från när inchecknings-meddelanden visas med kommandofamiljen `git log`.
++
+Den här inställningen kan åsidosättas med miljövariabeln `GIT_NOTES_DISPLAY_REF`, som måste vara en kolonseparerad lista med referenser eller globs.
++
+En varning kommer att utfärdas för referenser som inte finns, men en glob som inte matchar några referenser ignoreras tyst.
++
+Den här inställningen kan inaktiveras med alternativet `--no-notes` till kommandofamiljen linkgit:git-log[1], eller med alternativet `--notes=<ref>` som accepteras av dessa kommandon.
++
+Det effektiva värdet för `core.notesRef` (eventuellt åsidosatt av `GIT_NOTES_REF`) läggs också implicit till i listan över referenser som ska visas.
+
+`notes.rewrite.<kommando>`::
+	När man skriver om incheckningar med _<kommando>_ (för närvarande `amend` eller `rebase`), och variabeln är `false`, kommer git inte att kopiera anteckningar från originalet till den omskrivna incheckningen. Standardvärdet är `true`. Se även `notes.rewriteRef` nedan.
++
+Den här inställningen kan åsidosättas med miljövariabeln `GIT_NOTES_REWRITE_REF`, som måste vara en kolonseparerad lista med referenser eller globs.
+
+`notes.rewriteMode`::
+	När anteckningar kopieras under en omskrivning (se alternativet `notes.rewrite.<kommando>`), avgör detta vad som ska göras om mål-incheckningen redan har en anteckning. Måste vara en av `overwrite`, `concatenate`, `cat_sort_uniq` eller `ignore`. Standardvärdet är `concatenate`.
++
+Den här inställningen kan åsidosättas med miljövariabeln `GIT_NOTES_REWRITE_MODE`.
+
+`notes.rewriteRef`::
+	När anteckningar kopieras under en omskrivning, anger detta den (fullständigt kvalificerade) referens vars anteckningar ska kopieras. Kan vara en glob, i vilket fall anteckningar i alla matchande referenser kommer att kopieras. Du kan också ange denna konfiguration flera gånger.
++
+Har inget standardvärde; du måste konfigurera den här variabeln för att aktivera omskrivning av anteckningar. Ställ in den på `refs/notes/commits` för att aktivera omskrivning för standard incheckning anteckningarna.
++
+Kan åsidosättas med miljövariabeln `GIT_NOTES_REWRITE_REF`. Se `notes.rewrite.<kommando>` ovan för en ytterligare beskrivning av dess format.
+[]
+
+
+MILJÖ
+-----
+
+`GIT_NOTES_REF`::
+	Vilken referens anteckningar ska manipuleras från, i stället för `refs/notes/commits`. Detta åsidosätter inställningen `core.notesRef`.
+
+`GIT_NOTES_DISPLAY_REF`::
+	Kolonavgränsad lista med referenser eller glober som anger vilka referenser, utöver standardvärdet från `core.notesRef` eller `GIT_NOTES_REF`, som anteckningar ska läsas från när incheckningsmeddelanden visas. Detta åsidosätter inställningen `notes.displayRef`.
++
+En varning kommer att utfärdas för referenser som inte finns, men en glob som inte matchar några referenser ignoreras tyst.
+
+`GIT_NOTES_REWRITE_MODE`::
+	När anteckningar kopieras under en omskrivning: vad som ska göras om målincheckningen redan har en anteckning. Måste vara ett av följande värden: `overwrite`, `concatenate`, `cat_sort_uniq` eller `ignore`. Detta åsidosätter inställningen `core.rewriteMode`.
+
+`GIT_NOTES_REWRITE_REF`::
+	Vid omskrivning av incheckningar: vilka anteckningar som ska kopieras från originalet till den omskrivna incheckningen. Måste vara en kolonavgränsad lista med referenser eller glober.
++
+Om det inte är angivet i miljön, beror listan över anteckningar som ska kopieras på inställningarna `notes.rewrite.<kommando>` och `notes.rewriteRef`.
+
+GIT
+---
+En del av linkgit:git[1]-sviten
