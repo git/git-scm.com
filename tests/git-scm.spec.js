@@ -23,6 +23,23 @@ test.afterEach(async ({ page }, testInfo) => {
 
 if (process.platform === 'win32') test.setTimeout(60_000) // give it some time
 
+// Navigating to a page that immediately redirects elsewhere via
+// `<meta http-equiv="refresh" content="0; url=...">` occasionally races with
+// Chrome's navigation handling: the in-flight load is aborted and the page is
+// left stranded on the internal error page `chrome-error://chromewebdata/`.
+// As that is a committed navigation, merely polling for the target URL cannot
+// recover from it, the navigation has to be re-triggered. This is a known,
+// transient Playwright/Chromium issue (see e.g.
+// https://github.com/microsoft/playwright/issues/19161), so retry the whole
+// navigate-and-assert dance until the expected URL is reached.
+async function gotoAndExpectRedirect(page, gotoURL, expectedURL) {
+  await expect(async () => {
+    await page.goto(gotoURL)
+    await expect(page).toHaveURL(expectedURL)
+    // Retry every second for up to 15 seconds in total
+  }).toPass({ intervals: [1_000], timeout: 15_000 });
+}
+
 test('generator is Hugo', async ({page}) => {
   await page.goto(url)
   await expect(page.locator('meta[name="generator"]')).toHaveAttribute('content', /^Hugo /)
@@ -189,11 +206,9 @@ test('anchor links in manual pages', async ({ page }) => {
 })
 
 test('book', async ({ page }) => {
-  await page.goto(`${url}book/`)
-  await expect(page).toHaveURL(`${url}book/en/v2`)
+  await gotoAndExpectRedirect(page, `${url}book/`, `${url}book/en/v2`)
 
-  await page.goto(`${url}book`)
-  await expect(page).toHaveURL(`${url}book/en/v2`)
+  await gotoAndExpectRedirect(page, `${url}book`, `${url}book/en/v2`)
 
   // the repository URL is correct
   await expect(page.getByRole('link', { name: 'hosted on GitHub' }))

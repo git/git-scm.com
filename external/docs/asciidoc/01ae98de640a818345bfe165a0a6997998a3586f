@@ -1,0 +1,179 @@
+git-merge-base(1)
+=================
+
+NOM
+---
+git-merge-base - Trouve un ancêtre aussi bon que possible pour une fusion
+
+
+SYNOPSIS
+--------
+[verse]
+'git merge-base' [-a | --all] <commit> <commit>...
+'git merge-base' [-a | --all] --octopus <commit>...
+'git merge-base' --is-ancestor <commit> <commit>
+'git merge-base' --independent <commit>...
+'git merge-base' --fork-point <réf> [<commit>]
+
+DESCRIPTION
+-----------
+
+'git merge-base' trouve le(s) meilleur(s) ancêtre(s) commun(s) entre deux commits à utiliser dans une fusion à 3 sens. Un ancêtre commun est « meilleur » qu'un autre ancêtre commun si ce dernier est un ancêtre du premier. Un ancêtre commun qui n'a pas de meilleur ancêtre commun est un « meilleur ancêtre commun », c'est-à-dire une « base de fusion ». Notez qu'il peut y avoir plus d'une base de fusion pour une paire de commits.
+
+MODES D'OPÉRATION
+-----------------
+
+Dans le cas particulier le plus courant, spécifier seulement deux commits sur la ligne de commande signifie calculer la base de fusion entre les deux commits donnés.
+
+Plus généralement, parmi les deux commits à partir desquelles calculer la base de fusion, l'une est spécifiée par le premier argument de commit sur la ligne de commande ; l'autre commit est un commit (éventuellement hypothétique) qui est une fusion de tous les commits restantes sur la ligne de commande.
+
+Par conséquent, la « base de fusion » n'est pas nécessairement contenue dans chacun des arguments de commit si plus de deux commits sont spécifiées. C'est différent de linkgit:git-show-branch[1] quand il est utilisé avec l'option `--merge-base`.
+
+--octopus::
+	Calculer les meilleurs ancêtres communs de tous les commits fournis, en préparation d'une fusion à n sens. Cela imite le comportement de 'git show-branch --merge-base'.
+
+--independent::
+	Au lieu d'afficher les bases de fusion, afficher un sous-ensemble minimal des commits fournis ayant les mêmes ancêtres. En d'autres termes, parmi les commits donnés, lister ceux qui ne peuvent être atteints depuis aucune autre. Cela imite le comportement de 'git show-branch --independent'.
+
+--is-ancestor::
+	Vérifier si la première <commit> est un ancêtre de la seconde <commit>, et quitter avec le statut 0 si c'est vrai, ou avec le statut 1 si ce n'est pas le cas. Les erreurs sont signalées par un statut non nul différent de 1.
+
+--fork-point::
+	Trouver le point auquel une branche (ou tout historique menant à <commit>) a bifurqué depuis une autre branche (ou toute référence) <réf>. Cela ne cherche pas seulement l'ancêtre commun des deux commits, mais tient également compte du reflog de <réf> pour voir si l'historique menant à <commit> a bifurqué depuis une incarnation antérieure de la branche <réf> (voir la discussion sur ce mode ci-dessous).
+
+OPTIONS
+-------
+-a::
+--all::
+	Afficher toutes les bases de fusion pour les commits, au lieu d'une seule.
+
+DISCUSSION
+----------
+
+Étant donné deux commits 'A' et 'B', `git merge-base A B` affichera un commit qui est atteignable depuis 'A' et 'B' via la relation parent.
+
+Par exemple, avec cette topologie :
+
+....
+	 o---o---o---B
+	/
+---o---1---o---o---o---A
+....
+
+la base de fusion entre 'A' et 'B' est '1'.
+
+Étant donné trois commits 'A', 'B' et 'C', `git merge-base A B C` calculera la base de fusion entre 'A' et un commit hypothétique 'M', qui est une fusion entre 'B' et 'C'. Par exemple, avec cette topologie :
+
+....
+       o---o---o---o---C
+      /
+     /   o---o---o---B
+    /   /
+---2---1---o---o---o---A
+....
+
+le résultat de `git merge-base A B C` est '1'. C'est parce que la topologie équivalente avec un commit de fusion 'M' entre 'B' et 'C' est :
+
+
+....
+       o---o---o---o---o
+      /                 \
+     /   o---o---o---o---M
+    /   /
+---2---1---o---o---o---A
+....
+
+et le résultat de `git merge-base A M` est '1'. Le commit '2' est aussi un ancêtre commun entre 'A' et 'M', mais '1' est un meilleur ancêtre commun, car '2' est un ancêtre de '1'. Par conséquent, '2' n'est pas une base de fusion.
+
+Le résultat de `git merge-base --octopus A B C` est '2', car '2' est le meilleur ancêtre commun de tous les commits.
+
+Quand l'historique implique des fusions en croisé, il peut y avoir plus d'un ancêtre commun 'meilleur' pour deux commits. Par exemple, avec cette topologie :
+
+....
+---1---o---A
+    \ /
+     X
+    / \
+---2---o---o---B
+....
+
+both '1' et '2' sont des bases de fusion de A et B. Aucune n'est meilleure que l'autre (les deux sont des bases de fusion 'meilleures'). Quand l'option `--all` n'est pas donnée, celle qui est affichée parmi les meilleures n'est pas spécifiée.
+
+Un idiome courant pour vérifier l'« avance-rapide-ité » entre deux commits A et B consiste (ou du moins consistait) à calculer la base de fusion entre A et B, et à vérifier si elle est la même que A, auquel cas A est un ancêtre de B. Vous verrez cet idiome souvent dans les anciens scripts.
+
+....
+A=$(git rev-parse --verify A)
+if test "$A" = "$(git merge-base A B)"
+then
+	... A est un ancêtre de B ...
+fi
+....
+
+Dans les versions modernes de git, on peut l'exprimer de façon plus directe :
+
+....
+if git merge-base --is-ancestor A B
+then
+	... A est un ancêtre de B ...
+fi
+....
+
+à la place.
+
+Discussion sur le mode fork-point
+---------------------------------
+
+Après avoir travaillé sur la branche `topic` créée avec `git switch -c topic origin/master`, l'historique de la branche de suivi distant `origin/master` peut avoir été rembobiné et reconstruit, conduisant à un historique de cette forme :
+
+....
+		 o---B2
+		/
+---o---o---B1--o---o---o---B (origin/master)
+	\
+	 B0
+	  \
+	   D0---D1---D (topic)
+....
+
+où `origin/master` pointait auparavant vers les commits B0, B1, B2 et pointe maintenant vers B, et votre branche `topic` a été démarrée par-dessus quand `origin/master` était à B0, et vous avez construit trois commits, D0, D1 et D, par-dessus. Imaginez que vous voulez maintenant rebaser le travail effectué sur topic par-dessus origin/master mis à jour.
+
+Dans ce cas, `git merge-base origin/master topic` retournerait le parent de B0 dans l'image ci-dessus, mais B0^..D n'est *pas* la plage de commits que vous voudriez rejouer par-dessus B (elle inclut B0, qui n'est pas ce que vous avez écrit ; c'est un commit que l'autre côté a abandonnée quand il a déplacé son sommet de B0 à B1).
+
+`git merge-base --fork-point origin/master topic` est conçu pour aider dans un tel cas. Il tient compte non seulement de B mais aussi de B0, B1 et B2 (c'est-à-dire les anciens sommets des branches de suivi distant que le reflog de votre dépôt connaît) pour voir sur quel commit votre branche topic a été construite et trouve B0, vous permettant de ne rejouer que les commits de votre topic, en excluant les commits que l'autre côté a ultérieurement abandonnées.
+
+Ainsi
+
+    $ fork_point=$(git merge-base --fork-point origin/master topic)
+
+trouvera B0, et
+
+    $ git rebase --onto origin/master $fork_point topic
+
+rejouera D0, D1 et D par-dessus B pour créer un nouvel historique de cette forme :
+
+....
+		 o---B2
+		/
+---o---o---B1--o---o---o---B (origin/master)
+	\                   \
+	 B0                  D0'--D1'--D' (topic - mis à jour)
+	  \
+	   D0---D1---D (topic - ancien)
+....
+
+Un avertissement est que les anciennes entrées du reflog de votre dépôt peuvent expirer via `git gc`. Si B0 n'apparaît plus dans le reflog de la branche de suivi distant `origin/master`, le mode `--fork-point` ne peut évidemment pas le trouver et échoue, évitant de donner un résultat aléatoire et inutile (comme le parent de B0, que donne la même commande sans l'option `--fork-point`).
+
+De plus, la branche de suivi distant avec laquelle vous utilisez le mode `--fork-point` doit être celle depuis le sommet de laquelle votre topic a bifurqué. Si vous avez bifurqué depuis un commit plus ancienne que le sommet, ce mode ne trouvera pas le point de bifurcation (imaginez dans l'historique exemple ci-dessus que B0 n'existait pas, que origin/master commençait à B1, passait à B2 puis à B, et que vous avez bifurqué votre topic sur origin/master^ quand origin/master était B1 ; la forme de l'historique serait la même qu'au-dessus, sans B0, et le parent de B1 est ce que `git merge-base origin/master topic` trouve correctement, mais le mode `--fork-point` ne le trouvera pas, car ce n'est pas l'une des commits qui se trouvaient au sommet de origin/master).
+
+
+Voir aussi
+----------
+linkgit:git-rev-list[1], linkgit:git-show-branch[1], linkgit:git-merge[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

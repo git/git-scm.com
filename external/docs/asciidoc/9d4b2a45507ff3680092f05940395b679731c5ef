@@ -1,0 +1,623 @@
+git-rev-parse(1)
+================
+
+NOM
+---
+git-rev-parse - Extraire et formater les paramètres
+
+
+SYNOPSIS
+--------
+[verse]
+'git rev-parse' [<options>] <arg>...
+
+DESCRIPTION
+-----------
+
+De nombreuses commandes presque-porcelaine de Git prennent un mélange de drapeaux (c'est-à-dire des paramètres qui commencent par un tiret '-') et de paramètres destinés à la commande sous-jacente 'git rev-list' qu'elles utilisent en interne, ainsi que des drapeaux et paramètres pour les autres commandes qu'elles utilisent en aval de 'git rev-list'. Le but principal de cette commande est de permettre aux programmes appelants de les distinguer. Il existe quelques autres modes de fonctionnement qui n'ont rien à voir avec l'aide ci-dessus pour l'analyse des options de ligne de commande.
+
+Sauf indication contraire, la plupart des options et des modes de fonctionnement nécessitent d'exécuter cette commande à l'intérieur d'un dépôt git ou d'un arbre de travail qui est sous le contrôle d'un dépôt git, sinon une erreur fatale sera retournée.
+
+
+OPTIONS
+-------
+
+Modes de fonctionnement
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Chacune de ces options doit apparaître en premier sur la ligne de commande.
+
+--parseopt::
+	Utiliser 'git rev-parse' en mode analyse d'options (voir la section PARSEOPT ci-dessous). La commande dans ce mode peut être utilisée en dehors d'un dépôt ou d'un arbre de travail contrôlé par un dépôt.
+
+--sq-quote::
+	Utiliser 'git rev-parse' en mode citation shell (voir la section SQ-QUOTE ci-dessous). Contrairement à l'option `--sq` ci-dessous, ce mode ne fait que la citation. Rien d'autre n'est fait sur l'entrée de la commande. La commande dans ce mode peut être utilisée en dehors d'un dépôt ou d'un arbre de travail contrôlé par un dépôt.
+
+Options pour --parseopt
+~~~~~~~~~~~~~~~~~~~~~~~
+
+--keep-dashdash::
+	Significatif uniquement en mode `--parseopt`. Indique à l'analyseur d'options de rééchoer le premier `--` rencontré au lieu de l'ignorer.
+
+--stop-at-non-option::
+	Significatif uniquement en mode `--parseopt`. Permet à l'analyseur d'options de s'arrêter au premier argument qui n'est pas une option. Cela peut être utilisé pour analyser des sous-commandes qui prennent elles-mêmes des options.
+
+--stuck-long::
+	Significatif uniquement en mode `--parseopt`. Affiche les options sous leur forme longue si disponible, et avec leurs arguments collés.
+
+Options de filtrage
+~~~~~~~~~~~~~~~~~~~
+
+--revs-only::
+	Ne pas afficher les drapeaux et paramètres non destinés à la commande 'git rev-list'.
+
+--no-revs::
+	Ne pas afficher les drapeaux et paramètres destinés à la commande 'git rev-list'.
+
+--flags::
+	Ne pas afficher les paramètres qui ne sont pas des drapeaux.
+
+--no-flags::
+	Ne pas afficher les paramètres de type drapeau.
+
+Options de sortie
+~~~~~~~~~~~~~~~~~
+
+--default <arg>::
+	Si aucun paramètre n'est donné par l'utilisateur, utiliser `<arg>` à la place.
+
+--prefix <arg>::
+	Se comporter comme si 'git rev-parse' avait été invoqué depuis le sous-répertoire `<arg>` de l'arbre de travail. Tous les noms de fichiers relatifs sont résolus comme s'ils étaient préfixés par `<arg>` et seront affichés sous cette forme.
++
+Cela peut être utilisé pour convertir les arguments d'une commande exécutée dans un sous-répertoire afin qu'ils puissent toujours être utilisés après être passé au répertoire de niveau supérieur du dépôt. Par exemple :
++
+----
+prefix=$(git rev-parse --show-prefix)
+cd "$(git rev-parse --show-toplevel)"
+# rev-parse fournit le -- nécessaire pour 'set'
+eval "set $(git rev-parse --sq --prefix "$prefix" -- "$@")"
+----
+
+--verify::
+	Vérifier qu'un seul paramètre est fourni, et qu'il peut être converti en un SHA-1 brut de 20 octets pouvant être utilisé pour accéder à la base de données d'objets. Si c'est le cas, l'émettre sur la sortie standard ; sinon, provoquer une erreur.
++
+Si vous voulez vous assurer que la sortie nomme réellement un objet dans votre base de données d'objets et/ou peut être utilisé comme un type spécifique d'objet que vous requérez, vous pouvez ajouter l'opérateur d'épluchage `^{type}` au paramètre. Par exemple, `git rev-parse "$VAR^{commit}"` vérifiera que `$VAR` nomme un objet existant qui est un commit (c'est-à-dire un commit, ou une étiquette annotée pointant vers un commit). Pour vérifier que `$VAR` nomme un objet existant de n'importe quel type, `git rev-parse "$VAR^{object}"` peut être utilisé.
++
+Notez que si vous vérifiez un nom provenant d'une source non fiable, il est prudent d'utiliser `--end-of-options` afin que l'argument de nom ne soit pas confondu avec une autre option.
+
+-q::
+--quiet::
+	Significatif uniquement en mode `--verify`. Ne pas afficher de message d'erreur si le premier argument n'est pas un nom d'objet valide ; à la place, terminer silencieusement avec un état non nul. Les SHA-1 pour les noms d'objets valides sont affichés sur la sortie standard en cas de succès.
+
+--sq::
+	Habituellement, la sortie est composée d'une ligne par drapeau et paramètre. Cette option produit une sortie sur une seule ligne, correctement citée pour être consommée par le shell. Utile lorsque vous vous attendez à ce que votre paramètre contienne des espaces et des sauts de ligne (par exemple, lorsque vous utilisez la pioche `-S` avec 'git diff-{asterisk}'). Contrairement à l'option `--sq-quote`, l'entrée de la commande est toujours interprétée comme d'habitude.
+
+--short[=<longueur>]::
+	Identique à `--verify` mais raccourcit le nom de l'objet en un préfixe unique d'au moins `length` caractères. La longueur minimale est 4, la valeur par défaut est la valeur effective de la variable de config `core.abbrev` (voir linkgit:git-config[1]).
+
+--not::
+	Lors de l'affichage des noms d'objets, les préfixer avec '{caret}' et supprimer le préfixe '{caret}' des noms d'objets qui en ont déjà un.
+
+--abbrev-ref[=(strict|loose)]::
+	Un nom court non ambigu de l'objet. L'option core.warnAmbiguousRefs est utilisée pour sélectionner le mode d'abréviation strict.
+
+--symbolic::
+	Habituellement, les noms d'objets sont affichés sous forme SHA-1 (avec un possible préfixe '{caret}') ; cette option les affiche sous une forme aussi proche que possible de l'entrée originale.
+
+--symbolic-full-name::
+	C'est similaire à --symbolic, mais omet les entrées qui ne sont pas des références (c'est-à-dire des noms de branches ou d'étiquettes ; ou plus explicitement la forme "heads/master" pour lever l'ambiguïté lorsque vous voulez nommer la branche "master" lorsqu'il existe malheureusement une étiquette "master"), et les affiche comme des noms de références complets (par exemple "refs/heads/master").
+
+--output-object-format=(sha1|sha256|storage)::
+
+	Permettre les oid à entrer depuis n'importe quel format d'objet que le dépôt actuel prend en charge.
++
+En spécifiant "sha1", traduit si nécessaire et renvoie un oid sha1.
++
+En spécifiant "sha256", traduit si nécessaire et renvoie un oid sha256.
++
+En spécifiant "storage", traduit si nécessaire et renvoie un oid encodé avec l'algorithme de hachage de stockage.
+
+Options pour les objets
+~~~~~~~~~~~~~~~~~~~~~~~
+
+--all::
+	Afficher toutes les références trouvées dans `refs/`.
+
+--branches[=<motif>]::
+--tags[=<motif>]::
+--remotes[=<motif>]::
+	Afficher respectivement toutes les branches, les étiquettes ou les branches de suivi à distance (c'est-à-dire, les références trouvées dans `refs/heads`, `refs/tags`, ou `refs/remotes`, respectivement).
++
+Si un `motif` est donné, seules les références correspondant au motif shell glob donné sont affichées. Si le motif ne contient pas de caractère de correspondance (`?`, `*`, ou `[`), il est transformé en une correspondance de préfixe en ajoutant `/*`.
+
+--glob=<motif>::
+	Afficher toutes les références correspondant au motif shell glob `motif`. Si le motif ne commence pas par `refs/`, ceci est automatiquement ajouté. Si le motif ne contient pas de caractère de correspondance (`?`, `*`, ou `[`), il est transformé en une correspondance de préfixe en ajoutant `/*`.
+
+--exclude=<motif-glob>::
+	Ne pas inclure les références correspondant à'<glob-pattern>' que les `--all`, `--branches`, `--tags`, `--remotes`, ou `--glob` suivantes considéreraient autrement. Les répétitions de cette option accumulent les motifs d'exclusion jusqu'à la prochaine option `--all`, `--branches`, `--tags`, `--remotes` ou `--glob` (les autres options ou arguments n'éliminent pas les motifs accumulés).
++
+Les motifs donnés ne doivent pas commencer par `refs/heads`, `refs/tags`, ou `refs/remotes` lorsqu'ils sont appliqués à `--branches`, `--tags`, ou `--remotes`, respectivement, et ils doivent commencer par `refs/` lorsqu'ils sont appliqués à `--glob` ou `--all`. Si un'/{asterisk}' final est intentionnel, il doit être donné explicitement.
+
+--exclude-hidden=(fetch|receive|uploadpack)::
+	Ne pas inclure les références qui seraient cachées par `git-fetch`, `git-receive-pack` ou `git-upload-pack` en consultant la configuration `fetch.hideRefs`, `receive.hideRefs` ou `uploadpack.hideRefs`correspondante ainsi que `transfer.hideRefs` (voir linkgit:git-config[1]). Cette option affecte l'option de pseudo-référence suivante `--all` ou `--glob` et est effacée après leur traitement.
+
+--disambiguate=<préfixe>::
+	Afficher chaque objet dont le nom commence par le préfixe donné. Le <préfixe> doit faire au moins 4 chiffres hexadécimaux pour éviter de lister chaque objet du dépôt par erreur.
+
+Options pour les fichiers
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+--local-env-vars::
+	Lister les variables d'environnement GIT_* qui sont locales au dépôt (par exemple GIT_DIR ou GIT_WORK_TREE, mais pas GIT_EDITOR). Seuls les noms des variables sont listés, pas leur valeur, même si elles sont définies.
+
+--path-format=(absolute|relative)::
+	Contrôle le comportement de certaines autres options. Si spécifié comme absolute, les chemins affichés par ces options seront absolus et canoniques. Si spécifié comme relative, les chemins seront relatifs au répertoire de travail courant si cela est possible. La valeur par défaut dépend de l'option.
++
+Cette option peut être spécifiée plusieurs fois et n'affecte que les arguments qui la suivent sur la ligne de commande, soit jusqu'à la fin de la ligne de commande, soit la prochaine instance de cette option.
+
+Les options suivantes sont modifiées par `--path-format` :
+
+--git-dir::
+	Afficher `$GIT_DIR` si défini. Sinon, afficher le chemin vers le répertoire .git. Le chemin affiché, lorsqu'il est relatif, est relatif au répertoire de travail courant.
++
+Si `$GIT_DIR` n'est pas défini et que le répertoire courant n'est pas détecté comme étant dans un dépôt Git ou un arbre de travail, afficher un message sur stderr et terminer avec un état non nul.
+
+--git-common-dir::
+	Afficher `$GIT_COMMON_DIR` si défini, sinon `$GIT_DIR`.
+
+--resolve-git-dir <chemin>::
+	Vérifier si <chemin> est un dépôt valide ou un gitfile qui pointe vers un dépôt valide, et afficher l'emplacement du dépôt. Si <chemin> est un gitfile, alors le chemin résolu vers le vrai dépôt est affiché.
+
+--git-path <chemin>::
+	Résoudre "$GIT_DIR/<chemin>" et prendre en compte les autres variables de relocalisation de chemin telles que $GIT_OBJECT_DIRECTORY, $GIT_INDEX_FILE... Par exemple, si $GIT_OBJECT_DIRECTORY est défini à /foo/bar, alors "git rev-parse --git-path objects/abc" renvoie /foo/bar/abc.
+
+--show-toplevel::
+	Afficher le chemin (par défaut, absolu) du répertoire de niveau supérieur de l'arbre de travail. S'il n'y a pas d'arbre de travail, signaler une erreur.
+
+--show-superproject-working-tree::
+	Afficher le chemin absolu de la racine de l'arbre de travail du super-projet (s'il existe) qui utilise le dépôt actuel comme sous-module. Ne produit rien si le dépôt actuel n'est utilisé comme sous-module par aucun projet.
+
+--shared-index-path::
+	Afficher le chemin vers le fichier d'index partagé en mode index partagé, ou vide si non en mode index partagé.
+
+Les options suivantes ne sont pas affectées par `--path-format` :
+
+--absolute-git-dir::
+	Comme `--git-dir`, mais sa sortie est toujours le chemin absolu canonisé.
+
+--is-inside-git-dir::
+	Lorsque le répertoire de travail courant se trouve sous le répertoire du dépôt, afficher "true", sinon "false".
+
+--is-inside-work-tree::
+	Lorsque le répertoire de travail courant se trouve à l'intérieur de l'arbre de travail du dépôt, afficher "true", sinon "false".
+
+--is-bare-repository::
+	Lorsque le dépôt est nu, afficher "true", sinon "false".
+
+--is-shallow-repository::
+	Lorsque le dépôt est superficiel, afficher "true", sinon "false".
+
+--show-cdup::
+	Lorsque la commande est invoquée depuis un sous-répertoire, afficher le chemin du répertoire de niveau supérieur relatif au répertoire courant (typiquement une séquence de "../", ou une chaîne vide).
+
+--show-prefix::
+	Lorsque la commande est invoquée depuis un sous-répertoire, afficher le chemin du répertoire courant relatif au répertoire de niveau supérieur.
+
+--show-object-format[=(storage|input|output|compat)]::
+	Afficher le format d'objet (algorithme de hachage) utilisé pour le dépôt en stockage à l'intérieur du répertoire `.git`, en entrée, en sortie ou en compatibilité. Pour l'entrée, plusieurs algorithmes peuvent être affichés, séparés par des espaces. Si `compat` est demandé et qu'aucun algorithme de compatibilité n'est activé, affiche une ligne vide. Si non spécifié, la valeur par défaut est "storage".
+
+--show-ref-format::
+	Afficher le format de stockage des références utilisé dans un dépôt.
+
+
+Autres options
+~~~~~~~~~~~~~~
+
+--since=<chaîne-date>::
+--after=<chaîne-date>::
+	Analyser la chaîne de date et afficher le paramètre --max-age= correspondant pour 'git rev-list'.
+
+--until=<chaîne-date>::
+--before=<chaîne-date>::
+	Analyser la chaîne de date et afficher le paramètre --min-age= correspondant pour 'git rev-list'.
+
+<arg>...::
+	Drapeaux et paramètres à analyser.
+
+
+SPÉCIFICATION DE RÉVISIONS
+--------------------------
+
+Un paramètre de révision _<rév>_, mais pas nécessairement, nomme un objet commit. Il utilise ce qu'on appelle une syntaxe 'extended SHA-1'. Voici différentes façons de faire des noms d'objets. Ceux énumérés près de la fin de cette liste nomment les arbres et les blobs contenus dans un commit.
+
+NOTE: Ce document montre la syntaxe "raw" comme vue par git. Le shell et d'autres UIs pourraient nécessiter une citation supplémentaire pour protéger les caractères spéciaux et éviter le découpage des mots.
+
+'<sha1>', pa ex. 'dae86e1950b1277e545cee180551750029cfe735', 'dae86e'::
+  Le nom complet SHA-1 de l'objet (chaîne hexadécimale de 40 octets), ou un sous-chaîne d'entête unique dans le dépôt. par ex. dae86e1950b1277e545cee180551750029cfe735 et dae86e nomment le même objet de commit s'il n'y a pas d'autre objet dans votre dépôt dont le nom d'objet commence par dae86e.
+
+'<sortieDécrite>', par ex. 'v1.7.4.2-679-g3bee7fb'::
+  Sortie de `git describe` ; c.-à-d. une étiquette la plus proche, éventuellement suivie d'un tiret et d'un nombre de commits, suivi d'un tiret, d'un 'g' et d'un nom d'objet abrégé.
+
+'<nom-de-réf>', c-à-d. 'master', 'heads/master', 'refs/heads/master'::
+  Un nom symbolique. Par exemple, 'master' signifie généralement l'objet de commit référencé par 'refs/heads/master'. Si vous avez à la fois 'heads/master' et 'tags/master', vous pouvez explicitement dire 'heads/master' pour dire à Git auquel vous faîtes référence. Dans l'ambiguïté, un '<nom-de-réf>' est sélectionné en prenant la première correspondance avec les règles suivantes :
++
+  . Si '$GIT_DIR/<refname>' existe, c'est ce que vous voulez dire (cela n'est généralement utile que pour `HEAD`, `FETCH_HEAD`, `ORIG_HEAD`, `MERGE_HEAD`, `REBASE_HEAD`, `REVERT_HEAD`, `CHERRY_PICK_HEAD`, `BISECT_HEAD` et `AUTO_MERGE`) ;
+
+  . sinon, 'refs/<refname>' si cela existe ;
+
+  . sinon, 'refs/tags/<refname>' si cela existe ;
+
+  . sinon, 'refs/heads/<refname>' si cela existe ;
+
+  . sinon, 'refs/remotes/<refname>' si cela existe ;
+
+  . sinon, 'refs/remotes/<refname>/HEAD' si cela existe.
+
++
+  `HEAD`:::
+    nomme le commit sur lequel vous avez basé les changements dans l'arbre de travail.
+  `FETCH_HEAD`:::
+    enregistre la branche que vous avez récupérée depuis un dépôt distant avec
+    votre dernière invocation de `git fetch`.
+  `ORIG_HEAD`:::
+    est créé par les commandes qui déplacent votre `HEAD` de façon radicale (`git
+    am`, `git merge`, `git rebase`, `git reset`), pour enregistrer la position
+    de `HEAD` avant leur opération, afin que vous puissiez facilement ramener
+    le sommet de la branche à l'état avant de les avoir exécutées.
+  `MERGE_HEAD`:::
+    enregistre la ou les commits que vous fusionnez dans votre branche quand
+    vous exécutez `git merge`.
+  `REBASE_HEAD`:::
+    pendant un rebasage, enregistre le commit à laquelle l'opération est
+    currently arrêtée, soit à cause de conflits ou d'une commande `edit` dans
+    un rebasage interactif.
+  `REVERT_HEAD`:::
+    enregistre le commit que vous annulez quand vous exécutez `git revert`.
+  `CHERRY_PICK_HEAD`:::
+    enregistre le commit que vous picorez quand vous exécutez `git
+    cherry-pick`.
+  `BISECT_HEAD`:::
+    enregistre le commit courant à tester quand vous exécutez `git bisect
+    --no-checkout`.
+  `AUTO_MERGE`:::
+    enregistre un objet arbre correspondant à l'état que la
+    stratégie de fusion 'ort' a écrit dans l'arbre de travail quand une opération
+    de fusion a résulté en des conflits.
+
++
+Notez que n'importe lequel des cas 'refs/*' ci-dessus peut provenir soit du répertoire `$GIT_DIR/refs` soit du fichier `$GIT_DIR/packed-refs`. Bien que l'encodage du nom de référence ne soit pas spécifié, UTF-8 est préféré car certains traitements de sortie peuvent supposer que les noms de référence sont en UTF-8.
+
+'@'::
+  '@' seul est un raccourci pour `HEAD`.
+
+'[<refname>]@{<date>}', p. ex. 'master@\{yesterday\}', 'HEAD@{5 minutes ago}'::
+  Une référence suivie du suffixe '@' avec une spécification de date entre accolades (p. ex. '\{yesterday\}', '{1 month 2 weeks 3 days 1 hour 1 second ago}' ou '{1979-02-26 18:30:00}') spécifie la valeur de la référence à un moment antérieur. Ce suffixe ne peut être utilisé qu'immédiatement après un nom de référence et la référence doit avoir un journal existant ('$GIT_DIR/logs/<ref>'). Notez que cela recherche l'état de votre référence *locale* à un moment donné ; p. ex., ce qui était dans votre branche locale 'master' la semaine dernière. Si vous voulez examiner les commits effectuées à certaines périodes, voir `--since` et `--until`.
+
+'<refname>@{<n>}', p. ex. 'master@\{1\}'::
+  Une référence suivie du suffixe '@' avec une spécification ordinale entre accolades (p. ex. '\{1\}', '\{15\}') spécifie la n-ième valeur antérieure de cette référence. Par exemple 'master@\{1\}' est la valeur antérieure immédiate de 'master' tandis que 'master@\{5\}' est la 5ème valeur antérieure de 'master'. Ce suffixe ne peut être utilisé qu'immédiatement après un nom de référence et la référence doit avoir un journal existant ('$GIT_DIR/logs/<refname>').
+
+'@{<n>}', p. ex. '@\{1\}'::
+  Vous pouvez utiliser la construction '@' avec une partie référence vide pour accéder à une entrée du reflog de la branche courante. Par exemple, si vous êtes sur la branche 'blabla', alors '@\{1\}' signifie la même chose que 'blabla@\{1\}'.
+
+'@{-<n>}', p. ex. '@{-1}'::
+  La construction '@{-<n>}' désigne la <n>-ième branche/commit extrait avant la courante.
+
+'[<nom-de-branche>]@\{upstream\}', p. ex. 'master@\{upstream\}', '@\{u\}'::
+  Une branche B peut être configurée pour se construire par-dessus une branche X (configurée avec `branch.<name>.merge`) sur un distant R (configuré avec `branch.<name>.remote`). B@{u} fait référence à la branche de suivi distant pour la branche X prise depuis le distant R, généralement trouvée à `refs/remotes/R/X`.
+
+'[<branche>]@\{push\}', par ex. 'master@\{push\}', '@\{push\}'::
+  Le suffixe '@\{push}' indique la branche « où nous pousserions » si `git push` était exécuté pendant que `branche` est extraite (ou le `HEAD` courant si aucune branche n'est spécifiée). Comme pour '@\{upstream\}', nous signalons la branche de suivi distante qui correspond à cette branche sur le dépôt distant.
++
+Voici un exemple pour clarifier :
++
+------------------------------
+$ git config push.default current
+$ git config remote.pushdefault myfork
+$ git switch -c mybranch origin/master
+
+$ git rev-parse --symbolic-full-name @{upstream}
+refs/remotes/origin/master
+
+$ git rev-parse --symbolic-full-name @{push}
+refs/remotes/myfork/mybranch
+------------------------------
++
+Notez dans l'exemple que nous avons mis en place un flux de travail triangulaire, où nous tirons depuis un emplacement et poussons vers un autre. Dans un flux de travail non triangulaire, '@\{push}' est identique à '@\{upstream}', et il n'est pas nécessaire.
++
+Ce suffixe est également accepté en majuscules, et signifie la même chose quelle que soit la casse.
+
+'<rev>{caret}[<n>]', par ex. 'HEAD{caret}, v1.5.1{caret}0'::
+  Un suffixe '{caret}' après un paramètre de révision signifie le premier parent de cet objet commit. '{caret}<n>' signifie le <n>e parent (c.-à-d. '<rev>{caret}' est équivalent à '<rev>{caret}1'). Comme règle spéciale, '<rev>{caret}0' signifie le commit lui-même et est utilisé lorsque '<rev>' est le nom d'objet d'une étiquette qui pointe vers un objet commit.
+
+'<rev>{tilde}[<n>]', par ex. 'HEAD{tilde}, master{tilde}3'::
+  Un suffixe '{tilde}' après un paramètre de révision signifie le premier parent de cet objet commit. Un suffixe '{tilde}<n>' après un paramètre de révision signifie l'objet commit qui est l'ancêtre à la <n>e génération de l'objet commit nommé, en suivant uniquement les premiers parents. C.-à-d. '<rev>{tilde}3' est équivalent à '<rev>{caret}{caret}{caret}' qui est équivalent à '<rev>{caret}1{caret}1{caret}1'. Voir ci-dessous pour une illustration de l'utilisation de cette forme.
+
+'<rev>{caret}{<type>}', par ex. 'v0.99.8{caret}\{commit\}'::
+  Un suffixe '{caret}' suivi d'un nom de type d'objet encadré par des accolades signifie déréférencer l'objet à '<rev>' récursivement jusqu'à ce qu'un objet de type '<type>' soit trouvé ou que l'objet ne puisse plus être déréférencé (auquel cas, erreur). Par exemple, si '<rev>' est un commit-esque, '<rev>{caret}\{commit\}' décrit l'objet commit correspondant. De même, si '<rev>' est un arbre-esque, '<rev>{caret}\{tree\}' décrit l'objet arbre correspondant. '<rev>{caret}0' est un raccourci pour '<rev>{caret}\{commit\}'.
++
+'<rev>{caret}\{object\}' peut être utilisé pour s'assurer que '<rev>' nomme un objet existant, sans exiger que '<rev>' soit une étiquette, et sans déréférencer '<rev>' ; car une étiquette est déjà un objet, elle n'a pas besoin d'être déréférencée même une fois pour obtenir un objet.
++
+'<rev>{caret}\{tag\}' peut être utilisé pour s'assurer que '<rev>' identifie une étiquette existante.
+
+'<rev>{caret}{}', par ex. 'v0.99.8{caret}{}'::
+  Un suffixe '{caret}' suivi d'une paire d'accolades vide signifie que l'objet pourrait être une étiquette, et déréférencer l'étiquette récursivement jusqu'à ce qu'un objet non-étiquette soit trouvé.
+
+'<rev>{caret}{/<texte>}', par ex. 'HEAD^{/fix nasty bug}'::
+  Un suffixe '{caret}' après un paramètre de révision, suivi d'une paire d'accolades contenant un texte précédé d'une barre oblique, est identique à la syntaxe ':/fix nasty bug' ci-dessous sauf qu'il retourne le commit correspondant le plus récent qui est atteignable depuis le '<rev>' avant '{caret}'.
+
+':/<texte>', par ex. ':/fix nasty bug'::
+  Deux-points, suivi d'une barre oblique, suivi d'un texte, nomme un commit dont le message de validation correspond à l'expression régulière spécifiée. Ce nom retourne le commit correspondant le plus récent qui est atteignable depuis n'importe quelle référence, y compris HEAD. L'expression régulière peut correspondre à n'importe quelle partie du message de validation. Pour correspondre aux messages commençant par une chaîne, on peut utiliser par ex. ':/^foo'. La séquence spéciale ':/!' est réservée aux modificateurs de la correspondance. ':/!-foo' effectue une correspondance négative, tandis que ':/!!foo' correspond au caractère littéral '!' suivi de 'foo'. Toute autre séquence commençant par ':/!' est réservée pour le moment. Selon le texte donné, les règles de séparation de mots du shell peuvent nécessiter des guillemets supplémentaires.
+
+'<rev>:<chemin>', par ex. 'HEAD:README', 'master:./README'::
+  Un suffixe ':' suivi d'un chemin nomme le blob ou l'arbre au chemin donné dans l'objet arbre-esque nommé par la partie avant les deux-points. Un chemin commençant par './' ou '../' est relatif au répertoire de travail courant. Le chemin donné sera converti pour être relatif au répertoire racine de l'arbre de travail. C'est principalement utile pour adresser un blob ou un arbre depuis un commit ou un arbre qui a la même structure d'arbre que l'arbre de travail.
+
+':[<n>:]<chemin>', par ex. ':0:README', ':README'::
+  Deux-points, optionnellement suivis d'un numéro d'étape (0 à 3) et deux-points, suivis d'un chemin, nomme un objet blob dans l'index au chemin donné. Un numéro d'étape manquant (et les deux-points qui le suivent) nomme une entrée d'étape 0. Pendant une fusion, l'étape 1 est l'ancêtre commun, l'étape 2 est la version de la branche cible (généralement la branche courante), et l'étape 3 est la version de la branche en cours de fusion.
+
+Voici une illustration de Jon Loeliger. Les deux nœuds de commit B et C sont des parents du nœud de commit A. Les commits parents sont ordonnés de gauche à droite.
+
+........................................
+G   H   I   J
+ \ /     \ /
+  D   E   F
+   \  |  / \
+    \ | /   |
+     \|/    |
+      B     C
+       \   /
+        \ /
+         A
+........................................
+
+    A =      = A^0
+    B = A^   = A^1     = A~1
+    C =      = A^2
+    D = A^^  = A^1^1   = A~2
+    E = B^2  = A^^2
+    F = B^3  = A^^3
+    G = A^^^ = A^1^1^1 = A~3
+    H = D^2  = B^^2    = A^^^2  = A~2^2
+    I = F^   = B^3^    = A^^3^
+    J = F^2  = B^3^2   = A^^3^2
+
+
+SPÉCIFICATION DE PLAGES
+-----------------------
+
+Les commandes de parcours d'historique telles que `git log` opèrent sur un ensemble de commits, pas sur un seul commit.
+
+Pour ces commandes, spécifier une seule révision, en utilisant la notation décrite dans la section précédente, signifie l'ensemble des commits `atteignables` depuis le commit donné.
+
+Spécifier plusieurs révisions signifie l'ensemble de commits accessibles à partir de l'un des commits donnés.
+
+L'ensemble atteignable d'un commit est le commit lui-même et les commits dans sa chaîne d'ascendance.
+
+Il existe plusieurs notations pour spécifier un ensemble de commits connectés (appelé « intervalle de révisions »), illustrées ci-dessous.
+
+
+Exclusions de commits
+~~~~~~~~~~~~~~~~~~~~~
+
+Notation '{caret}<rev>' (accent circonflexe)::
+ Pour exclure les commits atteignables depuis un commit, une notation préfixe '{caret}' est utilisée. Par ex. '{caret}r1 r2' signifie les commits atteignables depuis 'r2' mais excluant ceux atteignables depuis 'r1' (c.-à-d. 'r1' et ses ancêtres).
+
+Notations d'intervalles pointillés
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+La notation d'intervalle '..' (deux points)::
+ L'opération d'ensemble '{caret}r1 r2' apparaît si souvent qu'il existe un raccourci. Lorsque vous avez deux commits 'r1' et 'r2' (nommés selon la syntaxe expliquée dans SPÉCIFICATION DES RÉVISIONS ci-dessus), vous pouvez demander les commits atteignables depuis r2 en excluant ceux atteignables depuis r1 avec '{caret}r1 r2' et cela peut s'écrire 'r1..r2'.
+
+La notation de différence symétrique '\...' (trois points)::
+ Une notation similaire 'r1\...r2' est appelée différence symétrique de 'r1' et 'r2' et est définie comme 'r1 r2 --not $(git merge-base --all r1 r2)'. C'est l'ensemble des commits atteignables depuis l'un des deux 'r1' (côté gauche) ou 'r2' (côté droit) mais pas depuis les deux.
+
+Dans ces deux notations abrégées, vous pouvez omettre une extrémité et la laisser par défaut à HEAD. Par exemple, 'origin..' est un raccourci pour 'origin..HEAD' et demande « Qu'ai-je fait depuis que j'ai forké depuis la branche origin ? ». De même, '..origin' est un raccourci pour 'HEAD..origin' et demande « Qu'a fait l'origine depuis que j'ai forké depuis eux ? ». Notez que '..' signifierait 'HEAD..HEAD' qui est un intervalle vide à la fois atteignable et inatteignable depuis HEAD.
+
+Les commandes spécifiquement conçues pour prendre deux intervalles distincts (par ex. « git range-diff R1 R2 » pour comparer deux intervalles) existent, mais ce sont des exceptions. Sauf indication contraire, toutes les commandes « git » qui opèrent sur un ensemble de commits fonctionnent sur un seul intervalle de révisions. En d'autres mots, écrire deux « notations d'intervalle à deux points » côte à côte, par ex.
+
+    $ git log A..B C..D
+
+ne spécifie *pas* deux intervalles de révisions pour la plupart des commandes. Au lieu de cela, il nommera un seul ensemble connecté de commits, c.-à-d. ceux qui sont atteignables depuis B ou D mais qui ne sont atteignables ni depuis A ni depuis C. Dans un historique linéaire comme celui-ci :
+
+    ---A---B---o---o---C---D
+
+car A et B sont atteignables depuis C, l'intervalle de révisions spécifié par ces deux intervalles pointillés est un seul commit D.
+
+
+Autres notations abrégées <rev>{caret} Parent
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trois autres raccourcis existent, particulièrement utiles pour les commits de fusion, pour nommer un ensemble formé par un commit et ses commits parents.
+
+La notation 'r1{caret}@' signifie tous les parents de 'r1'.
+
+La notation 'r1{caret}!' inclut le commit 'r1' mais exclut tous ses parents. À elle seule, cette notation désigne le commit unique 'r1'.
+
+La notation '<rev>{caret}-[<n>]' inclut '<rev>' mais exclut le <n>e parent (c.-à-d. un raccourci pour '<rev>{caret}<n>..<rev>'), avec '<n>' = 1 si non spécifié. C'est typiquement utile pour les commits de fusion où vous pouvez simplement passer '<commit>{caret}-' pour obtenir tous les commits de la branche qui a été fusionnée dans le commit de fusion '<commit>' (y compris '<commit>' lui-même).
+
+Alors que '<rev>{caret}<n>' concernait la spécification d'un seul commit parent, ces trois notations considèrent également ses parents. Par exemple, vous pouvez dire 'HEAD{caret}2{caret}@', cependant vous ne pouvez pas dire 'HEAD{caret}@{caret}2'.
+
+Résumé des intervalles de révisions
+-----------------------------------
+
+'<rev>'::
+	Inclure les commits atteignables depuis <rev> (c.-à-d. <rev> et ses ancêtres).
+
+'{caret}<rev>'::
+	Exclure les commits atteignables depuis <rev> (c.-à-d. <rev> et ses ancêtres).
+
+<rév1>..<rév2>::
+	Inclure les commits atteignables depuis <rev2> mais exclure ceux atteignables depuis <rev1>. Lorsque <rev1> ou <rev2> est omis, la valeur par défaut est `HEAD`.
+
+<rév1>\...<rév2>::
+	Inclure les commits atteignables depuis <rev1> ou <rev2> mais exclure ceux atteignables depuis les deux. Lorsque <rev1> ou <rev2> est omis, la valeur par défaut est `HEAD`.
+
+'<rev>{caret}@', par ex. 'HEAD{caret}@'::
+  Un suffixe '{caret}' suivi d'un arobase est identique à lister tous les parents de '<rev>' (c.-à-d. inclure tout ce qui est atteignable depuis ses parents, mais pas le commit lui-même).
+
+'<rev>{caret}!', par ex. 'HEAD{caret}!'::
+  Un suffixe '{caret}' suivi d'un point d'exclamation est identique à donner le commit '<rev>' et tous ses parents préfixés avec '{caret}' pour les exclure (et leurs ancêtres).
+
+'<rev>{caret}-<n>', par ex. 'HEAD{caret}-, HEAD{caret}-2'::
+	Équivalent à '<rev>{caret}<n>..<rev>', avec '<n>' = 1 si non spécifié.
+
+Voici quelques exemples utilisant l'illustration de Loeliger ci-dessus, avec chaque étape de l'expansion et de la sélection de la notation soigneusement détaillée :
+
+....
+   Args   Expanded arguments    Selected commits
+   D                            G H D
+   D F                          G H I J D F
+   ^G D                         H D
+   ^D B                         E I J F B
+   ^D B C                       E I J F B C
+   C                            I J F C
+   B..C   = ^B C                C
+   B...C  = B ^F C              G H D E B C
+   B^-    = B^..B
+	  = ^B^1 B              E I J F B
+   C^@    = C^1
+	  = F                   I J F
+   B^@    = B^1 B^2 B^3
+	  = D E F               D G H E F I J
+   C^!    = C ^C^@
+	  = C ^C^1
+	  = C ^F                C
+   B^!    = B ^B^@
+	  = B ^B^1 ^B^2 ^B^3
+	  = B ^D ^E ^F          B
+   F^! D  = F ^I ^J D           G H D F
+....
+[]
+
+PARSEOPT
+--------
+
+En mode `--parseopt`, 'git rev-parse' aide à formater les options pour fournir aux scripts shell les mêmes fonctionnalités que les builtin C. Il fonctionne comme un normaliseur d'options (par exemple, sépare les valeurs agrégées des interrupteurs simples), un peu comme le fait `getopt(1)`.
+
+Il prend sur l'entrée standard la spécification des options à analyser et comprendre, et échoe sur la sortie standard une chaîne adaptée à `sh(1)` `eval` pour remplacer les arguments par des versions normalisées. En cas d'erreur, il affiche l'utilisation sur le flux d'erreur standard, et termine avec le code 129.
+
+Note : Assurez-vous de citer le résultat lorsque vous le passez à `eval`. Voir ci-dessous pour un exemple.
+
+Format d'entrée
+~~~~~~~~~~~~~~~
+
+Le format d'entrée de 'git rev-parse --parseopt' est entièrement basé sur du texte. Il comporte deux parties, séparées par une ligne qui ne contient que `--`. Les lignes avant le séparateur (devrait y en avoir une ou plus) sont utilisées pour l'utilisation. Les lignes après le séparateur décrivent les options.
+
+Chaque ligne d'options a ce format :
+
+------------
+<spec-opt><drapeaux>*<arg-indice>? SP+ help LF
+------------
+
+`<opt-spec>`::
+	son format est le caractère d'option courte, puis le nom d'option longue séparé par une virgule. Les deux parties ne sont pas requises, bien qu'au moins une soit nécessaire. Ne peut contenir aucun des caractères `<flags>`. `h,help`, `dry-run` et `f` sont des exemples de `<opt-spec>` corrects.
+
+`<drapeaux>`::
+	`<drapeaux>` sont `*`, `=`, `?` ou `!`.
+	* Utilisez `=` si l'option prend un argument.
+
+	* Utilisez `?` pour indiquer que l'option prend un argument optionnel. Vous voudrez probablement utiliser le mode `--stuck-long` pour pouvoir analyser sans ambiguïté l'argument optionnel.
+
+	* Utilisez `*` pour indiquer que cette option ne doit pas être listée dans l'utilisation générée pour l'argument `-h`. Elle est affichée pour `--help-all` comme documenté dans linkgit:gitcli[7].
+
+	* Utilisez `!` pour ne pas rendre disponible l'option longue négée correspondante.
+
+`<arg-hint>`::
+	`<arg-hint>`, si spécifié, est utilisé comme nom de l'argument dans l'aide, pour les options qui prennent des arguments. `<arg-hint>` se termine par le premier espace. Il est d'usage d'utiliser un tiret pour séparer les mots dans un indice d'argument multi-mots.
+
+Le reste de la ligne, après avoir supprimé les espaces, est utilisé comme aide associée à l'option.
+
+Les lignes vides sont ignorées, et les lignes qui ne correspondent pas à cette spécification sont utilisées comme en-têtes de groupe d'options (commencer la ligne par un espace pour créer de telles lignes volontairement).
+
+Exemple
+~~~~~~~
+
+------------
+OPTS_SPEC="\
+some-command [<options>] <args>...
+
+some-command fait foo et bar !
+--
+h,help! afficher l'aide
+
+foo une option astucieuse --foo bar= une option cool --bar avec un argument baz= une autre option cool --baz avec un argument nommé qux?path qux peut prendre un argument de chemin mais a une signification par lui-même
+
+  Un en-tête de groupe d'options
+C?        option C avec un argument optionnel"
+
+eval "$(echo "$OPTS_SPEC" | git rev-parse --parseopt -- "$@" || echo exit $?)"
+------------
+
+
+Texte d'utilisation
+~~~~~~~~~~~~~~~~~~~
+
+Lorsque `"$@"` vaut `-h` ou `--help` dans l'exemple ci-dessus, le texte d'utilisation suivant serait affiché :
+
+------------
+utilisation : some-command [<options>] <args>...
+
+    some-command fait foo et bar !
+
+    -h, --help            afficher l'aide
+    --[no-]foo            une option astucieuse --foo
+    --[no-]bar ...        une option cool --bar avec un argument
+    --[no-]baz <arg>      une autre option cool --baz avec un argument nommé
+    --[no-]qux[=<path>]   qux peut prendre un argument de chemin mais a une signification par lui-même
+
+En-tête d'un groupe d'options
+    -C[...]               option C avec un argument optionnel
+------------
+
+SQ-QUOTE
+--------
+
+En mode `--sq-quote`, 'git rev-parse' affiche sur la sortie standard une seule ligne adaptée à `sh(1)` `eval`. Cette ligne est produite en normalisant les arguments suivant `--sq-quote`. Rien d'autre que le quotes des arguments n'est effectué.
+
+Si vous souhaitez que l'entrée de la commande soit toujours interprétée comme d'habitude par 'git rev-parse' avant que la sortie ne soit quotée par le shell, consultez l'option `--sq`.
+
+Exemple
+~~~~~~~
+
+------------
+$ cat >your-git-script.sh <<\EOF
+#!/bin/sh
+args=$(git rev-parse --sq-quote "$@")   # quote user-supplied arguments
+command="git frotz -n24 $args"          # and use it inside a handcrafted
+					# command line
+eval "$command"
+EOF
+
+$ sh your-git-script.sh "a b'c"
+------------
+
+EXEMPLES
+--------
+
+* Afficher le nom de l'objet du commit courant :
++
+------------
+$ git rev-parse --verify HEAD
+------------
+
+* Afficher le nom de l'objet commit de la révision dans la variable shell $REV :
++
+------------
+$ git rev-parse --verify --end-of-options $REV^{commit}
+------------
++
+Cela provoquera une erreur si $REV est vide ou n'est pas une révision valide.
+
+* Similaire à ci-dessus :
++
+------------
+$ git rev-parse --default master --verify --end-of-options $REV
+------------
++
+mais si $REV est vide, le nom de l'objet commit de master sera affiché.
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

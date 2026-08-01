@@ -1,0 +1,718 @@
+git-svn(1)
+==========
+
+NOM
+---
+git-svn - Opération Bidirectionnelles entre un dépôt Subversion et Git
+
+SYNOPSIS
+--------
+[verse]
+'git svn' <commande> [<options>] [<arguments>]
+
+DESCRIPTION
+-----------
+'git svn' est un simple conduit pour les modifications entre Subversion et Git. Il fournit un flux bidirectionnel de changements entre un dépôt Subversion et un dépôt Git.
+
+'git svn' peut suivre un dépôt Subversion standard, suivant la disposition commune "trunk/branches/tags", avec l'option --stdlayout. Il peut également suivre des branches et des étiquettes dans n'importe quelle organisation avec les options -T/-t/-b (voir les options 'init' ci-dessous, et aussi la commande 'clone').
+
+Une fois paramétré pour suivre un dépôt Subversion (avec l'une des méthodes ci-dessus), le dépôt Git peut être mis à jour à partir de Subversion par la commande 'fetch' et Subversion mis à jour à partir de Git par la commande 'dcommit'.
+
+COMMANDES
+---------
+
+'init'::
+	Initialise un dépôt Git vide avec des répertoires de métadonnées supplémentaires pour 'git svn'. L'URL Subversion peut être spécifiée comme un argument de ligne de commande, ou comme des arguments URL complets pour -T/-t/-b. En option, le répertoire cible à utiliser peut être spécifié comme deuxième argument. Normalement cette commande initialise le répertoire actuel.
+
+-T<sous-répertoire-trunk>;;
+--trunk=<sous-répertoire-trunk>;;
+-t<sous-rép-des-étiquettes>;;
+--tags=<sous-répertoire-tags->;;
+-b <sous-rép-des-branches>;;
+--branches=<sous-rép-des-branches>;;
+-s;;
+--stdlayout;;
+	Ce sont des options optionnelles de ligne de commande pour init. Chacun de ces drapeaux peut indiquer un chemin de dépôt relatif (--tags=project/tags) ou un url complet (--tags=https://foo.org/projet/tags). Vous pouvez spécifier plus d'une option --tags et/ou --branches, dans le cas où votre dépôt Subversion place des étiquettes ou des branches sous plusieurs chemins. L'option --stdlayout est un moyen rapide de définir trunk,tags,branches comme les chemins relatifs, ce qui est la valeur par défaut de Subversion. Si l'une des autres options est également donnée, elles ont préséance.
+--no-metadata;;
+	Définir l'option 'noMetadata' dans la configuration [svn-remote]. Cette option n'est pas recommandée, veuillez lire la section 'svn.noMetadata' de cette page avant d'utiliser cette option.
+--use-svm-props;;
+	Définir l'option 'useSvmProps' dans la configuration [svn-remote].
+--use-svnsync-props;;
+	Définir l'option 'useSvnsyncProps' dans la configuration [svn-remote].
+--rewrite-root=<URL>;;
+	Régler l'option 'rewriteRoot' dans la configuration [svn-remote].
+--rewrite-uuid=<UUID>;;
+	Régler l'option 'rewriteUUID' dans la configuration [svn-remote].
+--username=<utilisateur>;;
+	Pour les transports pour lesquels SVN gère l'authentification (http, https et svn de base), spécifier le nom d'utilisateur. Pour les autres transports (par exemple `svn+ssh://`), vous devez inclure le nom d'utilisateur dans l'URL, par exemple. `svn+ssh://foo@svn.bar.com/project`
+--prefix=<préfixe>;;
+	Cela permet de spécifier un préfixe qui est prépendé aux noms des distants si le tronc/branches/tags est spécifié. Le préfixe n'inclut pas automatiquement une barre oblique terminale, alors assurez-vous d'en inclure un dans l'argument si c'est ce que vous voulez. Si --branches/-b est spécifié, le préfixe doit inclure une barre oblique terminale. Spécifier un préfixe (avec une barre oblique terminale) est fortement conseillé dans tous les cas, care vos réfs de suivi de SVN seront alors sous `refs/remotes/<préfixe>/*`, qui est compatible avec le format de suivi des réfs à distance natif de Git (`refs/remotes/<distant>/*`). Spécifier un préfixe est également utile si vous souhaitez suivre plusieurs projets qui partagent un dépôt commun. Par défaut, le préfixe est défini comme 'origin/'.
++
+NOTE: Avant Git v2.0, le préfixe par défaut était "" (pas de préfixe). Cela signifiait que les réfs de suivi SVN étaient mises à "refs/remotes/*", ce qui est incompatible avec la façon dont les réfs de suivi à distance de Git sont organisées. Si vous voulez toujours l'ancien par défaut, vous pouvez l'obtenir en passant `--prefix ""` sur la ligne de commande (`--prefix="" peut ne pas fonctionner si votre version de Perl Getopt::Long est < v2.37).
+
+--ignore-refs=<regex>;;
+	Lorsqu'elle est passée à 'init' ou 'clone', cette expression régulière sera conservée comme clé de configuration. Voir 'fetch' pour une description de `--ignore-refs`.
+--ignore-paths=<regex>;;
+	Lorsqu'elle est passée à `init` ou `clone`, cette expression régulière sera conservée comme clé de configuration. Voir `fetch` pour une description de `--ignore-paths`.
+--include-paths=<regex>;;
+	Lorsqu'elle est passée à `init` ou `clone`, cette expression régulière sera conservée comme clé de configuration. Voir `fetch` pour une description de `--include-paths`.
+--no-minimize-url;;
+	Lors du suivi de plusieurs répertoires (en utilisant les options --stdlayout, --branches ou --tags), git svn tentera de se connecter à la racine (ou au niveau le plus élevé autorisé) du dépôt Subversion. Ce défaut permet un meilleur suivi de l'historique si des projets entiers sont déplacés dans un dépôt, mais peut causer des problèmes sur les dépôts où les restrictions d'accès en lecture sont en place. Passer `--no-minimize-url` permettra à git svn d'accepter des URLs tel quel sans tenter de se connecter à un répertoire de niveau supérieur. Cette option est désactivée par défaut lorsque seule une URL/branche est suivie (cela ferait peu de bien).
+
+'fetch'::
+	Récupérer les révisions non-récupérées depuis le distant Subversion suivi. Le nom de la section [svn-remote "..."] dans le fichier $GIT_DIR/config peut être spécifié comme un argument optionnel en ligne de commande.
++
+Cela met automatiquement à jour le rev_map si nécessaire (voir '$GIT_DIR/svn/\**/.rev_map.*' dans la section FICHIERS ci-dessous pour plus de détails).
+
+--localtime;;
+	Conserver les temps de commit Git dans la zone temporelle locale au lieu de UTC. Ceci oblige 'git log' (même sans --date=local) à afficher les mêmes dates que `svn log` ferait dans la zone horaire locale.
++
+Cela n'interfère pas avec l'interaction avec le dépôt Subversion que vous avez cloné, mais si vous souhaitez que votre dépôt Git local puisse interagir avec le dépôt Git local de quelqu'un d'autre, soit n'utilisez pas cette option, soit vous devriez l'utiliser tout les deux dans le même fuseau horaire local.
+
+--parent;;
+	Ne récupère que le parent SVN du HEAD actuel.
+
+--ignore-refs=<regex>;;
+	Ignorer les réfs pour les branches ou les étiquettes correspondant à l'expression régulière Perl. Une "assertion de recherche négative" comme `^refs/remotes/origin/(?!tags/wanted-tag|wanted-branch).*$` peut être utilisée pour sélectionner seulement certaines réfs.
++
+[verse]
+clé de configuration : svn-remote.<nom>.ignore-refs
++
+Si la clé de configuration ignore-refs est définie et que l'option de ligne de commande est également donnée, les deux expressions régulières seront utilisées.
+
+--ignore-paths=<regex>;;
+	Cela permet de spécifier une expression régulière Perl qui causera le rejet de tous les chemins correspondants de l'extraction de SVN. L'option `--ignore-paths` devrait correspondre à chaque 'fetch' (y compris les récupérations automatiques dues à 'clone', 'dcommit', 'rebase', etc) sur un dépôt donné.
++
+[verse]
+clé de configuration : svn-remote.<nom>.ignore-paths
++
+Si la clé de configuration ignore-paths est définie, et que l'option de ligne de commande est également donnée, les deux expressions régulières seront utilisées.
++
+Exemples :
++
+--
+Rejeter les répertoires "doc*" pour chaque récupération;;
++
+------------------------------------------------------------------------
+--ignore-paths="^doc"
+------------------------------------------------------------------------
+
+Réjeter les "branches" et "tags" des répertoires de premier niveau;;
++
+------------------------------------------------------------------------
+--ignore-paths="^[^/]+/(?:branches|tags)"
+------------------------------------------------------------------------
+--
+
+--include-paths=<regex>;;
+	Cela permet de spécifier une expression régulière Perl qui causera l'inclusion seulement des chemins correspondants de l'extraction de SVN. L'option `--include-paths` devrait correspondre à chaque 'fetch' (y compris les récupérations automatiques dues à 'clone', 'dcommit', 'rebase', etc) sur un dépôt donné. `--ignore-paths` a priorité sur `--include-paths`.
++
+[verse]
+clé de configuration : svn-remote.<nom>.include-paths
+
+--log-window-size=<n>;;
+	Récupérer <n> entrées de journal par requête lors du parcours de l'historique Subversion. La valeur par défaut est 100. Pour les dépôts Subversion très gros, des valeurs plus grandes peuvent être nécessaires pour que 'clone'/'fetch' se termine dans un délai raisonnable. Mais des valeurs trop grandes peuvent conduire à une utilisation mémoire plus élevée et un épuisement du délai de requête.
+
+'clone'::
+	Lance 'init' et 'fetch'. Il créera automatiquement un répertoire basé sur le nom de base de l'URL qui lui est transmise ; ou si un deuxième argument est passé ; il créera un répertoire et travaillera dedans. Il accepte tous les arguments que les commandes 'init' et 'fetch' acceptent, à l'exception de `--fetch-all` et `--parent`. Après un clonage du dépôt, la commande 'fetch' sera en mesure de mettre à jour les révisions sans affecter l'arbre de travail ; et la commande 'rebase' sera en mesure de mettre à jour l'arbre de travail avec les derniers changements.
+
+--preserve-empty-dirs;;
+	Crée un fichier de réservation d'espace dans le dépôt Git local pour chaque répertoire vide extrait de Subversion. Cela comprend des répertoires qui deviennent vides en supprimant toutes les entrées dans le dépôt Subversion (mais pas le répertoire lui-même). Les fichiers de réservation d'espace sont également suivis et enlevés lorsque cela n'est plus nécessaire.
+
+--placeholder-filename=<fichier>;;
+	Définir le nom des fichiers de réservation d'espace créés par --preserve-empty-dirs. Par défaut : ".gitignore"
+
+'rebase'::
+	Ceci récupère les révision du parent SVN de la HEAD actuelle et rebase le travail actuel (non validé dans SVN) sur elle.
++
+Cela fonctionne de la même manière que `svn update` ou 'git pull', sauf que cela conserve l'historique linéaire avec 'git rebase' au lieu de 'git merge' pour la facilité de d'application de dcommit avec 'git svn'.
++
+Cela accepte toutes les options que 'git svn fetch' et 'git rebase' acceptent. Cependant, `--fetch-all` ne récupère que depuis le [svn-remote] actuel, et pas tous les [svn-remote].
++
+Comme 'git rebase' ; cela exige que l'arbre de travail soit propre et qu'il n'ait pas de changements non validés.
++
+Cela met automatiquement à jour le rev_map si nécessaire (voir '$GIT_DIR/svn/\**/.rev_map.*' dans la section FICHIERS ci-dessous pour plus de détails).
+
+-l;;
+--local;;
+	Ne pas récupérer à distance ; exécuter seulement 'git rebase' sur le dernier commit récupéré de l'amont SVN.
+
+'dcommit'::
+	Valider chaque diff de la branche actuelle directement dans dépôt SVN, puis rebaser ou réinitialiser(selon s'il y a ou non une diff entre SVN et la tête). Cela créera une révision dans SVN pour chaque commit dans Git.
++
+Lorsqu'un nom de branche Git optionnel (ou un nom d'objet commit Git) est spécifié comme argument, la sous-commande travaille sur la branche spécifiée, pas sur la branche actuelle.
++
+L'utilisation de 'dcommit' est préférable à 'set-tree' (voir ci-dessous).
++
+--no-rebase;;
+	Après avoir validé, ne pas rebaser ou réinitialiser.
+--commit-url <URL>;;
+	Validez sur cette URL SVN (le chemin complet). Il s'agit d'autoriser les dépôts 'git svn' existants créés avec une méthode de transport (par exemple `svn://` ou `http://` pour une lecture anonyme) à être réutilisés si un utilisateur a plus tard accès à une autre méthode de transport (par exemple `svn+ssh://` ou `https://`) pour valider.
++
+[verse]
+clé de configuration : svn-remote.<nom>.commiturl
+clé de configuration : svn.commiturl (surcharge toutes les options svn-remote.<nom>.commiturl)
++
+Notez que l'URL SVN de la clé de configuration de commiturl inclut la branche SVN. Si vous préférez configurer l'URL de commit pour un dépôt SVN entier, utilisez svn-remote.<nom>.pushurl à la place.
++
+L'utilisation de cette option pour tout autre but (ne demandez pas) est très fortement découragée.
+
+--mergeinfo=<mergeinfo>;;
+	Ajouter les informations de fusion données pendant le dcommit (par exemple `--mergeinfo="/branches/foo:1-10"`). Toutes les versions de serveur svn peuvent stocker ces informations (en tant que propriété), et les clients svn à partir de la version 1.5 peuvent en faire usage. Pour spécifier les informations de fusion de plusieurs branches, utilisez un seul caractère d'espace entre les branches (`--mergeinfo="/branches/foo:1-10 /branches/bar:3.5-6,8"`)
++
+[verse]
+clé de configuration : svn.pushmergeinfo
++
+Cette option indiquera à git-svn de tenter de supprimer automatiquement la propriété svn:mergeinfo dans le dépôt SVN lorsque c'est possible. À l'heure actuelle, cela ne peut être fait que lors de dcommit de fusions pas en avance rapide où tous les parents ont déjà été poussés dans SVN.
+
+--interactive;;
+	Demander à l'utilisateur de confirmer qu'une rustine doit être envoyée à SVN. Pour chaque rustine, on peut répondre "yes" (accepter cette rustine), "no" (abandonner cette rustine), "all" (accepter toutes les rustines), ou "quit" (abandonner toutes les rustines).
++
+"git svn dcommit" retourne immédiatement si la réponse est "no" ou "quit", sans rien valider dans SVN.
+
+'branch'::
+	Créer une branche dans le dépôt SVN.
+
+-m;;
+--message;;
+	Permet de spécifier le message de validation.
+
+-t;;
+--tag;;
+	Créer une étiquette en utilisant le tags_subdir au lieu de branches_subdir spécifié lors de l'init git svn.
+
+-d<chemin>;;
+--destination=<chemin>;;
+
+	Si plus d'une option --branches (ou --tags) a été donnée à la commande 'init' ou 'clone', vous devez fournir l'emplacement de la branche (ou étiquette) que vous souhaitez créer dans le dépôt SVN. Le chemin à utiliser pour créer la branche ou l'étiquette et doit correspondre au motif sur le côté gauche de l'une des branches ou étiquettes configurées. Vous pouvez voir ces spéc-de-réf avec les commandes
++
+	git config --get-all svn-remote.<nom>.branches git config --get-all svn-remote.<nom>.tags
++
+où _<nom>_ est le nom du dépôt SVN comme spécifié par l'option `-R` pour 'init' (ou "svn" par défaut).
+
+--username;;
+	Spécifier le nom d'utilisateur SVN pour effectuer le commit. Cette option remplace la propriété de configuration 'username'.
+
+--commit-url;;
+	Utiliser l'URL spécifiée pour se connecter au dépôt Subversion de destination. Ceci est utile dans les cas où le dépôt SVN source est en lecture seule. Cette option remplace la propriété de configuration 'commiturl'.
++
+	git config --get-all svn-remote.<nom>.commiturl
++
+
+--parents;;
+	Créer des dossiers parents. Ce paramètre est équivalent au paramètre `--parents` des commandes svn cp et est utile pour les structures de dépôt non standard.
+
+'tag'::
+	Créer une étiquette dans le dépôt SVN. C'est un raccourci pour 'branch -t'.
+
+'log'::
+	Cela devrait rendre facile d'examiner les messages de journal svn lorsque les utilisateurs de svn se réfèrent aux numéros -r/--revision.
++
+Les caractéristiques suivantes de `svn log' sont prises en charge :
++
+--
+`-r <n>[:<n>]`;;
+`--revision=<n>[:<n>]`;;
+	est prise en charge, mais les arguments non numériques ne le sont pas : HEAD, NEXT, BASE, PREV, etc ...
+-v;;
+--verbose;;
+	ce n'est pas complètement compatible avec la sortie `--verbose` de svn log, mais raisonnablement proche.
+`--limit=<n>`;;
+	n'est PAS la même chose que `--max-count`, ne compte pas les commits fusionnés/exclus
+--incremental;;
+	pris en charge
+--
++
+Nouvelles fonctionnalités :
++
+--
+--show-commit;;
+	montre aussi le sha1 du commit Git
+--oneline;;
+	notre version de `--pretty=oneline`
+--
++
+NOTE: SVN lui-même ne stocke que les dates qu'en UTC et rien d'autre. Le client svn normal convertit le temps UTC à l'heure locale (ou basé sur l'environnement TZ=). Cette commande a le même comportement.
++
+Tous les autres arguments sont transmis directement à 'git log'
+
+'blame'::
+	Afficher la révision et l'auteur qui ont modifié chaque ligne d'un fichier. La sortie de ce mode est compatible en format avec la sortie de `svn blame` par défaut. Comme la commande SVN blame, les modifications locales non validées dans l'arbre de travail sont ignorées ; la version du fichier dans la révision HEAD est annotée. Les arguments inconnus sont transmis directement à `git blame`.
++
+--git-format;;
+	Produire la sortie dans le même format que `git blame`, mais avec les numéros de révision SVN au lieu des empreintes des commits Git. Dans ce mode, les modifications qui n'ont pas été validées dans SVN (y compris les éditions locales de la copie de travail) sont indiquées comme révision 0.
+
+'find-rev'::
+	Lorsqu'un numéro de révision SVN de forme 'rN' est donnée, retourner l'empreinte Git correspondante (ceci peut éventuellement être suivi par un arbre-esque pour spécifier quelle branche doit être recherchée). Lorsqu'un arbre-esque est donné, retourner le numéro de révision SVN correspondant.
++
+-B;;
+--before;;
+	Ne pas exiger une correspondance exacte si une révision SVN est donnée, trouver plutôt le commit correspondant à l'état du dépôt SVN (sur la branche actuelle) à la révision spécifiée.
++
+-A;;
+--after;;
+	Ne pas exiger une correspondance exacte si une révision SVN est fournie ; s'il n'y a pas de correspondance exacte, retourner la correspondance la plus proche en cherchant avant dans l'historique.
+
+'set-tree'::
+	Vous devriez envisager d'utiliser "dcommit" au lieu de cette commande. Valider des objets de commit ou d'arbre spécifiés à SVN. Cela dépend du fait ques vos données de récupération importées sont à jour. Cela ne fait absolument aucune tentative de rustinage lors du commit sur SVN, et écrase simplement les fichiers avec ceux spécifiés dans l'arbre ou le commit. Toute fusion est supposée avoir eu lieu indépendamment des fonctions 'git svn'.
+
+'create-ignore'::
+	Trouver récursivement les propriétés svn:ignore et svn:global-ignores sur les répertoires et crée des fichiers .gitignore correspondant. Les fichiers résultants sont indexés pour être validés, mais ne sont pas validés. Utiliser `-r`/`--revision` pour faire référence à une révision spécifique.
+
+'show-ignore'::
+	Trouve récursivement et répertorie les propriétés svn:ignore et svn:global-ignores sur les répertoires. La sortie est adaptée pour ajouter au fichier `$GIT_DIR/info/exclude`.
+
+'mkdirs'::
+	Tente de recréer des répertoires vides que le noyau Git ne peut pas suivre en fonction de l'information dans les fichiers `$GIT_DIR/svn/<nom-de-réf>/unhandled.log`). Les répertoires vides sont automatiquement recréés en utilisant "git svn clone" et "git svn rebase", donc "mkdirs" est destiné à être utilisé après des commandes comme "git checkout" ou "git reset". (Voir l'option de configuration`svn-remote.<nom>.automkdirs` pour plus d'informations.)
+
+'commit-diff'::
+	Compose la diff de deux arguments arbre-esques de la ligne de commande. Cette commande ne s'appuie pas sur la présence d'un dépôt initialisé par `git svn init'. Cette commande prend trois arguments, a) l'arbre d'origine contre lequel on diff, (b) le nouvel arbre résultat , (c) l'URL du dépôt de Subversion cible. L'argument final (URL) peut être omis si vous travaillez à partir d'un dépôt qui connaît 'git svn' (qui a été initialisé avec 'git svn init'). Pour cela, l'option `-r<révision>` est nécessaire.
++
+Le message de validation est fourni directement avec l'option `-m` ou `-F`, ou indirectement à partir de l'étiquette ou du commit lorsque le deuxième arbre-esque dénote un tel objet, ou il est demandé en invoquant un éditeur (voir l'option `--edit` ci-dessous).
+
+-m <msg>;;
+--message=<msg>;;
+	Utiliser le _<msg>_ fourni comme message de validation. Cette option désactive l'option `--edit`.
+
+-F <fichier>;;
+--file=<fichier>;;
+	Prendre le message de validation depuis le fichier indiqué. Cette option désactive l'option `--edit`.
+
+'info'::
+	Affiche des informations sur un fichier ou un répertoire similaires à ce que fournit `svn info'. Ne prend pas actuellement en charge l'argument -r/--revision. Utilisez l'option --url pour n'afficher que la valeur du champ 'URL:'.
+
+'proplist'::
+	Liste les propriétés stockées dans le dépôt Subversion concernant un fichier ou un répertoire donné. Utilisez -r/--revision pour faire référence à une révision Subversion spécifique.
+
+'propget'::
+	Récupère la propriété Subversion donnée en premier argument, pour un fichier. Une révision spécifique peut être spécifiée avec -r/--revision.
+
+'propset'::
+	Définit la propriété Subversion donnée en premier argument, à la valeur donnée en second argument pour le fichier donné en troisième argument.
++
+Exemple :
++
+------------------------------------------------------------------------
+git svn propset svn:keywords "FreeBSD=%H" devel/py-tipper/Makefile
+------------------------------------------------------------------------
++
+Cela définira la propriété 'svn:keywords' à 'FreeBSD=%H' pour le fichier 'devel/py-tipper/Makefile'.
+
+'show-externals'::
+	Affiche les externals Subversion. Utilisez -r/--revision pour spécifier une révision spécifique.
+
+'gc'::
+	Compresse les fichiers $GIT_DIR/svn/<nom_réf>/unhandled.log et supprime les fichiers $GIT_DIR/svn/<nom_réf>/index.
+
+'reset'::
+	Annule les effets de 'fetch' jusqu'à la révision spécifiée. Cela vous permet de re-'fetch' une révision SVN. Normalement, le contenu d'une révision SVN ne devrait jamais changer et 'reset' ne devrait pas être nécessaire. Cependant, si les permissions SVN changent, ou si vous modifiez votre option --ignore-paths, un 'fetch' peut échouer avec « not found in commit » (fichier non précédemment visible) ou « checksum mismatch » (modification manquée). Si le fichier problématique ne peut pas être ignoré indéfiniment (avec --ignore-paths), la seule façon de réparer le dépôt est d'utiliser 'reset'.
++
+Seuls le rev_map et refs/remotes/git-svn sont modifiés (voir '$GIT_DIR/svn/\**/.rev_map.*' dans la section FICHIERS ci-dessous pour les détails). Suivez 'reset' par un 'fetch' puis 'git reset' ou 'git rebase' pour déplacer les branches locales vers le nouvel arbre.
+
+-r <n>;;
+--revision=<n>;;
+	Spécifie la révision la plus récente à conserver. Toutes les révisions ultérieures sont jetées.
+-p;;
+--parent;;
+	Jette également la révision spécifiée, en conservant le parent le plus proche à la place.
+Exemple :;;
+Supposons que vous ayez des modifications locales dans « master », mais que vous deviez re-fetch « r2 ».
++
+------------
+    r1---r2---r3 remotes/git-svn
+                \
+                 A---B master
+------------
++
+Corrigez le problème de ignore-paths ou de permissions SVN qui a causé « r2 » d'être incomplet en premier lieu. Ensuite :
++
+[verse]
+git svn reset -r2 -p
+git svn fetch
++
+------------
+    r1---r2'--r3' remotes/git-svn
+      \
+       r2---r3---A---B master
+------------
++
+Corriger ensuite "master" avec 'git rebase'. N'utilisez PAS 'git merge' sinon votre historique ne sera pas compatible avec un futur 'dcommit' !
++
+[verse]
+git rebase --onto remotes/git-svn A^ master
++
+------------
+    r1---r2'--r3' remotes/git-svn
+                \
+                 A'--B' master
+------------
+
+OPTIONS
+-------
+
+--shared[=(false|true|umask|group|all|world|everybody)]::
+--template=<répertoire-de-modèles>::
+	Utilisé uniquement avec la commande 'init'. Ceux-ci sont passés directement à 'git init'.
+
+-r <arg>::
+--revision <arg>::
+	   Utilisé avec la commande 'fetch'.
++
+Cela permet de prendre en charge les plages de révision pour un historiel partiel/cautérisé. $NUMBER, $NUMBER1:$NUMBER2 (plages numériques), $NUMBER:HEAD et BASE:$NUMBER sont tous pris en charge.
++
+Cela peut vous permettre de créer des miroirs partiels lors de l'exécution de fetch ; mais ce n'est généralement pas recommandé car l'historiel sera ignoré et perdu.
+
+-::
+--stdin::
+	Utilisé uniquement avec la commande 'set-tree'.
++
+Lire une liste de commits depuis stdin et les valider dans l'ordre inverse. Seul le sha1 de début est lu à partir de chaque ligne, de sorte que la sortie de 'git rev-list --pretty=oneline' peut être utilisée.
+
+--rmdir::
+	Utilisé uniquement avec les commandes 'dcommit', 'set-tree' et 'commit-diff'.
++
+Supprimer les répertoires de l'arbre SVN s'il ne reste plus de fichiers. SVN peut versionner les répertoires vides et ils ne sont pas supprimés par défaut s'il ne reste aucun fichier dedans. Git ne peut pas versionner les répertoires vides. L'activation de cette option fera que le commit vers SVN se comportera comme Git.
++
+[verse]
+clé de config : svn.rmdir
+
+-e::
+--edit::
+	Utilisé uniquement avec les commandes 'dcommit', 'set-tree' et 'commit-diff'.
++
+Modifier le message de commit avant de valider dans SVN. Cette option est désactivée par défaut pour les objets qui sont des commits, et forcée lors de la validation d'objets arbre.
++
+[verse]
+clé de config : svn.edit
+
+-l<num>::
+--find-copies-harder::
+	Utilisé uniquement avec les commandes 'dcommit', 'set-tree' et 'commit-diff'.
++
+Ils sont tous les deux passés directement à 'git diff-tree' ; voir linkgit:git-diff-tree[1] pour plus d'informations.
++
+[verse]
+clé de config : svn.l
+clé de config : svn.findcopiesharder
+
+-A<fichier>::
+--authors-file=<fichier>::
+	La syntaxe est compatible avec le fichier utilisé par 'git cvsimport' mais une adresse e-mail vide peut être fournie avec '<>' :
++
+------------------------------------------------------------------------
+	loginname = Joe User <user@example.com>
+------------------------------------------------------------------------
++
+Si cette option est spécifiée et que 'git svn' rencontre un nom de committer SVN qui n'existe pas dans le fichier des auteurs, 'git svn' interrompra l'opération. L'utilisateur devra ensuite ajouter l'entrée appropriée. La ré-exécution de la commande 'git svn' précédente après modification du fichier des auteurs devrait reprendre l'opération.
++
+[verse]
+clé de config : svn.authorsfile
+
+--authors-prog=<fichier>::
+	Si cette option est spécifiée, pour chaque nom de committer SVN qui n'existe pas dans le fichier des auteurs, le fichier donné est exécuté avec le nom du committer comme premier argument. Le programme doit retourner une seule ligne de la forme "Nom <email>" ou "Nom <>", qui sera traitée comme si elle était incluse dans le fichier des auteurs.
++
+Pour des raisons historiques, un 'filename' relatif est d'abord recherché par rapport au répertoire courant pour 'init' et 'clone', et par rapport à la racine de l'arbre de travail pour 'fetch'. Si le 'filename' n'est pas trouvé, il est recherché comme toute autre commande dans '$PATH'.
++
+[verse]
+clé de config : svn.authorsProg
+
+-q::
+--quiet::
+	Rendre 'git svn' moins verbeux. Spécifier une seconde fois pour le rendre encore moins verbeux.
+
+-m::
+--merge::
+-s<strategie>::
+--strategy=<strategie>::
+-p::
+--rebase-merges::
+	Ces options ne sont utilisées qu'avec les commandes 'dcommit' et 'rebase'.
++
+Passé directement à 'git rebase' lors de l'utilisation de 'dcommit' si un 'git reset' ne peut pas être utilisé (voir 'dcommit').
+
+-n::
+--dry-run::
+	Cela peut être utilisé avec les commandes 'dcommit', 'rebase', 'branch' et 'tag'.
++
+Pour 'dcommit', afficher la série d'arguments Git qui montrera quels diffs seront validés dans SVN.
++
+Pour 'rebase', afficher la branche locale associée au dépôt svn distant associé à la branche courante et l'URL du dépôt svn qui sera récupéré.
++
+Pour 'branch' et 'tag', afficher les urls qui seront utilisées pour la copie lors de la création de la branche ou de l'étiquette.
+
+--use-log-author::
+	Lors de la récupération des commits svn dans Git (dans le cadre des opérations 'fetch', 'rebase' ou 'dcommit'), rechercher la première ligne `From:` ou le bas de page `Signed-off-by` dans le message de log et l'utiliser comme chaîne d'auteur.
++
+[verse]
+clé de config : svn.useLogAuthor
+
+--add-author-from::
+	Lors de la validation vers svn depuis Git (dans le cadre des opérations 'set-tree' ou 'dcommit'), si le message de log existant n'a pas déjà un bas de page `From:` ou `Signed-off-by`, ajouter une ligne `From:` basée sur la chaîne d'auteur du commit Git. Si vous utilisez cette option, alors `--use-log-author` récupérera une chaîne d'auteur valide pour tous les commits.
++
+[verse]
+clé de config : svn.addAuthorFrom
+
+OPTIONS AVANCÉES
+----------------
+
+-i<GIT_SVN_ID>::
+--id <GIT_SVN_ID>::
+	Cela définit GIT_SVN_ID (au lieu d'utiliser l'environnement). Cela permet à l'utilisateur de remplacer le nom de ref par défaut pour la récupération lors du suivi d'une seule URL. Les commandes 'log' et 'dcommit' ne nécessitent plus cet argument.
+
+-R<nom-distant>::
+--svn-remote <nom-distant>::
+	Spécifier la section [svn-remote "<nom-distant>"] à utiliser, cela permet de suivre plusieurs dépôts SVN. Par défaut : "svn"
+
+--follow-parent::
+	Cette option n'est pertinente que si nous suivons des branches (en utilisant l'une des options de disposition du dépôt --trunk, --tags, --branches, --stdlayout). Pour chaque branche suivie, essayer de déterminer d'où sa révision a été copiée et définir un parent approprié dans le premier commit Git pour la branche. Cela est particulièrement utile lorsque nous suivons un répertoire qui a été déplacé dans le dépôt. Si cette fonctionnalité est désactivée, les branches créées par 'git svn' seront toutes linéaires et ne partageront aucun historique, ce qui signifie qu'il n'y aura pas d'informations sur l'endroit où les branches ont été créées ou fusionnées. Cependant, le suivi d'historiques longs/conduits peut prendre beaucoup de temps, donc la désactivation de cette fonctionnalité peut accélérer le processus de clonage. Cette fonctionnalité est activée par défaut, utilisez --no-follow-parent pour la désactiver.
++
+[verse]
+clé de config : svn.followparent
+
+OPTIONS RÉSERVÉES AU FICHIER DE CONFIGURATION
+---------------------------------------------
+
+svn.noMetadata::
+svn-remote.<nom>.noMetadata::
+	Cela supprime les lignes 'git-svn-id:' à la fin de chaque commit.
++
+Cette option ne peut être utilisée que pour des importations ponctuelles car 'git svn' ne pourra pas récupérer à nouveau sans métadonnées. De plus, si vous perdez vos fichiers '$GIT_DIR/svn/\**/.rev_map.*', 'git svn' ne pourra pas les reconstruire.
++
+La commande 'git svn log' ne fonctionnera pas non plus sur les dépôts l'utilisant. L'utilisation de cette option entre en conflit avec l'option 'useSvmProps' pour des raisons (espérons-le) évidentes.
++
+Cette option n'est PAS recommandée car elle rend difficile le suivi des anciennes références aux numéros de révision SVN dans la documentation existante, les rapports de bogues et les archives. Si vous prévoyez éventuellement de migrer de SVN à Git et que vous êtes certain d'abandonner l'historique SVN, envisagez plutôt https://github.com/newren/git-filter-repo[git-filter-repo]. filter-repo permet également de reformatrer les métadonnées pour faciliter la lecture et de réécrire les informations d'auteur pour les utilisateurs non-"svn.authorsFile".
+
+svn.useSvmProps::
+svn-remote.<nom>.useSvmProps::
+	Cela permet à 'git svn' de recorrespondre les URLs et UUID de dépôt à partir des miroirs créés avec SVN::Mirror (ou svk) pour les métadonnées.
++
+Si une révision SVN a une propriété "svm:headrev", il est probable que la révision ait été créée par SVN::Mirror (également utilisé par SVK). La propriété contient un UUID de dépôt et une révision. Nous voulons faire en sorte qu'il semble que nous mirorisons l'URL originale, donc introduisons une fonction helper qui retourne l'URL d'identité originale et l'UUID, et l'utilisons lors de la génération des métadonnées dans les messages de commit.
+
+svn.useSvnsyncProps::
+svn-remote.<nom>.useSvnsyncprops::
+	Similaire à l'option useSvmProps ; celle-ci est destinée aux utilisateurs de la commande svnsync(1) distribuée avec SVN 1.4.x et versions ultérieures.
+
+svn-remote.<nom>.rewriteRoot::
+	Cela permet aux utilisateurs de créer des dépôts à partir d'URLs alternatives. Par exemple, un administrateur pourrait exécuter 'git svn' sur le serveur localement (en accédant via file://) mais souhaiter distribuer le dépôt avec une URL publique http:// ou svn:// dans les métadonnées afin que les utilisateurs voient l'URL publique.
+
+svn-remote.<nom>.rewriteUUID::
+	Similaire à l'option useSvmProps ; celle-ci est destinée aux utilisateurs qui ont besoin de recorrespondre l'UUID manuellement. Cela peut être utile dans des situations où l'UUID original n'est pas disponible via useSvmProps ou useSvnsyncProps.
+
+svn-remote.<nom>.pushurl::
+
+	Similaire à `remote.<nom>.pushurl` de Git, cette clé est conçue pour être utilisée dans les cas où 'url' pointe vers un dépôt SVN via un transport en lecture seule, pour fournir un transport alternatif en lecture/écriture. Il est supposé que les deux clés pointent vers le même dépôt. Contrairement à 'commiturl', 'pushurl' est un chemin de base. Si 'commiturl' ou 'pushurl' peut être utilisé, 'commiturl' a la priorité.
+
+svn.brokenSymlinkWorkaround::
+	Cela désactive les vérifications potentiellement coûteuses pour contourner les liens symboliques cassés enregistrés dans SVN par des clients défectueux. Définissez cette option à "false" si vous suivez un dépôt SVN avec de nombreux blobs vides qui ne sont pas des liens symboliques. Cette option peut être modifiée pendant l'exécution de 'git svn' et prendre effet sur la prochaine révision récupérée. Si non définie, 'git svn' suppose cette option à "true".
+
+svn.pathnameencoding::
+	Cela indique à git svn de recoder les noms de chemins dans un encodage donné. Cela peut être utilisé par les utilisateurs Windows et par ceux qui travaillent dans des locales non-utf8 pour éviter les noms de fichiers corrompus avec des caractères non-ASCII. Les encodages valides sont ceux supportés par le module Encode de Perl.
+
+svn-remote.<nom>.automkdirs::
+	Normalement, les commandes "git svn clone" et "git svn rebase" tentent de recréer les répertoires vides qui sont dans le dépôt Subversion. Si cette option est définie à "false", les répertoires vides ne seront créés que si la commande "git svn mkdirs" est exécutée explicitement. Si non définie, 'git svn' suppose cette option à "true".
+
+Les options noMetadata, rewriteRoot, rewriteUUID, useSvnsyncProps et useSvmProps affectent toutes les métadonnées générées et utilisées par 'git svn' ; elles *doivent* être définies dans le fichier de configuration avant tout import d'historique et ces paramètres ne doivent jamais être modifiés une fois définis.
+
+De plus, une seule de ces options peut être utilisée par section svn-remote car elles affectent la ligne de métadonnées 'git-svn-id:', à l'exception de rewriteRoot et rewriteUUID qui peuvent être utilisées ensemble.
+
+
+EXEMPLES DE BASE
+----------------
+
+Suivre et contribuer au tronc d'un projet géré par Subversion (en ignorant les étiquettes et les branches) :
+
+------------------------------------------------------------------------
+# Cloner un dépôt (comme git clone)
+	git svn clone http://svn.example.com/project/trunk
+# Entrer dans le répertoire nouvellement cloné :
+	cd trunk
+# Vous devriez être sur la branche master, vérifier avec 'git branch'
+	git branch
+# Faire du travail et valider localement dans Git :
+	git commit ...
+# Quelque chose est validé dans SVN, rebasez vos changements locaux par rapport aux
+# derniers changements dans SVN :
+	git svn rebase
+# Maintenant validez vos changements (qui ont été validés précédemment avec Git) dans SVN,
+# ainsi que la mise à jour automatique de votre HEAD de travail :
+	git svn dcommit
+# Ajouter les paramètres svn:ignore et svn:global-ignores au fichier d'exclusion Git par défaut :
+	git svn show-ignore >> .git/info/exclude
+------------------------------------------------------------------------
+
+Suivre et contribuer à un projet Subversion complet (avec un tronc, des étiquettes et des branches) :
+
+------------------------------------------------------------------------
+# Cloner un dépôt avec la disposition SVN standard (comme git clone)
+	git svn clone http://svn.example.com/project --stdlayout --prefix svn/
+# Ou, si le dépôt utilise une disposition non standard :
+	git svn clone http://svn.example.com/project -T tr -b branch -t tag --prefix svn/
+# Voir toutes les branches et étiquettes que vous avez clonées :
+	git branch -r
+# Créer une nouvelle branche dans SVN
+	git svn branch waldo
+# Réinitialiser votre master vers le tronc (ou toute autre branche, en remplaçant 'trunk'
+# par le nom approprié) :
+	git reset --hard svn/trunk
+# Vous ne pouvez dcommiter qu'une seule branche/étiquette/tronc à la fois. L'utilisation
+# de dcommit/rebase/show-ignore doit être la même que ci-dessus.
+------------------------------------------------------------------------
+
+Le 'git svn clone' initial peut prendre beaucoup de temps (surtout pour les grands dépôts Subversion). Si plusieurs personnes (ou une seule personne avec plusieurs machines) veulent utiliser 'git svn' pour interagir avec le même dépôt Subversion, vous pouvez faire le 'git svn clone' initial vers un dépôt sur un serveur et faire cloner ce dépôt à chaque personne avec 'git clone' :
+
+------------------------------------------------------------------------
+# Effectuer l'importation initiale sur un serveur
+	ssh server "cd /pub && git svn clone http://svn.example.com/project [options...]"
+# Cloner localement - s'assurer que l'espace refs/remotes/ correspond au serveur
+	mkdir project
+	cd project
+	git init
+	git remote add origin server:/pub/project
+	git config --replace-all remote.origin.fetch ''+refs/remotes/*:refs/remotes/*''
+	git fetch
+# Empêcher fetch/pull depuis le serveur Git distant à l'avenir,
+# nous voulons uniquement utiliser git svn pour les mises à jour futures
+	git config --remove-section remote.origin
+# Créer une branche locale à partir de l'une des branches juste récupérées
+	git checkout -b master FETCH_HEAD
+# Initialiser 'git svn' localement (assurez-vous d'utiliser la même URL et
+# les mêmes options --stdlayout/-T/-b/-t/--prefix que celles utilisées sur le serveur)
+	git svn init http://svn.example.com/project [options...]
+# Récupérer les derniers changements depuis Subversion
+	git svn rebase
+------------------------------------------------------------------------
+
+REBASE VS. PULL/MERGE
+---------------------
+Préférez utiliser 'git svn rebase' ou 'git rebase', plutôt que 'git pull' ou 'git merge' pour synchroniser les commits non intégrés avec une branche 'git svn'. Cela permettra de garder l'historique des commits non intégrés linéaire par rapport au dépôt SVN distant et permettra l'utilisation de la sous-commande préférée 'git svn dcommit' pour repousser les commits non intégrés dans SVN.
+
+À l'origine, 'git svn' recommandait que les développeurs fassent pull ou merge depuis la branche 'git svn'. C'était parce que l'auteur préférait `git svn set-tree B` pour valider une seule tête plutôt que la notation `git svn set-tree A..B` pour valider plusieurs commits. L'utilisation de 'git pull' ou 'git merge' avec `git svn set-tree A..B` provoquera un aplatissement de l'historique non linéaire lors de la validation dans SVN et cela peut entraîner des commits de fusion qui inversent inopinément des commits précédents dans SVN.
+
+SUIVI DES FUSIONS
+-----------------
+Bien que 'git svn' puisse suivre l'historique de copie (y compris les branches et les étiquettes) pour les dépôts adoptant une disposition standard, il ne peut pas encore représenter l'historique de fusion qui s'est produit dans git en amont pour les utilisateurs SVN. Il est donc conseillé aux utilisateurs de garder l'historique aussi linéaire que possible dans Git pour faciliter la compatibilité avec SVN (voir la section CAVEATS ci-dessous).
+
+GESTION DES BRANCHES SVN
+------------------------
+Si 'git svn' est configuré pour récupérer des branches (et que --follow-branches est actif), il crée parfois plusieurs branches Git pour une branche SVN, où les branches supplémentaires ont des noms de la forme 'branche@nnn' (avec nnn un numéro de révision SVN). Ces branches supplémentaires sont créées si 'git svn' ne peut pas trouver un commit parent pour le premier commit dans une branche SVN, pour connecter la branche à l'historique des autres branches.
+
+Normalement, le premier commit dans une branche SVN consiste en une opération de copie. 'git svn' lira ce commit pour obtenir la révision SVN à partir de laquelle la branche a été créée. Il essaiera ensuite de trouver le commit Git qui correspond à cette révision SVN et l'utilisera comme parent de la branche. Cependant, il est possible qu'il n'y ait pas de commit Git approprié pour servir de parent. Cela se produira, entre autres raisons, si la branche SVN est la copie d'une révision qui n'a pas été récupérée par 'git svn' (par exemple parce que c'est une ancienne révision qui a été ignorée avec `--revision`), ou si dans SVN un répertoire a été copié qui n'est pas suivi par 'git svn' (comme une branche qui n'est pas du tout suivie, ou un sous-répertoire d'une branche suivie). Dans ces cas, 'git svn' créera quand même une branche Git, mais au lieu d'utiliser un commit Git existant comme parent de la branche, il lira l'historique SVN du répertoire à partir duquel la branche a été copiée et créera des commits Git appropriés. Cela est indiqué par le message "Initializing parent : <nom-branche>".
+
+De plus, il créera une branche spéciale nommée '<nom-branche>@<SVN-Révision>', où <SVN-Révision> est le numéro de révision SVN à partir de laquelle la branche a été copiée. Cette branche pointera vers le commit parent nouvellement créé de la branche. Si dans SVN la branche a été supprimée et recréée ultérieurement à partir d'une version différente, il y aura plusieurs branches avec un '@'.
+
+Notez que cela peut signifier que plusieurs commits Git sont créés pour une seule révision SVN.
+
+Un exemple : dans un dépôt SVN avec une disposition standard trunk/tags/branches, un répertoire trunk/sub est créé en r.100. En r.200, trunk/sub est mis en branche en le copiant dans branches/. 'git svn clone -s' créera alors une branche 'sub'. Il créera également de nouveaux commits Git pour r.100 à r.199 et les utilisera comme l'historique de la branche 'sub'. Ainsi il y aura deux commits Git pour chaque révision de r.100 à r.199 (un contenant trunk/, un contenant trunk/sub/). Enfin, il créera une branche 'sub@200' pointant vers le nouveau commit parent de la branche 'sub' (c.-à-d. le commit pour r.200 et trunk/sub/).
+
+MISES EN GARDE
+--------------
+
+Par souci de simplicité et d'interopérabilité avec Subversion, il est recommandé que tous les utilisateurs de 'git svn' clonent, récupèrent et valident directement depuis le serveur SVN, et évitent toutes les opérations 'git clone'/'pull'/'merge'/'push' entre les dépôts et branches Git. La méthode recommandée pour échanger du code entre les branches Git et les utilisateurs est 'git format-patch' et 'git am', ou simplement la validation dans le dépôt SVN.
+
+L'exécution de 'git merge' ou 'git pull' n'est PAS recommandée sur une branche à partir de laquelle vous prévoyez de faire un dcommit car les utilisateurs SVN ne peuvent pas voir les fusions que vous avez faites. De plus, si vous faites un merge ou un pull depuis une branche Git qui est un miroir d'une branche SVN, 'dcommit' peut valider dans la mauvaise branche.
+
+Si vous faites un merge, notez la règle suivante : 'git svn dcommit' tentera de valider par-dessus le commit SVN nommé dans
+
+------------------------------------------------------------------------
+git log --grep=^git-svn-id: --first-parent -1
+------------------------------------------------------------------------
+
+Vous *devez* donc vous assurer que le commit le plus récent de la branche sur laquelle vous voulez faire un dcommit est le *premier* parent de la fusion. Le chaos s'ensuivra sinon, en particulier si le premier parent est un commit plus ancien sur la même branche SVN.
+
+'git clone' ne clone pas les branches sous la hiérarchie refs/remotes/ ni les métadonnées ou la configuration 'git svn'. Ainsi les dépôts créés et gérés avec 'git svn' devraient utiliser 'rsync' pour le clonage, si le clonage doit être fait.
+
+Puisque 'dcommit' utilise rebase en interne, les branches Git que vous 'git push' avant le dcommit nécessiteront de forcer l'écrasement de la ref existante sur le dépôt distant. C'est généralement considéré comme une mauvaise pratique, voir la documentation linkgit:git-push[1] pour plus de détails.
+
+N'utilisez pas l'option --amend de linkgit:git-commit[1] sur un changement que vous avez déjà dcommité. C'est considéré comme une mauvaise pratique de faire --amend sur des commits que vous avez déjà poussés vers un dépôt distant pour d'autres utilisateurs, et le dcommit avec SVN est analogue à cela.
+
+Lors du clonage d'un dépôt SVN, si aucune des options de description de la disposition du dépôt n'est utilisée (--trunk, --tags, --branches, --stdlayout), 'git svn clone' créera un dépôt Git avec un historique entièrement linéaire, où les branches et les étiquettes apparaissent comme des répertoires séparés dans la copie de travail. Bien que ce soit le moyen le plus simple d'obtenir une copie d'un dépôt complet, pour les projets avec de nombreuses branches cela entraînera une copie de travail bien plus grande que le tronc seul. Ainsi pour les projets utilisant la structure de répertoires standard (trunk/branches/tags), il est recommandé de cloner avec l'option `--stdlayout`. Si le projet utilise une structure non standard, et/ou si les branches et les étiquettes ne sont pas requises, il est plus simple de ne cloner qu'un seul répertoire (typiquement trunk), sans donner d'option de disposition de dépôt. Si l'historique complet avec les branches et les étiquettes est requis, les options `--trunk` / `--branches` / `--tags` doivent être utilisées.
+
+Lors de l'utilisation de multiples --branches ou --tags, 'git svn' ne gère pas automatiquement les collisions de noms (par exemple, si deux branches de différents chemins ont le même nom, ou si une branche et une étiquette ont le même nom). Dans ces cas, utilisez 'init' pour configurer votre dépôt Git puis, avant votre premier 'fetch', éditez le fichier $GIT_DIR/config pour que les branches et les étiquettes soient associées à des espaces de noms différents. Par exemple :
+
+	branches = stable/*:refs/remotes/svn/stable/*
+	branches = debug/*:refs/remotes/svn/debug/*
+
+CONFIGURATION
+-------------
+
+'git svn' stocke les informations de configuration [svn-remote] dans le fichier $GIT_DIR/config du dépôt. C'est similaire aux sections [remote] de Git sauf que les clés 'fetch' n'acceptent pas d'arguments glob ; mais elles sont plutôt gérées par les clés 'branches' et 'tags'. Puisque certains dépôts SVN sont configurés de manière inhabituelle avec plusieurs projets, les expansions de type glob comme celles listées ci-dessous sont autorisées :
+
+------------------------------------------------------------------------
+[svn-remote "projet-a"]
+	url = http://server.org/svn
+	fetch = trunk/projet-a:refs/remotes/projet-a/trunk
+	branches = branches/*/projet-a:refs/remotes/projet-a/branches/*
+	branches = branches/release_*:refs/remotes/projet-a/branches/release_*
+	branches = branches/re*se:refs/remotes/projet-a/branches/*
+	tags = tags/*/projet-a:refs/remotes/projet-a/tags/*
+------------------------------------------------------------------------
+
+Gardez à l'esprit que le joker `*` (astérisque) de la ref locale (à droite du `:`) *doit* être le composant de chemin le plus à droite ; cependant le joker distant peut être n'importe où tant qu'il s'agit d'un composant de chemin indépendant (entouré par `/` ou fin de ligne). Ce type de configuration n'est pas automatiquement créé par 'init' et doit être saisi manuellement avec un éditeur de texte ou en utilisant 'git config'.
+
+Notez également qu'un seul astérisque est autorisé par mot. Par exemple :
+
+	branches = branches/re*se:refs/remotes/projet-a/branches/*
+
+correspondra aux branches 'release', 'rese', 're123se', cependant
+
+	branches = branches/re*s*e:refs/remotes/project-a/branches/*
+
+provoquera une erreur.
+
+Il est également possible de récupérer un sous-ensemble de branches ou d'étiquettes en utilisant une liste séparée par des virgules de noms entre accolades. Par exemple :
+
+------------------------------------------------------------------------
+[svn-remote "huge-project"]
+	url = http://server.org/svn
+	fetch = trunk/src:refs/remotes/trunk
+	branches = branches/{red,green}/src:refs/remotes/project-a/branches/*
+	tags = tags/{1.0,2.0}/src:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+Les clés fetch, branches et tags multiples sont supportées :
+
+------------------------------------------------------------------------
+[svn-remote "messy-repo"]
+	url = http://server.org/svn
+	fetch = trunk/project-a:refs/remotes/project-a/trunk
+	fetch = branches/demos/june-project-a-demo:refs/remotes/project-a/demos/june-demo
+	branches = branches/server/*:refs/remotes/project-a/branches/*
+	branches = branches/demos/2011/*:refs/remotes/project-a/2011-demos/*
+	tags = tags/server/*:refs/remotes/project-a/tags/*
+------------------------------------------------------------------------
+
+Créer une branche dans une telle configuration nécessite de désambiguïser l'emplacement à utiliser avec l'option -d ou --destination :
+
+------------------------------------------------------------------------
+$ git svn branch -d branches/server release-2-3-0
+------------------------------------------------------------------------
+
+Notez que git-svn suit la révision la plus élevée dans laquelle une branche ou une étiquette est apparue. Si le sous-ensemble de branches ou d'étiquettes est modifié après la récupération, alors $GIT_DIR/svn/.metadata doit être édité manuellement pour supprimer (ou réinitialiser) branches-maxRev et/ou tags-maxRev selon les besoins.
+
+FICHIERS
+--------
+$GIT_DIR/svn/\**/.rev_map.*::
+	Correspondance entre les numéros de révision Subversion et les noms de commits Git. Dans un dépôt où l'option de config svn.noMetadata n'est pas définie, ceci peut être reconstruit à partir des lignes git-svn-id: qui se trouvent à la fin de chaque commit (voir la section 'clé de config svn.noMetadata' ci-dessus pour plus de détails).
++
+'git svn fetch' et 'git svn rebase' mettent automatiquement à jour le rev_map s'il est manquant ou obsolète. 'git svn reset' le rembobine automatiquement.
+
+BOGUES
+------
+
+Nous ignorons toutes les propriétés SVN sauf svn:executable. Toute propriété non gérée est enregistrée dans $GIT_DIR/svn/<refname>/unhandled.log
+
+Les répertoires renommés et copiés ne sont pas détectés par Git et ne sont donc pas suivis lors de la validation dans SVN. Je n'ai pas l'intention d'ajouter la prise en charge de cela car c'est assez difficile et chronophage à mettre en œuvre pour tous les cas particuliers possibles (Git ne le fait pas non plus). La validation de fichiers renommés et copiés est entièrement prise en charge s'ils sont suffisamment similaires pour que Git puisse les détecter.
+
+Dans SVN, il est possible ( bien que déconseillé) de valider des modifications sur une étiquette (car une étiquette n'est qu'une copie de répertoire, donc techniquement identique à une branche). Lors du clonage d'un dépôt SVN, 'git svn' ne peut pas savoir si une telle validation sur une étiquette se produira à l'avenir. Il se comporte donc de manière conservatrice et importe toutes les étiquettes SVN en tant que branches, en préfixant le nom de l'étiquette par 'tags/'.
+
+VOIR AUSSI
+----------
+linkgit:git-rebase[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

@@ -1,0 +1,109 @@
+git-send-pack(1)
+================
+
+NOM
+---
+git-send-pack - Pousse des objets par le protocole Git vers un autre dépôt
+
+
+SYNOPSIS
+--------
+[verse]
+'git send-pack' [--mirror] [--dry-run] [--force]
+		[--receive-pack=<git-receive-pack>]
+		[--verbose] [--thin] [--atomic]
+		[--[no-]signed | --signed=(true|false|if-asked)]
+		[<hôte>:]<répertoire> (--all | <réf>...)
+
+DESCRIPTION
+-----------
+Habituellement, vous voudriez utiliser 'git push', qui est un enveloppeur de niveau supérieur de cette commande, à la place. Voir linkgit:git-push[1].
+
+Invoque 'git-receive-pack' sur un dépôt possiblement distant, et le met à jour depuis le dépôt courant, en envoyant les réf. nommées.
+
+
+OPTIONS
+-------
+--receive-pack=<git-receive-pack>::
+	Chemin d'accès au programme 'git-receive-pack' sur l'extrémité distante. Parfois utile lorsque vous poussez vers un dépôt distant via ssh, et que vous n'avez pas le programme dans un répertoire sur le $PATH par défaut.
+
+--exec=<git-receive-pack>::
+	Identique à --receive-pack=<git-receive-pack>.
+
+--all::
+	Au lieu de spécifier explicitement quelles réf. mettre à jour, mettre à jour toutes les têtes qui existent localement.
+
+--stdin::
+	Prendre la liste des réf. depuis stdin, une par ligne. S'il y a des réf. spécifiées sur la ligne de commande en plus de cette option, alors les réf. depuis stdin sont traitées après celles de la ligne de commande.
++
+Si `--stateless-rpc` est spécifié ensemble avec cette option, alors la liste des réf. doit être au format paquet (pkt-line). Chaque réf. doit être dans un paquet séparé, et la liste doit se terminer par un paquet de vidage.
+
+--dry-run::
+	Fait tout sauf envoyer les mises à jour.
+
+--force::
+	En général, la commande refuse de mettre à jour une référence distante qui n'est pas un ancêtre de la référence locale utilisée pour l'écraser. Ce drapeau désactive cette vérification. Cela signifie que le dépôt distant peut perdre des commits ; à utiliser avec précaution.
+
+--verbose::
+	Mode bavard.
+
+--thin::
+	Envoyer un paquet "mince", qui enregistre les objets sous forme de delta basée sur des objets non inclus dans le paquet pour réduire le trafic réseau.
+
+--atomic::
+	Utiliser une transaction atomique pour mettre à jour les réf. Si l'une des réf. échoue à se mettre à jour, alors la totalité de la poussée échouera sans changer de réf.
+
+--signed::
+--no-signed::
+--signed=(true|false|if-asked)::
+	Signer avec GPG la demande de poussée pour mettre à jour les références du côté réception, pour lui permettre d'être vérifié par les crochets et/ou d'être enregistrée. Si `false` ou `--no-signed`, aucune signature ne sera tentée. Si `true` ou `--signed`, la poussée échouera si le serveur ne prend pas en charge les poussées signées. S'il est défini sur `if-asked`, signer si et seulement si le serveur prend en charge les poussées signées. La poussée échouera également si l'appel réel à `gpg --sign` échoue. Voir linkgit:git-receive-pack[1] pour les détails sur l'extrémité réceptrice.
+
+--push-option=<chaîne>::
+	Passer la chaîne spécifiée comme option de poussée pour la consommation par des hooks côté serveur. Si le serveur ne supporte pas les options de poussée, afficher une erreur. Voir linkgit:git-push[1] et linkgit:githooks[5] pour plus de détails.
+
+<hôte>::
+	Un hôte distant pour héberger le dépôt. Lorsque cette partie est spécifiée, 'git-receive-pack' est invoqué via ssh.
+
+<répertoire>::
+	Le dépôt à mettre à jour.
+
+<réf>...::
+	Les références distantes à mettre à jour.
+
+
+SPÉCIFICATION DES RÉFÉRENCES
+----------------------------
+
+Il y a trois façons de spécifier quelles réf. mettre à jour côté distant.
+
+Avec le drapeau `--all`, toutes les réf. qui existent localement sont transférées côté distant. Vous ne pouvez spécifier aucun '<réf>' si vous utilisez ce drapeau.
+
+Sans `--all` et sans aucun '<réf>', les têtes qui existent à la fois côté local et côté distant sont mises à jour.
+
+Lorsqu'une ou plusieurs'<ref>' sont spécifiées explicitement (soit pas la ligne de commande, soit par `--stdin`), cela peut être soit un motif unique, soit une paire de motifs séparés par deux points ":" (cela signifie qu'un nom de ref ne peut pas contenir de deux points). Un motif unique '<nom>' est une abréviation de '<nom>:<nom>'.
+
+Chaque paire de motifs se compose du côté source (avant les deux points) et du côté destination (après les deux points). La réf à pousser est déterminée par la recherche d'une correspondance avec le côté source, et l'endroit où il est poussé est déterminé en utilisant le côté destination. Les règles utilisées pour correspondre à une réf sont les mêmes règles utilisées par 'git rev-parse' pour résoudre un nom de réf symbolique. Voir linkgit:git-rev-parse[1].
+
+ - C'est une erreur si <src> ne correspond pas exactement à une des réf. locales.
+
+ - C’est une erreur si '<dst>'correspond à plus d'une référence distante.
+
+ - Si <dst> ne correspond à aucune réf. distante, soit
+
+   * il doit commencer par "refs/" ; <dst> est utilisé comme destination littérale dans ce cas.
+
+   * <src> == <dst> et la ref qui correspond à <src> ne doit pas exister dans l'ensemble des réfs distantes ; la réf qui correspond à <src> localement est utilisée comme nom de la destination.
+
+Sans `--force`, la réf <src> est stockée dans le distant seulement si <dst> n'existe pas, ou si <dst> est un sous-ensemble approprié (c'est-à-dire un ancêtre) de <src>. Cette vérification, connue sous le nom de "vérification d'avance rapide", est effectuée afin d'éviter d'écraser accidentellement la réf distante et de perdre les commits d'autres personnes à partir de là.
+
+Avec `--force`, la vérification de l'avance rapide est désactivée pour toutes les réfs.
+
+En option, un paramètre <réf> peut être préfixé par un signe plus '+' pour désactiver la vérification de l'avance rapide uniquement sur cette référence.
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .

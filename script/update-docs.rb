@@ -199,6 +199,13 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
   data["l10n"] = {} unless data["l10n"]
   l10n = data["l10n"]
 
+  # Track every (docname, lang) pair seen anywhere in the upstream source so
+  # that, after processing, we can remove output files whose source has been
+  # deleted upstream. Files that are merely *unchanged* still get added here
+  # (above the asciidoc-sha skip), so the cleanup correctly distinguishes
+  # "source vanished" from "source unchanged since last run".
+  seen_translations = Set.new
+
   filter_tags.call(rebuild, false).sort_by { |tag| Version.version_to_num(tag.first[1..]) }.each do |tag|
     name, commit_sha, tree_sha, ts = tag
     puts "#{name}: #{ts}, #{commit_sha[0, 8]}, #{tree_sha[0, 8]}", ts
@@ -249,6 +256,8 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       lang = File.dirname(full_path)
       path = File.basename(full_path, ".#{ext}")
       txt_path = path.sub(/\.adoc$/, '.txt')
+
+      seen_translations.add([path, lang])
 
       doc_path = "#{SITE_ROOT}external/docs/content/docs/#{path}"
 
@@ -341,7 +350,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         "subsection" => "manual",
         "title" => "Git - #{path} Documentation",
         "docname" => path,
-        "lang" => lang,
+        "params" => { "lang" => lang },
         "aliases" => ["/docs/#{path}/#{lang}/index.html"]
       }
 
@@ -372,6 +381,47 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
         File.open(doc_path, "w") do |out|
           out.write(wrap_front_matter(front_matter))
         end
+      end
+    end
+  end
+
+  # Clean up orphan translated outputs and the matching `data.json` entries
+  # whose upstream source has gone away. Skipped entirely when no source was
+  # iterated (e.g. when the early `next if !rerun && l10n["committed"] >= ts`
+  # short-circuits the whole tag loop) so that an "everything is up to date"
+  # run never deletes anything.
+  unless seen_translations.empty?
+    Dir.glob("#{SITE_ROOT}external/docs/content/docs/*/*.html").each do |output_path|
+      m = output_path.match(%r{/external/docs/content/docs/([^/]+)/([^/]+)\.html\z})
+      next unless m
+      docname = m[1]
+      lang = m[2]
+      # Only consider translation-shaped lang codes (e.g. `en`, `fr`, `pt_BR`,
+      # `zh_HANS-CN`); skip versioned English files like `2.30.0.html`.
+      next unless lang =~ /\A[a-z]{2}(?:_[A-Z]+(?:-[A-Z]+)?)?\z/
+      next if seen_translations.include?([docname, lang])
+      # Preserve redirect stubs written by the `check_paths` loop above:
+      # they may have been emitted by an earlier run when some other
+      # translation linked to this docname, and they keep historic URLs of
+      # the form `/docs/<docname>/<lang>` from 404'ing.
+      next if File.read(output_path, 256).include?("\nredirect_to:")
+      puts "Removing orphan translation #{output_path}"
+      File.delete(output_path)
+    end
+
+    # `layouts/partials/ref/languages.html` iterates
+    # `data.pages.<docname>.languages` on every English manual page to build
+    # the per-page language picker, so a stale entry here generates a dead
+    # link from every variant of every English page (including each
+    # versioned `/docs/<docname>/<version>.html` slice). Prune symmetrically
+    # with the file-deletion loop above.
+    data["pages"].each do |docname, page_data|
+      next unless page_data.is_a?(Hash)
+      langs = page_data["languages"]
+      next unless langs.is_a?(Hash)
+      langs.keys.reject { |lang| seen_translations.include?([docname, lang]) }.each do |lang|
+        puts "Removing orphan language entry data.pages.#{docname}.languages.#{lang}"
+        langs.delete(lang)
       end
     end
   end

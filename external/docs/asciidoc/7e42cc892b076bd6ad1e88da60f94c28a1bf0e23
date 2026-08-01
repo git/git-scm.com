@@ -1,0 +1,266 @@
+git-read-tree(1)
+================
+
+NOM
+---
+git-read-tree - Lit l'information d'arbre dans l'index
+
+
+SYNOPSIS
+--------
+[verse]
+'git read-tree' [(-m [--trivial] [--aggressive] | --reset | --prefix=<préfixe>)
+		[-u | -i]] [--index-output=<fichier>] [--no-sparse-checkout]
+		(--empty | <arbre-esque1> [<arbre-esque2> [<arbre-esque3>]])
+
+
+DESCRIPTION
+-----------
+Lit les informations d'arbre données par <arbre-esque> dans l'index, mais ne *met pas à jour* les fichiers qu'il « met en cache ». (voir : linkgit:git-checkout-index[1])
+
+En option, il peut fusionner un arbre dans l'index, effectuer une fusion en avance rapide (c'est-à-dire à 2 sens) ou une fusion à 3 sens, avec l'option `-m`. Quand il est utilisé avec `-m`, l'option `-u` lui impose aussi de mettre à jour les fichiers dans l'arbre de travail avec le résultat de la fusion.
+
+Seules les fusions triviales sont effectuées par 'git read-tree' lui-même. Seuls les chemins en conflit seront dans un état non fusionné quand 'git read-tree' retourne.
+
+OPTIONS
+-------
+-m::
+	Effectuer une fusion, pas seulement une lecture. La commande refusera de s'exécuter si le fichier d'index contient des entrées non fusionnées, indiquant que vous n'avez pas terminé une fusion précédente que vous avez lancée.
+
+--reset::
+	Identique à -m, sauf que les entrées non fusionnées sont abandonnées au lieu de faire échouer l'opération. Quand il est utilisé avec `-u`, les mises à jour entraînant la perte de modifications de l'arbre de travail ou de fichiers ou répertoires non suivis n'annuleront pas l'opération.
+
+-u::
+	Après une fusion réussie, mettre à jour les fichiers dans l'arbre de travail avec le résultat de la fusion.
+
+-i::
+	Habituellement, une fusion nécessite que le fichier d'index ainsi que les fichiers dans l'arbre de travail soient à jour avec le commit de tête actuel, afin de ne pas perdre les modifications locales. Cette option désactive la vérification avec l'arbre de travail et est destinée à être utilisée lors de la création d'une fusion d'arbres qui ne sont pas directement liés à l'état actuel de l'arbre de travail dans un fichier d'index temporaire.
+
+-n::
+--dry-run::
+	Vérifier si la commande échouerait, sans réellement mettre à jour l'index ou les fichiers dans l'arbre de travail.
+
+-v::
+	Afficher la progression de l'extraction des fichiers.
+
+--trivial::
+	Restreindre la fusion à 3 sens par 'git read-tree' à ne se produire que s'il n'y a pas de fusion au niveau des fichiers requise, au lieu de résoudre la fusion pour les cas triviaux et de laisser les fichiers en conflit non résolus dans l'index.
+
+--aggressive::
+	Habituellement, une fusion à 3 sens par 'git read-tree' résout la fusion pour les cas vraiment triviaux et laisse les autres cas non résolus dans l'index, afin que les interfaces de haut niveau puissent implémenter différentes politiques de fusion. Cette option fait que la commande résout quelques cas supplémentaires en interne :
++
+* quand un côté supprime un chemin et que l'autre côté le laisse non modifié. La résolution consiste à supprimer ce chemin.
+* quand les deux côtés suppriment un chemin. La résolution consiste à supprimer ce chemin.
+* quand les deux côtés ajoutent un chemin de manière identique. La résolution consiste à ajouter ce chemin.
+
+--prefix=<préfixe>::
+	Garder le contenu actuel de l'index et lire le contenu de l'arbre-esque nommé dans le répertoire sous `<préfixe>`. La commande refusera d'écraser les entrées qui existaient déjà dans le fichier d'index d'origine.
+
+--index-output=<fichier>::
+	Au lieu d'écrire les résultats dans `$GIT_INDEX_FILE`, écrire l'index résultant dans le fichier nommé. Pendant l'exécution de la commande, le fichier d'index original est verrouillé par le même mécanisme que d'habitude. Le fichier doit permettre d'être renommé (rename(2)) depuis un fichier temporaire créé à côté du fichier d'index habituel ; cela signifie généralement qu'il doit se trouver sur le même système de fichiers que le fichier d'index lui-même, et vous avez besoin d'une permission d'écriture sur les répertoires dans lesquels se trouvent le fichier d'index et le fichier de sortie d'index.
+
+--recurse-submodules::
+--no-recurse-submodules::
+	L'utilisation de `--recurse-submodules` permet de mettre à jour le contenu de tous les sous-modules actifs en fonction du commit enregistré dans le super-projet en appelant récursivement read-tree, en définissant également le HEAD des sous-modules à détacher à ce commit.
+
+--no-sparse-checkout::
+	Désactiver la prise en charge du extraction partielle même si `core.sparseCheckout` est vrai.
+
+--empty::
+	Au lieu de lire des objets arbre dans l'index, le vider seulement.
+
+-q::
+--quiet::
+	Silencieux, supprimer les messages d'état.
+
+<arbre-esque#>::
+	L'identifiant du ou des objets arbre à lire/fusionner.
+
+
+FUSION
+------
+Si `-m` est spécifié, 'git read-tree' peut effectuer 3 types de fusion : une fusion d'arbre unique si seulement 1 arbre est donné, une fusion en avance rapide avec 2 arbres, ou une fusion à 3 sens si 3 arbres ou plus sont fournis.
+
+
+Fusion d'arbre unique
+~~~~~~~~~~~~~~~~~~~~~
+Si seulement 1 arbre est spécifié, 'git read-tree' fonctionne comme si l'utilisateur n'avait pas spécifié `-m`, sauf que si l'index original a une entrée pour un chemin donné, et que le contenu du chemin correspond à l'arbre en cours de lecture, les informations stat de l'index sont utilisées. (En d'autres termes, les stat() de l'index ont la priorité sur celles de l'arbre fusionné).
+
+Cela signifie que si vous faites un `git read-tree -m <nouvel-arbre>` suivi d'un `git checkout-index -f -u -a`, 'git checkout-index' n'extrait que les éléments qui ont vraiment changé.
+
+Ceci est utilisé pour éviter les faux positifs inutiles quand 'git diff-files' est exécuté après 'git read-tree'.
+
+
+Fusion à deux arbres
+~~~~~~~~~~~~~~~~~~~~
+
+Typiquement, ceci est invoqué comme `git read-tree -m $H $M`, où $H est le commit de tête du dépôt actuel, et $M est la tête d'un arbre étranger, qui est simplement en avance sur $H (c'est-à-dire que nous sommes dans une situation d'avance rapide).
+
+Quand deux arbres sont spécifiés, l'utilisateur indique à 'git read-tree' ce qui suit :
+
+     1. L'index actuel et l'arbre de travail sont dérivés de $H, mais
+	l'utilisateur peut avoir des modifications locales depuis $H.
+
+     2. L'utilisateur veut avancer rapidement jusqu'à $M.
+
+Dans ce cas, la commande `git read-tree -m $H $M` s'assure qu'aucune modification locale n'est perdue à la suite de cette « fusion ». Voici les règles de « report en avant », où « I » désigne l'index, « clean » signifie que l'index et l'arbre de travail coïncident, et « exists »/« nothing » font référence à la présence d'un chemin dans le commit spécifié :
+
+....
+	I                   H        M        Résultat
+       -------------------------------------------------------
+     0  rien                rien     rien     (n'arrive pas)
+     1  rien                rien     existe   utiliser M
+     2  rien                existe   rien     supprimer le chemin de l'index
+     3  rien                existe   existe,  utiliser M si « initial checkout »,
+				     H == M   garder l'index sinon
+				     existe,  échec
+				     H != M
+
+        propre I==H  I==M
+       ------------------
+     4  oui   N/A   N/A     rien     rien     garder l'index
+     5  non   N/A   N/A     rien     rien     garder l'index
+
+     6  oui   N/A   oui     rien     existe   garder l'index
+     7  non   N/A   oui     rien     existe   garder l'index
+     8  oui   N/A   non     rien     existe   échec
+     9  non   N/A   non     rien     existe   échec
+
+     10 oui   oui   N/A     existe   rien     supprimer le chemin de l'index
+     11 non   oui   N/A     existe   rien     échec
+     12 oui   non   N/A     existe   rien     échec
+     13 non   non   N/A     existe   rien     échec
+
+	propre (H==M)
+       ------
+     14 oui                 existe   existe   garder l'index
+     15 non                 existe   existe   garder l'index
+
+        propre I==H  I==M (H!=M)
+       ------------------
+     16 oui   non   non     existe   existe   échec
+     17 non   non   non     existe   existe   échec
+     18 oui   non   oui     existe   existe   garder l'index
+     19 non   non   oui     existe   existe   garder l'index
+     20 oui   oui   non     existe   existe   utiliser M
+     21 non   oui   non     existe   existe   échec
+....
+
+Dans tous les cas « garder l'index », l'entrée d'index reste telle qu'elle était dans le fichier d'index original. Si l'entrée n'est pas à jour, 'git read-tree' garde la copie dans l'arbre de travail intacte lors du fonctionnement avec l'option -u.
+
+Quand cette forme de 'git read-tree' retourne avec succès, vous pouvez voir lesquelles des « modifications locales » que vous avez faites ont été reportées en exécutant `git diff-index --cached $M`. Notez que cela ne correspond pas nécessairement à ce que `git diff-index --cached $H` aurait produit avant une telle fusion à deux arbres. Ceci est dû aux cas 18 et 19 -- si vous aviez déjà les modifications dans $M (par exemple si vous les avez récupérées par courriel sous forme de patch), `git diff-index --cached $H` vous aurait informé de la modification avant cette fusion, mais cela n'apparaîtrait pas dans la sortie de `git diff-index --cached $M` après la fusion à deux arbres.
+
+Le cas 3 est légèrement délicat et nécessite une explication. Le résultat de cette règle devrait logiquement être de supprimer le chemin si l'utilisateur a indexé la suppression du chemin puis bascule vers une nouvelle branche. Cela empêcherait cependant l'extraction initiale de se produire, donc la règle est modifiée pour utiliser M (le nouvel arbre) uniquement quand le contenu de l'index est vide. Sinon, la suppression du chemin est conservée tant que $H et $M sont identiques.
+
+Fusion à 3 sens
+~~~~~~~~~~~~~~~
+Chaque entrée « d'index » possède deux bits d'état de « phase ». La phase 0 est la normale, et c'est la seule que vous verriez dans tout usage normal.
+
+Cependant, quand vous faites 'git read-tree' avec trois arbres, la « phase » commence à 1.
+
+Cela signifie que vous pouvez faire
+
+----------------
+$ git read-tree -m <arbre1> <arbre2> <arbre3>
+----------------
+
+et vous vous retrouverez avec un index contenant toutes les entrées de <arbre1> en « phase1 », toutes les entrées de <arbre2> en « phase2 » et toutes les entrées de <arbre3> en « phase3 ». Lors d'une fusion d'une autre branche dans la branche courante, on utilise l'arbre ancêtre commun comme <arbre1>, la tête de la branche courante comme <arbre2>, et la tête de l'autre branche comme <arbre3>.
+
+De plus, 'git read-tree' possède une logique de cas particulier qui dit : si vous voyez un fichier qui correspond sous tous les aspects dans les états suivants, il « s'effondre » en « phase0 » :
+
+   - les phases 2 et 3 sont identiques ; prendre l'une ou l'autre (cela ne fait aucune différence - le même travail a été fait sur notre branche en phase 2 et leur branche en phase 3)
+
+   - les phases 1 et 2 sont identiques et la phase 3 est différente ; prendre la phase 3 (notre branche en phase 2 n'a rien fait depuis l'ancêtre en phase 1 tandis que leur branche en phase 3 a travaillé dessus)
+
+   - les phases 1 et 3 sont identiques et la phase 2 est différente ; prendre la phase 2 (nous avons fait quelque chose tandis qu'ils n'ont rien fait)
+
+La commande 'git write-tree' refuse d'écrire un arbre absurde, et se plaindra des entrées non fusionnées si elle voit une seule entrée qui n'est pas en phase 0.
+
+OK, tout cela ressemble à un ensemble de règles totalement absurdes, mais c'est exactement ce que vous voulez pour effectuer une fusion rapide. Les différentes phases représentent l'« arbre résultat » (phase 0, alias « merged »), l'arbre original (phase 1, alias « orig »), et les deux arbres que vous essayez de fusionner (phases 2 et 3 respectivement).
+
+L'ordre des phases 1, 2 et 3 (et donc l'ordre des trois arguments <arbre-esque> en ligne de commande) est important quand vous démarrez une fusion à 3 sens avec un fichier d'index déjà rempli. Voici un aperçu du fonctionnement de l'algorithme :
+
+- si un fichier existe dans un format identique dans les trois arbres, il sera automatiquement réduit à l'état « merged » par 'git read-tree'.
+
+- un fichier qui présente _n'importe quelle_ différence dans les trois arbres restera comme des entrées séparées dans l'index. C'est à la « politique de porcelaine » de déterminer comment supprimer les phases non nulles et d'insérer une version fusionnée.
+
+- le fichier d'index sauvegarde et restaure toutes ces informations, donc vous pouvez fusionner les choses de manière incrémentale, mais tant qu'il a des entrées en phases 1/2/3 (c'est-à-dire « entrées non fusionnées »), vous ne pouvez pas écrire le résultat. L'algorithme de fusion finit donc par être vraiment simple :
+
+  * vous parcourez l'index dans l'ordre et ignorez toutes les entrées de phase 0, puisqu'elles ont déjà été traitées.
+
+  * si vous trouvez une « phase1 », mais pas de « phase2 » ou de « phase3 » correspondante, vous savez qu'elle a été supprimée des deux arbres (elle n'existait que dans l'arbre original), et vous supprimez cette entrée.
+
+  * si vous trouvez un arbre « phase2 » et « phase3 » correspondant, vous en supprimez un et transformez l'autre en entrée « phase0 ». Supprimez également toute entrée « phase1 » correspondante si elle existe. .. toutes les règles triviales normales ..
+
+Vous utiliseriez normalement 'git merge-index' avec le 'git merge-one-file' fourni pour effectuer cette dernière étape. Le script met à jour les fichiers dans l'arbre de travail au fur et à mesure qu'il fusionne chaque chemin et à la fin d'une fusion réussie.
+
+Quand vous démarrez une fusion à 3 sens avec un fichier d'index déjà rempli, il est supposé qu'il représente l'état des fichiers dans votre arbre de travail, et vous pouvez même avoir des fichiers avec des modifications non enregistrées dans le fichier d'index. Il est de plus supposé que cet état est « dérivé » de l'arbre de phase 2. La fusion à 3 sens refuse de s'exécuter si elle trouve une entrée dans le fichier d'index original qui ne correspond pas à la phase 2.
+
+Ceci est fait pour vous empêcher de perdre vos modifications en cours, et de mélanger vos modifications aléatoires dans un commit de fusion sans rapport. Pour illustrer, supposons que vous partiez de ce qui a été commis en dernier dans votre dépôt :
+
+----------------
+$ JC=`git rev-parse --verify "HEAD^0"`
+$ git checkout-index -f -u -a $JC
+----------------
+
+Vous faites des modifications aléatoires, sans exécuter 'git update-index'. Et puis vous remarquez que le sommet de votre arbre « amont » a avancé depuis que vous avez tiré depuis lui :
+
+----------------
+$ git fetch git://.... linus
+$ LT=`git rev-parse FETCH_HEAD`
+----------------
+
+Votre arbre de travail est toujours basé sur votre HEAD ($JC), mais vous avez quelques modifications depuis. La fusion à trois sens s'assure que vous n'avez pas ajouté ou modifié d'entrées d'index depuis $JC, et si c'est le cas, fait ce qu'il faut. Donc avec la séquence suivante :
+
+----------------
+$ git read-tree -m -u `git merge-base $JC $LT` $JC $LT
+$ git merge-index git-merge-one-file -a
+$ echo "Merge with Linus" | \
+  git commit-tree `git write-tree` -p $JC -p $LT
+----------------
+
+ce que vous valideriez serait un commit pur entre $JC et $LT sans vos modifications en cours, et votre arbre de travail serait mis à jour avec le résultat de la fusion.
+
+Cependant, si vous avez des modifications locales dans l'arbre de travail qui seraient écrasées par cette fusion, 'git read-tree' refusera de s'exécuter pour empêcher la perte de vos modifications.
+
+En d'autres termes, il n'est pas nécessaire de s'inquiéter de ce qui n'existe que dans l'arbre de travail. Quand vous avez des modifications locales dans une partie du projet qui n'est pas impliquée dans la fusion, vos modifications n'interfèrent pas avec la fusion et sont conservées intactes. Quand elles *interfèrent* effectivement, la fusion ne démarre même pas ('git read-tree' se plaint bruyamment et échoue sans rien modifier). Dans ce cas, vous pouvez simplement continuer ce que vous étiez en train de faire, et quand votre arbre de travail est prêt (c'est-à-dire que vous avez terminé votre travail en cours), tentez à nouveau la fusion.
+
+
+CHECKOUT PARTIEL
+----------------
+
+Note : les fonctionnalités skip-worktree de linkgit:git-update-index[1] et de `read-tree` sont antérieures à l'introduction de linkgit:git-sparse-checkout[1]. Les utilisateurs sont encouragés à utiliser la commande `sparse-checkout` de préférence à ces commandes de plomberie pour les besoins liés au extraction partielle/skip-worktree. Cependant, les informations ci-dessous peuvent être utiles aux utilisateurs qui essaient de comprendre le style de motif utilisé dans le mode non-cone de la commande `sparse-checkout`.
+
+Le « extraction partielle » (sparse checkout) permet de peupler le répertoire de travail de manière partielle. Il utilise le bit skip-worktree (voir linkgit:git-update-index[1]) pour indiquer à Git si un fichier dans le répertoire de travail mérite d'être examiné.
+
+'git read-tree' et d'autres commandes basées sur la fusion ('git merge', 'git checkout'...) peuvent aider à maintenir le bitmap skip-worktree et la mise à jour du répertoire de travail. `$GIT_DIR/info/sparse-checkout` est utilisé pour définir le bitmap de référence skip-worktree. Quand 'git read-tree' a besoin de mettre à jour le répertoire de travail, il réinitialise le bit skip-worktree dans l'index en se basant sur ce fichier, qui utilise la même syntaxe que les fichiers .gitignore. Si une entrée correspond à un motif dans ce fichier, ou si l'entrée correspond à un fichier présent dans l'arbre de travail, alors skip-worktree ne sera pas positionné sur cette entrée. Sinon, skip-worktree sera positionné.
+
+Ensuite, il compare la nouvelle valeur skip-worktree avec la précédente. Si skip-worktree passe de positionné à non positionné, il ajoutera à nouveau le fichier correspondant. S'il passe de non positionné à positionné, ce fichier sera supprimé.
+
+Bien que `$GIT_DIR/info/sparse-checkout` soit habituellement utilisé pour spécifier quels fichiers sont inclus, vous pouvez aussi spécifier quels fichiers ne sont _pas_ inclus, en utilisant des motifs de négation. Par exemple, pour supprimer le fichier `unwanted` :
+
+----------------
+/*
+!unwanted
+----------------
+
+Une autre chose délicate est de repeupler entièrement le répertoire de travail quand vous ne voulez plus de extraction partielle. Vous ne pouvez pas simplement désactiver le « extraction partielle » car les bits skip-worktree sont toujours dans l'index et votre répertoire de travail est toujours peuplé partiellement. Vous devriez repeupler le répertoire de travail avec le contenu du fichier `$GIT_DIR/info/sparse-checkout` comme suit :
+
+----------------
+/*
+----------------
+
+Ensuite, vous pouvez désactiver le extraction partielle. La prise en charge du extraction partielle dans 'git read-tree' et les commandes similaires est désactivée par défaut. Vous devez activer `core.sparseCheckout` pour bénéficier de la prise en charge du extraction partielle.
+
+
+VOIR AUSSI
+----------
+linkgit:git-write-tree[1], linkgit:git-ls-files[1], linkgit:gitignore[5], linkgit:git-sparse-checkout[1]
+
+GIT
+---
+Fait partie de la suite linkgit:git[1]
+
+TRADUCTION
+----------
+Cette  page de manuel a été traduite par Jean-Noël Avila <jn.avila AT free DOT fr> et les membres du projet git-manpages-l10n. Veuillez signaler toute erreur de traduction par un rapport de bogue sur le site https://github.com/jnavila/git-manpages-l10n .
