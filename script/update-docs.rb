@@ -80,16 +80,17 @@ def wrap_front_matter(front_matter)
   "#{front_matter.to_yaml.sub("---\n", "---\n#{content_note}\n")}---\n"
 end
 
-def expand_l10n(path, content, get_f_content, categories, ext)
-  content.gsub!(/include::({build_dir}\/)?(\S+)\.#{ext}/) do |line|
-    line.gsub!("include::", "")
-    if categories[line]
-      new_content = categories[line]
+def expand_l10n(path, content, get_f_content, categories, ext, build_dir = File.dirname(path))
+  content.gsub!(/include::({build_dir}\/)?(\S+\.#{ext})/) do
+    match = Regexp.last_match
+    target = match[2]
+    if categories[target]
+      new_content = categories[target]
     else
-      new_content, new_path = get_f_content.call(path, line)
+      new_content, new_path = get_f_content.call(path, target, match[1] ? build_dir : nil)
     end
     if new_content
-      expand_l10n(new_path, new_content, get_f_content, categories, ext)
+      expand_l10n(new_path, new_content, get_f_content, categories, ext, build_dir)
     else
       "\n\n[WARNING]\n====\nMissing `#{new_path}`\n\nSee original version for this content.\n====\n\n"
     end
@@ -230,8 +231,8 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
 
     puts "Found #{doc_files.size} entries"
 
-    get_content_f = proc do |source, target|
-      name = File.join(File.dirname(source), target)
+    get_content_f = proc do |source, target, build_dir = nil|
+      name = File.join(build_dir || File.dirname(source), target)
       content_file = tag_files.detect { |ent| ent.first == name }
       if content_file
         new_content = get_content.call(content_file[1])
