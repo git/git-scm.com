@@ -13,11 +13,6 @@
 //= require jquery.defaultvalue
 //= require session.min
 
-// Used to detect initial (useless) popstate.
-// If history.state exists, assume browser isn't going to fire initial popstate.
-popped = 'state' in window.history;
-initialURL = location.href;
-
 const baseURLPrefix = (() => {
   const thisScriptSrc =
     Array.from(document.getElementsByTagName('script'))
@@ -41,37 +36,15 @@ $(document).ready(function() {
   Print.init();
 });
 
-function onPopState(fn) {
-  if (window.history && window.history.pushState) {
-    return $(window).on('popstate', function() {
-      var section;
-      initialPop = !popped && location.href === initialURL;
-      popped = true;
-      if (initialPop) {
-        return;
-      }
-      fn();
-    });
-  }
-}
-
 var DownloadBox = {
   init: function() {
-    $('#gui-os-filter').addClass('visible');
     var os = window.session.browser.os; // Mac, Win, Linux
     if(os == "Mac") {
       $("#download-link").text("Install for Mac").attr("href", `${baseURLPrefix}install/mac`);
-      $("#gui-os-filter").attr('data-os', 'mac');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Mac)")
     } else if (os == "Windows") {
       $("#download-link").text("Install for Windows").attr("href", `${baseURLPrefix}install/windows`);
-      $("#gui-os-filter").attr('data-os', 'windows');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Windows)")
     } else if (os == "Linux") {
       $("#download-link").text("Install for Linux").attr("href", `${baseURLPrefix}install/linux`);
-      $("#gui-os-filter").attr('data-os', 'linux');
-      $("#gui-os-filter").text("Only show GUIs for my OS (Linux)")
-    } else {
     }
   }
 }
@@ -498,76 +471,7 @@ var Forms = {
 }
 var Downloads = {
   init: function() {
-    Downloads.observeGUIOSFilter();
-    Downloads.observePopState();
-    Downloads.filterGUIS();
     Downloads.postProcessDownloadPage();
-  },
-
-  getOSFromQueryString: function() {
-    const query = window.location.search.substring(1);
-    const needle = `os=`;
-    return query
-      .split('&')
-      .filter(e => e.startsWith(needle))
-      .map(e => decodeURIComponent(e.substring(needle.length).replace(/\+/g, '%20')))
-      .pop();
-  },
-
-  getOSFilter: function(os) {
-    os = os || Downloads.getOSFromQueryString();
-    return os === 'linux' || os === 'mac' || os === 'windows' || os === 'android' || os === 'ios' ? os : '';
-  },
-
-  capitalizeOS: function(os) {
-    const platforms = {"linux": "Linux", "mac": "Mac", "windows": "Windows", "android": "Android", "ios": "iOS"};
-    return platforms[os];
-  },
-
-  filterGUIS: function(os) {
-    var osFilter = Downloads.getOSFilter(os);
-    var capitalizedOS = Downloads.capitalizeOS(osFilter);
-    $('a.gui-os-filter').not("[data-os='"+osFilter+"']").removeClass('selected');
-    $('a.gui-os-filter').filter("[data-os='"+osFilter+"']").addClass('selected');
-
-    if (osFilter === '') {
-      $('ul.gui-thumbnails li').removeClass("masked");
-      $('#os-filter-count').hide();
-    }
-    else {
-      $('ul.gui-thumbnails li').filter("."+osFilter).removeClass('masked');
-      $('ul.gui-thumbnails li').not("."+osFilter).addClass('masked');
-      var osCount = $('ul.gui-thumbnails li' + '.' + osFilter).length;
-      $('#os-filter-count strong').html(osCount);
-      $('#os-filter-count .os').html(capitalizedOS);
-      $('#os-filter-count').show();
-    }
-  },
-
-  observeGUIOSFilter: function() {
-    $('a.gui-os-filter').on('click', function(e) {
-      e.preventDefault();
-      var os = $(this).attr('data-os');
-
-      if (window.history && window.history.pushState) {
-        var url = os === ''
-          ? `${baseURLPrefix}downloads/guis`
-          : `${baseURLPrefix}downloads/guis?os=${os}`;
-        try {
-          history.pushState(null, $(this).html(), url);
-        } catch (e) {
-          if (`${e}`.indexOf('The operation is insecure') < 0) console.log(e)
-        }
-      }
-
-      Downloads.filterGUIS(os);
-    });
-  },
-
-  observePopState: function() {
-    onPopState(function() {
-      Downloads.filterGUIS();
-    });
   },
 
   // say how many days ago this version was released
