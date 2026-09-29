@@ -51,9 +51,6 @@ Here is a detailed list of the relevant directories:
   - static/
   - assets/
 
-- To add new GUIs:
-  - data/
-
 - To work on pre-rendering pages that originate from other repositories (such as the ProGit book):
   - script/
 
@@ -131,7 +128,6 @@ Believe it or not, https://git-scm.com/ has its own test suite. It uses [Playwri
 >     /content/404.html \
 >     /content/_index.html \
 >     /content/about/small-and-fast.html \
->     /content/downloads/guis/ \
 >     /content/search/ \
 >     /data/ \
 >     /external/book/content/book/_index.html \
@@ -280,20 +276,6 @@ If you wish to contribute to this website, please [fork it on GitHub](https://gi
 Then, clone it using [`scalar`](https://git-scm.com/docs/scalar) (this avoids long clone times) and then use [`git sparse-checkout add <directory>`](https://git-scm.com/docs/git-sparse-checkout) to check out the files relevant to your work.
 
 After making the changes, commit and push to a named branch in your fork, then open a pull request. If it is a big feature, you might want to [start an issue](https://github.com/git/git-scm.com/issues/new) first to make sure it's something that will be accepted.
-
-## Adding a new GUI
-
-The [list of GUI clients](https://git-scm.com/downloads/guis) has been constructed by the community for a long time. If you want to add another tool you'll need to follow a few steps:
-
-1. Add a new `.md` file with the GUI client details: data/guis
-    1. The fields need to be enclosed within `---` lines
-    2. The fields `name`, `project_url`, `price`, `license` should be very straightforward to fill.
-    3. The field `image_tag` corresponds to the path of the image of the tool (should start with `images/guis/`).
-    4. `platforms` is a list of at least 1 platform in which the tool is supported. The possibilities are: `Windows`, `Mac`, `Linux`, `Android`, and `iOS`
-    5. `order` can be filled with the biggest number already existing, plus 1 (this number determines the order in which the GUIs are rendered). This is the only field whose value should _not_ be enclosed in double-quote characters.
-    6. `trend_name` is an optional field that can be used for helping sorting the clients.
-
-2. Add the image to `static/images/guis/<GUI_CLIENT_NAME>@2x.png` and `static/images/guis/<GUI_CLIENT_NAME>.png` making sure the aspect ratio matches a 588:332 image.
 
 ## Useful links
 
