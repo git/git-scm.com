@@ -195,6 +195,33 @@ test('manual pages', async ({ page }) => {
   await expect(synopsis).not.toHaveText(/git remote renom.*<ancien> <nouveau>/)
 })
 
+test('git manual lists commands', async ({ page }) => {
+  await page.goto(`${url}docs/git`)
+
+  for (const [section, command] of [
+    ['main_porcelain_commands', 'git-add[1]'],
+    ['ancillary_commands', 'git-config[1]'],
+    ['ancillary_commands', 'git-annotate[1]'],
+    ['interacting_with_others', 'git-archimport[1]'],
+    ['manipulation_commands', 'git-apply[1]'],
+    ['interrogation_commands', 'git-cat-file[1]'],
+    ['syncing_repositories', 'git-daemon[1]'],
+    ['syncing_repositories', 'git-http-fetch[1]'],
+    ['internal_helper_commands', 'git-check-attr[1]'],
+    ['guides', 'gitcore-tutorial[7]'],
+    ['repository_command_and_file_interfaces', 'gitattributes[5]'],
+    [
+      'file_formats_protocols_and_other_developer_interfaces',
+      'gitformat-bundle[5]'
+    ]
+  ]) {
+    const commands = page.locator(`#_${section}`)
+      .locator('xpath=..').locator('dt')
+    await expect(commands.getByRole('link', { name: command, exact: true }))
+      .toBeVisible()
+  }
+})
+
 test('anchor links in manual pages', async ({ page }) => {
   // Test that anchor links work without HTML tags
   const anchor = '#Documentation/git-clone.txt---recurse-submodulesltpathspecgt'
