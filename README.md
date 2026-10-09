@@ -140,6 +140,7 @@ Believe it or not, https://git-scm.com/ has its own test suite. It uses [Playwri
 >     /external/book/content/book/en/v2/_index.html \
 >     /external/book/content/book/fr/v2/Démarrage-rapide-À-propos-de-la-gestion-de-version.html \
 >     /external/book/data/ \
+>     /external/docs/content/docs/git.html \
 >     /external/docs/content/docs/git-add/fr.html \
 >     /external/docs/content/docs/git-clone.html \
 >     /external/docs/content/docs/git-commit.html \
