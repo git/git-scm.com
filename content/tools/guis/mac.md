@@ -1,0 +1,6 @@
+---
+redirect_to: tools/guis?os=mac
+aliases:
+- /download/gui/mac
+- /download/guis/mac
+---

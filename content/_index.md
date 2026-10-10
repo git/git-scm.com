@@ -1,0 +1,4 @@
+---
+section: home
+is_site_root: true
+---

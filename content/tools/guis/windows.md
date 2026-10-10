@@ -1,0 +1,6 @@
+---
+redirect_to: tools/guis?os=windows
+aliases:
+- /download/gui/windows
+- /download/guis/windows
+---

@@ -1,0 +1,6 @@
+---
+redirect_to: tools/guis?os=linux
+aliases:
+- /download/gui/linux
+- /download/guis/linux
+---

@@ -1,0 +1,6 @@
+---
+redirect_to: tools/guis?os=ios
+aliases:
+- /download/gui/ios
+- /download/guis/ios
+---
