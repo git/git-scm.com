@@ -157,26 +157,26 @@ class Book
       front_matter["book"]["ebook_mobi"] = self.ebook_mobi
     end
 
-    path = self.absolute_path("_index.html")
+    path = self.absolute_path("_index.md")
     FileUtils.mkdir_p(File.dirname(path))
     File.open(path, 'w') do |file|
       file.write(self.wrap_front_matter(front_matter))
     end
 
     front_matter = { "redirect_to" => "book/#{@language_code}/v#{@edition}" }
-    File.write(self.absolute_path("../_index.html"), self.wrap_front_matter(front_matter))
+    File.write(self.absolute_path("../_index.md"), self.wrap_front_matter(front_matter))
     FileUtils.mkdir_p(self.absolute_path("../v1"))
-    File.write(self.absolute_path("../v1/_index.html"), self.wrap_front_matter(front_matter))
+    File.write(self.absolute_path("../v1/_index.md"), self.wrap_front_matter(front_matter))
 
     if @language_code == "en"
-      File.write(self.absolute_path("../../_index.html"), self.wrap_front_matter(front_matter))
+      File.write(self.absolute_path("../../_index.md"), self.wrap_front_matter(front_matter))
       FileUtils.mkdir_p(self.absolute_path("../../v1"))
-      File.write(self.absolute_path("../../v1/_index.html"), self.wrap_front_matter(front_matter))
+      File.write(self.absolute_path("../../v1/_index.md"), self.wrap_front_matter(front_matter))
     end
 
     FileUtils.mkdir_p(self.absolute_path("ch00"))
     @xrefs.each do |id_xref, section|
-      path = self.absolute_path("ch00/#{id_xref}.html")
+      path = self.absolute_path("ch00/#{id_xref}.md")
       if section == 'redirect-to-en'
 	if id_xref == 'ch01-introduction'
 	  id_xref = 'ch01-getting-started'
@@ -380,7 +380,7 @@ class Section
 
     path = self.absolute_path(self.slug.gsub(/[:?]/, ''))
     FileUtils.mkdir_p(File.dirname(path))
-    File.open("#{path}.html", 'w') do |file|
+    File.open("#{path}.md", 'w') do |file|
       file.write(@chapter.wrap_front_matter(self.front_matter))
       file.write(self.html.strip)
     end

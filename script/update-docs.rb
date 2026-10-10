@@ -14,7 +14,7 @@ require_relative "version"
 require_relative 'asciidoctor-extensions'
 
 SITE_ROOT = File.join(File.expand_path(File.dirname(__FILE__)), '../')
-DOCS_INDEX_FILE = "#{SITE_ROOT}external/docs/content/docs/_index.html"
+DOCS_INDEX_FILE = "#{SITE_ROOT}external/docs/content/docs/_index.md"
 DATA_FILE = "#{SITE_ROOT}external/docs/data/docs.json"
 DOCS_EXTRA_FILE = "#{SITE_ROOT}data/docs_extra.yml"
 
@@ -343,7 +343,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
 
       html = mark_glossary_tooltips(html, glossary_data_by_lang, lang)
 
-      # Write <docname>/<lang>.html
+      # Write <docname>/<lang>.md
       front_matter = {
         "category" => "manual",
         "section" => "documentation",
@@ -360,7 +360,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
       end
 
       FileUtils.mkdir_p(doc_path)
-      File.open("#{doc_path}/#{lang}.html", "w") do |out|
+      File.open("#{doc_path}/#{lang}.md", "w") do |out|
         out.write(wrap_front_matter(front_matter))
         out.write(html)
       end
@@ -374,7 +374,7 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
     # translated manual pages may point to other translated manual pages that do
     # not exist. In these cases, redirect to the English version.
     check_paths.each do |path|
-      doc_path = "#{SITE_ROOT}external/docs/content/#{path}.html"
+      doc_path = "#{SITE_ROOT}external/docs/content/#{path}.md"
       if !File.exist?(doc_path)
         front_matter = { "redirect_to" => "#{path.sub(/\/[^\/]*$/, '')}" } # rtrim `/<lang>`
         FileUtils.mkdir_p(File.dirname(doc_path))
@@ -391,13 +391,13 @@ def index_l10n_doc(filter_tags, doc_list, get_content)
   # short-circuits the whole tag loop) so that an "everything is up to date"
   # run never deletes anything.
   unless seen_translations.empty?
-    Dir.glob("#{SITE_ROOT}external/docs/content/docs/*/*.html").each do |output_path|
-      m = output_path.match(%r{/external/docs/content/docs/([^/]+)/([^/]+)\.html\z})
+    Dir.glob("#{SITE_ROOT}external/docs/content/docs/*/*.md").each do |output_path|
+      m = output_path.match(%r{/external/docs/content/docs/([^/]+)/([^/]+)\.md\z})
       next unless m
       docname = m[1]
       lang = m[2]
       # Only consider translation-shaped lang codes (e.g. `en`, `fr`, `pt_BR`,
-      # `zh_HANS-CN`); skip versioned English files like `2.30.0.html`.
+      # `zh_HANS-CN`); skip versioned English files like `2.30.0.md`.
       next unless lang =~ /\A[a-z]{2}(?:_[A-Z]+(?:-[A-Z]+)?)?\z/
       next if seen_translations.include?([docname, lang])
       # Preserve redirect stubs written by the `check_paths` loop above:
@@ -712,7 +712,7 @@ def index_doc(filter_tags, doc_list, get_content)
           page_data["latest-changes"] = doc_versions[changed_in]
         end
 
-        # Write <docname>/<version>.html
+        # Write <docname>/<version>.md
         front_matter = {
           "category" => "manual",
           "section" => "documentation",
@@ -727,9 +727,9 @@ def index_doc(filter_tags, doc_list, get_content)
           front_matter['headings'] = headings
         end
 
-        if changed_in != doc_version_index && File.exist?("#{doc_path}/#{version}.html")
+        if changed_in != doc_version_index && File.exist?("#{doc_path}/#{version}.md")
           # remove obsolete file
-          File.delete("#{doc_path}/#{version}.html")
+          File.delete("#{doc_path}/#{version}.md")
         end
 
         FileUtils.mkdir_p(doc_path)
@@ -738,15 +738,15 @@ def index_doc(filter_tags, doc_list, get_content)
           doc_versions[changed_in..unchanged_until].flat_map do |v|
             ["/docs/#{docname}/#{v}/index.html"]
           end
-        File.open("#{doc_path}/#{doc_versions[changed_in]}.html", "w") do |out|
+        File.open("#{doc_path}/#{doc_versions[changed_in]}.md", "w") do |out|
           out.write(wrap_front_matter(front_matter_with_redirects))
           out.write(html)
         end
 
-        # Write <docname>.html
+        # Write <docname>.md
         if page_data["latest-changes"] == version
           FileUtils.mkdir_p(File.dirname(doc_path))
-          File.open("#{doc_path}.html", "w") do |out|
+          File.open("#{doc_path}.md", "w") do |out|
             front_matter["latest-changes"] = version
             front_matter["aliases"] = ["/docs/#{docname}/index.html"]
             out.write(wrap_front_matter(front_matter))
@@ -797,7 +797,7 @@ def index_doc(filter_tags, doc_list, get_content)
       # that are not populated. Let's redirect to the source files in the
       # git/git repository.
       check_paths.each do |path|
-        doc_path = "#{SITE_ROOT}external/docs/content/#{path}.html"
+        doc_path = "#{SITE_ROOT}external/docs/content/#{path}.md"
         if !File.exist?(doc_path)
           type = 'blob'
           target = path.sub(/^docs\//, '')
