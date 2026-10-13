@@ -21,7 +21,7 @@ module Git
       rule(:opt_or_alt) { match('[\[\] |()]') >> space? }
       rule(:ellipsis) { str('...') >> match('\]|$').present? }
       rule(:grammar) { opt_or_alt | ellipsis }
-      rule(:ignore) { match('[\'`]') }
+      rule(:ignore) { str('`') }
 
       rule(:token) do
         grammar.as(:grammar) | placeholder.as(:placeholder) | space.as(:space) |
