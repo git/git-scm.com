@@ -81,6 +81,7 @@
     var send = function(){ parent.postMessage({gitSimEmbed: id, height: document.body.scrollHeight}, '*'); };
     window.addEventListener('load', function(){ send(); parent.postMessage({gitSimEmbedReady: id}, '*'); });
     window.addEventListener('git-sim:layout', send);
+    document.addEventListener('git-sim:step', function(e){ var d = e.detail || {}; parent.postMessage({gitSimStep: id, step: d.step, steps: d.steps}, '*'); });
     if (window.ResizeObserver) new ResizeObserver(send).observe(document.body);
     var closeMenus = function(){ if (document.querySelector('#shareMenu:not([hidden]), #helpMenu:not([hidden])')) document.body.click(); };
     window.addEventListener('blur', closeMenus);
@@ -88,6 +89,7 @@
       if (e.source !== window.parent) return;
       var m = e.data || {};
       if (m.gitSimClose === id) { closeMenus(); return; }
+      if (m.gitSimGo === id && typeof m.step === 'number') { document.dispatchEvent(new CustomEvent('git-sim:go', {detail: {step: m.step}})); return; }
       if (m.gitSimTheme !== id || !m.theme) return;
       root.dataset.theme = m.theme;
       try { if (window.GitSimViewer && GitSimViewer.setTheme) GitSimViewer.setTheme(m.theme); } catch (err) {}
@@ -112,12 +114,36 @@
     return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, tail + '</body>') : html + tail;
   }
 
+  function stepList(f){
+    const sel = f.element.dataset.steps;
+    if (!sel) return [];
+    try { return Array.from((f.element.parentElement || document).querySelectorAll(sel)).filter(n => !f.element.contains(n)); } catch (err) { return []; }
+  }
+  function markStep(f, step, steps){
+    stepList(f).forEach((n, k) => { if (k === step) n.setAttribute('aria-current', 'step'); else n.removeAttribute('aria-current'); });
+    f.element.dispatchEvent(new CustomEvent('git-sim:step', {detail: {step: step, steps: steps}}));
+  }
+  function bindSteps(id, f){
+    if (f.stepsBound) return;
+    f.stepsBound = true;
+    stepList(f).forEach((n, k) => {
+      n.setAttribute('role', 'button');
+      n.tabIndex = 0;
+      n.title = 'Play this step';
+      const go = () => { if (f.iframe.contentWindow) f.iframe.contentWindow.postMessage({gitSimGo: id, step: k}, '*'); };
+      n.addEventListener('click', go);
+      n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    });
+  }
+
   window.addEventListener('message', e => {
     const m = e.data || {};
-    const f = frames.get(m.gitSimEmbedReady || m.gitSimEmbed);
+    const f = frames.get(m.gitSimEmbedReady || m.gitSimEmbed || m.gitSimStep);
     if (!f || e.source !== f.iframe.contentWindow) return;
+    if (m.gitSimStep && typeof m.step === 'number') { markStep(f, m.step, m.steps); return; }
     if (m.gitSimEmbedReady) {
       f.ready = true;
+      bindSteps(m.gitSimEmbedReady, f);
       if (typeof deliver === 'function') deliver(m.gitSimEmbedReady);
       if (!f.svg) sendTheme(m.gitSimEmbedReady);
     }

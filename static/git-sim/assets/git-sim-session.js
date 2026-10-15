@@ -68,9 +68,11 @@ function makeViewer(root){
   function retheme(svg, from, to){
     if (!svg || from === to || !PALETTES[from] || !PALETTES[to]) return;
     const map = colorMap(from, to);
+    const plain = String(PALETTES[from].ref_text).toUpperCase();
+    const plainRefs = Array.from($('text[data-role="ref"]', svg)).filter(t => (t.getAttribute('fill') || '').toUpperCase() === plain);
     const attrs = ['fill', 'stroke', 'flood-color', 'data-before-fill', 'data-before-stroke', 'data-after-fill', 'data-after-stroke'];
     $('*', svg).forEach(el => attrs.forEach(a => { const v = el.getAttribute(a); if (v) { const m = map[v.toUpperCase()]; if (m) el.setAttribute(a, m); } }));
-    $('text[data-role="ref"]', svg).forEach(t => t.setAttribute('fill', PALETTES[to].ref_text));
+    plainRefs.forEach(t => t.setAttribute('fill', PALETTES[to].ref_text));
     $('[data-role="background"]', svg).forEach(r => r.setAttribute('fill', PALETTES[to].bg));
     $('line[data-role="title"]', svg).forEach(l => l.setAttribute('stroke', PALETTES[to].accent));
     reshade(svg, to);
@@ -277,7 +279,8 @@ function makeViewer(root){
     });
     recolored.forEach(el => {
       const a = amount(el, progress);
-      if (el.dataset.afterFill && el.dataset.beforeFill !== undefined) el.setAttribute('fill', mix(el.dataset.beforeFill, el.dataset.afterFill, a));
+      const hollow = el.dataset.afterFill === 'none' || el.dataset.beforeFill === 'none' || el.getAttribute('fill') === 'none';
+      if (el.dataset.afterFill && el.dataset.beforeFill !== undefined && !hollow) el.setAttribute('fill', mix(el.dataset.beforeFill, el.dataset.afterFill, a));
       if (el.dataset.afterStroke && el.dataset.beforeFill !== undefined) el.setAttribute('stroke', mix(el.dataset.beforeStroke || el.dataset.beforeFill, el.dataset.afterStroke, a));
       if (el.dataset.afterDash || el.dataset.beforeDash !== undefined) el.setAttribute('stroke-dasharray', a < .5 ? (el.dataset.beforeDash || 'none') : (el.dataset.afterDash || 'none'));
     });
@@ -293,17 +296,21 @@ function makeViewer(root){
 
   let playing = false, raf = null, hold = null;
   const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const compactRun = !!document.documentElement.dataset.compact;
+  const stepwise = x => { const k = Math.floor(x); return k + ease(x - k); };
+  const unstep = v => { const k = Math.floor(v), f = v - k;
+    return k + (f < .5 ? Math.sqrt(f / 2) : 1 - Math.sqrt(2 * (1 - f)) / 2); };
   function tween(to, ms, then){
-    const from = progress, t0 = performance.now();
+    const from = compactRun ? unstep(progress) : progress, t0 = performance.now();
     const frame = now => {
       if (!playing) return;
       const t = clamp((now - t0) / ms, 0, 1);
-      setProgress(from + (to - from) * ease(t));
+      setProgress(compactRun ? stepwise(from + (to - from) * t) : from + (to - from) * ease(t));
       if (t < 1) raf = requestAnimationFrame(frame); else if (then) hold = setTimeout(then, then === backward ? 1400 : 1000);
     };
     raf = requestAnimationFrame(frame);
   }
-  const perStep = clamp(4500 / maxStep, 380, 900);
+  const perStep = compactRun ? 1000 : clamp(4500 / maxStep, 380, 900);
   function forward(){ tween(maxStep, perStep * Math.max(1, maxStep - progress) + 200, backward); }
   function backward(){ tween(0, 700 + 120 * maxStep, forward); }
   function startPlay(){
@@ -407,11 +414,28 @@ function makeViewer(root){
   }
   function clearHighlight(){ $('.dim,.lit', svg).forEach(el => el.classList.remove('dim', 'lit')); }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const compactPage = !!document.documentElement.dataset.compact;
+  function labelOf(sha){
+    const label = $('[data-role="commit-label"][data-sha="' + sha + '"]', svg)[0];
+    const commit = $('[data-role="commit"][data-sha="' + sha + '"]', svg)[0];
+    return (label && label.textContent.trim()) || (commit && commit.dataset.message) || String(sha).slice(0, 7);
+  }
   function describe(el){
     const d = el.dataset;
     if (d.role === 'commit' || d.role === 'commit-label' || d.role === 'commit-hit') {
       const c = $('[data-role="commit"][data-sha="' + d.sha + '"]', svg)[0];
       const data = c ? c.dataset : d;
+      if (compactPage && data.kind !== 'elided') {
+        const label = labelOf(data.sha), parents = (data.parents || '').split(/\s+/).filter(Boolean).map(labelOf);
+        const copied = /[′']$/.test(label) ? label.replace(/[′']+$/, '') : '';
+        const said = data.kind === 'merge' ? 'A merge commit: it has two parents, one from each branch.'
+          : copied ? `A copy of ${copied}: the same changes, on a new parent.`
+          : data.lost ? 'This commit is no longer reachable from any branch and will eventually be garbage collected.'
+          : '';
+        return `<div class="sha">${esc(label)}</div>` +
+          `<div><span class="k">${parents.length > 1 ? 'parents' : 'parent'}</span> ${esc(parents.join(', ') || 'none')}</div>` +
+          (said ? `<div class="say">${esc(said)}</div>` : '');
+      }
       if (data.kind === 'elided') return `<div class="msg">${esc(data.message || '')}</div><div class="k">stands for the commits between its neighbours</div>`;
       return `<div class="sha">${esc(data.sha)}</div><div class="msg">${esc(data.message || '')}</div>` +
         `<div><span class="k">author</span> ${esc(data.author || '')}</div>` +
@@ -422,7 +446,22 @@ function makeViewer(root){
         (data.phase === 'after' ? '<div><span class="k">simulated by this command</span></div>' : '') +
         '<div class="k">click to copy sha</div>';
     }
-    if (d.role === 'ref') return `<div class="sha">${esc(d.name)}</div><div><span class="k">${esc(d.kind || 'ref')}</span>${d.phase === 'after' ? ' · simulated' : d.phase === 'removed' ? ' · removed by this command' : ''}</div>`;
+    if (compactPage && d.role === 'ref') {
+      const name = '<b>' + esc(d.name) + '</b>';
+      if (d.name === 'HEAD') return '<div class="say">Git HEAD always points to the currently checked-out branch/commit.</div>';
+      if (d.kind === 'tag') return '<div class="say">The ' + name + ' tag. In Git, a tag is a label that stays on one commit.</div>';
+      if (d.kind === 'remote') return '<div class="say">The ' + name + ' remote-tracking branch: where that branch was on the remote when you last fetched.</div>';
+      return '<div class="say">The ' + name + ' branch. In Git, a branch is just a label that points to a commit.</div>';
+    }
+    if (compactPage && d.role === 'file') {
+      const col = String(d.column || '').toLowerCase(), name = '<b>' + esc(d.name) + '</b>';
+      const said = /stag/.test(col) ? name + ' is staged: its changes go into the next commit.'
+        : /modif/.test(col) ? name + " has changes that aren't staged yet."
+        : /untrack/.test(col) ? "Git isn't tracking " + name + ' yet.'
+        : name;
+      return '<div class="say">' + said + '</div>';
+    }
+    if (d.role === 'ref') return`<div class="sha">${esc(d.name)}</div><div><span class="k">${esc(d.kind || 'ref')}</span>${d.phase === 'after' ? ' · simulated' : d.phase === 'removed' ? ' · removed by this command' : ''}</div>`;
     if (d.role === 'file') return `<div class="sha">${esc(d.name)}</div><div><span class="k">${esc(d.column || '')}</span>${d.phase === 'after' ? ' · after the command' : ''}</div>`;
     return '';
   }
@@ -446,7 +485,7 @@ function makeViewer(root){
   svg.addEventListener('mouseleave', clearNow);
   svg.addEventListener('click', e => {
     const el = e.target.closest('[data-sha]');
-    if (!el || !navigator.clipboard) return;
+    if (!el || !navigator.clipboard || compactPage) return;
     navigator.clipboard.writeText(el.dataset.sha).then(() => {
       tip.innerHTML = `<div class="sha">${esc(el.dataset.sha)}</div><div class="k">copied</div>`;
       clearTimeout(tipTimer); tipTimer = setTimeout(() => { tip.style.display = 'none'; }, 900);
@@ -645,25 +684,29 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
     return text;
   }
   const trace = frag.has('debug') ? (m => { lastError = 'trace: ' + m; status.textContent = lastError; }) : () => {};
-  async function show(index, play, then){
+  let showToken = 0;
+  async function show(index, play, then, wait){
+    const token = ++showToken;
     const item = items.find(i => i.index === index);
     if (!item) return;
     trace(`fetching ${index}`);
     const svg = await svgOf(index);
     trace(`fetched ${index}: ${svg ? svg.length : 0} chars`);
-    if (!svg) return;
+    if (!svg || token !== showToken) return;
     current = index;
     Array.from(chips.children).forEach(c => c.classList.toggle('cur', Number(c.dataset.i) === index));
     const chip = chips.querySelector(`.chip[data-i="${index}"]`);
     if (chip) { const cr = chip.getBoundingClientRect(), sr = chips.getBoundingClientRect();
       if (cr.left < sr.left) chips.scrollLeft += cr.left - sr.left; else if (cr.right > sr.right) chips.scrollLeft += cr.right - sr.right; }
     const empty = $('empty'); if (empty) empty.remove();
+    const hold = play && wait > 0;
     try {
-      V.mount(svg, {title: item.label, state: 'after'});
+      V.mount(svg, {title: item.label, state: hold ? 'before' : 'after'});
     } catch (e) { complain(`could not draw change ${index}: ${e.message}`); return; }
     trace(`mounted ${index}: stage has ${$('stage').children.length} child(ren)`);
     setStatus();
-    if (play) V.playOnce(then); else if (then) then();
+    if (hold) setTimeout(() => { if (token === showToken) V.playOnce(then); }, wait);
+    else if (play) V.playOnce(then); else if (then) then();
   }
   function add(item, svg, fresh){
     if (items.some(i => i.index === item.index)) return;
@@ -677,29 +720,34 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
     else if (current < 0 && !recording) show(item.index, false);
     setStatus();
   }
-  function replay(from){
+  function replay(from, wait){
     const order = items.map(i => i.index).filter(i => i !== 0);
     if (!order.length || (items.length < 2 && !recorded)) return;
     replaying = true; follow = false;
     let at = from == null ? 0 : Math.max(0, order.indexOf(from));
+    let first = true;
     const next = () => {
       if (!replaying) return;
-      if (at >= order.length) { replaying = false; follow = !recorded; setStatus(); return; }
+      if (at >= order.length) { replaying = false; follow = !recorded; setStatus(); document.dispatchEvent(new CustomEvent('git-sim:done')); return; }
+      const held = first ? wait : 0;
+      first = false;
       show(order[at++], true, () => {
         const hooks = window.GitSimLiveHooks || {};
         if (!hooks.hold) { setTimeout(next, 700); return; }
         Promise.resolve().then(() => hooks.hold(at >= order.length)).catch(() => {}).then(() => setTimeout(next, 150));
-      });
+      }, held);
     };
     next();
   }
-  function stopReplay(){ replaying = false; setStatus(); const hooks = window.GitSimLiveHooks || {}; if (hooks.stopped) hooks.stopped(); }
+  function stopReplay(){ replaying = false; showToken++; setStatus(); const hooks = window.GitSimLiveHooks || {}; if (hooks.stopped) hooks.stopped(); }
   replayBtn.addEventListener('click', () => { if (replaying) stopReplay(); else replay(); });
   window.GitSimLive = {
-    play(from){ if (recording) return; const order = items.map(i => i.index).filter(i => i !== 0);
-      if (from != null && order.includes(from)) { replay(from); return; }
-      replay(current === order[order.length - 1] ? order[0] : current); },
+    play(from, wait){ if (recording) return; const order = items.map(i => i.index).filter(i => i !== 0);
+      if (from != null && order.includes(from)) { replay(from, wait); return; }
+      replay(current === order[order.length - 1] ? order[0] : current, wait); },
     stop(){ stopReplay(); },
+    step(index){ if (recording || !items.some(i => i.index === index)) return; replaying = false; follow = false;
+      show(index, true, () => { setStatus(); document.dispatchEvent(new CustomEvent('git-sim:done')); }); },
     get playing(){ return replaying; },
   };
   document.addEventListener('keydown', e => {
@@ -748,6 +796,7 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
   const timeOf = chip => { const t = chip.querySelector('small'); return t ? t.textContent.trim() : ''; };
   const steps = () => Array.from(chips.querySelectorAll('.chip')).filter(c => c.dataset.i !== '0');
   let paused = false;
+  let started = false, idle = false, lastStep = null;
   const running = () => !!(window.GitSimLive && GitSimLive.playing);
   const playing = () => running() && !paused;
   function go(k){
@@ -755,9 +804,11 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
     if (!s) return;
     const wasPlaying = playing();
     paused = false;
+    started = true; idle = false;
     GitSimLive.stop();
     if (wasPlaying) GitSimLive.play(+s.dataset.i); else s.click();
     syncPlay();
+    show();
   }
   const STATES = {watching: 'Watching', paused: 'Paused', replaying: 'Replaying', recording: 'Recording', disconnected: 'Disconnected'};
   function pill(){
@@ -803,11 +854,16 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
     }
     $('vpPrev').disabled = at <= 0;
     $('vpNext').disabled = at >= all.length - 1;
+    const step = started && !idle ? at : -1;
+    if (step !== lastStep) {
+      lastStep = step;
+      document.dispatchEvent(new CustomEvent('git-sim:step', {detail: {step: step, steps: all.length}}));
+    }
   }
   new MutationObserver(show).observe(chips, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']});
 
   const DETAILS = 'git-sim:step-details';
-  let details = (() => { try { return localStorage.getItem(DETAILS) !== '0'; } catch (e) { return true; } })();
+  let details = root.dataset.compact ? false : (() => { try { return localStorage.getItem(DETAILS) !== '0'; } catch (e) { return true; } })();
   const labels = $('vpLabels');
   function applyDetails(){
     $('vpStepBar').classList.toggle('labeled', details);
@@ -824,18 +880,35 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
   applyDetails();
 
   function syncPlay(){
+    if (!started && running()) { started = true; show(); }
     const on = playing();
     $('vpPlayIcon').innerHTML = on ? icon.pause : icon.play;
     $('vpPlayText').textContent = on ? 'Pause' : 'Play';
+    $('vpPlay').setAttribute('aria-label', on ? 'Pause' : 'Play');
+    $('vpPlay').title = on ? 'Pause' : 'Play';
     pill();
   }
   function togglePlay(){
     if (paused && running()) { paused = false; GitSimViewer.resumeOnce(); }
     else if (running()) { paused = true; GitSimViewer.pauseOnce(); }
-    else { paused = false; GitSimLive.play(); }
+    else if (root.dataset.compact && steps().length) { paused = false; started = true; idle = false; GitSimLive.play(+steps()[0].dataset.i, 500); }
+    else { paused = false; idle = false; GitSimLive.play(); }
     syncPlay();
+    show();
   }
+  document.addEventListener('git-sim:go', e => {
+    const s = steps()[(e.detail || {}).step];
+    if (!s) return;
+    started = true; idle = false; paused = false;
+    GitSimLive.stop();
+    GitSimLive.step(+s.dataset.i);
+    syncPlay(); show();
+  });
+  document.addEventListener('git-sim:done', () => { idle = true; show(); });
   $('vpPlay').addEventListener('click', togglePlay);
+  document.addEventListener('keydown', e => {
+    if (e.key === '[' || e.key === ']') { started = true; idle = false; setTimeout(show); }
+  });
   document.querySelectorAll('.vp-player button, .vp-watch').forEach(b => b.addEventListener('mousedown', e => e.preventDefault()));
   $('vpPrev').addEventListener('click', () => { const all = steps(); go(all.indexOf(chips.querySelector('.chip.cur')) - 1); });
   $('vpNext').addEventListener('click', () => { const all = steps(); go(all.indexOf(chips.querySelector('.chip.cur')) + 1); });
@@ -857,10 +930,11 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
     if (!vb || !vb.width || !commit) { if (svg) svg.style.maxWidth = ''; return; }
     const size = commit.getBBox().width;
     if (!size) return;
-    let width = vb.width * 60 / size;
+    const fixed = +root.dataset.commitPx || 0;
+    let width = vb.width * (fixed || 60) / size;
     const framed = !!root.dataset.embedId;
     const room = framed ? Infinity : window.innerHeight - (stage.getBoundingClientRect().top + window.scrollY) - 150;
-    if (room > 120) width = Math.max(Math.min(width, room * vb.width / vb.height), vb.width * 34 / size);
+    if (room > 120 && !fixed) width = Math.max(Math.min(width, room * vb.width / vb.height), vb.width * 34 / size);
     svg.style.maxWidth = Math.round(width) + 'px';
     svg.style.maxHeight = Math.round(width * vb.height / vb.width) + 'px';
     svg.style.marginLeft = svg.style.marginRight = 'auto';
@@ -869,4 +943,51 @@ window.GitSimViewer = Object.assign(makeViewer(document), {instance: makeViewer}
   window.addEventListener('resize', cap);
   if (window.ResizeObserver) new ResizeObserver(() => cap()).observe(stage);
   cap();
+
+  function reserveCorner(){
+    const svg = stage.querySelector('svg');
+    if (!svg) return;
+    const sb = svg.getBoundingClientRect(), stb = stage.getBoundingClientRect();
+    if (!sb.width || !sb.height) return;
+    const texts = Array.from(document.querySelectorAll('script[type="image/svg+xml"][id^="git-sim-step-"]')).map(s => s.textContent);
+    if (session && session.items) session.items.forEach(it => { if (it.svg) texts.push(it.svg); });
+    if (!texts.length) texts.push(svg.outerHTML);
+    const box = document.createElement('div');
+    box.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden;width:' + sb.width + 'px';
+    document.body.appendChild(box);
+    const size = 30, margin = 8, gap = 4;
+    const reach = margin + size + gap;
+    const offX = sb.left - stb.left, offY = sb.top - stb.top;
+    let need = 0;
+    texts.forEach(text => {
+      box.innerHTML = text;
+      const s = box.querySelector('svg');
+      if (!s) return;
+      s.removeAttribute('id');
+      s.style.cssText = 'display:block;width:' + sb.width + 'px;height:' + sb.height + 'px';
+      const o = s.getBoundingClientRect();
+      const vb = s.viewBox && s.viewBox.baseVal, k = vb && vb.width ? o.width / vb.width : 1;
+      s.querySelectorAll('[data-role]').forEach(el => {
+        const role = el.dataset.role;
+        if (role === 'background' || role === 'title' || role === 'commit-hit') return;
+        const b = el.getBoundingClientRect();
+        if (!b.width && !b.height) return;
+        const dx = (parseFloat(el.dataset.dx) || 0) * k, dy = (parseFloat(el.dataset.dy) || 0) * k;
+        [[0, 0], [dx, dy]].forEach(([mx, my]) => {
+          if (b.left - o.left + offX + mx >= reach) return;
+          need = Math.max(need, b.bottom - o.top + offY + my + gap + size + margin - stb.height);
+        });
+      });
+    });
+    box.remove();
+    const pad = Math.max(0, Math.ceil(need)) + 'px';
+    if (document.body.style.paddingBottom === pad) return;
+    document.body.style.paddingBottom = pad;
+    window.dispatchEvent(new Event('git-sim:layout'));
+  }
+  if (root.dataset.compact) {
+    const ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    ready.then(() => requestAnimationFrame(reserveCorner));
+    window.addEventListener('resize', () => requestAnimationFrame(reserveCorner));
+  }
 })();
