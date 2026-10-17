@@ -51,12 +51,6 @@ async function startServer() {
         resolve();
       }
     });
-    server.stderr.on('data', (data) => {
-      if (data.toString().includes('Now listening')) {
-        clearTimeout(timeout);
-        resolve();
-      }
-    });
     server.on('error', (err) => {
       clearTimeout(timeout);
       reject(err);
