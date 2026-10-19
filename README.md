@@ -284,6 +284,11 @@ After making the changes, commit and push to a named branch in your fork, then o
 
 ## Adding a new GUI
 
+Due to a huge number of new GUI submissions, we're only accepting established
+GUI clients. Please include a link to your project's release history that
+shows that the project has been active for 3 years or more, as well as some
+evidence that your project already has a significant userbase.
+
 The [list of GUI clients](https://git-scm.com/downloads/guis) has been constructed by the community for a long time. If you want to add another tool you'll need to follow a few steps:
 
 1. Add a new `.md` file with the GUI client details: data/guis
