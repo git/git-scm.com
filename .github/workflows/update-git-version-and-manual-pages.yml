@@ -65,6 +65,33 @@ jobs:
       - name: prepare worktree
         if: steps.commit.outputs.result != '' || inputs.force-rebuild == true
         run: git sparse-checkout disable
+      - uses: actions/setup-node@v5
+        if: steps.commit.outputs.result != ''
+      - name: regenerate OG image for the new version
+        if: steps.commit.outputs.result != ''
+        run: |
+          # The card embeds the current version (see script/take-og-image.js), so
+          # regenerate it whenever a new Git version is recorded in hugo.yml.
+          HUGO_VERSION="$(sed -n 's/^ *hugo_version: *//p' <hugo.yml)"
+          curl -Lo /tmp/hugo.deb "https://github.com/gohugoio/hugo/releases/download/v$HUGO_VERSION/hugo_extended_${HUGO_VERSION}_linux-amd64.deb"
+          sudo dpkg -i /tmp/hugo.deb
+          npm install @playwright/test >/dev/null
+          npx playwright install chromium >/dev/null
+          node script/take-og-image.js
+          git add static/images/og-image.png &&
+          if git diff-index --cached --quiet HEAD -- static/images/og-image.png
+          then
+            echo '::notice::OG image unchanged' >&2
+            exit 0
+          fi &&
+          version='${{ steps.commit.outputs.result }}' &&
+          git \
+            -c user.name=${{ github.actor }} \
+            -c user.email=${{ github.actor }}@noreply.github.com \
+            commit -m "Update OG image for Git $version" \
+              -m 'Regenerated via the `update-git-version-and-manual-pages.yml` GitHub workflow.' \
+              -- static/images/og-image.png &&
+          echo "result=modified" >>$GITHUB_OUTPUT
       - name: clone git.git
         if: steps.commit.outputs.result != '' || inputs.force-rebuild == true
         run: git clone --bare https://github.com/git/git '${{ runner.temp }}/git'
