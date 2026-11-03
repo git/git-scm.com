@@ -5,6 +5,7 @@ require 'yaml'
 
 class Book
   @@all_books = {
+    "af" => "progit2-af/progit2",
     "az" => "progit2-aze/progit2",
     "be" => "progit/progit2-be",
     "bg" => "progit/progit2-bg",
